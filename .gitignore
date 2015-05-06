@@ -1,0 +1,5 @@
+*.o
+*.s
+*.OLD
+kyu
+kyu.bin
