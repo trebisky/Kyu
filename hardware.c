@@ -11,9 +11,17 @@ void
 hardware_init ( void )
 {
 #ifdef ARCH_ARM
-	trap_init ();
-	serial_init ( CONSOLE_BAUD );
 	wdt_disable ();
+	trap_init ();
+
+	serial_init ( CONSOLE_BAUD );
+	timer_init ( DEFAULT_TIMER_RATE );
+
+	interrupt_init ();
+
+	intcon_init ();
+	intcon_timer ();
+	intcon_uart ();
 #endif
 
 #ifdef ARCH_X86

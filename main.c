@@ -107,13 +107,36 @@ sys_init ( int xxx )
 }
 
 #ifndef WANT_USER
+void
+user_init ( int xx )
+{
+	enable_irq ();
+        timer_irqena ();
+
+        /* interrupt_test (); */
+
+#ifdef notdef
+	for ( ;; ) {
+	    delay1 ();
+	    printf ( "Ticks: %d\n", get_timer_count() );
+	}
+#endif
+
+	serial_int_setup ();
+
+        for ( ;; ) {
+            serial_int_test ();
+            delay1 ();
+        }
+}
+
 /*
  * user_init is the hook that allows the user to
  * set up his threads and such, to customize the
  * system for his application.
  */
 void
-user_init ( int xx )
+Xuser_init ( int xx )
 {
 	/* XXX */
 	printf ( "Stub thread: user_init\n" );

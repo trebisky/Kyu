@@ -45,7 +45,13 @@ extern unsigned long  FIQ_STACK_START;
 /* tjt for Kyu */
 extern void *vectors;
 
-int timer_count;
+static int timer_count;
+
+int
+get_timer_count ( void )
+{
+	return timer_count;
+}
 
 void
 interrupt_init ( void )
