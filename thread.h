@@ -1,10 +1,20 @@
 /* thread.h
- * $Id: thread.h,v 1.7 2002/12/24 04:08:20 tom Exp $
  * T. Trebisky  8/25/2002
  */
 
 #ifndef NULL
 #define NULL	(0)
+#endif
+
+/* XXX XXX - should be in some hardware specific include file */
+#ifdef ARCH_X86
+#define THR_STACK_BASE	0x70000
+#define THR_STACK_LIMIT	4096 * 32 /* (0x20000) */
+#endif
+
+#ifdef ARCH_ARM
+#define THR_STACK_BASE	0x98000000
+#define THR_STACK_LIMIT	4096 * 128
 #endif
 
 enum console_mode { SERIAL, VGA, SIO_0, SIO_1 };
@@ -63,6 +73,20 @@ struct sem * safe_sem_new ( int );
 
 #define MAX_TNAME	6
 
+#ifdef ARCH_ARM
+struct jmp_regs {
+	int regs[16];
+};
+
+/* We don't need eip here, since ...
+ * well things are just different here.
+ */
+struct int_regs {
+	int regs[16];
+};
+#endif
+
+#ifdef ARCH_X86
 /* This is what is saved by save_t/restore_t
  * if the size of this changes, you must fiddle
  * some constants in locore.S so that the next
@@ -90,6 +114,7 @@ struct int_regs {
 	int ebp;
 	int esp;
 };
+#endif
 
 enum thread_state {
 	READY,		/* ready to go */
@@ -108,8 +133,8 @@ enum thread_mode { JMP, INT, CONT };
 struct thread {
 	struct int_regs iregs;
 	struct jmp_regs regs;
-	/* -- everthing before there must be kept in
-	 *    a stict order (and size) since assembly
+	/* -- everthing before this must be kept in
+	 *    a strict order (and size) since assembly
 	 *    language routines have hard coded offsets
 	 *    that expect a certain layout.
 	 */

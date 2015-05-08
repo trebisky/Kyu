@@ -1,6 +1,7 @@
 /*
  * from U-boot 2015.01 - arch/arm/include/asm/proc-armv
- * copied verbatim for Kyu project 4-29-2015
+ * copied for Kyu project 4-29-2015
+ * Removed arm64 stuff for clarity
  */
 /*
  *  linux/include/asm-arm/proc-armv/ptrace.h
@@ -13,25 +14,6 @@
  */
 #ifndef __ASM_PROC_PTRACE_H
 #define __ASM_PROC_PTRACE_H
-
-#ifdef CONFIG_ARM64
-
-#define PCMASK		0
-
-#ifndef __ASSEMBLY__
-
-/*
- * This struct defines the way the registers are stored
- * on the stack during an exception.
- */
-struct pt_regs {
-	unsigned long elr;
-	unsigned long regs[31];
-};
-
-#endif	/* __ASSEMBLY__ */
-
-#else	/* CONFIG_ARM64 */
 
 #define USR26_MODE	0x00
 #define FIQ26_MODE	0x01
@@ -65,6 +47,7 @@ struct pt_regs {
 	long uregs[18];
 };
 
+#define ARM_ORIG_r0	uregs[17]
 #define ARM_cpsr	uregs[16]
 #define ARM_pc		uregs[15]
 #define ARM_lr		uregs[14]
@@ -82,7 +65,6 @@ struct pt_regs {
 #define ARM_r2		uregs[2]
 #define ARM_r1		uregs[1]
 #define ARM_r0		uregs[0]
-#define ARM_ORIG_r0	uregs[17]
 
 #ifdef KYU
 
@@ -135,7 +117,5 @@ static inline int valid_user_regs(struct pt_regs *regs)
 #endif	/* KYU */
 
 #endif	/* __ASSEMBLY__ */
-
-#endif	/* CONFIG_ARM64 */
 
 #endif

@@ -18,6 +18,23 @@ void puts ( char * );
 
 /* -------------------------------------------- */
 
+/* Set up for minimal IO without interrupts */
+void
+console_initialize ( void )
+{
+	serial_init ( CONSOLE_BAUD );
+}
+
+/* Full initialization */
+void
+console_init ( void )
+{
+	serial_init ( CONSOLE_BAUD );
+}
+
+/* --------------- */
+/* --------------- */
+
 void
 console_serial ( void )
 {
@@ -60,6 +77,7 @@ getchare ( void )
 {
 	if ( cur_thread->con_mode == SERIAL )
 	    return serial_getc ();
+
 #ifdef ARCH_X86
 	else if ( cur_thread->con_mode == SIO_0 )
 	    return sio_getc ( 0 );
@@ -80,6 +98,7 @@ getchar ( void )
 	    c = serial_getc ();
 	    serial_putc ( c );
 	}
+
 #ifdef ARCH_X86
 	else if ( cur_thread->con_mode == SIO_0 ) {
 	    c = sio_getc ( 0 );
@@ -213,7 +232,9 @@ int vprintf ( const char *fmt, va_list args )
 
 	rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
 
+#ifdef ARCH_ARM
 	serial_puts ( buf );
+#endif
 #ifdef ARCH_X86
 	if ( cur_thread->con_mode == SIO_0 )
 	    sio_puts ( 0, buf );
@@ -294,11 +315,11 @@ panic_debug ( void )
 	    	thr_show_current ();
 	    if ( c == 's' ) {
 		printf ( "eip: %8x\n", getip() );
-		printf ( "esp: %8x\n", getsp() );
+		printf ( "esp: %8x\n", get_sp() );
 		printf ( " ef: %8x\n", getfl() );
 	    }
 	    if ( c == 'd' ) {
-	    	dump_l ( (void *) getsp(), 8 );
+	    	dump_l ( (void *) get_sp(), 8 );
 	    }
 	    if ( c == 'c' ) {	/* continue */
 		printf ( "continue from panic\n" );

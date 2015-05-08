@@ -3,3 +3,5 @@
 *.OLD
 kyu
 kyu.bin
+*.swp
+trap_stubs.c

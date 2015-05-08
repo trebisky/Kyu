@@ -9,6 +9,8 @@
 #define MAX_SEM		64
 #define MAX_CV		32
 
+#define DEBUG_THREADS	1
+
 #define STACK_SIZE	4096	/* bytes */
 
 /*
@@ -16,7 +18,13 @@
 */
 #define	ARCH_ARM
 
+/* XXX XXX - doesn't belong here */
+#ifdef	ARCH_ARM
+#define IRQ_STACK_BASE 0x9D000000
+#endif
+
 /*
+#define WANT_DELAY
 #define WANT_PCI
 #define WANT_NET
 #define WANT_SLAB

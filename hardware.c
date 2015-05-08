@@ -13,6 +13,7 @@ hardware_init ( void )
 #ifdef ARCH_ARM
 	trap_init ();
 	serial_init ( CONSOLE_BAUD );
+	wdt_disable ();
 #endif
 
 #ifdef ARCH_X86

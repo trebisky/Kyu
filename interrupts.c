@@ -30,6 +30,7 @@
 #include <asm/u-boot-arm.h>
 #endif
 
+#include <kyu.h>
 #include <ptrace.h>
 
 #define STACKSIZE_IRQ 4096
@@ -49,7 +50,7 @@ int timer_count;
 void
 interrupt_init ( void )
 {
-	unsigned long irq_sp = 0x9D000000; /* XXX */
+	unsigned long irq_sp = IRQ_STACK_BASE;	/* in kyu.h */
 
 	IRQ_STACK_START = irq_sp - 4;
         IRQ_STACK_START_IN = irq_sp + 8;

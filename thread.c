@@ -143,14 +143,14 @@ thr_init ( void )
 	struct thread *tp;
 	int i;
 
-	thread_debug = 0;
+	thread_debug = DEBUG_THREADS;
 	threads_running = 0;
 
 	sem_init ();
 
 	/* XXX */
-	stack_next = (char *) 0x70000;
-	stack_limit = 0x10000;
+	stack_next = (char *) THR_STACK_BASE;
+	stack_limit = THR_STACK_LIMIT;
 	stack_avail = (struct stack_list *) 0;
 
 	/* put a few structures on the available list.
@@ -177,10 +177,6 @@ thr_init ( void )
 	/* let this be the initial thead.
 	 */
 	cur_thread = thr_new ( "sys", sys_init, (void *) 0, PRI_SYS, 0 );
-
-	/*
-	threads_running = 1;
-	*/
 }
 
 /* OK, I have gotten tired of uncommenting and
@@ -203,7 +199,7 @@ void
 thr_sched ( void )
 {
 	if ( thread_debug )
-	    printf ( "thr_sched called\n" );
+	    printf ( "thr_sched called: %d\n", threads_running );
 
 	/* should never be called twice.
 	 */
@@ -211,10 +207,18 @@ thr_sched ( void )
 	    panic ( "thr_sched" );
 
 	threads_running = 1;
+
 	/* launch the system by running the
 	 * current thread
 	 */
+	 printf ( "thr_sched launching first thread %08x\n", cur_thread->regs.regs[0] ); 
+
+#ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );
+#endif
+#ifdef ARCH_ARM
+	resume_c ( cur_thread->regs.regs[0] );
+#endif
 	/* NOTREACHED */
 }
 
@@ -229,12 +233,14 @@ thr_one_all ( struct thread *tp, char *msg )
 	printf ( "\n" );
 
 	printf ( " stack: %8x\n", (int) tp->stack );
+#ifdef ARCH_X86
 	printf ( " esp: %8x\n", tp->regs.esp );
 	printf ( " eip: %8x\n", tp->regs.eip );
 	printf ( " esi: %8x\n", tp->regs.esi );
 	printf ( " edi: %8x\n", tp->regs.edi );
 	printf ( " ebp: %8x\n", tp->regs.ebp );
 	printf ( " ebx: %8x\n", tp->regs.ebx );
+#endif
 	printf ( "\n" );
 }
 
@@ -279,6 +285,9 @@ thr_show_state ( struct thread *tp )
 	    case IDLE:
 		printf ( "   IDLE " );
 		break;
+	    case DEAD:
+		printf ( "   DEAD " );
+		break;
 	    default:
 		printf ( "    ?%d? ", tp->state );
 		break;
@@ -312,8 +321,11 @@ thr_one ( struct thread *tp )
 	else
 	    printf ( "%d ", tp->mode );
 
-	printf ( "%8x %4d\n",
-	    tp->regs.esp, tp->pri );
+#ifdef ARCH_X86
+	printf ( "%8x %4d\n", tp->regs.esp, tp->pri );
+#else
+	printf ( "%8x %4d\n", 0, tp->pri );	/* XXX */
+#endif
 }
 
 /* PUBLIC - show all threads.
@@ -342,7 +354,9 @@ void
 thr_show_current ( void )
 {
 	thr_one_all ( cur_thread, "cur" );
+#ifdef ARCH_X86
 	dump_l ( (void *)cur_thread->regs.esp - 16, 4 );
+#endif
 }
 
 /* goofy routines to handle thread names.
@@ -382,6 +396,85 @@ thrnm ( char *place )
 	*place = '\0';
 }
 
+#ifdef notdef
+/* Set up a thread to resume via a continuation
+ * shared by thr_block_c() and thr_kill()
+ */
+static void
+block_c ( struct thread *tp, tfptr func, void *arg )
+{
+	long *estack;
+
+	estack = (long *) &tp->stack[tp->stack_size];
+	estack -= 3;
+
+	/* The resumed thread function will fall into exit.
+	 */
+	estack[0] = (long) thr_exit;
+	estack[1] = (long) arg;
+	estack[2] = (long) func;
+
+	tp->regs.esp = (int) estack;
+	tp->regs.eip = (int) 0;		/* XXX bogus */
+
+	tp->mode = CONT;
+}
+#endif
+
+/* Setup a thread to come alive as a continuation
+ */
+static void
+block_c ( struct thread *tp, tfptr func, void *arg )
+{
+	long *estack;
+
+	/* Set up the stack.  We need to
+	 * preload 3 words on it as follows:
+	 *
+	 * 1 - a place for the thread function
+	 *	to return into, should it return.
+	 * 2 - the argument to the thread function.
+	 * 3 - the pointer to the thread function.
+	 * 
+	 * To actually continue (resume) the thread,
+	 * we push a 3 word context for an IRET
+	 * on the stack above this (the IRET will
+	 * consume this, leaving things so a RET
+	 * will use word 1)
+	 * The argument and continuation function
+	 * pointer can be used again and again.
+	 * the return function is always thr_exit().
+	 */
+	estack = (long *) &tp->stack[tp->stack_size];
+#ifdef notdef
+	printf ( "block_c: estack at %08x\n", estack );
+#endif
+
+#ifdef ARCH_X86
+	estack -= 3;
+	/* any thread that returns should fall into exit */
+	estack[0] = (long) thr_exit;
+	estack[1] = (long) arg;
+	estack[2] = (long) func;
+
+	tp->regs.esp = (int) estack;
+	tp->regs.eip = (int) 0;	/* XXX completely bogus */
+#endif
+
+#ifdef ARCH_ARM
+	/* This is a setup for an ldmia */
+	estack -= 4;
+	estack[0] = (long) arg;
+	estack[1] = (long) &tp->stack[tp->stack_size];
+	estack[2] = (long) thr_exit;
+	estack[3] = (long) func;
+
+	tp->regs.regs[0] = (int) estack;
+#endif
+
+	tp->mode = CONT;
+}
+
 /* PUBLIC - make and start a new thread.
  */
 struct thread *
@@ -389,7 +482,6 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 {
 	struct thread *tp;
 	char *stack;
-	long *estack;
 	struct thread *p, *lp;
 
 	if ( flags & TF_FPU )
@@ -420,7 +512,7 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	    return (struct thread *) 0;
 	}
 
-	/* grab that available gizmo.
+	/* grab the available thread
 	 */
 	tp = thread_avail;
 	thread_avail = tp->next;
@@ -460,38 +552,7 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 
 	/* Threads come alive as a continuation,
 	 */
-	tp->mode = CONT;
-
-	/* Set up the stack.  We need to
-	 * preload 3 words on it as follows:
-	 *
-	 * 1 - a place for the thread function
-	 *	to return into, should it return.
-	 * 2 - the argument to the thread function.
-	 * 3 - the pointer to the thread function.
-	 * 
-	 * To actually continue (resume) the thread,
-	 * we push a 3 word context for an IRET
-	 * on the stack above this (the IRET will
-	 * consume this, leaving things so a RET
-	 * will use word 1)
-	 * The argument and continuation function
-	 * pointer can be used again and again.
-	 * the return function is always thr_exit().
-	 */
-	estack = (long *) &tp->stack[tp->stack_size];
-#ifdef notdef
-	printf ( "thr_new: estack at %08x\n", estack );
-#endif
-
-	estack -= 3;
-	/* any thread that returns should fall into exit */
-	estack[0] = (long) thr_exit;
-	estack[1] = (long) arg;
-	estack[2] = (long) func;
-
-	tp->regs.esp = (int) estack;
-	tp->regs.eip = (int) 0;	/* XXX completely bogus */
+	block_c ( tp, func, arg );
 
 	if ( flags & TF_BLOCK )
 	    tp->state = WAIT;
@@ -533,14 +594,16 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	 * thread into the mix, we should run
 	 * it RIGHT NOW, if it is more urgent
 	 * than the current thread.
-	 *
-	 * We avoid this if we are in the midst
-	 * of initializing the thread system.
 	 */
-	if ( tp->pri < cur_thread->pri
-	    && tp->state == READY
-	    && threads_running )
-		change_thread ( tp, 0 );
+
+	/* We don't have a current thread the first
+	 *  time this is called.
+	 */
+	if ( ! cur_thread || ! threads_running )
+	    return tp;
+
+	if ( tp->pri < cur_thread->pri && tp->state == READY )
+	    change_thread ( tp, 0 );
 
 	return tp;
 }
@@ -722,35 +785,18 @@ thr_block_c ( enum thread_state why, tfptr func, void *arg )
 	 * with no intervening threads, so we
 	 * do not want to simply return.
 	 */
+#ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );
+#endif
+#ifdef ARCH_ARM
+	resume_c ( cur_thread->regs.regs[0] );
+#endif
+
 	/* NOTREACHED */
 
 	/*
 	panic ( "thr_block_c -- resched" );
 	*/
-}
-
-/* Set up a thread to resume via a continuation
- * shared by thr_block_c() and thr_kill()
- */
-static void
-block_c ( struct thread *tp, tfptr func, void *arg )
-{
-	long *estack;
-
-	estack = (long *) &tp->stack[tp->stack_size];
-	estack -= 3;
-
-	/* The resumed thread function will fall into exit.
-	 */
-	estack[0] = (long) thr_exit;
-	estack[1] = (long) arg;
-	estack[2] = (long) func;
-
-	tp->regs.esp = (int) estack;
-	tp->regs.eip = (int) 0;		/* XXX bogus */
-
-	tp->mode = CONT;
 }
 
 /* block ourself  --  quick!
@@ -781,7 +827,12 @@ thr_block_q ( enum thread_state why )
 	 * with no intervening threads, so we
 	 * do not want to simply return.
 	 */
+#ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );
+#endif
+#ifdef ARCH_ARM
+	resume_c ( cur_thread->regs.regs[0] );
+#endif
 	/* NOTREACHED */
 
 	/*
@@ -1050,8 +1101,10 @@ change_thread ( struct thread *new_tp, int options )
 	if ( ! (options & RSF_INTER) &&
 		(options & RSF_CONT) == 0 ) {
 		    cur_thread->mode = JMP;
-		    if ( save_j ( &cur_thread->regs ) )
+		    if ( save_j ( &cur_thread->regs ) ) {
+			printf ( "Change_thread: bailout\n" );
 			return;
+		    }
 	}
 
 	/* If this is running at interrupt level,
@@ -1075,10 +1128,12 @@ change_thread ( struct thread *new_tp, int options )
 	cur_thread = new_tp;
 	switch ( cur_thread->mode ) {
 	    case JMP:
+		printf ("change_thread_resume_j\n");
 		resume_j ( &new_tp->regs );
 		panic ( "change_thread, switch_j" );
 		break;
 	    case INT:
+		printf ("change_thread_resume_i\n");
 		resume_i ( &new_tp->iregs );
 		panic ( "change_thread, switch_i" );
 		break;
@@ -1087,7 +1142,13 @@ change_thread ( struct thread *new_tp, int options )
 		printf ("change_thread_resume_c: %08x\n", new_tp->regs.esp);
 		dump_l ( (void *)new_tp->regs.esp, 1 );
 		*/
+		printf ("change_thread_resume_c: %08x\n", new_tp->regs.regs[0]);
+#ifdef ARCH_X86
 		resume_c ( new_tp->regs.esp );
+#endif
+#ifdef ARCH_ARM
+		resume_c ( new_tp->regs.regs[0] );
+#endif
 		panic ( "change_thread, switch_c" );
 		break;
 	}
@@ -1129,7 +1190,7 @@ resched ( int options )
 	    } else {
 	    }
 #endif
-	    printf ( "resched: %s ", cur_thread->name );
+	    printf ( "resched: current thread: %s ", cur_thread->name );
 	    thr_show_state ( cur_thread );
 	    printf ( " (%04x)\n", options );
 	}

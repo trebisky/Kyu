@@ -7,7 +7,8 @@
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
 
 CCX = arm-linux-gnu-gcc
-COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float -I.
+#COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float -I.
+COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float -I.
 CC = $(CCX) $(COPTS)
 
 # It is a bug that we cannot invoke gcc to do this,
@@ -19,8 +20,12 @@ LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/4.9.2 -lgcc
 BIN = arm-linux-gnu-objcopy -O binary
 DUMP = arm-linux-gnu-objdump -d
 
-OBJS = vectors.o locore.o interrupts.o \
-    version.o main.o hardware.o thread.o \
+# For now, locore.o must come first since U-boot simply branches
+# to 80300000 to start this running.
+OBJS =  locore.o \
+    vectors.o interrupts.o \
+    main.o version.o \
+    hardware.o trap_stubs.o thread.o \
     recon_main.o intcon.o timer.o wdt.o serial.o gpio.o mux.o prf.o console.o \
     kyulib.o eabi_stubs.o
 
