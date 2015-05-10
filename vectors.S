@@ -74,9 +74,8 @@ FIQ_STACK_START:
 @
 @ IRQ stack frame.
 @
-#define S_FRAME_SIZE	72
+#define S_FRAME_SIZE	68
 
-#define S_OLD_R0	68
 #define S_PSR		64
 #define S_PC		60
 #define S_LR		56
@@ -97,7 +96,6 @@ FIQ_STACK_START:
 #define S_R0		0
 
 #define MODE_SVC 0x13
-#define I_BIT	 0x80
 
 /*
  * use bad_save_user_regs for abort/prefetch/undef/swi ...
@@ -127,7 +125,6 @@ FIQ_STACK_START:
 	str	lr, [r8, #0]		@ Save calling PC
 	mrs	r6, spsr
 	str	r6, [r8, #4]		@ Save CPSR
-	str	r0, [r8, #8]		@ Save OLD_R0
 	mov	r0, sp
 	.endm
 
@@ -160,6 +157,7 @@ FIQ_STACK_START:
 	ldr	sp, FIQ_STACK_START
 	.endm
 
+	.globl	cur_thread
 /*
  * exception handlers
  */
@@ -199,13 +197,34 @@ not_used:
 	bl	do_not_used
 
 	.align	5
-irq:
+OLDirq:
 	get_irq_stack
 	irq_save_user_regs
 	bl	do_irq
 	irq_restore_user_regs
 
+/* When interrupt happens we have our own private r13 and r14 (sp and lr)
+ * r14 has the address to return to +4, but sp is free to be used.
+ * we simply use sp as a scratch register (and lr as well later on).
+ */
 	.align	5
+irq:
+	@ldr	sp, cur_thread
+	stmia	sp, {r0-r12}
+	add	sp, sp, #S_PC
+	stmdb	sp, {sp, lr}^
+	add	lr, lr, #4
+	str	lr, [sp,#0]
+	mrs	lr, spsr
+	str	lr, [sp,#4]
+
+	bl	do_irq
+
+	@ldr	sp, cur_thread
+	ldmia	sp, {r0-lr,pc}^
+
+	.align	5
+	.globl	fiq	/* XXX */
 fiq:
 	get_fiq_stack
 	/* someone ought to write a more efficient fiq_save_user_regs */
