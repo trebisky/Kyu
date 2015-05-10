@@ -14,6 +14,26 @@ void net_init ( void );
 
 extern char *kyu_version;
 
+#ifdef notdef
+extern char __bss_start__;
+extern char __bss_end__;
+
+/* This works, but we do it in assembly in locore.S */
+static void
+clear_bss ( void )
+{
+	long *p;
+
+	printf ( "bss start: %08x\n", &__bss_start__ );
+	printf ( "bss  end : %08x\n", &__bss_end__ );
+
+	p = (long *) &__bss_start__;
+	while ( p < (long *) &__bss_end__ ) {
+	    *p++ = 0;
+	}
+}
+#endif
+
 /* This is the first bit of C code that runs in 32 bit mode.
  * it runs with a provisional stack at 0x90000 (so it will
  * be down in 0x8ffe0 or so while this runs).  We abandon
@@ -120,7 +140,6 @@ user_init ( int xx )
 	    delay1 ();
 	    printf ( "Ticks: %d\n", get_timer_count() );
 	}
-#endif
 
 	serial_int_setup ();
 
@@ -128,6 +147,9 @@ user_init ( int xx )
             serial_int_test ();
             delay1 ();
         }
+#endif
+
+	gpio_test ();
 }
 
 /*

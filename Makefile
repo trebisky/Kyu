@@ -19,11 +19,12 @@ LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/4.9.2 -lgcc
 
 BIN = arm-linux-gnu-objcopy -O binary
 DUMP = arm-linux-gnu-objdump -d
+NM = arm-linux-gnu-nm
 
 # For now, locore.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 OBJS =  locore.o \
-    vectors.o interrupts.o \
+    interrupts.o \
     main.o version.o \
     hardware.o trap_stubs.o thread.o \
     recon_main.o intcon.o timer.o wdt.o serial.o gpio.o mux.o prf.o console.o \
@@ -33,14 +34,22 @@ all: install
 
 dump: kyu.dump
 
+syms: kyu.syms
+
 install: kyu.bin
 	cp kyu.bin /var/lib/tftpboot/hello.bin
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump
 
+kyu.syms:	kyu
+	$(NM) kyu >kyu.syms
+
 version:
 	$(CC) --version
+
+help:
+	$(CC) --help=optimizers
 
 .c.o:
 	$(CC) -c $<
@@ -55,4 +64,4 @@ kyu.bin: kyu
 	$(BIN) kyu kyu.bin
 
 clean:
-	rm -f *.o *.s kyu kyu.bin
+	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.syms

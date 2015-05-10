@@ -16,10 +16,11 @@ hardware_init ( void )
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
+	gpio_init ();
 
 	interrupt_init ();
-
 	intcon_init ();
+
 	intcon_timer ();
 	intcon_uart ();
 #endif

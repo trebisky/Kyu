@@ -44,10 +44,9 @@
    stack during a system call. */
 
 struct pt_regs {
-	long uregs[18];
+	long uregs[17];
 };
 
-#define ARM_ORIG_r0	uregs[17]
 #define ARM_cpsr	uregs[16]
 #define ARM_pc		uregs[15]
 #define ARM_lr		uregs[14]
@@ -89,30 +88,6 @@ struct pt_regs {
 
 #define condition_codes(regs) \
 	((regs)->ARM_cpsr & (CC_V_BIT|CC_C_BIT|CC_Z_BIT|CC_N_BIT))
-
-/* copied here by tjt */
-#define pc_pointer(v) \
-        ((v) & ~PCMASK)
-
-#define instruction_pointer(regs) \
-        (pc_pointer((regs)->ARM_pc))
-
-/* Are the current registers suitable for user mode?
- * (used to maintain security in signal handlers)
- */
-static inline int valid_user_regs(struct pt_regs *regs)
-{
-	if ((regs->ARM_cpsr & 0xf) == 0 &&
-	    (regs->ARM_cpsr & (F_BIT|I_BIT)) == 0)
-		return 1;
-
-	/*
-	 * Force CPSR to something logical...
-	 */
-	regs->ARM_cpsr &= (CC_V_BIT|CC_C_BIT|CC_Z_BIT|CC_N_BIT|0x10);
-
-	return 0;
-}
 
 #endif	/* KYU */
 

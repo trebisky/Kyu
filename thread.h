@@ -74,19 +74,25 @@ struct sem * safe_sem_new ( int );
 #define MAX_TNAME	6
 
 #ifdef ARCH_ARM
+/* XXX - move this */
+/* We only need to save registers that the
+ * compiler EABI says we should, since this
+ * is always done from synchronous calls
+ */
 struct jmp_regs {
 	int regs[16];
 };
 
-/* We don't need eip here, since ...
- * well things are just different here.
+/* We have to save all registers here, since
+ * an interrupt is entirely unpredictable.
  */
 struct int_regs {
-	int regs[16];
+	int regs[17];
 };
 #endif
 
 #ifdef ARCH_X86
+/* XXX - move this */
 /* This is what is saved by save_t/restore_t
  * if the size of this changes, you must fiddle
  * some constants in locore.S so that the next
@@ -130,14 +136,17 @@ enum thread_state {
 
 enum thread_mode { JMP, INT, CONT };
 
+/* The iregs structure is referenced from the assembly language
+ * interrupt handling code which expects to find a place to store
+ * the interrupt context at the start of this structure.
+ * It is not clear that the position of "regs" is constrained
+ * in any way, but comments from x86 skidoo code suggest so.
+ */
+
 struct thread {
 	struct int_regs iregs;
 	struct jmp_regs regs;
-	/* -- everthing before this must be kept in
-	 *    a strict order (and size) since assembly
-	 *    language routines have hard coded offsets
-	 *    that expect a certain layout.
-	 */
+	/* -- everthing before this must not be reordered */
 	int prof;
 	struct thread *next;		/* all threads */
 	struct thread *wnext;		/* waiting list */

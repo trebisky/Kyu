@@ -1,8 +1,11 @@
 *.o
 *.s
-*.OLD
 kyu
 kyu.bin
 kyu.dump
+kyu.syms
 *.swp
 trap_stubs.c
+*.OLD
+OLD
+OLD/*

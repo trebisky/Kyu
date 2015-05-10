@@ -45,14 +45,6 @@ extern unsigned long  FIQ_STACK_START;
 /* tjt for Kyu */
 extern void *vectors;
 
-static int timer_count;
-
-int
-get_timer_count ( void )
-{
-	return timer_count;
-}
-
 void
 interrupt_init ( void )
 {
@@ -65,8 +57,6 @@ interrupt_init ( void )
 	/*
 	printf ( "My vectors at: %08x\n", &vectors );
 	*/
-
-	timer_count = 0;
 
 	set_vbar ( &vectors );
 }
@@ -97,6 +87,13 @@ void bad_mode (void)
 #endif
 
 void bad_mode (void) {}
+
+/* copied here by tjt */
+#define pc_pointer(v) \
+         ((v) & ~PCMASK)
+
+#define instruction_pointer(regs) \
+        (pc_pointer((regs)->ARM_pc))
 
 void show_regs (struct pt_regs *regs)
 {
@@ -179,13 +176,13 @@ void do_fiq (struct pt_regs *pt_regs)
 
 #include "omap_ints.h"
 
-void do_irq (struct pt_regs *pt_regs)
+void do_irq ( void )
 {
 	int n = intcon_irqwho ();
 
 	if ( n == NINT_TIMER0 ) {
 	    timer_irqack ();
-	    ++timer_count;
+	    timer_int ();
 	    return;
 	}
 
@@ -196,7 +193,9 @@ void do_irq (struct pt_regs *pt_regs)
 	}
 
 	printf ("interrupt request: %d\n", n);
+	/*
 	show_regs (pt_regs);
+	*/
 	bad_mode ();
 }
 
