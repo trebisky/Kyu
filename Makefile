@@ -27,7 +27,7 @@ OBJS =  locore.o \
     interrupts.o show_regs.o \
     main.o version.o \
     hardware.o thread.o \
-    recon_main.o intcon.o timer.o wdt.o serial.o gpio.o mux.o prf.o console.o \
+    intcon.o timer.o wdt.o serial.o gpio.o mux.o prf.o console.o \
     kyulib.o eabi_stubs.o
 
 all: install
