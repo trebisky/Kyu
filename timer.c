@@ -8,6 +8,7 @@
  */
 #include <kyu.h>
 #include <thread.h>
+#include <omap_ints.h>
 
 void timer_irqena ( void );
 void timer_irqdis ( void );
@@ -15,8 +16,7 @@ void timer_irqdis ( void );
 extern struct thread *cur_thread;
 extern int thread_debug;
 
-extern long in_interrupt;
-extern struct thread *in_newtp;
+void timer_int ( int );
 
 #define TIMER0_BASE      0x44E05000
 
@@ -33,23 +33,27 @@ extern struct thread *in_newtp;
 
 /* registers in a timer (except the special timer 1) */
 
-#define TIMER_ID	0x00
-#define TIMER_OCP	0x10
-#define TIMER_EOI	0x20
-#define TIMER_IRQ_SR	0x24
-#define TIMER_IRQ_ST	0x28
-#define TIMER_ENA	0x2C
-#define TIMER_DIS	0x30
-#define TIMER_WAKE	0x34
-#define TIMER_CTRL	0x38
-#define TIMER_COUNT	0x3C
-#define TIMER_LOAD	0x40
-#define TIMER_TRIG	0x44
-#define TIMER_WPS	0x48
-#define TIMER_MATCH	0x4C
-#define TIMER_CAP1	0x50
-#define TIMER_SIC	0x54
-#define TIMER_CAP2	0x58
+struct dmtimer {
+	volatile unsigned long id;
+	long _pad0[3];
+	volatile unsigned long ocp;
+	long _pad1[3];
+	volatile unsigned long eoi;
+	volatile unsigned long irq_sr;
+	volatile unsigned long irq_st;
+	volatile unsigned long ena;
+	volatile unsigned long dis;
+	volatile unsigned long wake;
+	volatile unsigned long ctrl;
+	volatile unsigned long count;
+	volatile unsigned long load;
+	volatile unsigned long trig;
+	volatile unsigned long wps;
+	volatile unsigned long match;
+	volatile unsigned long cap1;
+	volatile unsigned long sic;
+	volatile unsigned long cap2;
+};
 
 /* bits in ENA/DIS registers and others */
 #define TIMER_CAP	0x04
@@ -58,18 +62,8 @@ extern struct thread *in_newtp;
 
 #define TIMER_CLOCK	32768
 
-/* XXX XXX - eradicate this stuff */
-/* May not need these, but here they are */
-#define getb(a)          (*(volatile unsigned char *)(a))
-#define getw(a)          (*(volatile unsigned short *)(a))
-#define getl(a)          (*(volatile unsigned int *)(a))
-
-#define putb(v,a)        (*(volatile unsigned char *)(a) = (v))
-#define putw(v,a)        (*(volatile unsigned short *)(a) = (v))
-#define putl(v,a)        (*(volatile unsigned int *)(a) = (v))
-
-long timer_count_t = 0;
-long timer_count_s = 0;
+static volatile long timer_count_t;
+static volatile long timer_count_s;
 
 /* a kindness to the linux emulator.
  */
@@ -78,15 +72,16 @@ volatile unsigned long jiffies;
 static vfptr timer_hook;
 static vfptr net_timer_hook;
 
-int timer_rate;
+static int timer_rate;
 
-struct thread *timer_wait;
+/* Holds list of threads waiting on delays */
+static struct thread *timer_wait;
 
 /* Close to a 1 second delay */
 void
 delay1 ( void )
 {
-    volatile long x = 200000000;
+    volatile long x = 250000000;
 
     while ( x-- > 0 )
 	;
@@ -96,20 +91,20 @@ delay1 ( void )
 void
 delay10 ( void )
 {
-    volatile long x = 20000000;
+    volatile long x = 25000000;
 
     while ( x-- > 0 )
 	;
 }
 
 void
-tmr_hookup ( vfptr new )
+timer_hookup ( vfptr new )
 {
 	timer_hook = new;
 }
 
 void
-net_tmr_hookup ( vfptr new )
+net_timer_hookup ( vfptr new )
 {
 	net_timer_hook = new;
 }
@@ -130,9 +125,9 @@ get_timer_count_s ( void )
 }
 
 static void
-timer_rate_set ( int rate )
+timer_rate_set_i ( int rate )
 {
-	char *base = (char *) TIMER_BASE;
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
 	unsigned long val;
 
 	val = 0xffffffff;
@@ -140,14 +135,13 @@ timer_rate_set ( int rate )
 	printf ( "Loading: %08x\n", val );
 
 	/* load the timer */
-	putl ( val, base + TIMER_LOAD );
-	putl ( val, base + TIMER_COUNT );
+	base->load = val;
+	base->count = val;
 
 #ifdef notdef
 	/* see what actually got in there */
 	/* Always returns 0 */
-	val = getl ( base + TIMER_LOAD );
-	printf ( "Timer load: %08x\n", val );
+	printf ( "Timer load: %08x\n", val = base->load );
 #endif
 
 }
@@ -155,10 +149,13 @@ timer_rate_set ( int rate )
 void
 timer_init ( int rate )
 {
-	char *base = (char *) TIMER_BASE;
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
 	int i;
 
 	timer_rate = rate;
+
+	timer_count_t = 0;
+	timer_count_s = 0;
 
 	timer_hook = (vfptr) 0;
 	net_timer_hook = (vfptr) 0;
@@ -166,20 +163,21 @@ timer_init ( int rate )
 	timer_wait = (struct thread *) 0;
 
 #ifdef notdef
-	val = getl ( base + TIMER_ID );
-	printf ( "Timer id: %08x\n", val );
+	printf ( "Timer id: %08x\n", base->id );
 #endif
+	irq_hookup ( NINT_TIMER0, timer_int, 0 );
 
-	timer_rate_set ( rate );
+	timer_rate_set_i ( rate );
+	timer_irqena ();
 
 	/* start the timer with autoreload */
-	putl ( 3, base + TIMER_CTRL );
+	base->ctrl = 3;
 }
 
 /* Public entry point.
  */
 int
-tmr_rate_get ( void )
+timer_rate_get ( void )
 {
 	return timer_rate;
 }
@@ -188,10 +186,10 @@ tmr_rate_get ( void )
  * Set a different timer rate
  */
 void
-tmr_rate_set ( int hz )
+timer_rate_set ( int hz )
 {
 	timer_irqdis ();
-	timer_rate_set ( hz );
+	timer_rate_set_i ( hz );
 	timer_irqena ();
 }
 
@@ -200,14 +198,14 @@ timer_test ( void )
 {
 	int i;
 	int val, st;
-	char *base = (char *) TIMER_BASE;
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
 
 	for ( i=0; i<20; i++ ) {
-	    val = getl ( base + TIMER_COUNT );
-	    st = getl ( base + TIMER_IRQ_SR );
+	    val = base->count;
+	    st = base->irq_sr;
 	    printf ( "Timer: %08x %08x\n", val, st );
 	    if ( st )
-		putl ( TIMER_OVF, base + TIMER_IRQ_ST );
+		base->irq_st = TIMER_OVF;
 	    delay10 ();
 	    delay10 ();
 	}
@@ -216,42 +214,38 @@ timer_test ( void )
 void
 timer_irqena ( void )
 {
-	char *base = (char *) TIMER_BASE;
-	putl ( TIMER_OVF, base + TIMER_ENA );
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
+	base->ena = TIMER_OVF;
 }
 
 void
 timer_irqdis ( void )
 {
-	char *base = (char *) TIMER_BASE;
-	putl ( TIMER_OVF, base + TIMER_DIS );
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
+	base->dis = TIMER_OVF;
 }
 
+/* acknowledge the interrupt */
 void
 timer_irqack ( void )
 {
-	char *base = (char *) TIMER_BASE;
-	putl ( TIMER_OVF, base + TIMER_IRQ_ST );
+	struct dmtimer *base = (struct dmtimer *) TIMER_BASE;
+	base->irq_st = TIMER_OVF;
 }
 
 void
-timer_int ( void )
+timer_int ( int xxx )
 {
 	struct thread *tp;
 	static int subcount;
 
-#ifdef SPECIAL
-#define SPECIAL
-	printf ( "timer_int sp = %08x\n", get_sp () );
-	printf ( "timer_int sr = %08x\n", get_cpsr () );
-	printf ( "timer_int ssp = %08x\n", get_ssp () );
-	printf ( "timer_int sr = %08x\n", get_cpsr () );
-	printf ( "timer_int sp = %08x\n", get_sp () );
-	spin ();
-#endif
+	timer_irqack ();
 
 	++jiffies;
 
+	/* These counts are bogus, but really handy
+	 * when first bringing up the timer and
+	 * interrupt system.
 	/* old baloney - really the count
 	 * would do (if we chose to export it).
 	 * Accessing these externally is tacky,
@@ -260,6 +254,7 @@ timer_int ( void )
 	 * XXX maybe ditch these counts
 	 */
 	++timer_count_t;
+
 	++subcount;
 	if ( (subcount % timer_rate) == 0 ) {
 	    ++timer_count_s;
@@ -270,7 +265,6 @@ timer_int ( void )
 
 	++cur_thread->prof;
 
-	in_interrupt = 1;
 	if ( timer_wait ) {
 	    --timer_wait->delay;
 	    while ( timer_wait->delay == 0 ) {
@@ -290,46 +284,6 @@ timer_int ( void )
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
-
-	/* -------------------------------------------
-	 * From here down should become the epilog
-	 * of every interrupt routine that could
-	 * possibly do a thr_unblock()
-	 *
-	 * XXX - should this just get moved into
-	 * the wrapper that calls this then?
-	 * Hard to do if we call resume_i when done.
-	 */
-
-	/* By this time a couple of things could
-	 * make us want to return to a different
-	 * thread than what we were running when
-	 * the interrupt happened.
-	 *
-	 * First, when we call the timer hook, the
-	 * user routine could unblock a semaphore,
-	 * or unblock a thread, or some such thing.
-	 *
-	 * Second, when we unblock a thread on the
-	 * delay list, we may have a hot new candidate.
-	 */
-
-	if ( in_newtp ) {
-	    tp = in_newtp;
-	    in_newtp = (struct thread *) 0;
-	    in_interrupt = 0;
-	    change_thread_int ( tp );
-	    /* NOTREACHED */
-
-	    panic ( "timer, change_thread" );
-	}
-
-	in_interrupt = 0;
-	resume_i ( &cur_thread->iregs );
-	/* NOTREACHED */
-
-	/* XXX - just disabled during ARM port */
-	panic ( "timer, resume" );
 }
 
 /* maintain a linked list of folks waiting on

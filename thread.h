@@ -123,15 +123,15 @@ struct int_regs {
 #endif
 
 enum thread_state {
-	READY,		/* ready to go */
-	WAIT,		/* blocked */
-	SWAIT,		/* blocked on semaphore */
-	DELAY,		/* blocked on timer event */
-	IDLE,		/* running idle loop */
-	JOIN,		/* waiting to join somebody */
-	ZOMBIE,		/* waiting to be joined */
-	FAULT,		/* did something bad */
-	DEAD		/* on free list */
+	READY,		/* 0 - ready to go */
+	WAIT,		/* 1 - blocked */
+	SWAIT,		/* 2 - blocked on semaphore */
+	DELAY,		/* 3 - blocked on timer event */
+	IDLE,		/* 4 - running idle loop */
+	JOIN,		/* 5 - waiting to join somebody */
+	ZOMBIE,		/* 6 - waiting to be joined */
+	FAULT,		/* 7 - did something bad */
+	DEAD		/* 8 - on free list */
 };
 
 enum thread_mode { JMP, INT, CONT };

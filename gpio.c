@@ -90,11 +90,43 @@ gpio_test ( void )
 
 	for ( ;; ) {
 	    if ( i == 0 )
-		printf ( "Pass %d\n", n++ );
+		printf ( "GPIO test, pass %d\n", n++ );
 	    p->clear_data = pork[i];
 	    i = (i+1) % 4;
 	    p->set_data = pork[i];
 	    delay10 ();
+	}
+}
+
+/* Cute light show.
+ *  use timer interrupts
+ */
+void
+gpio_test2 ( void )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+	int i;
+	int n;
+
+	/*
+	struct gpio *p = (struct gpio *) 0;
+	printf ( "waken1 at %08x\n", &p->waken1 );
+	printf ( "status at %08x\n", &p->status );
+	printf ( "set_data at %08x\n", &p->set_data );
+	*/
+
+	p->clear_data = ALL_LED;
+	i=0;
+	p->set_data = pork[i];
+	n = 1;
+
+	for ( ;; ) {
+	    if ( i == 0 )
+		printf ( "GPIO test, pass %d\n", n++ );
+	    p->clear_data = pork[i];
+	    i = (i+1) % 4;
+	    p->set_data = pork[i];
+	    thr_delay ( 10 );
 	}
 }
 

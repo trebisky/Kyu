@@ -1,76 +1,48 @@
-/* Taken from U-boot /arch/arm/lib/interrupts.c
- * and trimmed for use in Kyu
- * 4-30-2015  U-boot 2015.01
+/* interrupts.c
+ * - was trap.c on the x86
  */
-
-/*
- * (C) Copyright 2003
- * Texas Instruments <www.ti.com>
- *
- * (C) Copyright 2002
- * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
- * Marius Groeger <mgroeger@sysgo.de>
- *
- * (C) Copyright 2002
- * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
- * Alex Zuepke <azu@sysgo.de>
- *
- * (C) Copyright 2002-2004
- * Gary Jennejohn, DENX Software Engineering, <garyj@denx.de>
- *
- * (C) Copyright 2004
- * Philippe Robin, ARM Ltd. <philippe.robin@arm.com>
- *
- * SPDX-License-Identifier:	GPL-2.0+
- */
-
-#ifdef notdef
-#include <common.h>
-#include <asm/proc-armv/ptrace.h>
-#include <asm/u-boot-arm.h>
-#endif
 
 #include <kyu.h>
-#include <ptrace.h>
+#include <thread.h>
 
-#define STACKSIZE_IRQ 4096
-
-/* These were in arch/arm/include/asm/u-boot-arm.h
- * tjt
- */
-extern unsigned long  IRQ_STACK_START;
-extern unsigned long  IRQ_STACK_START_IN;
-extern unsigned long  FIQ_STACK_START;
-
-/* tjt for Kyu */
+/* XXX - for Kyu, really should just do this in assembly startup */
 extern void *vectors;
+
+extern struct thread *cur_thread;
+
+long in_interrupt;
+struct thread *in_newtp;
 
 void
 interrupt_init ( void )
 {
-	unsigned long irq_sp = IRQ_STACK_BASE;	/* in kyu.h */
-
-	IRQ_STACK_START = irq_sp - 4;
-        IRQ_STACK_START_IN = irq_sp + 8;
-        FIQ_STACK_START = IRQ_STACK_START - STACKSIZE_IRQ;
+        in_interrupt = 0;
+        in_newtp = (struct thread *) 0;
 
 	/*
 	printf ( "My vectors at: %08x\n", &vectors );
 	*/
 
+	/* XXX move to locore.S */
 	set_vbar ( &vectors );
 }
 
-volatile int val;
-
 void
-interrupt_test ( void )
+interrupt_test_dabort ( void )
 {
-#ifdef notdef
 	/* generate a data abort */
 	int *p = (int *) 0;
 	volatile int x = *p;
-#endif
+}
+
+/* Try to generate a divide by zero without the compiler
+ * optimizing it away.  Apparently the ARM does not care?
+ */
+volatile int val;
+
+void
+zdiv_test ( void )
+{
 	int i;
 
 	val = 9;
@@ -78,125 +50,166 @@ interrupt_test ( void )
 	    val /= i;
 }
 
-#ifdef notdef
-void bad_mode (void)
+/* XXX - someday mark the offending thread and let it be.
+ * To just return usually means the exception hits us again
+ * immediately and we get a flood of stupid output.
+ * Resetting the cpu (like U-boot) just puts us into a slower loop.
+ * To spin is bad, but at least we get sensible output.
+ */
+void
+evil_exception ( char *msg )
 {
-	panic ("Resetting CPU ...\n");
-	reset_cpu (0);
-}
-#endif
+	printf ( "%s in thread %s\n", msg, cur_thread->name );
+	show_thread_regs ( cur_thread );
 
-void bad_mode (void) {}
+	thr_fault ();
+	/* Should not return */
 
-/* copied here by tjt */
-#define pc_pointer(v) \
-         ((v) & ~PCMASK)
-
-#define instruction_pointer(regs) \
-        (pc_pointer((regs)->ARM_pc))
-
-void show_regs (struct pt_regs *regs)
-{
-	unsigned long flags;
-	const char *processor_modes[] = {
-	"USER_26",	"FIQ_26",	"IRQ_26",	"SVC_26",
-	"UK4_26",	"UK5_26",	"UK6_26",	"UK7_26",
-	"UK8_26",	"UK9_26",	"UK10_26",	"UK11_26",
-	"UK12_26",	"UK13_26",	"UK14_26",	"UK15_26",
-	"USER_32",	"FIQ_32",	"IRQ_32",	"SVC_32",
-	"UK4_32",	"UK5_32",	"UK6_32",	"ABT_32",
-	"UK8_32",	"UK9_32",	"HYP_32",	"UND_32",
-	"UK12_32",	"UK13_32",	"UK14_32",	"SYS_32",
-	};
-
-	flags = condition_codes (regs);
-
-	printf ("pc : [<%08lx>]	   lr : [<%08lx>]\n"
-		"sp : %08lx  ip : %08lx	 fp : %08lx\n",
-		instruction_pointer (regs),
-		regs->ARM_lr, regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
-	printf ("r10: %08lx  r9 : %08lx	 r8 : %08lx\n",
-		regs->ARM_r10, regs->ARM_r9, regs->ARM_r8);
-	printf ("r7 : %08lx  r6 : %08lx	 r5 : %08lx  r4 : %08lx\n",
-		regs->ARM_r7, regs->ARM_r6, regs->ARM_r5, regs->ARM_r4);
-	printf ("r3 : %08lx  r2 : %08lx	 r1 : %08lx  r0 : %08lx\n",
-		regs->ARM_r3, regs->ARM_r2, regs->ARM_r1, regs->ARM_r0);
-	printf ("Flags: %c%c%c%c",
-		flags & CC_N_BIT ? 'N' : 'n',
-		flags & CC_Z_BIT ? 'Z' : 'z',
-		flags & CC_C_BIT ? 'C' : 'c', flags & CC_V_BIT ? 'V' : 'v');
-	printf ("  IRQs %s  FIQs %s  Mode %s%s\n",
-		interrupts_enabled (regs) ? "on" : "off",
-		fast_interrupts_enabled (regs) ? "on" : "off",
-		processor_modes[processor_mode (regs)],
-		thumb_mode (regs) ? " (T)" : "");
+	spin ();	/* XXX */
 }
 
-void do_undefined_instruction (struct pt_regs *pt_regs)
+void
+do_undefined_instruction ( void )
 {
-	printf ("undefined instruction\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("undefined instruction");
 }
 
-void do_software_interrupt (struct pt_regs *pt_regs)
+void do_software_interrupt ( void )
 {
-	printf ("software interrupt\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("software interrupt");
 }
 
-void do_prefetch_abort (struct pt_regs *pt_regs)
+void do_prefetch_abort ( void )
 {
-	printf ("prefetch abort\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("prefetch abort");
 }
 
-void do_data_abort (struct pt_regs *pt_regs)
+void do_data_abort ( void )
 {
-	printf ("data abort\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("data abort");
 }
 
-void do_not_used (struct pt_regs *pt_regs)
+void do_not_used ( void )
 {
-	printf ("not used\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("not used");
 }
 
-void do_fiq (struct pt_regs *pt_regs)
+/* evil for now */
+void do_fiq ( void )
 {
-	printf ("fast interrupt request\n");
-	show_regs (pt_regs);
-	bad_mode ();
+	evil_exception ("fast interrupt request");
 }
+
+/* -------------------------------------------- */
 
 #include "omap_ints.h"
 
+typedef void (*irq_fptr) ( void * );
+
+struct irq_info {
+	irq_fptr func;
+	void *	arg;
+};
+
+static struct irq_info irq_table[NUM_INTS];
+
+/* Here is the user routine to connect/disconnect
+ * a C routine to an interrupt.
+ */
+void
+irq_hookup ( int irq, irq_fptr func, void *arg )
+{
+	if ( irq < 0 || irq >= NUM_INTS )
+	    panic ( "irq_hookup: not available" );
+
+	printf ( "irq_hookup: %d, %08x, %d\n", irq, func, (int) arg );
+
+	if ( func ) {
+	    irq_table[irq].func = func;
+	    irq_table[irq].arg = arg;
+	    intcon_ena ( irq );
+	} else {
+	    intcon_dis ( irq );
+	    irq_table[irq].func = (irq_fptr) 0;
+	    irq_table[irq].arg = (void *) 0;
+	}
+}
+
+#ifdef notdef
+static void
+special_debug ( void )
+{
+	printf ( "timer_int sp = %08x\n", get_sp () );
+	printf ( "timer_int sr = %08x\n", get_cpsr () );
+	printf ( "timer_int ssp = %08x\n", get_ssp () );
+	printf ( "timer_int sr = %08x\n", get_cpsr () );
+	printf ( "timer_int sp = %08x\n", get_sp () );
+	spin ();
+}
+#endif
+
+
+/* Interrupt handler, called at interrupt level
+ * when the IRQ line indicates an interrupt.
+ */
 void do_irq ( void )
 {
-	int n = intcon_irqwho ();
+	int nint;
+	struct thread *tp;
 
-	if ( n == NINT_TIMER0 ) {
-	    timer_irqack ();
-	    timer_int ();
-	    return;
-	}
+	if ( ! cur_thread )
+	    panic ( "irq int, cur_thread" );
 
-	if ( n == NINT_UART0 ) {
-	    serial_irqack ();
-	    serial_int ();
-	    return;
-	}
+	in_interrupt = 1;
 
-	printf ("interrupt request: %d\n", n);
-	/*
-	show_regs (pt_regs);
+	nint = intcon_irqwho ();
+
+	/* Always swamps output, but useful in
+	 * dire debugging situations.
+	printf ( "Interrupt %d\n", nint );
+	printf ( "#" );
 	*/
-	bad_mode ();
+
+	if ( ! irq_table[nint].func ) {
+	    /* Probably unrelated to current thread.
+	     * This is pretty severe - XXX
+	     */
+	    printf ("Unknown interrupt request: %d\n", nint );
+	    show_thread_regs ( cur_thread );
+	    spin ();
+	}
+
+	/* call the user handler
+	 */
+	(irq_table[nint].func)( irq_table[nint].arg );
+
+	/* By this time a couple of things could
+	 * make us want to return to a different
+	 * thread than what we were running when
+	 * the interrupt happened.
+	 *
+	 * First, when we call the timer hook, the
+	 * user routine could unblock a semaphore,
+	 * or unblock a thread, or some such thing.
+	 *
+	 * Second, when we unblock a thread on the
+	 * delay list, we may have a hot new candidate.
+	 */
+	if ( in_newtp ) {
+	    tp = in_newtp;
+	    in_newtp = (struct thread *) 0;
+	    in_interrupt = 0;
+	    change_thread_int ( tp );
+	    /* NOTREACHED */
+
+	    panic ( "irq int , change_thread" );
+	}
+
+	in_interrupt = 0;
+	resume_i ( &cur_thread->iregs );
+	/* NOTREACHED */
+
+	panic ( "do_irq, resume" );
 }
 
 /* THE END */

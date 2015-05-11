@@ -302,10 +302,12 @@ void serial_irqack ( void )
 }
 
 /* Process whatever should be processed */
-void serial_int ( void )
+void serial_int ( int xxx )
 {
     struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
     int c;
+
+    serial_irqack ();
 
     if ( ! next ) {
 	putb(0, &com_port->ier);

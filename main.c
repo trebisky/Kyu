@@ -45,6 +45,9 @@ kern_startup ( void )
 {
 	console_initialize ();
 
+	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
+	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
+
 	/* print initial banner on VGA console
 	 * no matter what (in case we get hosed before
 	 * we can set up a serial console.
@@ -78,6 +81,9 @@ kern_startup ( void )
 void
 sys_init ( int xxx )
 {
+	printf ( "Sys thread starting with stack: %08x\n",  get_sp() );
+	printf ( "Sys thread starting with cpsr: %08x\n",  get_cpsr() );
+
 	/* XXX - a race on the x86, the thread is
 	 * launched with interrupts enabled.
 	 */
@@ -122,34 +128,70 @@ sys_init ( int xxx )
 	/* This is a nice idea, but doesn't always work
 	 */
 	printf ( "Kyu %s running\n", kyu_version );
+	printf ( "Sys thread finished with stack: %08x\n",  get_sp() );
+	printf ( "Sys thread finished with cpsr: %08x\n",  get_cpsr() );
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 }
+
+static int dregs[17];
 
 #ifndef WANT_USER
 void
 user_init ( int xx )
 {
+	get_regs ( dregs );
+	dregs[16] = get_cpsr ();
+	show_regs ( dregs );
+
+	printf ( "User thread running with stack: %08x\n",  get_sp() );
+	printf ( "User thread running with cpsr: %08x\n",  get_cpsr() );
 	enable_irq ();
-        timer_irqena ();
 
-        /* interrupt_test (); */
+	    delay1 ();
 
-#ifdef notdef
+	get_regs ( dregs );
+	dregs[16] = get_cpsr ();
+	show_regs ( dregs );
+
+	printf ( "User thread running with stack: %08x\n",  get_sp() );
+	printf ( "User thread running with cpsr: %08x\n",  get_cpsr() );
+
+	printf ( "First Ticks: %d\n", get_timer_count_t() );
+
 	for ( ;; ) {
 	    delay1 ();
-	    printf ( "Ticks: %d\n", get_timer_count() );
+	    printf ( "Ticks: %d\n", get_timer_count_t() );
+	    /*
+	    spin ();
+	    printf ( "Escape 1\n" );
+	    spin ();
+	    printf ( "Escape 2\n" );
+	    spin ();
+	    printf ( "Escape 3\n" );
+	    spin ();
+	    printf ( "Escape 4\n" );
+	    spin ();
+	    printf ( "Escape 5\n" );
+	    */
 	}
 
+#ifdef notdef
 	serial_int_setup ();
 
         for ( ;; ) {
             serial_int_test ();
             delay1 ();
         }
+
+	/* Generate data abort */
+	interrupt_test_dabort ();
 #endif
 
+	/*
 	gpio_test ();
+	*/
+	gpio_test2 ();
 }
 
 /*

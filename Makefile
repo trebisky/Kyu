@@ -24,9 +24,9 @@ NM = arm-linux-gnu-nm
 # For now, locore.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 OBJS =  locore.o \
-    interrupts.o \
+    interrupts.o show_regs.o \
     main.o version.o \
-    hardware.o trap_stubs.o thread.o \
+    hardware.o thread.o \
     recon_main.o intcon.o timer.o wdt.o serial.o gpio.o mux.o prf.o console.o \
     kyulib.o eabi_stubs.o
 

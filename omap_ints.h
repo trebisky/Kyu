@@ -5,6 +5,8 @@
  *  the list as needed.
  */
 
+#define NUM_INTS	128
+
 #define NINT_TIMER0	66
 #define NINT_TIMER1	67
 #define NINT_UART0	72

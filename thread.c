@@ -285,6 +285,9 @@ thr_show_state ( struct thread *tp )
 	    case IDLE:
 		printf ( "   IDLE " );
 		break;
+	    case FAULT:
+		printf ( "  FAULT " );
+		break;
 	    case DEAD:
 		printf ( "   DEAD " );
 		break;
@@ -395,31 +398,6 @@ thrnm ( char *place )
 	place =  thrnm_i ( place, thr_id );
 	*place = '\0';
 }
-
-#ifdef notdef
-/* Set up a thread to resume via a continuation
- * shared by thr_block_c() and thr_kill()
- */
-static void
-block_c ( struct thread *tp, tfptr func, void *arg )
-{
-	long *estack;
-
-	estack = (long *) &tp->stack[tp->stack_size];
-	estack -= 3;
-
-	/* The resumed thread function will fall into exit.
-	 */
-	estack[0] = (long) thr_exit;
-	estack[1] = (long) arg;
-	estack[2] = (long) func;
-
-	tp->regs.esp = (int) estack;
-	tp->regs.eip = (int) 0;		/* XXX bogus */
-
-	tp->mode = CONT;
-}
-#endif
 
 /* Setup a thread to come alive as a continuation
  */
@@ -643,6 +621,25 @@ cleanup_thread ( struct thread *xp )
 	 */
 	xp->next = thread_avail;
 	thread_avail = xp;
+}
+
+/* Called from interrupt level when
+ * current thread does something evil like
+ * addressing invalid memory or trying to
+ * execute an invalid instruction.
+ */
+void
+thr_fault ( void )
+{
+	cur_thread->state = FAULT;
+
+	spin ();
+
+	/* XXX from interrupt level ???? */
+	resched ( 0 );
+	/* NOTREACHED */
+
+	panic ( "thr_fault - resched" );
 }
 
 void
@@ -1137,7 +1134,7 @@ change_thread ( struct thread *new_tp, int options )
 		resume_i ( &new_tp->iregs );
 		panic ( "change_thread, switch_i" );
 		break;
-	    default:
+	    case CONT:
 		/*
 		printf ("change_thread_resume_c: %08x\n", new_tp->regs.esp);
 		dump_l ( (void *)new_tp->regs.esp, 1 );
@@ -1150,6 +1147,9 @@ change_thread ( struct thread *new_tp, int options )
 		resume_c ( new_tp->regs.regs[0] );
 #endif
 		panic ( "change_thread, switch_c" );
+		break;
+	    default:
+		panic ( "change_thread, unknown mode: %d for thread %s\n", cur_thread->mode, cur_thread->name );
 		break;
 	}
 	/* NOTREACHED */

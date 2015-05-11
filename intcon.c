@@ -72,7 +72,8 @@ intcon_test ( void )
  * Then we have clear and set registers, which I guess
  * avoid reading, changing and setting the MIR register.
  */
-static void intcon_ena ( int item )
+void
+intcon_ena ( int item )
 {
 	struct intcon *base = (struct intcon *) INTCON_BASE;
 	int who;
@@ -83,15 +84,14 @@ static void intcon_ena ( int item )
 }
 
 void
-intcon_timer ( void )
+intcon_dis ( int item )
 {
-	intcon_ena ( NINT_TIMER0 );
-}
+	struct intcon *base = (struct intcon *) INTCON_BASE;
+	int who;
 
-void
-intcon_uart ( void )
-{
-	intcon_ena ( NINT_UART0 );
+	item &= 0x7f;
+	who = item/32;
+	base->mask[who].set = 1 << (item%32);
 }
 
 /* Called from interrupt handler */

@@ -75,17 +75,11 @@ struct pt_regs {
 #define ARM_r1		uregs[1]
 #define ARM_r0		uregs[0]
 
-#ifdef KYU
-
 #define user_mode(regs)	\
 	(((regs)->ARM_cpsr & 0xf) == 0)
 
-#ifdef CONFIG_ARM_THUMB
 #define thumb_mode(regs) \
 	(((regs)->ARM_cpsr & T_BIT))
-#else
-#define thumb_mode(regs) (0)
-#endif
 
 #define processor_mode(regs) \
 	((regs)->ARM_cpsr & MODE_MASK)
@@ -99,9 +93,6 @@ struct pt_regs {
 #define condition_codes(regs) \
 	((regs)->ARM_cpsr & (CC_V_BIT|CC_C_BIT|CC_Z_BIT|CC_N_BIT))
 
-#endif	/* KYU */
-
-/* copied here by tjt */
 #define pc_pointer(v) \
          ((v) & ~PCMASK)
 
@@ -120,12 +111,9 @@ static const char *processor_modes[] = {
 };
 
 void
-show_regs (struct thread *tp)
+show_regs (struct pt_regs *regs)
 {
 	unsigned long flags;
-	struct pt_regs *regs;
-
-	regs = (struct pt_regs *) tp->iregs.regs;
 
 	flags = condition_codes (regs);
 
@@ -133,21 +121,34 @@ show_regs (struct thread *tp)
 		"sp : %08lx  ip : %08lx	 fp : %08lx\n",
 		instruction_pointer (regs),
 		regs->ARM_lr, regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
+
 	printf ("r10: %08lx  r9 : %08lx	 r8 : %08lx\n",
 		regs->ARM_r10, regs->ARM_r9, regs->ARM_r8);
 	printf ("r7 : %08lx  r6 : %08lx	 r5 : %08lx  r4 : %08lx\n",
 		regs->ARM_r7, regs->ARM_r6, regs->ARM_r5, regs->ARM_r4);
 	printf ("r3 : %08lx  r2 : %08lx	 r1 : %08lx  r0 : %08lx\n",
 		regs->ARM_r3, regs->ARM_r2, regs->ARM_r1, regs->ARM_r0);
-	printf ("Flags: %c%c%c%c",
+
+	printf ("cpsr: %08x", regs->ARM_cpsr );
+	printf ("  Flags: %c%c%c%c",
 		flags & CC_N_BIT ? 'N' : 'n',
 		flags & CC_Z_BIT ? 'Z' : 'z',
 		flags & CC_C_BIT ? 'C' : 'c', flags & CC_V_BIT ? 'V' : 'v');
+
 	printf ("  IRQs %s  FIQs %s  Mode %s%s\n",
 		interrupts_enabled (regs) ? "on" : "off",
 		fast_interrupts_enabled (regs) ? "on" : "off",
 		processor_modes[processor_mode (regs)],
 		thumb_mode (regs) ? " (T)" : "");
+}
+
+void
+show_thread_regs ( struct thread *tp )
+{
+	struct pt_regs *regs;
+
+	regs = (struct pt_regs *) tp->iregs.regs;
+	show_regs ( regs );
 }
 
 /* THE END */
