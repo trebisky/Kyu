@@ -60,7 +60,11 @@ struct dmtimer {
 #define TIMER_OVF	0x02
 #define TIMER_MAT	0x01
 
+/* XXX - The weird 76677 gives close to 100 Hz ticks */
+/*
 #define TIMER_CLOCK	32768
+ */
+#define TIMER_CLOCK	76677
 
 static volatile long timer_count_t;
 static volatile long timer_count_s;
@@ -76,6 +80,10 @@ static int timer_rate;
 
 /* Holds list of threads waiting on delays */
 static struct thread *timer_wait;
+
+/* The following have been crudely calibrated
+ * by guessing and using a stopwatch.
+ */
 
 /* Close to a 1 second delay */
 void
@@ -226,6 +234,7 @@ timer_irqdis ( void )
 }
 
 /* acknowledge the interrupt */
+/* XXX - make this inline */
 void
 timer_irqack ( void )
 {
