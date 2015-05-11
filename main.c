@@ -158,7 +158,10 @@ user_init ( int xx )
 	printf ( "User thread running with cpsr: %08x\n",  get_cpsr() );
 
 	printf ( "First Ticks: %d\n", get_timer_count_t() );
+	delay1 ();
+	printf ( "More Ticks: %d\n", get_timer_count_t() );
 
+#ifdef notdef
 	for ( ;; ) {
 	    delay1 ();
 	    printf ( "Ticks: %d\n", get_timer_count_t() );
@@ -175,6 +178,7 @@ user_init ( int xx )
 	    printf ( "Escape 5\n" );
 	    */
 	}
+#endif
 
 #ifdef notdef
 	serial_int_setup ();

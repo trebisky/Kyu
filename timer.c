@@ -276,7 +276,7 @@ timer_int ( int xxx )
 
 	if ( timer_wait ) {
 	    --timer_wait->delay;
-	    while ( timer_wait->delay == 0 ) {
+	    while ( timer_wait && timer_wait->delay == 0 ) {
 		tp = timer_wait;
 		timer_wait = timer_wait->wnext;
 		if ( thread_debug ) {
