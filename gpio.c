@@ -126,7 +126,7 @@ gpio_test2 ( void )
 	    p->clear_data = pork[i];
 	    i = (i+1) % 4;
 	    p->set_data = pork[i];
-	    thr_delay ( 10 );
+	    thr_delay ( 5 );
 	}
 }
 

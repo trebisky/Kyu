@@ -14,7 +14,6 @@ void timer_irqena ( void );
 void timer_irqdis ( void );
 
 extern struct thread *cur_thread;
-extern int thread_debug;
 
 void timer_int ( int );
 
@@ -279,9 +278,11 @@ timer_int ( int xxx )
 	    while ( timer_wait && timer_wait->delay == 0 ) {
 		tp = timer_wait;
 		timer_wait = timer_wait->wnext;
-		if ( thread_debug ) {
+		/*
+		if ( timer_debug ) {
 		    printf ( "Remove wait: %s\n", tp->name );
 		}
+		*/
 	    	thr_unblock ( tp );
 	    }
 	}

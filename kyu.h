@@ -9,7 +9,11 @@
 #define MAX_SEM		64
 #define MAX_CV		32
 
-#define DEBUG_THREADS	1
+/* Set nonzero only when bringing the system up
+ * from scratch and initial debug is needed.
+ * Otherwise control debug level from test menu.
+ */
+#define DEBUG_THREADS	0
 
 #define STACK_SIZE	4096	/* bytes */
 
@@ -31,6 +35,7 @@
 #define WANT_BENCH
 #define WANT_USER
 */
+#define WANT_USER
 
 /* define this even if not using serial console.
 #define CONSOLE_BAUD		38400

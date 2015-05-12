@@ -10,6 +10,16 @@
  */
 	.globl uboot_startup
 uboot_startup:
+	.globl kyu_startup
+kyu_startup:
+	mrs	r0, cpsr	/* disable interrupts */
+	orr	r0, r0, #0xc0
+	msr	cpsr_c, r0
+
+	movw	r0, #:lower16:vectors	/* set VBAR */
+	movt	r0, #:upper16:vectors
+	mcr 	p15, 0, r0, c12, c0, 0
+
 	bl	clear_bss
 	bl	kern_startup
 	bx	lr
@@ -45,9 +55,9 @@ loop:	cmp	r3, r2
  */
 
 	.align  5
-.globl _start
+@.globl _start
+@_start:
 .globl vectors
-_start:
 vectors:
 	b	reset
 	ldr	pc, _undef
@@ -109,7 +119,7 @@ reset:
  * we simply use sp as a scratch register (and lr as well later on).
  * The ldmia including PC with trailing "^" will copy spsr_irq to cpsr
  */
-	.macro kyu_prolog
+	.macro OLD_kyu_prolog
 	movw	sp, #:lower16:cur_thread
 	movt	sp, #:upper16:cur_thread
 	ldr	sp, [sp, #0]
@@ -119,6 +129,32 @@ reset:
 	str	lr, [sp,#0]
 	mrs	lr, spsr
 	str	lr, [sp,#4]	/* saved SR */
+	ldr	sp, [sp,#-8]	/* thread stack */
+	.endm
+
+	.macro kyu_prolog
+	movw	sp, #:lower16:cur_thread
+	movt	sp, #:upper16:cur_thread
+	ldr	sp, [sp, #0]
+
+	stmia	sp, {r0-r12}
+	add	sp, sp, #S_PC
+
+	@stmdb	sp, {sp, lr}^
+	mrs     ip, cpsr
+        bic     r0, ip, #0x1f
+        orr     r0, r0, #0x13
+        msr     cpsr_c, r0
+	add	r0, sp, #0
+	add	r1, lr, #0
+	msr	cpsr_c, ip
+	str	r0, [sp,#-8]
+	str	r1, [sp,#-4]
+
+	str	lr, [sp,#0]	/* PC when we resume */
+	mrs	lr, spsr
+	str	lr, [sp,#4]	/* saved SR */
+
 	ldr	sp, [sp,#-8]	/* thread stack */
 	.endm
 

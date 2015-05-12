@@ -5,9 +5,6 @@
 #include <kyu.h>
 #include <thread.h>
 
-/* XXX - for Kyu, really should just do this in assembly startup */
-extern void *vectors;
-
 extern struct thread *cur_thread;
 
 long in_interrupt;
@@ -18,13 +15,6 @@ interrupt_init ( void )
 {
         in_interrupt = 0;
         in_newtp = (struct thread *) 0;
-
-	/*
-	printf ( "My vectors at: %08x\n", &vectors );
-	*/
-
-	/* XXX move to locore.S */
-	set_vbar ( &vectors );
 }
 
 void
@@ -65,6 +55,7 @@ evil_exception ( char *msg )
 	thr_fault ();
 	/* Should not return */
 
+	kyu_startup ();	/* XXX */
 	spin ();	/* XXX */
 }
 

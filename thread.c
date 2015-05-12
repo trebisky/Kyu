@@ -37,10 +37,9 @@ static struct thread *thread_avail;
  */
 static struct thread *thread_ready;
 
-/* XXX
+/* change via thr_debug()
+ */
 static int thread_debug;
-*/
-int thread_debug;
 
 static char *stack_next;
 static int stack_limit;
@@ -633,9 +632,12 @@ thr_fault ( void )
 {
 	cur_thread->state = FAULT;
 
+	/* XXX */
+	kyu_startup ();
 	spin ();
 
 	/* XXX from interrupt level ???? */
+	/* does not work */
 	resched ( 0 );
 	/* NOTREACHED */
 
@@ -1099,7 +1101,8 @@ change_thread ( struct thread *new_tp, int options )
 		(options & RSF_CONT) == 0 ) {
 		    cur_thread->mode = JMP;
 		    if ( save_j ( &cur_thread->regs ) ) {
-			printf ( "Change_thread: bailout\n" );
+			if ( thread_debug )
+			    printf ( "Change_thread: returns\n" );
 			return;
 		    }
 	}
@@ -1125,12 +1128,14 @@ change_thread ( struct thread *new_tp, int options )
 	cur_thread = new_tp;
 	switch ( cur_thread->mode ) {
 	    case JMP:
-		printf ("change_thread_resume_j\n");
+		if ( thread_debug )
+		    printf ("change_thread_resume_j\n");
 		resume_j ( &new_tp->regs );
 		panic ( "change_thread, switch_j" );
 		break;
 	    case INT:
-		printf ("change_thread_resume_i\n");
+		if ( thread_debug )
+		    printf ("change_thread_resume_i\n");
 		resume_i ( &new_tp->iregs );
 		panic ( "change_thread, switch_i" );
 		break;
@@ -1139,7 +1144,8 @@ change_thread ( struct thread *new_tp, int options )
 		printf ("change_thread_resume_c: %08x\n", new_tp->regs.esp);
 		dump_l ( (void *)new_tp->regs.esp, 1 );
 		*/
-		printf ("change_thread_resume_c: %08x\n", new_tp->regs.regs[0]);
+		if ( thread_debug )
+		    printf ("change_thread_resume_c: %08x\n", new_tp->regs.regs[0]);
 #ifdef ARCH_X86
 		resume_c ( new_tp->regs.esp );
 #endif
