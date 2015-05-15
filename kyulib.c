@@ -270,6 +270,13 @@ dump_l ( void *addr, int n )
 	}
 }
 
+/* Dump this many words */
+void
+dump_ln ( void *addr, int nw )
+{
+	dump_l ( addr, (nw+3) / 4 );
+}
+
 void
 fill_l ( void *addr, long data, int n )
 {

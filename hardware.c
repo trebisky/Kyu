@@ -34,4 +34,14 @@ hardware_init ( void )
 #endif
 }
 
+int
+valid_ram_address ( unsigned long addr )
+{
+	if ( addr < 0x80000000 )
+	    return 0;
+	if ( addr >= 0x90000000 )
+	    return 0;
+	return 1;
+}
+
 /* THE END */

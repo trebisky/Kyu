@@ -1,6 +1,22 @@
 /* locore.S
+ *
+ * Kyu project  5-12-2015  Tom Trebisky
+ *
  * temporary catch-all for assembly language
+ *
+ * Amazingly enough, ARM by default is little-endian.
+ * It can switch, but watch out if you do!
  */
+
+#define PSR_M_SUPER	0x13
+#define PSR_M_IRQ	0x12
+#define PSR_M_FIQ	0x11
+
+#define PSR_IRQ_DIS	0x80
+#define PSR_FIQ_DIS	0x40
+#define PSR_INT_DIS	0xc0
+
+#define PSR_DEFAULT	PSR_M_SUPER
 
 /* For the time being, this is the first thing linked
  * and U-boot simply branches to a hard address 80300000.
@@ -13,8 +29,8 @@ uboot_startup:
 	.globl kyu_startup
 kyu_startup:
 	mrs	r0, cpsr	/* disable interrupts */
-	orr	r0, r0, #0xc0
-	msr	cpsr_c, r0
+	orr	r0, r0, #PSR_INT_DIS
+	msr	cpsr, r0
 
 	movw	r0, #:lower16:vectors	/* set VBAR */
 	movt	r0, #:upper16:vectors
@@ -116,55 +132,66 @@ reset:
 /* When an interrupt happens we have our own private r13 and r14 (sp and lr)
  * r14 has the address to return to (plus some adjustment),
  *  but sp is entirely free to be used.
+ * So, we start the prolog with an adjusted PC in the lr register.
  * we simply use sp as a scratch register (and lr as well later on).
- * The ldmia including PC with trailing "^" will copy spsr_irq to cpsr
+ *
+ * Using the "^" to get the "non-interrupt" registers is a mistake.
+ *  this gets the user mode registers, which we have no interest in.
  */
-	.macro OLD_kyu_prolog
-	movw	sp, #:lower16:cur_thread
-	movt	sp, #:upper16:cur_thread
-	ldr	sp, [sp, #0]
-	stmia	sp, {r0-r12}
-	add	sp, sp, #S_PC
-	stmdb	sp, {sp, lr}^
-	str	lr, [sp,#0]
-	mrs	lr, spsr
-	str	lr, [sp,#4]	/* saved SR */
-	ldr	sp, [sp,#-8]	/* thread stack */
-	.endm
-
 	.macro kyu_prolog
 	movw	sp, #:lower16:cur_thread
 	movt	sp, #:upper16:cur_thread
 	ldr	sp, [sp, #0]
 
 	stmia	sp, {r0-r12}
-	add	sp, sp, #S_PC
 
-	@stmdb	sp, {sp, lr}^
-	mrs     ip, cpsr
+	mrs     ip, cpsr	/* save mode */
         bic     r0, ip, #0x1f
-        orr     r0, r0, #0x13
-        msr     cpsr_c, r0
-	add	r0, sp, #0
+        orr     r0, r0, #PSR_M_SUPER
+        msr     cpsr, r0	/* switch back to super */
+
+	add	r0, sp, #0	/* grab SP and LR */
 	add	r1, lr, #0
-	msr	cpsr_c, ip
-	str	r0, [sp,#-8]
-	str	r1, [sp,#-4]
+	msr	cpsr, ip
 
-	str	lr, [sp,#0]	/* PC when we resume */
+	str	r0, [sp,#S_SP]	/* save SP and LR */
+	str	r1, [sp,#S_LR]
+
+	str	lr, [sp,#S_PC]	/* PC when we resume */
+
 	mrs	lr, spsr
-	str	lr, [sp,#4]	/* saved SR */
+	str	lr, [sp,#S_PSR]	/* saved SR */
 
-	ldr	sp, [sp,#-8]	/* thread stack */
+	ldr	sp, [sp,#S_SP]	/* thread stack */
 	.endm
 
+	/* The way things are currently coded, we never use the epilog.
+	 * We always return from interrupts using resume_i()
+	 *  or some other specific resume method.
+	 */
 	.macro kyu_epilog
 	movw	sp, #:lower16:cur_thread
 	movt	sp, #:upper16:cur_thread
 	ldr	sp, [sp, #0]
-	ldr	r1, [sp,#S_PSR]
+
+	/* keep sp till bitter end */
+	ldr	r1, [sp, #S_PSR]
 	msr	spsr, r1
-	ldmia	sp, {r0-lr,pc}^
+	ldr	r1, [sp, #S_SP]
+	ldr	r2, [sp, #S_LR]
+
+	mrs     ip, cpsr	/* save mode */
+        bic     r3, ip, #0x1f
+        orr     r3, r3, #PSR_M_SUPER
+        msr     cpsr, r3	/* switch back to super */
+
+	add	sp, r1, #0	/* setup SP and LR */
+	add	lr, r2, #0
+	msr	cpsr, ip
+
+	ldr	lr, [sp, #S_PC]
+	ldmia	sp, {r0-r12}
+	movs	pc, lr
 	.endm
 
 	/* Sort of like the epilog, but we get
@@ -172,9 +199,91 @@ reset:
 	 */
 	.globl resume_i
 resume_i:
-	ldr	r1, [r0,#S_PSR]
+	/* keep r0 till bitter end */
+	ldr	r1, [r0, #S_PSR]
 	msr	spsr, r1
-	ldmia	r0, {r0-lr,pc}^
+	ldr	r1, [r0, #S_SP]
+	ldr	r2, [r0, #S_LR]
+
+	mrs     ip, cpsr	/* save mode */
+        bic     r3, ip, #0x1f
+        orr     r3, r3, #PSR_M_SUPER	/* enable interrupts */
+        msr     cpsr, r3	/* switch back to super */
+
+	add	sp, r1, #0	/* setup SP and LR */
+	add	lr, r2, #0
+	msr	cpsr, ip
+
+	ldr	lr, [r0, #S_PC]
+	ldmia	r0, {r0-r12}
+	movs	pc, lr
+
+/* This routine launches a thread from scratch.
+ *  on the ARM it gets a pointer to an array of 4 items:
+ *	an argument to pass
+ *	a place to start up at.
+ *	an initial stack pointer.
+ *	a place to return to (usually thr_exit)
+ * XXX danger if this is used from interrupt as we
+ *  are not doing sp and lr properly
+ */
+	.globl resume_c
+resume_c:
+	ldmia	r0,{r0,ip,sp,lr}
+	mrs     r1, cpsr
+	bic	r1, r1, #0xff
+	orr	r1, r1, #PSR_M_SUPER	/* enable interrupts */
+	msr	cpsr, r1
+	mov	pc, ip
+
+/* resume_j and save_j don't need to save all registers
+ * since these are called "synchronously", the compiler
+ * conventions should apply, and r0-r3 should not need
+ * to be saved.  Also ip and maybe others.
+ * But it is simple to save them all .....
+ * 
+ * *** This must be capable of being called from interrupt
+ *	level.
+ */
+
+OLDresume_j:
+	ldmia	r0, {r0-pc}
+
+	.globl resume_j
+resume_j:
+	/* keep r0 till the bitter end */
+	mrs     r1, cpsr
+	bic	r1, r1, #0xff
+	orr	r1, r1, #PSR_M_SUPER	/* enable interrupts */
+	msr	spsr, r1
+
+	ldr	r1, [r0, #S_SP]
+	ldr	r2, [r0, #S_LR]
+
+	mrs     ip, cpsr	/* save mode */
+        bic     r3, ip, #0x1f
+        orr     r3, r3, #PSR_M_SUPER	
+        msr     cpsr, r3	/* switch back to super */
+
+	add	sp, r1, #0	/* setup SP and LR */
+	add	lr, r2, #0
+	msr	cpsr, ip
+
+	ldr	lr, [r0, #S_PC]
+	ldmia	r0, {r0-r12}
+	movs	pc, lr
+
+	/* This is always called from supervisor level,
+	 * so we don't need to fuss with sp and lr.
+	 */
+	.globl save_j
+save_j:
+	stmia	r0, {r0-lr}
+	mov	ip, #1		/* resume will return 1 */
+	str	ip, [r0]
+	str	lr, [r0,#S_PC]	/* resume at this pc */
+	mov	r0, #0		/* we return 0 */
+	bx	lr
 /*
  * exception handlers
  */
@@ -232,9 +341,17 @@ get_sp:
         add     r0, sp, #0
 	bx	lr
 
+/* Use only in dire situations */
+        .globl set_sp
+set_sp:
+        add     sp, r0, #0
+	bx	lr
+
         .globl get_regs
 get_regs:
 	stmia	r0, {r0-pc}
+	mrs     ip, cpsr
+	str	ip, [r0,#S_PSR]
 	bx	lr
 
 /* For an experiment from interrupt code */
@@ -242,25 +359,12 @@ get_regs:
 get_ssp:
 	mrs	ip, cpsr
 	bic	r0, ip, #0x1f
-	orr	r0, r0, #0x13
-	msr	cpsr_c, r0
+	orr	r0, r0, #PSR_M_SUPER
+	msr	cpsr, r0
 
 	add	r0, sp, #0
 
-	msr	cpsr_c, ip
-	bx	lr
-
-/* Never called, demo of concept */
-        .globl synch_stack
-synch_stack:
-	mrs	ip, cpsr
-	bic	r0, ip, #0x1f
-	orr	r0, r0, #0x13
-	msr	cpsr_c, r0
-
-	add	r0, sp, #0
-	msr	cpsr_c, ip
-	add	sp, r0, #0
+	msr	cpsr, ip
 	bx	lr
 
 	.globl spin
@@ -299,7 +403,7 @@ get_sctrl:
 enable_irq:
 	mrs	r0, cpsr
 	bic	r0, r0, #0x80
-	msr	cpsr_c, r0
+	msr	cpsr, r0
 	bx	lr
 
 /* enable_fiq (void); */
@@ -307,7 +411,7 @@ enable_irq:
 enable_fiq:
 	mrs	r0, cpsr
 	bic	r0, r0, #0x40
-	msr	cpsr_c, r0
+	msr	cpsr, r0
 	bx	lr
 
 /* enter critical region
@@ -317,51 +421,18 @@ enable_fiq:
 cpu_enter:
 	mrs	r0, cpsr
 	orr	r0, r0, #0xc0
-	msr	cpsr_c, r0
+	msr	cpsr, r0
 	bx	lr
 
 /* leave critical region
  * i.e. enable both irq and fiq
- * XXX - note that perhaps we just want
- *  to enable whatever was previously enabled
+ * XXX - do we really want to enable both?
  */
 	.globl cpu_leave
 cpu_leave:
 	mrs	r0, cpsr
 	bic	r0, r0, #0xc0
-	msr	cpsr_c, r0
-	bx	lr
-
-/* This routine launches a thread from scratch.
- * It receives one argument, the future stack pointer
- * On the stack is:
- *	a place to return to (usually thr_exit)
- *	an argument
- *	a place to start up at.
- *	? what about SR ?
- */
-	.globl resume_c
-resume_c:
-	ldmia	r0,{r0,sp,lr,pc}
-
-/* resume_j and save_j don't need to save all registers
- * since these are called "synchronously", the compiler
- * conventions should apply, and r0-r3 should not need
- * to be saved.  Also ip and maybe others.
- * But it is simple to save them all .....
- */
-
-	.globl resume_j
-resume_j:
-	ldmia	r0, {r0-pc}
-
-	.globl save_j
-save_j:
-	stmia	r0, {r0-lr}
-	mov	ip, #1		/* resume will return 1 */
-	str	ip, [r0]
-	str	lr, [r0,#60]	/* resume at this pc */
-	mov	r0, #0		/* we return 0 */
+	msr	cpsr, r0
 	bx	lr
 
 /* THE END */

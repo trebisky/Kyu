@@ -27,6 +27,10 @@
 #include <kyu.h>
 #include <thread.h>
 
+struct thread *cur_thread;
+
+#define ARM_REGS	17	/* include psr */
+
 #define USR26_MODE	0x00
 #define FIQ26_MODE	0x01
 #define IRQ26_MODE	0x02
@@ -53,8 +57,8 @@
 /* this struct defines the way the registers are stored on the
    stack during a system call. */
 
-struct pt_regs {
-	long uregs[17];
+struct arm_regs {
+	long uregs[ARM_REGS];
 };
 
 #define ARM_cpsr	uregs[16]
@@ -111,7 +115,7 @@ static const char *processor_modes[] = {
 };
 
 void
-show_regs (struct pt_regs *regs)
+show_regs (struct arm_regs *regs)
 {
 	unsigned long flags;
 
@@ -143,12 +147,38 @@ show_regs (struct pt_regs *regs)
 }
 
 void
+show_stack ( unsigned long sp )
+{
+	unsigned long start;
+	unsigned long end;
+
+	start = sp & ~0xf;
+	end = (sp & ~0xfff) + 0x1000;
+
+	printf ( "\n" );
+	dump_ln ( (void *) start, (end-start)/sizeof(long) );
+}
+
+void
 show_thread_regs ( struct thread *tp )
 {
-	struct pt_regs *regs;
+	struct arm_regs *regs;
 
-	regs = (struct pt_regs *) tp->iregs.regs;
+	regs = (struct arm_regs *) tp->iregs.regs;
+	printf ( "\n" );
 	show_regs ( regs );
+	show_stack ( (unsigned long) regs->ARM_sp );
+}
+
+void
+show_my_regs ( void )
+{
+	struct arm_regs ar;
+
+	get_regs ( &ar );
+	printf ( "\n" );
+	show_regs ( &ar );
+	show_stack ( (unsigned long) ar.ARM_sp );
 }
 
 /* THE END */

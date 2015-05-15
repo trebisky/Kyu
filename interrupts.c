@@ -5,6 +5,8 @@
 #include <kyu.h>
 #include <thread.h>
 
+#include "omap_ints.h"
+
 extern struct thread *cur_thread;
 
 long in_interrupt;
@@ -47,53 +49,77 @@ zdiv_test ( void )
  * To spin is bad, but at least we get sensible output.
  */
 void
-evil_exception ( char *msg )
+evil_exception ( char *msg, int code )
 {
+	struct thread *tp;
+	unsigned long oldsp;
+
+	if ( valid_ram_address ( get_sp() ) ) {
+	    oldsp = get_sp();
+	    set_sp ( EVIL_STACK_BASE );
+	    printf ("Switched to evil stack from %08x\n", oldsp );
+	}
+
+	printf ( "\n" );
 	printf ( "%s in thread %s\n", msg, cur_thread->name );
 	show_thread_regs ( cur_thread );
+	spin();
 
-	thr_fault ();
-	/* Should not return */
+	thr_fault ( code );
 
+	/* Should return with a different thread marked
+	 * to be run
+	 */
+	if ( in_newtp ) {
+	    tp = in_newtp;
+	    in_newtp = (struct thread *) 0;
+	    in_interrupt = 0;
+	    change_thread_int ( tp );
+	    /* NOTREACHED */
+
+	    printf ( "evil_exception , change_thread" );
+	    spin ();
+	}
+
+#ifdef notdef
 	kyu_startup ();	/* XXX */
 	spin ();	/* XXX */
+#endif
 }
 
 void
 do_undefined_instruction ( void )
 {
-	evil_exception ("undefined instruction");
+	evil_exception ("undefined instruction", F_UNDEF);
 }
 
 void do_software_interrupt ( void )
 {
-	evil_exception ("software interrupt");
+	evil_exception ("software interrupt", F_SWI);
 }
 
 void do_prefetch_abort ( void )
 {
-	evil_exception ("prefetch abort");
+	evil_exception ("prefetch abort", F_PABT);
 }
 
 void do_data_abort ( void )
 {
-	evil_exception ("data abort");
+	evil_exception ("data abort", F_DABT);
 }
 
 void do_not_used ( void )
 {
-	evil_exception ("not used");
+	evil_exception ("not used", F_NU);
 }
 
 /* evil for now */
 void do_fiq ( void )
 {
-	evil_exception ("fast interrupt request");
+	evil_exception ("fast interrupt request", F_FIQ);
 }
 
 /* -------------------------------------------- */
-
-#include "omap_ints.h"
 
 typedef void (*irq_fptr) ( void * );
 
@@ -150,6 +176,17 @@ void do_irq ( void )
 
 	if ( ! cur_thread )
 	    panic ( "irq int, cur_thread" );
+
+#ifdef notdef
+	/* XXX */
+	printf ( "\n" );
+	printf ("Interrupt debug, sp = %08x\n", get_sp() );
+
+	show_thread_regs ( cur_thread );
+	printf ( "\n" );
+	show_stack ( get_sp () );
+	spin ();
+#endif
 
 	in_interrupt = 1;
 

@@ -1,5 +1,6 @@
 *.o
 *.s
+tags
 kyu
 kyu.bin
 kyu.dump

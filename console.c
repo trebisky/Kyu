@@ -10,6 +10,8 @@
 #include "thread.h"
 #include <stdarg.h>
 
+#include "omap_ints.h"
+
 extern struct thread *cur_thread;
 
 void panic ( char * );
@@ -347,10 +349,10 @@ panic ( char *msg )
 	/* returning here is probably a BAD idea.
 	 * (but, what the heck ...).
 	 */
-#else
-	for ( ;; )
-	    ;
 #endif
+
+	thr_fault ( F_PANIC );
+	spin ();
 
 }
 

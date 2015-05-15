@@ -30,11 +30,15 @@ OBJS =  locore.o \
     intcon.o timer.o wdt.o prm.o serial.o gpio.o mux.o prf.o \
     random.o kyulib.o eabi_stubs.o
 
-all: install
+all: install tags
 
 dump: kyu.dump
 
 syms: kyu.syms
+
+.PHONY:	tags
+tags:
+	ctags *.S *.h *.c
 
 install: kyu.bin
 	cp kyu.bin /var/lib/tftpboot/hello.bin

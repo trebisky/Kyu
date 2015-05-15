@@ -9,7 +9,7 @@
 
 #define PRI_BOSS	30
 
-void ask_test ( int );
+void test_main ( int );
 
 /*
  * user_init is the hook that allows the user to
@@ -24,7 +24,7 @@ user_init ( int xx )
 	timer_rate_set ( 100 );
 #endif
 
-	(void) safe_thr_new ( "test", ask_test, (void *)0, PRI_BOSS, 0 );
+	(void) safe_thr_new ( "test", test_main, (void *)0, PRI_BOSS, 0 );
 
 	/*
 	thr_show();

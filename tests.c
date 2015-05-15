@@ -165,8 +165,6 @@ struct test *cur_test_list = std_test_list;
 
 static int test_debug = 0;
 
-static void tester ( int );
-
 #ifdef ARCH_X86
 void
 stack_db ( char *msg )
@@ -193,6 +191,14 @@ kb_debug ( int val )
 	}
 }
 #endif
+
+int
+is_irq_disabled ( void )
+{
+	if ( get_cpsr() & 0x80 )
+	    return 1;
+	return 0;
+}
 
 /*
  * -------------------------------------------------
@@ -399,11 +405,23 @@ help_tests ( struct test *tp, int nt )
 	}
 }
 
+/* Any old thing */
+static void
+x_test ( void )
+{
+	printf ( "A %08x\n", cur_thread->regs );
+	printf ( "B %08x\n", cur_thread->regs.regs );
+	printf ( "C %08x\n", &cur_thread->regs );
+	printf ( "D %08x\n", cur_thread );
+	printf ( "E %08x\n", cur_thread->iregs );
+	printf ( "F %08x\n", &cur_thread->iregs );
+}
+
 #define MAXB	64
 #define MAXW	4
 
-void
-ask_test ( int xx )
+static void
+tester ( void )
 {
 	char buf[MAXB];
 	char *wp[MAXW];
@@ -412,6 +430,7 @@ ask_test ( int xx )
 	int i;
 	char *p;
 	struct test *tp;
+	char *desc;
 
 	/* Allow the lower priority user thread to
 	 * run (and exit), not that this matters all
@@ -487,6 +506,15 @@ ask_test ( int xx )
 		printf ( "Rebooting\n" );
 	    	reset_cpu ();
 	    }
+
+	    if ( **wp == 's' ) {
+		show_my_regs ();
+	    }
+
+	    if ( **wp == 'x' ) {
+		x_test ();
+	    }
+
 #endif
 
 #ifdef ARCH_X86
@@ -600,14 +628,6 @@ ask_test ( int xx )
 		if ( nl < 1 )
 		    nl = 1;
 
-		if ( nl > 1 ) {
-		    printf ( "looping test %d, %d times\n", n, nl );
-		    usual_delay = AUTO_DELAY;
-		} else {
-		    printf ( "Running test %d\n", n );
-		    usual_delay = USER_DELAY;
-		}
-
 		if ( n == 0 ) {
 		    all_tests ( nl );
 		    continue;
@@ -617,6 +637,16 @@ ask_test ( int xx )
 		    printf ( " ... No such test.\n" );
 		    continue;
 		}
+
+		desc = cur_test_list[n-1].desc;
+		if ( nl > 1 ) {
+		    printf ( "looping test %d (%s), %d times\n", n, desc, nl );
+		    usual_delay = AUTO_DELAY;
+		} else {
+		    printf ( "Running test %d (%s)\n", n, desc );
+		    usual_delay = USER_DELAY;
+		}
+
 
 		/* run single test, perhaps several times
 		 */
@@ -731,6 +761,23 @@ ask_test ( int xx )
 	}
 }
 
+/* The test thread starts here.
+ * wrapper for the above.
+ * Here so we can examine a simple stack right after
+ * this thread gets launched.
+ */
+void
+test_main ( int xx )
+{
+	/*
+	thr_show ();
+	show_my_regs ();
+	spin ();
+	*/
+
+	tester ();
+}
+
 #ifdef ARCH_X86
 void
 read_ports ( int start, int count )
@@ -800,6 +847,9 @@ test_basic ( int xx )
 {
 	int i;
 	int arg = 123;
+
+	if ( is_irq_disabled() )
+	    printf ("basic -- no IRQ\n" );
 
 	printf ( "Basic tests thread started.\n");
 	/*
@@ -1501,7 +1551,33 @@ test_fancy ( int count )
  * One thread is in a tight computation loop,
  * and the other one expects to receive activations
  * via semaphores from an interrupt.
+ *
+ * This was tricky on the x86 and revealed some issues
+ * on the ARM port as well.  Here is how things go:
+ *
+ * 1) we start with just the test thread as always,
+ *	running at priority 30.
+ * 2) the "slim" thread is launched, it runs at
+ *	priority 10 until it blocks on a semaphore.
+ * 3) back to the test thread which launches
+ *	the "busy" thread at priority 11
+ * 4) the busy thread goes into a loop, perhaps
+ *	calling thr_yield() in the easy case.
+ * 5) a timer interrupt happens and the ticker
+ *	routine is called on a timer hook at
+ *	interrupt level, it does an unblock on
+ *	the semaphore, which marks the slim thread
+ *	as ready to run.
+ * This is where things get interesting.  We are
+ *	in the timer interrupt, but we don't want
+ *	to resume the "busy" thread (which is the
+ *	current thread.  We want to switch to the
+ *	slim thread.
+ * The problem on the ARM was that the resume mode
+ *	for the slim thread was JUMP, and this was
+ *	not ready to be done from interrupt level.
  */
+
 
 static struct sem *t7_sem;
 static volatile int t7_tick;
@@ -1527,6 +1603,8 @@ slim ( int count )
 	*/
 	for ( ;; ) {
 	    sem_block ( t7_sem );
+	    if ( is_irq_disabled() )
+		printf ("slim -- no IRQ\n" );
 	    if ( t7_tick > count )
 	    	break;
 	    printf ( " %d(%d)", t7_tick, t7_sum );
@@ -1545,6 +1623,8 @@ busy ( int nice )
 	    if ( nice )
 		thr_yield ();
 	    ++t7_sum;
+	    if ( is_irq_disabled() )
+		printf ("busy -- no IRQ\n" );
 	}
 }
 
@@ -1567,8 +1647,11 @@ test_79 ( int count, int nice )
 	(void) safe_thr_new ( "slim", slim, (void *) count, PRI_TEST, 0 );
 	(void) safe_thr_new ( "busy", busy, (void *) nice, PRI_TEST+1, 0 );
 
-	while ( t7_run )
+	while ( t7_run ) {
+	    if ( is_irq_disabled() )
+		printf ("test -- no IRQ\n" );
 	    thr_yield ();
+	}
 
 	timer_hookup ( 0 );
 	sem_destroy ( t7_sem );

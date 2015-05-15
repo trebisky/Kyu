@@ -22,11 +22,6 @@
 */
 #define	ARCH_ARM
 
-/* XXX XXX - doesn't belong here */
-#ifdef	ARCH_ARM
-#define IRQ_STACK_BASE 0x9D000000
-#endif
-
 /*
 #define WANT_DELAY
 #define WANT_PCI

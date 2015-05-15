@@ -15,6 +15,8 @@
 #ifdef ARCH_ARM
 #define THR_STACK_BASE	0x98000000
 #define THR_STACK_LIMIT	4096 * 128
+
+#define EVIL_STACK_BASE 0x9a000000
 #endif
 
 enum console_mode { SERIAL, VGA, SIO_0, SIO_1 };
@@ -89,6 +91,17 @@ struct jmp_regs {
 struct int_regs {
 	int regs[17];
 };
+
+/* These aren't really registers.
+ * We bit the bullet on the arm, and put the
+ * info for cont (and quick) in their own place
+ * I think there were bugs waiting by trying to keep
+ * this in the jmp_regs, so this ought to be retroed
+ * to the x86 someday.
+ */
+struct cont_regs {
+	int regs[4];
+};
 #endif
 
 #ifdef ARCH_X86
@@ -144,9 +157,9 @@ enum thread_mode { JMP, INT, CONT };
  */
 
 struct thread {
-	struct int_regs iregs;
+	struct int_regs iregs;		/* must be first */
 	struct jmp_regs regs;
-	/* -- everthing before this must not be reordered */
+	struct cont_regs cregs;		/* new for ARM */
 	int prof;
 	struct thread *next;		/* all threads */
 	struct thread *wnext;		/* waiting list */

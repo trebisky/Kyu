@@ -1,6 +1,6 @@
 /* thread.c
- * $Id: thread.c,v 1.7 2002/12/24 04:08:20 tom Exp $
- * T. Trebisky 8/25/2002
+ * Kyu project
+ * T. Trebisky 8/25/2002 5/14/2015
  */
 
 #include "kyu.h"
@@ -61,7 +61,7 @@ void thr_unblock ( struct thread * );
 void change_thread_int ( struct thread * );
 static void change_thread ( struct thread *, int );
 static void resched ( int );
-static void block_c ( struct thread *, tfptr, void * );
+static void setup_c ( struct thread *, tfptr, void * );
 
 void sys_init ( int );
 
@@ -189,9 +189,11 @@ thr_debug ( int value )
 }
 
 /* OK, kick off the thread system.
- * At this point we are running in a
- * unique stack context (belonging to no
- * thread), at 0x8fff0 or so.
+ * At this point we are running in a unique stack context
+ *  (belonging to no thread),
+ *  at 0x8fff0 or so on the X86
+ *  at 0x980003f8 on the ARM (BBB)
+ *
  * We want to run a real thread.
  */
 void
@@ -210,13 +212,13 @@ thr_sched ( void )
 	/* launch the system by running the
 	 * current thread
 	 */
-	 printf ( "thr_sched launching first thread %08x\n", cur_thread->regs.regs[0] ); 
+	 printf ( "thr_sched launching first thread %08x\n", &cur_thread->cregs ); 
 
 #ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );
 #endif
 #ifdef ARCH_ARM
-	resume_c ( cur_thread->regs.regs[0] );
+	resume_c ( &cur_thread->cregs );
 #endif
 	/* NOTREACHED */
 }
@@ -401,30 +403,33 @@ thrnm ( char *place )
 /* Setup a thread to come alive as a continuation
  */
 static void
-block_c ( struct thread *tp, tfptr func, void *arg )
+setup_c ( struct thread *tp, tfptr func, void *arg )
 {
 	long *estack;
 
-	/* Set up the stack.  We need to
-	 * preload 3 words on it as follows:
+	/* Set up the stack for the x86.
+	 * We need to preload 3 words on it as follows:
 	 *
 	 * 1 - a place for the thread function
 	 *	to return into, should it return.
 	 * 2 - the argument to the thread function.
 	 * 3 - the pointer to the thread function.
 	 * 
-	 * To actually continue (resume) the thread,
-	 * we push a 3 word context for an IRET
-	 * on the stack above this (the IRET will
-	 * consume this, leaving things so a RET
-	 * will use word 1)
-	 * The argument and continuation function
-	 * pointer can be used again and again.
+	 * On the X86 to continue (resume) the thread,
+	 * we push a 3 word context for an IRET on the
+	 * stack above this.
+	 * (the IRET will consume this, leaving things so
+	 * a RET will use word 1 and go to thr_exit()
 	 * the return function is always thr_exit().
+	 *
+	 * The argument and continuation function
+	 * pointer can be (and must be able to be)
+	 * used again and again.
 	 */
 	estack = (long *) &tp->stack[tp->stack_size];
+
 #ifdef notdef
-	printf ( "block_c: estack at %08x\n", estack );
+	printf ( "setup_c: estack at %08x\n", estack );
 #endif
 
 #ifdef ARCH_X86
@@ -439,14 +444,13 @@ block_c ( struct thread *tp, tfptr func, void *arg )
 #endif
 
 #ifdef ARCH_ARM
-	/* This is a setup for an ldmia */
-	estack -= 4;
-	estack[0] = (long) arg;
-	estack[1] = (long) &tp->stack[tp->stack_size];
-	estack[2] = (long) thr_exit;
-	estack[3] = (long) func;
-
-	tp->regs.regs[0] = (int) estack;
+	/* This is setup for the ldmia
+	 * in resume_c (in locore.S)
+	 */
+	tp->cregs.regs[0] = (long) arg;
+	tp->cregs.regs[1] = (long) func;
+	tp->cregs.regs[2] = (long) estack;
+	tp->cregs.regs[3] = (long) thr_exit;
 #endif
 
 	tp->mode = CONT;
@@ -529,7 +533,7 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 
 	/* Threads come alive as a continuation,
 	 */
-	block_c ( tp, func, arg );
+	setup_c ( tp, func, arg );
 
 	if ( flags & TF_BLOCK )
 	    tp->state = WAIT;
@@ -628,17 +632,33 @@ cleanup_thread ( struct thread *xp )
  * execute an invalid instruction.
  */
 void
-thr_fault ( void )
+thr_fault ( int why )
 {
+	struct thread *tp;
+
 	cur_thread->state = FAULT;
+	cur_thread->fault = why;
+
+	/* XXX this isn't quite right.
+	 * we really want to call thr_block,
+	 * but that routine is not yet ready
+	 * to be called from interrupt level
+	 */
+
+	/* Find some other thread to run */
+	for ( tp=thread_ready; tp; tp = tp->next ) {
+	    if ( tp->state != READY ) {
+	    	in_newtp = tp;
+		return;
+	    }
+	}
 
 	/* XXX */
-	kyu_startup ();
 	spin ();
+	/*
+	kyu_startup ();
+	*/
 
-	/* XXX from interrupt level ???? */
-	/* does not work */
-	resched ( 0 );
 	/* NOTREACHED */
 
 	panic ( "thr_fault - resched" );
@@ -725,7 +745,7 @@ thr_kill ( struct thread *tp )
 	    thr_exit ();
 	    /* NOTREACHED */
 
-	block_c ( tp, (tfptr) thr_exit, 0 );
+	setup_c ( tp, (tfptr) thr_exit, 0 );
 	tp->state = READY;
 }
 
@@ -769,7 +789,7 @@ thr_block_c ( enum thread_state why, tfptr func, void *arg )
 	cpu_enter ();
 	cur_thread->state = why;
 
-	block_c ( cur_thread, func, arg );
+	setup_c ( cur_thread, func, arg );
 
 	/* here we *must* switch
 	 * to another thread
@@ -788,7 +808,7 @@ thr_block_c ( enum thread_state why, tfptr func, void *arg )
 	resume_c ( cur_thread->regs.esp );
 #endif
 #ifdef ARCH_ARM
-	resume_c ( cur_thread->regs.regs[0] );
+	resume_c ( &cur_thread->cregs );
 #endif
 
 	/* NOTREACHED */
@@ -830,7 +850,7 @@ thr_block_q ( enum thread_state why )
 	resume_c ( cur_thread->regs.esp );
 #endif
 #ifdef ARCH_ARM
-	resume_c ( cur_thread->regs.regs[0] );
+	resume_c ( &cur_thread->cregs );
 #endif
 	/* NOTREACHED */
 
@@ -987,8 +1007,18 @@ thr_delay_q ( int nticks )
 /* PUBLIC - offer to yield the processor.
  * (never an internal call, but rather a
  *  politeness call, we prefer to let another
- *  thread run, even one of the same priority.
+ *  thread run, even one of the same priority.)
+ * This call will cause the highest READY thread
+ *  other than the current one to run, i.e. this
+ *  will cause a violation of the usual principle
+ *  that the highest priority ready thread is
+ *  always the one running.  So this is evil.
+ * I make is an empty function so some old tests
+ *  won't need to be recoded.  It was a kind of crutch
+ *  during early testing, but caused trouble later.
  */
+
+#ifdef REAL_YIELD
 void
 thr_yield ( void )
 {
@@ -996,6 +1026,12 @@ thr_yield ( void )
 	resched ( RSF_YIELD );
 #endif
 }
+#else
+void
+thr_yield ( void )
+{
+}
+#endif
 
 /* Called from interrupt level when it is
  * clear that a different thread should be resumed.
@@ -1060,7 +1096,7 @@ change_thread ( struct thread *new_tp, int options )
 	 * it revealed our first race condition.
 	 */
 	if ( new_tp == cur_thread )
-	    panic ( "change_thread, current" );
+	    panic ( "change_thread, already running current" );
 
 	/* ---------------------------------------------
 	 * Now we are in the proper mode to launch
@@ -1107,7 +1143,7 @@ change_thread ( struct thread *new_tp, int options )
 		    }
 	}
 
-	/* If this is running at interrupt level,
+	/* If the current thread is running at interrupt level,
 	 * we need to mark the context we are leaving
 	 * so it is resumed using the interrupt resumer.
 	 */
@@ -1120,12 +1156,18 @@ change_thread ( struct thread *new_tp, int options )
 	cur_thread->yield = (struct thread *) 0;
 
 	/*
-	 * Remember, tp->state tells how the thread
-	 * should be resumed, not how it should be
-	 * saved.
+	 * Remember, tp->mode tells how the thread should be resumed,
+	 *  not how it should be saved.
 	 */
 
 	cur_thread = new_tp;
+
+	/* We need to stay locked between deciding how to resume
+	 * and actually doing so.  5-14-2015
+	 * Otherwise a bad race results.
+	 * Note that each resume reenables interrupts.
+	 */
+	cpu_enter ();
 	switch ( cur_thread->mode ) {
 	    case JMP:
 		if ( thread_debug )
@@ -1145,12 +1187,12 @@ change_thread ( struct thread *new_tp, int options )
 		dump_l ( (void *)new_tp->regs.esp, 1 );
 		*/
 		if ( thread_debug )
-		    printf ("change_thread_resume_c: %08x\n", new_tp->regs.regs[0]);
+		    printf ("change_thread_resume_c: %08x\n", &new_tp->cregs );
 #ifdef ARCH_X86
 		resume_c ( new_tp->regs.esp );
 #endif
 #ifdef ARCH_ARM
-		resume_c ( new_tp->regs.regs[0] );
+		resume_c ( &new_tp->cregs );
 #endif
 		panic ( "change_thread, switch_c" );
 		break;
@@ -1296,19 +1338,13 @@ resched ( int options )
 	 * aggressive optimization without
 	 * some volatile declaration).
 	 *
-	 * I wasn't sure this was right, if
-	 * we have a mix of threads, all
-	 * waiting on different events.
-	 * But then I considered the following.
-	 * (consider, keyboard and network),
-	 * and so we have no guarantee this
-	 * thread will be the one awakened.
-	 * However, if some thread other
-	 * than the current one should run,
-	 * the interrupt routine will arrange
-	 * for it to run, and if the current
-	 * thread should run, it will just mark
-	 * it ready, and this loop will pop loose.
+	 * What happens if we have several blocked threads?
+	 * In particular, what if when some event (interrupt) happens?
+	 * If the interrupt unblocks the current thread,
+	 *  then this loop pops loose and that is the easy case.
+	 * What if some other thread gets unblocked?
+	 * This gets handled in thr_unblock() where it marks
+	 * the thread to change to when the interrupt returns.
 	 */
 	{
 	    volatile enum thread_state *state;
