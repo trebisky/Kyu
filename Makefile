@@ -7,8 +7,8 @@
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
 
 CCX = arm-linux-gnu-gcc
-#COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float -I.
-COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float -I.
+COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float -I.
+#COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float -I.
 CC = $(CCX) $(COPTS)
 
 # It is a bug that we cannot invoke gcc to do this,

@@ -92,7 +92,7 @@ static struct stack_list *stack_avail;
 
 /* allocate a thread stack.
  */
-char *
+static char *
 thr_alloc ( int size )
 {
 	char *stack;
@@ -126,6 +126,7 @@ thr_alloc ( int size )
 
 /* free a thread stack.
  */
+static void
 thr_free ( char *stack, int size )
 {
 	struct stack_list *xp;

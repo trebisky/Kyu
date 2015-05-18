@@ -662,6 +662,10 @@ tester ( void )
 		a = a / b;
 		printf ("... All done!\n");
 	    }
+	    if ( **wp == 'g' ) {
+		gpio_test2();
+	    }
+
 #ifdef ARCH_X86
 	    if ( **wp == 'g' ) {
 		struct desc48 gdtbuf;

@@ -69,6 +69,7 @@ evil_exception ( char *msg, int code )
 
 	/* Should return with a different thread marked
 	 * to be run
+	 * XXX - move into thread.c
 	 */
 	if ( in_newtp ) {
 	    tp = in_newtp;
@@ -222,6 +223,7 @@ void do_irq ( void )
 	 *
 	 * Second, when we unblock a thread on the
 	 * delay list, we may have a hot new candidate.
+	 * XXX - move into thread.c
 	 */
 	if ( in_newtp ) {
 	    tp = in_newtp;
