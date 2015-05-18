@@ -1,0 +1,26 @@
+	/* By this time a couple of things could
+	 * make us want to return to a different
+	 * thread than what we were running when
+	 * the interrupt happened.
+	 *
+	 * First, when we call the timer hook, the
+	 * user routine could unblock a semaphore,
+	 * or unblock a thread, or some such thing.
+	 *
+	 * Second, when we unblock a thread on the
+	 * delay list, we may have a hot new candidate.
+	 * XXX - move into thread.c
+	 */
+	if ( in_newtp ) {
+	    tp = in_newtp;
+	    in_newtp = (struct thread *) 0;
+	    in_interrupt = 0;
+	    change_thread_int ( tp );
+	    /* NOTREACHED */
+
+	    panic ( "irq int , change_thread" );
+	}
+
+	in_interrupt = 0;
+	resume_i ( &cur_thread->iregs );
+	/* NOTREACHED */

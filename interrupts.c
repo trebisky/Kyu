@@ -9,16 +9,6 @@
 
 extern struct thread *cur_thread;
 
-long in_interrupt;
-struct thread *in_newtp;
-
-void
-interrupt_init ( void )
-{
-        in_interrupt = 0;
-        in_newtp = (struct thread *) 0;
-}
-
 void
 interrupt_test_dabort ( void )
 {
@@ -54,6 +44,9 @@ evil_exception ( char *msg, int code )
 	struct thread *tp;
 	unsigned long oldsp;
 
+	/* Tell thread system we are in an interrupt */
+	start_interrupt ();
+
 	if ( valid_ram_address ( get_sp() ) ) {
 	    oldsp = get_sp();
 	    set_sp ( EVIL_STACK_BASE );
@@ -67,25 +60,7 @@ evil_exception ( char *msg, int code )
 
 	thr_fault ( code );
 
-	/* Should return with a different thread marked
-	 * to be run
-	 * XXX - move into thread.c
-	 */
-	if ( in_newtp ) {
-	    tp = in_newtp;
-	    in_newtp = (struct thread *) 0;
-	    in_interrupt = 0;
-	    change_thread_int ( tp );
-	    /* NOTREACHED */
-
-	    printf ( "evil_exception , change_thread" );
-	    spin ();
-	}
-
-#ifdef notdef
-	kyu_startup ();	/* XXX */
-	spin ();	/* XXX */
-#endif
+	finish_interrupt ();
 }
 
 void
@@ -189,7 +164,8 @@ void do_irq ( void )
 	spin ();
 #endif
 
-	in_interrupt = 1;
+	/* Tell thread system we are in an interrupt */
+	start_interrupt ();
 
 	nint = intcon_irqwho ();
 
@@ -212,32 +188,7 @@ void do_irq ( void )
 	 */
 	(irq_table[nint].func)( irq_table[nint].arg );
 
-	/* By this time a couple of things could
-	 * make us want to return to a different
-	 * thread than what we were running when
-	 * the interrupt happened.
-	 *
-	 * First, when we call the timer hook, the
-	 * user routine could unblock a semaphore,
-	 * or unblock a thread, or some such thing.
-	 *
-	 * Second, when we unblock a thread on the
-	 * delay list, we may have a hot new candidate.
-	 * XXX - move into thread.c
-	 */
-	if ( in_newtp ) {
-	    tp = in_newtp;
-	    in_newtp = (struct thread *) 0;
-	    in_interrupt = 0;
-	    change_thread_int ( tp );
-	    /* NOTREACHED */
-
-	    panic ( "irq int , change_thread" );
-	}
-
-	in_interrupt = 0;
-	resume_i ( &cur_thread->iregs );
-	/* NOTREACHED */
+	finish_interrupt ();
 
 	panic ( "do_irq, resume" );
 }

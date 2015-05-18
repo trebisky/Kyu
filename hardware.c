@@ -14,7 +14,6 @@ hardware_init ( void )
 	wdt_disable ();
 
 	intcon_init ();
-	interrupt_init ();
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );

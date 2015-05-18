@@ -44,8 +44,8 @@ static int thread_debug;
 static char *stack_next;
 static int stack_limit;
 
-extern long in_interrupt;
-extern struct thread *in_newtp;
+static long in_interrupt;
+static struct thread *in_newtp;
 
 /* Here is an informal rule,
  * entry point names we export to the world
@@ -145,6 +145,8 @@ thr_init ( void )
 
 	thread_debug = DEBUG_THREADS;
 	threads_running = 0;
+	in_newtp = (struct thread *) 0;
+	in_interrupt = 0;
 
 	sem_init ();
 
@@ -1034,14 +1036,56 @@ thr_yield ( void )
 }
 #endif
 
-/* Called from interrupt level when it is
- * clear that a different thread should be resumed.
- * (instead of the one interrupted).
+/* Moved here from interrupt.c 5-18-2015
+ * Every interrupt or exception "returns" by
+ * calling this function.
+ *
+ * Moving it here cleans up a few loose ends.
+ *  - we can avoid having a special
+ *    change_thread routine for interrupts.
+ *  - we can avoid exporting in_newtp
+ * Having this here avoids having to export
+ * in_newtp and in_interrupt as globals (maybe).
+ *
+ * By this time a couple of things could
+ * make us want to return to a different
+ * thread than what we were running when
+ * the interrupt happened.
+ *
+ * First, when we call the timer hook, the
+ * user routine could unblock a semaphore,
+ * or unblock a thread, or some such thing.
+ *
+ * Second, when we unblock a thread on the
+ * delay list, we may have a hot new candidate.
  */
+
 void
-change_thread_int ( struct thread *new_tp )
+start_interrupt ( void )
 {
-	change_thread ( new_tp, RSF_INTER );
+	in_interrupt = 1;
+}
+
+void
+finish_interrupt ( void )
+{
+	struct thread *tp;
+
+	if ( in_newtp ) {
+	    tp = in_newtp;
+	    in_newtp = (struct thread *) 0;
+	    in_interrupt = 0;
+	    change_thread ( tp, RSF_INTER );
+	    /* NOTREACHED */
+
+	    panic ( "finish_interrupt , change_thread" );
+	}
+
+	in_interrupt = 0;
+	resume_i ( &cur_thread->iregs );
+	/* NOTREACHED */
+
+	panic ( "finish_interrupt , resume_i" );
 }
 
 /* We have decided to resume some other
