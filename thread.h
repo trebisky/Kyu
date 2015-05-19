@@ -108,7 +108,7 @@ struct cont_regs {
 #endif
 
 #ifdef ARCH_X86
-/* XXX - move this */
+/* XXX - move this stuff */
 /* This is what is saved by save_t/restore_t
  * if the size of this changes, you must fiddle
  * some constants in locore.S so that the next

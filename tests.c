@@ -1662,7 +1662,8 @@ test_fancy ( int count )
 /* -------------------------------------------- */
 /* test 7 */
 
-/* This test is a hard one.
+/* This test is a hard one, thus extremely valuable
+ *
  * One thread is in a tight computation loop,
  * and the other one expects to receive activations
  * via semaphores from an interrupt.
@@ -1691,8 +1692,12 @@ test_fancy ( int count )
  * The problem on the ARM was that the resume mode
  *	for the slim thread was JUMP, and this was
  *	not ready to be done from interrupt level.
+ *
+ * This test continued to expose tricky problems in
+ *   the ARM context switching code.  The last was
+ *   corrupting the condition codes in the PSR
+ *   during interrupts.  5-19-2015
  */
-
 
 static struct sem *t7_sem;
 static volatile int t7_tick;
@@ -1711,7 +1716,7 @@ t7_ticker ( void )
 }
 
 static void
-slim ( int count )
+slim79 ( int count )
 {
 	/*
 	printf ( "slim starting\n" );
@@ -1729,8 +1734,10 @@ slim ( int count )
 }
 
 static void
-busy ( int nice )
+busy79 ( int nice )
 {
+	int psr;
+
 	/*
 	printf ( "busy starting\n" );
 	*/
@@ -1738,8 +1745,10 @@ busy ( int nice )
 	    if ( nice )
 		thr_yield ();
 	    ++t7_sum;
-	    if ( is_irq_disabled() )
-		printf ("busy -- no IRQ\n" );
+	    /* if ( is_irq_disabled() ) */
+	    psr = get_cpsr();
+	    if ( psr & 0x80 )
+		printf ("busy -- no IRQ (%08x)\n", psr );
 	}
 }
 
@@ -1759,8 +1768,8 @@ test_79 ( int count, int nice )
 	 * semaphores coming from the interrupt routine
 	 * are useless.
 	 */
-	(void) safe_thr_new ( "slim", slim, (void *) count, PRI_TEST, 0 );
-	(void) safe_thr_new ( "busy", busy, (void *) nice, PRI_TEST+1, 0 );
+	(void) safe_thr_new ( "slim", slim79, (void *) count, PRI_TEST, 0 );
+	(void) safe_thr_new ( "busy", busy79, (void *) nice, PRI_TEST+1, 0 );
 
 	while ( t7_run ) {
 	    if ( is_irq_disabled() )

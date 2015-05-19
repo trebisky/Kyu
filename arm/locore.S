@@ -146,6 +146,9 @@ reset:
 
 	stmia	sp, {r0-r12}
 
+	mrs	ip, spsr	/* save before forcing to super */
+	str	ip, [sp,#S_PSR]	/* saved SR */
+
 	add	r0, sp, #0	/* our cur_thread */
 	add	r1, lr, #0	/* shuffle this (becomes PC on resume) */
 
@@ -159,8 +162,6 @@ reset:
 
 	str	r1, [r0,#S_PC]	/* PC when we resume */
 
-	mrs	ip, spsr
-	str	ip, [sp,#S_PSR]	/* saved SR */
 	.endm
 
 	/* The way things are currently coded, we never use the epilog.
