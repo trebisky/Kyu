@@ -270,10 +270,18 @@ dump_l ( void *addr, int n )
 	}
 }
 
+/* For sanity when testing */
+#define LIMITS
+
 /* Dump this many words */
 void
 dump_ln ( void *addr, int nw )
 {
+#ifdef LIMITS
+	if ( nw < 1 ) nw = 1;
+	if ( nw > 1024 ) nw = 1024;
+#endif
+
 	dump_l ( addr, (nw+3) / 4 );
 }
 

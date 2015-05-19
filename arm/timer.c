@@ -8,7 +8,9 @@
  */
 #include <kyu.h>
 #include <thread.h>
+
 #include <omap_ints.h>
+#include <cpu.h>
 
 void timer_irqena ( void );
 void timer_irqdis ( void );
@@ -139,7 +141,9 @@ timer_rate_set_i ( int rate )
 
 	val = 0xffffffff;
 	val -= TIMER_CLOCK / rate;
+	/*
 	printf ( "Loading: %08x\n", val );
+	*/
 
 	/* load the timer */
 	base->load = val;
@@ -305,13 +309,16 @@ timer_int ( int xxx )
  * when it becomes zero, one or more entries
  * get launched.
  *
- * Important - this must be called with
- * interrupts disabled !
+ * XXX - this is a standard Kyu feature and ought
+ * to get moved into common code.
  */
 void
 timer_add_wait ( struct thread *tp, int delay )
 {
 	struct thread *p, *lp;
+	int x;
+
+	x = splhigh ();
 
 	p = timer_wait;
 
@@ -334,6 +341,7 @@ timer_add_wait ( struct thread *tp, int delay )
 	/*
 	printf ( "Add wait: %d\n", delay );
 	*/
+	splx ( x );
 }
 
 /* THE END */

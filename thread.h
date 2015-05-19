@@ -67,13 +67,16 @@ struct cv *cv_new ( struct sem * );
 void cv_wait ( struct cv * );
 void cv_signal ( struct cv * );
 
+#ifdef notyet
 struct sem * cpu_new ( void );
 void cpu_wait ( struct sem * );
 void cpu_signal ( struct sem * );
+#endif
 
 struct sem * safe_sem_new ( int );
 
-#define MAX_TNAME	6
+/* This was 6 in Skidoo */
+#define MAX_TNAME	10
 
 #ifdef ARCH_ARM
 /* XXX - move this */
@@ -82,7 +85,7 @@ struct sem * safe_sem_new ( int );
  * is always done from synchronous calls
  */
 struct jmp_regs {
-	int regs[16];
+	int regs[17];
 };
 
 /* We have to save all registers here, since

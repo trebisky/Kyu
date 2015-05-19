@@ -11,6 +11,8 @@ INCS = -I. -Iarm
 
 include Makefile.inc
 
+#subdirs = arm
+
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 OBJS =  machine.o \
@@ -18,7 +20,7 @@ OBJS =  machine.o \
     console.o thread.o prf.o \
     random.o kyulib.o
 
-all: install tags
+all: tags install
 
 dump: kyu.dump
 
@@ -28,8 +30,17 @@ syms: kyu.syms
 tags:
 	ctags -R
 
-machine.o:
+machine.o:	bogus
 	cd arm ; make
+
+bogus:
+
+#.PHONY: subdirs $(SUBDIRS)
+#
+#subdirs: $(SUBDIRS)
+#
+#$(SUBDIRS):
+#	$(MAKE) -C $@
 
 install: kyu.bin
 	cp kyu.bin /var/lib/tftpboot/hello.bin

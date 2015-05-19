@@ -83,6 +83,9 @@ static void test_hard ( int );
 static void test_join ( int );
 static void test_mutex ( int );
 
+/* XXX should be in arch dependent menu */
+static void test_gpio ( int );
+
 #ifdef WANT_NET
 static void test_net ( int );
 static void test_netarp ( int );
@@ -127,6 +130,9 @@ struct test std_test_list[] = {
 	test_cv1,	"CV test",		0,
 	test_join,	"Join test",		0,
 	test_mutex,	"Mutex test",		0,
+	/*
+	test_gpio,	"BBB gpio test",	0,
+	*/
 	0,		0,			0
 };
 
@@ -208,9 +214,13 @@ struct test_info {
 	tfptr func;
 	int arg;
 	struct sem *sem;
+	int times;
 };
 
-void test_thread ( int arg )
+/* This gets launched as a thread to run
+ * each of the basic tests */
+void
+basic_wrapper ( int arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
 
@@ -227,16 +237,18 @@ void test_thread ( int arg )
  * priority thread, immediately -- effectively never
  * returning from thr_new.
  */
-void run_test ( tfptr func, int arg )
+void
+run_test ( tfptr func, int arg )
 {
 	struct test_info info;
 
 	info.func = func;
 	info.arg = arg;
 	info.sem = safe_sem_new ( CLEAR );
+	info.times = 1;	/* ignored */
 
 	(void) safe_thr_new ( 
-	    "this", test_thread, (void *) &info, PRI_WRAP, 0 );
+	    "bwrapper", basic_wrapper, (void *) &info, PRI_WRAP, 0 );
 
 	sem_block ( info.sem );
 	sem_destroy ( info.sem );
@@ -270,6 +282,50 @@ all_tests ( int nl )
 	for ( i=0; i<nl; i++ )
 	    for ( t=0; t<nt; t++ )
 		(*std_test_list[t].func) ( std_test_list[t].arg );
+}
+
+/* A global that endless tests can check to discover
+ * that they ought to quit.
+ */
+static int test_running;
+
+/* This gets launched as a thread to run each test
+ *  repeating the test as many times as indicated.
+ */
+void
+wrapper ( int arg )
+{
+	struct test_info *ip = (struct test_info *) arg;
+	int i;
+
+	for ( i=0; i< ip->times; i++ ) {
+	    if ( ! test_running )
+		break;
+	    (*ip->func) ( ip->arg );
+	}
+
+	sem_unblock ( ip->sem );
+}
+
+static void
+single_test ( struct test *tstp, int times )
+{
+	struct test_info info;
+
+	info.func = tstp->func;
+	info.arg = tstp->arg;
+	info.sem = safe_sem_new ( CLEAR );
+	info.times = times;
+
+	test_running = 1;
+
+	(void) safe_thr_new ( 
+	    "wrapper", wrapper, (void *) &info, PRI_WRAP, 0 );
+
+	/* Or we could do a join */
+	sem_block ( info.sem );
+
+	sem_destroy ( info.sem );
 }
 
 /* ---------------------------------------------------------------
@@ -485,6 +541,7 @@ tester ( void )
 	    	cur_test_list = std_test_list;
 	    }
 
+#ifdef notdef
 	    /* Silly and useless now */
 	    if ( **wp == 'e' ) {
 	    	printf ( "nw = %d\n", nw );
@@ -492,6 +549,15 @@ tester ( void )
 		for ( i=0; i<nw; i++ ) {
 		    printf ( "%d: %s\n", i, wp[i] );
 		}
+	    }
+#endif
+	    if ( **wp == 'e' ) {
+		printf ( "Test told to stop\n" );
+		test_running = 0;
+	    }
+
+	    if ( **wp == 'y' ) {
+		kyu_debugger ();
 	    }
 
 #ifdef ARCH_ARM
@@ -611,6 +677,7 @@ tester ( void )
 		thr_debug ( flags );
 	    }
 
+	    /* Show threads */
 	    if ( **wp == 't' && nw == 1 ) {
 	    	thr_show ();
 	    }
@@ -619,6 +686,7 @@ tester ( void )
 	    	thr_show_name ( wp[1] );
 	    }
 
+	    /* Run a test or tests */
 	    if ( **wp == 't' && nw > 1 ) {
 		n = atoi ( wp[1] );
 
@@ -647,14 +715,13 @@ tester ( void )
 		    usual_delay = USER_DELAY;
 		}
 
-
 		/* run single test, perhaps several times
 		 */
-		for ( i=0; i<nl; i++ )
-		    (*cur_test_list[n-1].func) ( cur_test_list[n-1].arg );
+		single_test ( &cur_test_list[n-1], nl );
 	    }
+
+	    /* provoke a divide by zero */
 	    if ( **wp == 'z' ) {
-	    	/* provoke a divide by zero */
 		volatile int a = 1;
 		int b = 0;
 
@@ -662,9 +729,17 @@ tester ( void )
 		a = a / b;
 		printf ("... All done!\n");
 	    }
-	    if ( **wp == 'g' ) {
-		gpio_test2();
+
+#ifdef notdef
+	    /* sort of like a keyboard test.
+	     * useful with a serial port to figure out
+	     * what gets sent when various keys get pressed.
+	     */
+	    if ( **wp == 'k' ) {
+		int cc = getchare ();
+		printf ( "Received: %02x\n", cc );
 	    }
+#endif
 
 #ifdef ARCH_X86
 	    if ( **wp == 'g' ) {
@@ -843,14 +918,25 @@ void f_ez ( int arg )
 /* Here is a thread to run a sequence of diagnostics.
  * At one time, this was the whole show (up until
  * we coded up an interactive test facility).
- * Being historical, it predates semaphores, and it would
- * be a bad idea to recode it to use them.
+ * Being historical, it predates semaphores,
+ *  and it would be a bad idea to recode it to use them.
+ * But they crept in anyhow.
+ *
+ * It is a good basic sanity test, checking:
+ *  1) that we can launch a thread.
+ *  2) that we can use the thread launcher,
+ *     (which uses semaphores)
  */
 static void
 test_basic ( int xx )
 {
 	int i;
 	int arg = 123;
+
+	/*
+	cpu_enter ();
+	kyu_debugger ();
+	*/
 
 	if ( is_irq_disabled() )
 	    printf ("basic -- no IRQ\n" );
@@ -937,6 +1023,9 @@ test_basic ( int xx )
 
 /* --------------------------------------------
  * Timer test.
+ *
+ * This tests that we are getting timer interrupts
+ *  and that the timer hookup call works.
  *
  * Gets ugly if we have a serial console and try
  * to do printf from interrupt level!
@@ -1076,21 +1165,42 @@ static void c2_s2 ( int );
 static void
 c2_s1 ( int limit )
 {
+	/*
+	thr_show ();
+	show_my_regs();
+	printf ( "\n" );
+	*/
+
 	++c2_count;
 	printf ( " %d", c2_count );
 
 	if ( c2_count < limit )
 	    thr_delay_c ( usual_delay, c2_s1, limit );
 	c2_done = 1;
+
+	/*
+	printf ( "\n" );
+	show_my_regs();
+	*/
 }
 
-/* Thread starts here to launch things.
+/* First part of the test, test thr_delay_c() only.
+ * Thread starts here to launch things.
+ * Bounces control to the above.
  */
 static void
-c2_f1 ( int limit )
+c2_slave1 ( int limit )
 {
+	/*
+	thr_show ();
+	show_my_regs();
+	printf ( "\n" );
+	*/
+
 	thr_delay_c ( usual_delay, c2_s1, limit );
 }
+
+/* -- */
 
 static void
 c2_s2 ( int limit )
@@ -1103,10 +1213,11 @@ c2_s2 ( int limit )
 	c2_done = 1;
 }
 
-/* Thread starts here to launch things.
+/* Second part of the test, test thr_delay_c() and thr_delay_q().
+ *  starts here -- bounces control to the above.
  */
 static void
-c2_f2 ( int limit )
+c2_slave2 ( int limit )
 {
 	thr_delay_c ( usual_delay, c2_s2, limit );
 }
@@ -1120,7 +1231,7 @@ test_contin2 ( int limit )
 
 	/* test the _c call only */
 	printf ("Ready ...");
-	(void) safe_thr_new ( "slave", c2_f1, (void *)limit, PRI_TEST, 0 );
+	(void) safe_thr_new ( "slave1", c2_slave1, (void *)limit, PRI_TEST, 0 );
 
 	while ( ! c2_done )
 	    thr_yield ();
@@ -1130,9 +1241,9 @@ test_contin2 ( int limit )
 	c2_count = 0;
 	c2_done = 0;
 
-	/* test the _c and _q calls only */
+	/* test the _c and _q calls */
 	printf ("Again ...");
-	(void) safe_thr_new ( "slave", c2_f2, (void *)limit, PRI_TEST, 0 );
+	(void) safe_thr_new ( "slave2", c2_slave2, (void *)limit, PRI_TEST, 0 );
 
 	while ( ! c2_done )
 	    thr_yield ();
@@ -1820,6 +1931,20 @@ test_mutex ( int count )
 	printf ( "Join OK\n");
 
 	sem_destroy ( mutex );
+}
+
+/* -------------------------------------------- */
+
+/* Test gpio on BBB */
+static void
+test_gpio ( int count )
+{
+	gpio_test_init ();
+
+	while ( test_running ) {
+	    thr_delay ( 4 );
+	    gpio_test_run ();
+	}
 }
 
 #ifdef ARCH_X86

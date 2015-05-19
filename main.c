@@ -45,8 +45,10 @@ kern_startup ( void )
 {
 	console_initialize ();
 
+	/*
 	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
 	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
+	*/
 
 	/* print initial banner on VGA console
 	 * no matter what (in case we get hosed before
@@ -61,7 +63,6 @@ kern_startup ( void )
 	*/
 
 	thr_init ();	/* prep thread system */
-	printf ( "thr_init done\n" );
 	thr_sched ();	/* set threads running */
 
 	/* Should set up and run sys thread,
@@ -81,16 +82,23 @@ kern_startup ( void )
 void
 sys_init ( int xxx )
 {
+	/*
 	printf ( "Sys thread starting with stack: %08x\n",  get_sp() );
 	printf ( "Sys thread starting with cpsr: %08x\n",  get_cpsr() );
+	*/
 
-	/* XXX - a race on the x86, the thread is
-	 * launched with interrupts enabled.
+	/* XXX - a race!
+	 * Threads are always launched with interrupts enabled.
+	 * This won't matter unless some interrupt source is
+	 * active on startup.  This certainly won't be so on
+	 * the am3359 in the BBB.
 	 */
 	cpu_enter ();
 
+	/*
 	printf ( "sys_init thread running\n" );
 	printf ( "Stack at %08x\n", get_sp() );
+	*/
 
 	console_init ();
 	hardware_init ();
@@ -128,17 +136,20 @@ sys_init ( int xxx )
 	/* This is a nice idea, but doesn't always work
 	 */
 	printf ( "Kyu %s running\n", kyu_version );
+	/*
 	printf ( "Sys thread finished with stack: %08x\n",  get_sp() );
 	printf ( "Sys thread finished with cpsr: %08x\n",  get_cpsr() );
+	*/
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 }
 
+#ifndef WANT_USER
+
 static int dregs[17];
 
-#ifndef WANT_USER
 void
-user_init ( int xx )
+XXuser_init ( int xx )
 {
 	get_regs ( dregs );
 	dregs[16] = get_cpsr ();
@@ -204,7 +215,7 @@ user_init ( int xx )
  * system for his application.
  */
 void
-Xuser_init ( int xx )
+user_init ( int xx )
 {
 	/* XXX */
 	printf ( "Stub thread: user_init\n" );

@@ -7,6 +7,8 @@
 #include "kyulib.h"
 #include "thread.h"
 
+#include "cpu.h"
+
 /* XXX - still doesn't work (w/ yield).
 #define SORT_PRI
 */
@@ -58,7 +60,6 @@ void thr_yield ( void );
 void thr_block ( enum thread_state );
 void thr_unblock ( struct thread * );
 
-void change_thread_int ( struct thread * );
 static void change_thread ( struct thread *, int );
 static void resched ( int );
 static void setup_c ( struct thread *, tfptr, void * );
@@ -71,6 +72,7 @@ void thr_show ( void );
  */
 static void thr_one ( struct thread * );
 void thr_one_all ( struct thread *, char *msg );
+
 static void thr_show_state ( struct thread * );
 
 /* policy options for resched ()
@@ -82,6 +84,41 @@ static void thr_show_state ( struct thread * );
 void sem_init ( void );
 int sem_block_t ( struct sem *, int );
 void sem_block_m ( struct sem *, struct sem * );
+
+/* Some notes on races and synchronization.
+ *  5-18-2015
+ *
+ * On first thought, it would seem that the only areas
+ * that need locking are those that could be modified
+ * by code running at interrupt level.  However, since
+ * interrupt code can trigger a reschedule, any two
+ * threads can contend with each other.  So any code
+ * that deals with shared data must lock it.  By and large
+ * this is just the thread list and current thread pointer,
+ * but it may not be limited to that.  One thread could be
+ * in the middle of thr_new() and an interrupt could force
+ * a preemption, then another thread could be running
+ * thr_new().  Virtually any scenario is possible.
+ *
+ * When this starts running on a multiprocessor system, there
+ * may be more things to worry about, or maybe not.  The need
+ * may be for different locking primitives, but the locks may
+ * already be in the right places.
+ *
+ * In many cases we establish a lock by disabling interrupts
+ * until we resume some thread via one of the resume_*
+ * routines.  These will transition to some new interrupt
+ * state, in most cases reenabling interrupts.
+ * On the x86 there was only one possibility, namely reenabling
+ * the one interrupt line.  On the ARM we have both IRQ and FIQ
+ * and care must be taken if we decide to use both.
+ *
+ * resume_c - it is always proper to reenable both IRQ and FIQ
+ *		since we are starting from scratch.
+ * resume_i - we simply return to whatever PSR state we
+ *		were in prior to the interrupt.
+ * resume_j - both IRQ and FIQ are reenabled.
+ */
 
 struct stack_list {
 	struct stack_list *next;
@@ -314,7 +351,7 @@ thr_one ( struct thread *tp )
 	else
 	    printf ( "  " );
 
-	printf ( "Thread: %5s ", tp->name );
+	printf ( "Thread: %10s ", tp->name );
 	printf ( "(%8x) ", tp );
 
 	thr_show_state ( tp );
@@ -331,7 +368,7 @@ thr_one ( struct thread *tp )
 #ifdef ARCH_X86
 	printf ( "%8x %4d\n", tp->regs.esp, tp->pri );
 #else
-	printf ( "%8x %4d\n", 0, tp->pri );	/* XXX */
+	printf ( "%8x %4d\n", tp->stack, tp->pri );	/* XXX */
 #endif
 }
 
@@ -342,7 +379,7 @@ thr_show ( void )
 {
 	struct thread *tp;
 
-	printf ( "  Thread:  name (  &tp   )  state     esp     pri\n");
+	printf ( "  Thread:      name (  &tp   )  state     esp     pri\n");
 	/*
 	thr_one ( thread0 );
 	*/
@@ -409,6 +446,11 @@ static void
 setup_c ( struct thread *tp, tfptr func, void *arg )
 {
 	long *estack;
+
+	if ( thread_debug ) {
+	    printf ( "- setup_c, tp, cur = %08x(%s) %08x(%s)\n",
+		tp, tp->name, cur_thread, cur_thread->name );
+	}
 
 	/* Set up the stack for the x86.
 	 * We need to preload 3 words on it as follows:
@@ -758,15 +800,14 @@ thr_kill ( struct thread *tp )
 void
 thr_block ( enum thread_state why )
 {
-	cpu_enter ();
 	if ( why == READY ) {	/* XXX paranoia !? */
-	    cpu_leave ();
 	    return;
 	}
 
 	if ( thread_debug )
 	    printf ( "thr_block(%d) for %s\n", why, cur_thread->name );
 
+	cpu_enter ();
 	cur_thread->state = why;
 
 	/* here we *must* switch
@@ -970,7 +1011,6 @@ thr_delay ( int nticks )
 	    printf ( "thr_delay(%d) for %s\n", nticks, cur_thread->name );
 
 	if ( nticks > 0 ) {
-	    cpu_enter ();
 	    timer_add_wait ( cur_thread, nticks );
 	    thr_block ( DELAY );
 	}
@@ -985,7 +1025,6 @@ thr_delay_c ( int nticks, tfptr func, void *arg )
 	    printf ( "thr_delay_c(%d) for %s\n", nticks, cur_thread->name );
 
 	if ( nticks > 0 ) {
-	    cpu_enter ();
 	    timer_add_wait ( cur_thread, nticks );
 	    thr_block_c ( DELAY, func, arg );
 	}
@@ -1001,7 +1040,6 @@ thr_delay_q ( int nticks )
 	    printf ( "thr_delay_q(%d) for %s\n", nticks, cur_thread->name );
 
 	if ( nticks > 0 ) {
-	    cpu_enter ();
 	    timer_add_wait ( cur_thread, nticks );
 	    thr_block_q ( DELAY );
 	}
@@ -1178,12 +1216,11 @@ change_thread ( struct thread *new_tp, int options )
 	 *	(this is how block_q and block_c work.)
 	 */
 
-	if ( ! (options & RSF_INTER) &&
-		(options & RSF_CONT) == 0 ) {
+	if ( ! (options & RSF_INTER) && (options & RSF_CONT) == 0 ) {
 		    cur_thread->mode = JMP;
 		    if ( save_j ( &cur_thread->regs ) ) {
 			if ( thread_debug )
-			    printf ( "Change_thread: returns\n" );
+			    printf ( "Change_thread: emerged from save_j\n" );
 			return;
 		    }
 	}
@@ -1228,11 +1265,11 @@ change_thread ( struct thread *new_tp, int options )
 		break;
 	    case CONT:
 		/*
-		printf ("change_thread_resume_c: %08x\n", new_tp->regs.esp);
+		printf ("change_thread_resume_c: %08x\n", new_tp);
 		dump_l ( (void *)new_tp->regs.esp, 1 );
 		*/
 		if ( thread_debug )
-		    printf ("change_thread_resume_c: %08x\n", &new_tp->cregs );
+		    printf ("change_thread_resume_c: %08x\n", new_tp );
 #ifdef ARCH_X86
 		resume_c ( new_tp->regs.esp );
 #endif
@@ -1758,13 +1795,14 @@ void cpu_leave_s ( void )
 }
 #endif
 
+#ifdef notyet
 /* Just some "sugar" to make the cpu_xxx() calls all nice
  * and analogous to the cv_xxx() calls.
  */
 struct sem *
 cpu_new ( void )
 {
-	sem_new ( CLEAR, SEM_FIFO );
+	return sem_new ( CLEAR, SEM_FIFO );
 }
 
 void
@@ -1786,5 +1824,6 @@ cpu_wait ( struct sem *xp )
 	sem_block ( xp );
 	cpu_enter ();
 }
+#endif
 
 /* THE END */

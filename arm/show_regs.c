@@ -151,12 +151,20 @@ show_stack ( unsigned long sp )
 {
 	unsigned long start;
 	unsigned long end;
+	int num;
 
 	start = sp & ~0xf;
 	end = (sp & ~0xfff) + 0x1000;
 
+	num = (end-start)/sizeof(long);
+
+	if ( num < 0 ) num = 4;
+
+	if ( num > (0x1000/sizeof(long)) )
+	    num = 0x1000/sizeof(long);
+
 	printf ( "\n" );
-	dump_ln ( (void *) start, (end-start)/sizeof(long) );
+	dump_ln ( (void *) start, num );
 }
 
 void

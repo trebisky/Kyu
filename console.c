@@ -14,6 +14,8 @@
 
 extern struct thread *cur_thread;
 
+static void panic_debug ( void );
+
 void panic ( char * );
 void putchar ( int );
 void puts ( char * );
@@ -116,6 +118,12 @@ getchar ( void )
 
 }
 
+#define ERASE	0x08	/* Ctrl-H */
+#define REBOOT	0x12	/* Ctrl-R */
+#define KILL	0x15	/* Ctrl-U */
+#define DELETE	0x7F	/* Backspace on PC keyboard */
+#define SPACE	0x20
+
 void
 backspace ( void )
 {
@@ -125,6 +133,10 @@ backspace ( void )
 	} else {
 	    vga_back ();
 	}
+#else
+	putchar ( ERASE );
+	putchar ( SPACE );
+	putchar ( ERASE );
 #endif
 }
 
@@ -142,13 +154,11 @@ getline ( char *buf, int n )
 	    if ( c == '\r' )
 	    	break;
 #ifdef notdef
-#define REBOOT	18
 	    if ( c == REBOOT ) {
 	    	kb_reset ();
 	    }
 #endif
 
-#define KILL	21
 	    if ( c == KILL ) {
 		while ( i ) {
 		    backspace();
@@ -158,8 +168,7 @@ getline ( char *buf, int n )
 		continue;
 	    }
 
-#define ERASE	8
-	    if ( c == ERASE ) {
+	    if ( c == ERASE || c == DELETE ) {
 		if ( i ) {
 		    backspace ();
 		    --p;
@@ -264,6 +273,52 @@ printf ( const char *fmt, ... )
 /* XXX - for now, panic routines are here.
  */
 
+
+/* This is a real panic, as distinguished
+ * from calls to dpanic(), which are just
+ * for debugging, and should be removed in
+ * production version.
+ */
+void
+panic ( char *msg )
+{
+	if ( msg )
+	    printf ( "PANIC: %s\n", msg );
+	else
+	    printf ( "PANIC\n" );
+
+#ifdef PANIC_DEBUG
+	panic_debug ();
+	/* returning here is probably a BAD idea.
+	 * (but, what the heck ...).
+	 */
+#endif
+
+	thr_fault ( F_PANIC );
+	spin ();
+
+}
+
+/* temporary debugging panic
+ */
+void
+dpanic ( char *msg )
+{
+	if ( msg )
+	    printf ( "panic: %s\n", msg );
+	else
+	    printf ( "panic\n" );
+
+#ifdef PANIC_DEBUG
+	panic_debug ();
+#endif
+	/* OK to return and continue here.
+	 */
+}
+
+/* ------------------------------------------ */
+/* ------------------------------------------ */
+
 /* Really only ready/proper for x86
 #define PANIC_DEBUG
 */
@@ -331,46 +386,96 @@ panic_debug ( void )
 }
 #endif
 
-/* This is a real panic, as distinguished
- * from calls to dpanic(), which are just
- * for debugging, and should be removed in
- * production version.
+/* The idea here is
+ * that we can call this from any place we are interested
+ * in examining, interact with this, then type "c"
+ * to continue.
+ * 
+ * Consider whether we can use printf without switching into
+ *   polling versus interrupt mode.
+ * Also consider ensuring that we have a valid stack.
  */
+#define MAXB	64
+#define MAXW	4
+
 void
-panic ( char *msg )
+kyu_debugger ( void )
 {
-	if ( msg )
-	    printf ( "PANIC: %s\n", msg );
-	else
-	    printf ( "PANIC\n" );
+	char buf[MAXB];
+	char *wp[MAXW];
+	int nw;
 
-#ifdef PANIC_DEBUG
-	panic_debug ();
-	/* returning here is probably a BAD idea.
-	 * (but, what the heck ...).
-	 */
-#endif
+	for ( ;; ) {
+	    printf ( "Kyu, debug> " );
+	    getline ( buf, MAXB );
+	    if ( ! buf[0] )
+	    	continue;
 
-	thr_fault ( F_PANIC );
-	spin ();
+	    nw = split ( buf, wp, MAXW );
 
-}
+	    if ( **wp == 'c' ) {
+		printf ( "Resume execution ...\n");
+		break;
+	    }
 
-/* temporary debugging panic
- */
-void
-dpanic ( char *msg )
-{
-	if ( msg )
-	    printf ( "panic: %s\n", msg );
-	else
-	    printf ( "panic\n" );
+	    /* Reboot */
+	    if ( **wp == 'R' ) {
+		printf ( "Rebooting\n" );
+	    	reset_cpu ();
+	    }
 
-#ifdef PANIC_DEBUG
-	panic_debug ();
-#endif
-	/* OK to return and continue here.
-	 */
+	    if ( **wp == 'r' ) {
+		show_my_regs ();
+	    }
+
+	    /* turn on or off thread debugging
+	     * think 'v' for verbose or
+	     *  'o' to match the illogical test command.
+	     */
+	    if ( (**wp == 'v' || **wp == 'o') && nw == 2 ) {
+	    	int flags = 0;
+		if ( nw > 1 )
+		    flags = atoi ( wp[1] );
+		thr_debug ( flags );
+	    }
+
+	    /* Show threads */
+	    if ( **wp == 't' && nw == 1 ) {
+	    	thr_show ();
+	    }
+
+	    if ( **wp == 'u' )
+	    	thr_show_current ();
+
+	    if ( **wp == '+' )	/* allow interrupts */
+		cpu_leave ();
+
+	    if ( **wp == '-' )	/* mask interrupts */
+		cpu_enter ();
+
+	    /* Show thread by name */
+	    if ( **wp == 't' && nw == 2 ) {
+	    	thr_show_name ( wp[1] );
+	    }
+
+	    /* dump memory as bytes */
+	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
+	    	dump_b ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		continue;
+	    }
+
+	    /* dump memory as words */
+	    if ( wp[0][0] == 'd' && wp[0][1] == 'w' && nw == 3 ) {
+	    	dump_w ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		continue;
+	    }
+
+	    /* dump memory as longs */
+	    if ( **wp == 'd' && nw == 3 ) {
+	    	dump_l ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		continue;
+	    }
+	}
 }
 
 /* THE END */

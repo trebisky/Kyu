@@ -132,10 +132,11 @@ reset:
 /* When an interrupt happens we have our own private r13 and r14 (sp and lr)
  * r14 has the address to return to (plus some adjustment),
  *  but sp is entirely free to be used.
+ *
  * So, we start the prolog with an adjusted PC in the lr register.
  * we simply use sp as a scratch register (and lr as well later on).
  *
- * Using the "^" to get the "non-interrupt" registers is a mistake.
+ * Using the "^" to get the "non-interrupt" registers would be a mistake.
  *  this gets the user mode registers, which we have no interest in.
  */
 	.macro kyu_prolog
@@ -145,24 +146,21 @@ reset:
 
 	stmia	sp, {r0-r12}
 
-	mrs     ip, cpsr	/* save mode */
-        bic     r0, ip, #0x1f
-        orr     r0, r0, #PSR_M_SUPER
-        msr     cpsr, r0	/* switch back to super */
+	add	r0, sp, #0	/* our cur_thread */
+	add	r1, lr, #0	/* shuffle this (becomes PC on resume) */
 
-	add	r0, sp, #0	/* grab SP and LR */
-	add	r1, lr, #0
-	msr	cpsr, ip
+	mrs     ip, cpsr	/* get current mode */
+        bic     ip, ip, #0x1f
+        orr     ip, ip, #PSR_M_SUPER
+        msr     cpsr, ip	/* force it to super */
 
-	str	r0, [sp,#S_SP]	/* save SP and LR */
-	str	r1, [sp,#S_LR]
+	str	sp, [r0,#S_SP]	/* save this */
+	str	lr, [r0,#S_LR]	/* this too */
 
-	str	lr, [sp,#S_PC]	/* PC when we resume */
+	str	r1, [r0,#S_PC]	/* PC when we resume */
 
-	mrs	lr, spsr
-	str	lr, [sp,#S_PSR]	/* saved SR */
-
-	ldr	sp, [sp,#S_SP]	/* thread stack */
+	mrs	ip, spsr
+	str	ip, [sp,#S_PSR]	/* saved SR */
 	.endm
 
 	/* The way things are currently coded, we never use the epilog.
@@ -170,35 +168,22 @@ reset:
 	 *  or some other specific resume method.
 	 */
 	.macro kyu_epilog
-	movw	sp, #:lower16:cur_thread
-	movt	sp, #:upper16:cur_thread
-	ldr	sp, [sp, #0]
-
-	/* keep sp till bitter end */
-	ldr	r1, [sp, #S_PSR]
-	msr	spsr, r1
-	ldr	r1, [sp, #S_SP]
-	ldr	r2, [sp, #S_LR]
-
-	mrs     ip, cpsr	/* save mode */
-        bic     r3, ip, #0x1f
-        orr     r3, r3, #PSR_M_SUPER
-        msr     cpsr, r3	/* switch back to super */
-
-	add	sp, r1, #0	/* setup SP and LR */
-	add	lr, r2, #0
-	msr	cpsr, ip
-
-	ldr	lr, [sp, #S_PC]
-	ldmia	sp, {r0-r12}
-	movs	pc, lr
+	b	spin
 	.endm
 
-	/* Sort of like the epilog, but we get
-	 * a pointer to a thread in r0
+	/* We get a pointer to a thread in r0
+	 * XXX XXX - Note that turning on both IRQ and FIQ is wrong
+	 *  and will yields bugs when we distinguish FIQ.
 	 */
 	.globl resume_i
 resume_i:
+	/* keep r0 till bitter end */
+	ldr	ip, [r0, #S_PSR]
+	msr	spsr, ip
+
+	ldmia	r0, {r0-pc}^
+
+OLDresume_i:
 	/* keep r0 till bitter end */
 	ldr	r1, [r0, #S_PSR]
 	msr	spsr, r1
@@ -232,7 +217,7 @@ resume_c:
 	ldmia	r0,{r0,ip,sp,lr}
 	mrs     r1, cpsr
 	bic	r1, r1, #0xff
-	orr	r1, r1, #PSR_M_SUPER	/* enable interrupts */
+	orr	r1, r1, #PSR_M_SUPER	/* enable both IRQ and FIQ */
 	msr	cpsr, r1
 	mov	pc, ip
 
@@ -242,15 +227,36 @@ resume_c:
  * to be saved.  Also ip and maybe others.
  * But it is simple to save them all .....
  * 
- * *** This must be capable of being called from interrupt
- *	level.
+ * *** resume_j must be capable of being called from
+ *      interrupt level.
  */
 
-OLDresume_j:
+VERYOLDresume_j:
 	ldmia	r0, {r0-pc}
+
+	/* This is always called from supervisor level,
+	 * so we don't need to fuss with sp and lr.
+	 */
+	.globl save_j
+save_j:
+	stmia	r0, {r0-lr}
+	mrs     ip, cpsr
+	str	ip, [r0, #S_PSR]
+	mov	ip, #1		/* resume will return 1 */
+	str	ip, [r0]	/* coincidence this points to r0 */
+	str	lr, [r0,#S_PC]	/* resume at this pc */
+	mov	r0, #0		/* we return 0 */
+	bx	lr
 
 	.globl resume_j
 resume_j:
+	/* keep r0 till bitter end */
+	ldr	ip, [r0, #S_PSR]
+	msr	spsr, ip
+
+	ldmia	r0, {r0-pc}^
+
+OLDresume_j:
 	/* keep r0 till the bitter end */
 	mrs     r1, cpsr
 	bic	r1, r1, #0xff
@@ -273,17 +279,6 @@ resume_j:
 	ldmia	r0, {r0-r12}
 	movs	pc, lr
 
-	/* This is always called from supervisor level,
-	 * so we don't need to fuss with sp and lr.
-	 */
-	.globl save_j
-save_j:
-	stmia	r0, {r0-lr}
-	mov	ip, #1		/* resume will return 1 */
-	str	ip, [r0]
-	str	lr, [r0,#S_PC]	/* resume at this pc */
-	mov	r0, #0		/* we return 0 */
-	bx	lr
 /*
  * exception handlers
  */

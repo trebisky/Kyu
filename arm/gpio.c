@@ -61,9 +61,10 @@ gpio_init ( void )
 	setup_led_mux ();
 
 	/* Setting the direction is essential */
-	printf ( "gpio1 OE = %08x\n", p->oe );
 	p->oe &= ~ALL_LED;
+	/*
 	printf ( "gpio1 OE = %08x\n", p->oe );
+	*/
 }
 
 int pork[] = { LED0, LED1, LED2, LED3 };
@@ -128,6 +129,33 @@ gpio_test2 ( void )
 	    p->set_data = pork[i];
 	    thr_delay ( 5 );
 	}
+}
+
+/* Cute light show.
+ *  hooks for test menu
+ */
+
+static int gpio_test_count;
+
+void
+gpio_test_init ( void )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+
+	p->clear_data = ALL_LED;
+
+	p->set_data = pork[0];
+	gpio_test_count = 0;
+}
+
+void
+gpio_test_run ( void )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+
+	p->clear_data = pork[gpio_test_count];
+	gpio_test_count = (gpio_test_count+1) % 4;
+	p->set_data = pork[gpio_test_count];
 }
 
 /* THE END */
