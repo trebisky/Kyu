@@ -35,10 +35,25 @@ typedef void (*vfptr) ( void );
 #define		PRI_MAGIC	900
 #define		MAX_PRI		1001
 
+enum thread_state {
+	READY,		/* 0 - ready to go */
+	WAIT,		/* 1 - blocked */
+	SWAIT,		/* 2 - blocked on semaphore */
+	DELAY,		/* 3 - blocked on timer event */
+	IDLE,		/* 4 - running idle loop */
+	JOIN,		/* 5 - waiting to join somebody */
+	ZOMBIE,		/* 6 - waiting to be joined */
+	FAULT,		/* 7 - did something bad */
+	DEAD		/* 8 - on free list */
+};
+
 struct thread *thr_new ( char *, tfptr, void *, int, int );
 struct thread *thr_self ( void );
 void thr_kill ( struct thread * );
 void thr_exit ( void );
+
+void thr_block ( enum thread_state );
+void thr_unblock ( struct thread * );
 
 struct thread * safe_thr_new ( char *, tfptr, void *, int, int );
 
@@ -138,17 +153,6 @@ struct int_regs {
 };
 #endif
 
-enum thread_state {
-	READY,		/* 0 - ready to go */
-	WAIT,		/* 1 - blocked */
-	SWAIT,		/* 2 - blocked on semaphore */
-	DELAY,		/* 3 - blocked on timer event */
-	IDLE,		/* 4 - running idle loop */
-	JOIN,		/* 5 - waiting to join somebody */
-	ZOMBIE,		/* 6 - waiting to be joined */
-	FAULT,		/* 7 - did something bad */
-	DEAD		/* 8 - on free list */
-};
 
 enum thread_mode { JMP, INT, CONT };
 

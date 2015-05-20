@@ -54,7 +54,7 @@ struct gpio {
 #define ALL_LED (LED0 | LED1 | LED2 | LED3)
 
 void
-gpio_init ( void )
+gpio_led_init ( void )
 {
 	struct gpio *p = (struct gpio *) GPIO1_BASE;
 
@@ -65,6 +65,30 @@ gpio_init ( void )
 	/*
 	printf ( "gpio1 OE = %08x\n", p->oe );
 	*/
+	p->clear_data = ALL_LED;
+}
+
+int led_bits[] = { LED0, LED1, LED2, LED3 };
+
+void
+gpio_led_set ( int val )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+	int i;
+
+	for ( i=0; i<4; i++ ) {
+	    if ( val & 0x01 )
+		p->set_data = led_bits[i];
+	    else
+		p->clear_data = led_bits[i];
+		val >>= 1;
+	}
+}
+
+void
+gpio_init ( void )
+{
+	gpio_led_init ();
 }
 
 int pork[] = { LED0, LED1, LED2, LED3 };
