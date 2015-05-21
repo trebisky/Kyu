@@ -43,7 +43,7 @@ bogus:
 #	$(MAKE) -C $@
 
 install: kyu.bin
-	cp kyu.bin /var/lib/tftpboot/hello.bin
+	cp kyu.bin /var/lib/tftpboot/kyu.bin
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump

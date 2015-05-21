@@ -1,7 +1,7 @@
-#include <kyu.h>
-#include <thread.h>
+#include "kyu.h"
+#include "thread.h"
 
-static struct thread *user_thread;
+static struct sem *user_sem;
 static int count;
 
 static void
@@ -9,7 +9,7 @@ ticker ( void )
 {
 	++count;
 	if ( count > 49 ) {
-	    thr_unblock ( user_thread );
+	    sem_unblock ( user_sem );
 	    count = 0;
 	}
 }
@@ -21,7 +21,8 @@ blinker ( int xx )
 {
 	gpio_led_set ( led );
 	led = (led+1) % 2;
-	thr_block_q ( WAIT );
+
+	sem_block_q ( user_sem );
 }
 
 void
@@ -29,9 +30,9 @@ user_init ( int xx )
 {
 
 	count = 0;
-	user_thread = thr_self ();
+	user_sem = sem_signal_new ( SEM_PRIO );
 	gpio_led_init ();
 	timer_hookup ( ticker );
 
-	thr_block_c ( WAIT, blinker, 0 );
+	sem_block_c ( user_sem, blinker, 0 );
 }

@@ -934,6 +934,7 @@ thr_unblock ( struct thread *tp )
 		printf ( "thr_unblock: %s\n", tp->name );
 	}
 
+	/* XXX - should this really be a panic ?? */
 	if ( tp->state == READY )
 	    panic ( "unblock, already ready" );
 
@@ -979,8 +980,7 @@ thr_unblock ( struct thread *tp )
 	 * to it.  8/22/2002
 	 */
 	if ( in_interrupt ) {
-	    if ( cur_thread->state != READY ||
-		    (tp->pri < cur_thread->pri) ) {
+	    if ( cur_thread->state != READY || (tp->pri < cur_thread->pri) ) {
 		if ( ! in_newtp || tp->pri < in_newtp->pri )
 		    in_newtp = tp;
 	    }

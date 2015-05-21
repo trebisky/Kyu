@@ -8,7 +8,7 @@ static void
 ticker ( void )
 {
 	++count;
-	if ( count > 50 ) {
+	if ( count > 49 ) {
 	    thr_unblock ( user_thread );
 	    count = 0;
 	}
