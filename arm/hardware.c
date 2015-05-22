@@ -13,6 +13,7 @@ hardware_init ( void )
 #ifdef ARCH_ARM
 	wdt_disable ();
 
+	mux_init ();
 	intcon_init ();
 
 	serial_init ( CONSOLE_BAUD );

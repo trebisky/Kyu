@@ -1,0 +1,137 @@
+/* omap_mux.h
+ *  Kyu project  5-21-2015  Tom Trebisky
+ *
+ * These are offsets into the conf array in the
+ * Control Module that are used to control the pinmux
+ *
+ * Note that there are some gaps near the end that
+ *  reflect gaps in the TRM.
+ */
+
+#define	MUX_GPMC_AD0		0
+#define	MUX_GPMC_AD1		1
+#define	MUX_GPMC_AD2		2
+#define	MUX_GPMC_AD3		3
+#define	MUX_GPMC_AD4		4
+#define	MUX_GPMC_AD5		5
+#define	MUX_GPMC_AD6		6
+#define	MUX_GPMC_AD7		7
+#define	MUX_GPMC_AD8		8
+#define	MUX_GPMC_AD9		9
+#define	MUX_GPMC_AD10		10
+#define	MUX_GPMC_AD11		11
+#define	MUX_GPMC_AD12		12
+#define	MUX_GPMC_AD13		13
+#define	MUX_GPMC_AD14		14
+#define	MUX_GPMC_AD15		15
+#define	MUX_GPMC_A0		16
+#define	MUX_GPMC_A1		17
+#define	MUX_GPMC_A2		18
+#define	MUX_GPMC_A3		19
+#define	MUX_GPMC_A4		20
+#define	MUX_GPMC_A5		21
+#define	MUX_GPMC_A6		22
+#define	MUX_GPMC_A7		23
+#define	MUX_GPMC_A8		24
+#define	MUX_GPMC_A9		25
+#define	MUX_GPMC_A10		26
+#define	MUX_GPMC_A11		27
+#define	MUX_GPMC_WAIT0		28
+#define	MUX_GPMC_WPN		29
+#define	MUX_GPMC_BEN1		30
+#define	MUX_GPMC_CSN0		31
+#define	MUX_GPMC_CSN1		32
+#define	MUX_GPMC_CSN2		33
+#define	MUX_GPMC_CSN3		34
+#define	MUX_GPMC_CLK		35
+#define	MUX_GPMC_ADVN_ALE	36
+#define	MUX_GPMC_OEN_REN	37
+#define	MUX_GPMC_WEN		38
+#define	MUX_GPMC_BE0N_CLE	39
+#define	MUX_LCD_DATA0		40
+#define	MUX_LCD_DATA1		41
+#define	MUX_LCD_DATA2		42
+#define	MUX_LCD_DATA3		43
+#define	MUX_LCD_DATA4		44
+#define	MUX_LCD_DATA5		45
+#define	MUX_LCD_DATA6		46
+#define	MUX_LCD_DATA7		47
+#define	MUX_LCD_DATA8		48
+#define	MUX_LCD_DATA9		49
+#define	MUX_LCD_DATA10		50
+#define	MUX_LCD_DATA11		51
+#define	MUX_LCD_DATA12		52
+#define	MUX_LCD_DATA13		53
+#define	MUX_LCD_DATA14		54
+#define	MUX_LCD_DATA15		55
+#define	MUX_LCD_VSYNC		56
+#define	MUX_LCD_HSYNC		57
+#define	MUX_LCD_PCLK		58
+#define	MUX_LCD_AC_BIAS_EN	59
+#define	MUX_MMC0_DAT3		60
+#define	MUX_MMC0_DAT2		61
+#define	MUX_MMC0_DAT1		62
+#define	MUX_MMC0_DAT0		63
+#define	MUX_MMC0_CLK		64
+#define	MUX_MMC0_CMD		65
+#define	MUX_MII1_COL		66
+#define	MUX_MII1_CRS		67
+#define	MUX_MII1_RXERR		68
+#define	MUX_MII1_TXEN		69
+#define	MUX_MII1_RXDV		70
+#define	MUX_MII1_TXD3		71
+#define	MUX_MII1_TXD2		72
+#define	MUX_MII1_TXD1		73
+#define	MUX_MII1_TXD0		74
+#define	MUX_MII1_TXCLK		75
+#define	MUX_MII1_RXCLK		76
+#define	MUX_MII1_RXD3		77
+#define	MUX_MII1_RXD2		78
+#define	MUX_MII1_RXD1		79
+#define	MUX_MII1_RXD0		80
+#define	MUX_RMII1_REFCLK	81
+#define	MUX_MDIO		82
+#define	MUX_MDC			83
+#define	MUX_SPI0_SCLK		84
+#define	MUX_SPI0_D0		85
+#define	MUX_SPI0_D1		86
+#define	MUX_SPI0_CS0		87
+#define	MUX_SPI0_CS1		88
+#define	MUX_ECAP0_IN_PWM0_OUT	89
+#define	MUX_UART0_CTSN		90
+#define	MUX_UART0_RTSN		91
+#define	MUX_UART0_RXD		92
+#define	MUX_UART0_TXD		93
+#define	MUX_UART1_CTSN		94
+#define	MUX_UART1_RTSN		95
+#define	MUX_UART1_RXD		96
+#define	MUX_UART1_TXD		97
+#define	MUX_I2C0_SDA		98
+#define	MUX_I2C0_SCL		99
+#define	MUX_MCASP0_ACLKX	100
+#define	MUX_MCASP0_FSX		101
+#define	MUX_MCASP0_AXR0		102
+#define	MUX_MCASP0_AHCLKR	103
+#define	MUX_MCASP0_ACLKR	104
+#define	MUX_MCASP0_FSR		105
+#define	MUX_MCASP0_AXR1		106
+#define	MUX_MCASP0_AHCLKX	107
+#define	MUX_XDMA_EVENT_INTR0	108
+#define	MUX_XDMA_EVENT_INTR1	109
+#define	MUX_WARMRSTN		110
+#define	MUX_NNMI		112
+#define	MUX_TMS			116
+#define	MUX_TDI			117
+#define	MUX_TDO			118
+#define	MUX_TCK			119
+#define	MUX_TRSTN		120
+#define	MUX_EMU0		121
+#define	MUX_EMU1		122
+#define	MUX_RTC_PWRONRSTN	126
+#define	MUX_PMIC_POWER_EN	127
+#define	MUX_EXT_WAKEUP		128
+#define	MUX_RTC_KALDO_ENN	129
+#define	MUX_USB0_DRVVBUS	135
+#define	MUX_USB1_DRVVBUS	141
+
+/* THE END */

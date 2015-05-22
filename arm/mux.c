@@ -2,222 +2,18 @@
 
 #define CTRL_BASE	0x44e10000
 
-/* All of this is in the "Control Module"
- *  in section 9 of the TRM.
+/* This is by far the ugliest part of the am3358
+ *  namely the "pinmux" as it has been nicknamed.
+ * Don't expect to find it under that name in the
+ *  technical documentation though, and you will
+ *  not find the full story in any one document either.
+ * Part of what you need to know is under "Control Module"
+ *  in section 9 of the TRM around page 1124.
+ * The other part is in the data sheet in a big table
+ *  that begins on page 19 entitled "Ball Characteristics"
  */
 
-/*
- * PAD CONTROL OFFSETS
- * Field names corresponds to the pad signal name
- */
-struct pad_signals {
-	int gpmc_ad0;
-	int gpmc_ad1;
-	int gpmc_ad2;
-	int gpmc_ad3;
-	int gpmc_ad4;
-	int gpmc_ad5;
-	int gpmc_ad6;
-	int gpmc_ad7;
-	int gpmc_ad8;
-	int gpmc_ad9;
-	int gpmc_ad10;
-	int gpmc_ad11;
-	int gpmc_ad12;
-	int gpmc_ad13;
-	int gpmc_ad14;
-	int gpmc_ad15;
-	int gpmc_a0;
-	int gpmc_a1;
-	int gpmc_a2;
-	int gpmc_a3;
-	int gpmc_a4;
-	int gpmc_a5;
-	int gpmc_a6;
-	int gpmc_a7;
-	int gpmc_a8;
-	int gpmc_a9;
-	int gpmc_a10;
-	int gpmc_a11;
-	int gpmc_wait0;
-	int gpmc_wpn;
-	int gpmc_be1n;
-	int gpmc_csn0;
-	int gpmc_csn1;
-	int gpmc_csn2;
-	int gpmc_csn3;
-	int gpmc_clk;
-	int gpmc_advn_ale;
-	int gpmc_oen_ren;
-	int gpmc_wen;
-	int gpmc_be0n_cle;
-	int lcd_data0;
-	int lcd_data1;
-	int lcd_data2;
-	int lcd_data3;
-	int lcd_data4;
-	int lcd_data5;
-	int lcd_data6;
-	int lcd_data7;
-	int lcd_data8;
-	int lcd_data9;
-	int lcd_data10;
-	int lcd_data11;
-	int lcd_data12;
-	int lcd_data13;
-	int lcd_data14;
-	int lcd_data15;
-	int lcd_vsync;
-	int lcd_hsync;
-	int lcd_pclk;
-	int lcd_ac_bias_en;
-	int mmc0_dat3;
-	int mmc0_dat2;
-	int mmc0_dat1;
-	int mmc0_dat0;
-	int mmc0_clk;
-	int mmc0_cmd;
-	int mii1_col;
-	int mii1_crs;
-	int mii1_rxerr;
-	int mii1_txen;
-	int mii1_rxdv;
-	int mii1_txd3;
-	int mii1_txd2;
-	int mii1_txd1;
-	int mii1_txd0;
-	int mii1_txclk;
-	int mii1_rxclk;
-	int mii1_rxd3;
-	int mii1_rxd2;
-	int mii1_rxd1;
-	int mii1_rxd0;
-	int rmii1_refclk;
-	int mdio_data;
-	int mdio_clk;
-	int spi0_sclk;
-	int spi0_d0;
-	int spi0_d1;
-	int spi0_cs0;
-	int spi0_cs1;
-	int ecap0_in_pwm0_out;
-	int uart0_ctsn;
-	int uart0_rtsn;
-	int uart0_rxd;
-	int uart0_txd;
-	int uart1_ctsn;
-	int uart1_rtsn;
-	int uart1_rxd;
-	int uart1_txd;
-	int i2c0_sda;
-	int i2c0_scl;
-	int mcasp0_aclkx;
-	int mcasp0_fsx;
-	int mcasp0_axr0;
-	int mcasp0_ahclkr;
-	int mcasp0_aclkr;
-	int mcasp0_fsr;
-	int mcasp0_axr1;
-	int mcasp0_ahclkx;
-	int xdma_event_intr0;
-	int xdma_event_intr1;
-	int nresetin_out;
-	int porz;
-	int nnmi;
-	int osc0_in;
-	int osc0_out;
-	int rsvd1;
-	int tms;
-	int tdi;
-	int tdo;
-	int tck;
-	int ntrst;
-	int emu0;
-	int emu1;		/* tjt: after this not all defined in am3359 */
-	int osc1_in;
-	int osc1_out;
-	int pmic_power_en;
-	int rtc_porz;
-	int rsvd2;
-	int ext_wakeup;
-	int enz_kaldo_1p8v;
-	int usb0_dm;
-	int usb0_dp;
-	int usb0_ce;
-	int usb0_id;
-	int usb0_vbus;
-	int usb0_drvvbus;
-	int usb1_dm;
-	int usb1_dp;
-	int usb1_ce;
-	int usb1_id;
-	int usb1_vbus;
-	int usb1_drvvbus;
-	int ddr_resetn;
-	int ddr_csn0;
-	int ddr_cke;
-	int ddr_ck;
-	int ddr_nck;
-	int ddr_casn;
-	int ddr_rasn;
-	int ddr_wen;
-	int ddr_ba0;
-	int ddr_ba1;
-	int ddr_ba2;
-	int ddr_a0;
-	int ddr_a1;
-	int ddr_a2;
-	int ddr_a3;
-	int ddr_a4;
-	int ddr_a5;
-	int ddr_a6;
-	int ddr_a7;
-	int ddr_a8;
-	int ddr_a9;
-	int ddr_a10;
-	int ddr_a11;
-	int ddr_a12;
-	int ddr_a13;
-	int ddr_a14;
-	int ddr_a15;
-	int ddr_odt;
-	int ddr_d0;
-	int ddr_d1;
-	int ddr_d2;
-	int ddr_d3;
-	int ddr_d4;
-	int ddr_d5;
-	int ddr_d6;
-	int ddr_d7;
-	int ddr_d8;
-	int ddr_d9;
-	int ddr_d10;
-	int ddr_d11;
-	int ddr_d12;
-	int ddr_d13;
-	int ddr_d14;
-	int ddr_d15;
-	int ddr_dqm0;
-	int ddr_dqm1;
-	int ddr_dqs0;
-	int ddr_dqsn0;
-	int ddr_dqs1;
-	int ddr_dqsn1;
-	int ddr_vref;
-	int ddr_vtp;
-	int ddr_strben0;
-	int ddr_strben1;
-	int ain7;
-	int ain6;
-	int ain5;
-	int ain4;
-	int ain3;
-	int ain2;
-	int ain1;
-	int ain0;
-	int vrefp;
-	int vrefn;
-};
+#include "omap_mux.h"
 
 /* Constants from U-boot
  * arch/arm/include/asm/arch-am33xx/mux_am33xx.h */
@@ -230,21 +26,33 @@ struct pad_signals {
 #define PULLUDDIS       (0x1 << 3) /* Pull up disabled */
 #define MODE(val)       val     /* used for Readability */
 
-#define PAD_BASE	(CTRL_BASE + 0x800)
+#define MUX_BASE	(CTRL_BASE + 0x800)
+
+void
+mux_init ( void )
+{
+    int *psp = (int *) MUX_BASE;
+
+    /*
+    printf ( "warmrstn at %08x\n", &psp[WARMRSTN] );
+    printf ( "rtc_pwronrstn at %08x\n", &psp[RTC_PWRONRSTN] );
+    printf ( "usb1_drvvbus at %08x\n", &psp[USB1_DRVVBUS] );
+    */
+}
 
 void
 setup_uart0_mux ( void )
 {
-    struct pad_signals *psp = (struct pad_signals *) PAD_BASE;
+    int *psp = (int *) MUX_BASE;
 
-    psp->uart0_rxd = MODE(0) | PULLUP_EN | RXACTIVE;
-    psp->uart0_txd = MODE(0) | PULLUDEN;
+    psp[MUX_UART0_RXD] = MODE(0) | PULLUP_EN | RXACTIVE;
+    psp[MUX_UART0_TXD] = MODE(0) | PULLUDEN;
 }
 
 void
 setup_led_mux ( void )
 {
-    struct pad_signals *psp = (struct pad_signals *) PAD_BASE;
+    int *psp = (int *) MUX_BASE;
 
 #ifdef notdef
     /* Yielded 0x27 for all 4 */
@@ -254,11 +62,10 @@ setup_led_mux ( void )
     printf ( "gpmc %08x\n", psp->gpmc_a8 );
 #endif
 
-    psp->gpmc_a5 = MODE(7) | PULLUDDIS;
-    psp->gpmc_a6 = MODE(7) | PULLUDDIS;
-    psp->gpmc_a7 = MODE(7) | PULLUDDIS;
-    psp->gpmc_a8 = MODE(7) | PULLUDDIS;
+    psp[MUX_GPMC_A5] = MODE(7) | PULLUDDIS;
+    psp[MUX_GPMC_A6] = MODE(7) | PULLUDDIS;
+    psp[MUX_GPMC_A7] = MODE(7) | PULLUDDIS;
+    psp[MUX_GPMC_A8] = MODE(7) | PULLUDDIS;
 }
 
 /* THE END */
-
