@@ -130,9 +130,7 @@ struct test std_test_list[] = {
 	test_cv1,	"CV test",		0,
 	test_join,	"Join test",		0,
 	test_mutex,	"Mutex test",		0,
-	/*
 	test_gpio,	"BBB gpio test",	0,
-	*/
 	0,		0,			0
 };
 
@@ -1948,12 +1946,15 @@ test_mutex ( int count )
 static void
 test_gpio ( int count )
 {
+	gpio_test3 ();
+#ifdef notdef
 	gpio_test_init ();
 
 	while ( test_running ) {
 	    thr_delay ( 4 );
 	    gpio_test_run ();
 	}
+#endif
 }
 
 #ifdef ARCH_X86

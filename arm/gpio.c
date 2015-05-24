@@ -4,10 +4,12 @@
  * 
  */
 
-#define GPIO0_BASE      0x48E07000
-#define GPIO1_BASE      0x4804C000
-#define GPIO2_BASE      0x48A1C000
-#define GPIO3_BASE      0x48A1E000
+#define GPIO0_BASE      ( (struct gpio *) 0x44E07000 )
+#define GPIO1_BASE      ( (struct gpio *) 0x4804C000 )
+#define GPIO2_BASE      ( (struct gpio *) 0x48A1C000 )
+#define GPIO3_BASE      ( (struct gpio *) 0x48A1E000 )
+
+#include <omap_gpio.h>
 
 struct gpio {
 	volatile unsigned long id;
@@ -46,6 +48,10 @@ struct gpio {
 	volatile unsigned long set_data;
 };
 
+static struct gpio *gpio_bases[] = {
+    GPIO0_BASE, GPIO1_BASE, GPIO2_BASE, GPIO3_BASE
+};
+
 #define LED0	1<<21
 #define LED1	1<<22
 #define LED2	1<<23
@@ -67,6 +73,22 @@ gpio_led_init ( void )
 	*/
 	p->clear_data = ALL_LED;
 }
+
+void
+gpio_set_bit ( int bit )
+{
+	int gpio = bit / 32;
+	gpio_bases[gpio]->set_data = 1 << (bit % 32);
+}
+
+void
+gpio_clear_bit ( int bit )
+{
+	int gpio = bit / 32;
+	gpio_bases[gpio]->clear_data = 1 << (bit % 32);
+}
+
+/* --------------------- */
 
 int led_bits[] = { LED0, LED1, LED2, LED3 };
 
@@ -90,6 +112,7 @@ gpio_init ( void )
 {
 	gpio_led_init ();
 }
+
 
 int pork[] = { LED0, LED1, LED2, LED3 };
 
@@ -152,6 +175,26 @@ gpio_test2 ( void )
 	    i = (i+1) % 4;
 	    p->set_data = pork[i];
 	    thr_delay ( 5 );
+	}
+}
+
+int users[] = { USER_LED0, USER_LED1, USER_LED2, USER_LED3 };
+
+/* Simple light blinking
+ *  use timer interrupts
+ */
+void
+gpio_test3 ( void )
+{
+	int who = 0;
+
+	gpio_clear_bit ( GPIO_0_2 );
+
+	for ( ;; ) {
+	    gpio_clear_bit ( users[who] );
+	    who = (who+1) % 4;
+	    gpio_set_bit ( users[who] );
+	    thr_delay ( 3 );
 	}
 }
 
