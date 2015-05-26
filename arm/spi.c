@@ -15,4 +15,17 @@
 #define SPI0_BASE      0x48030000
 #define SPI1_BASE      0x481A0000
 
+void
+spi_init ( void )
+{
+}
+
+/* XXX - tentative name */
+
+void
+spi_spi0_setup ( void )
+{
+	setup_spi0_mux ();
+}
+
 /* THE END */

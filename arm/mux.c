@@ -34,6 +34,7 @@ mux_init ( void )
     int *psp = (int *) MUX_BASE;
 
     /*
+     * Check offsets in structure
     printf ( "warmrstn at %08x\n", &psp[WARMRSTN] );
     printf ( "rtc_pwronrstn at %08x\n", &psp[RTC_PWRONRSTN] );
     printf ( "usb1_drvvbus at %08x\n", &psp[USB1_DRVVBUS] );
@@ -50,17 +51,47 @@ setup_uart0_mux ( void )
 }
 
 void
-setup_led_mux ( void )
+setup_i2c0_mux ( void )
 {
     int *psp = (int *) MUX_BASE;
 
-#ifdef notdef
-    /* Yielded 0x27 for all 4 */
-    printf ( "gpmc %08x\n", psp->gpmc_a5 );
-    printf ( "gpmc %08x\n", psp->gpmc_a6 );
-    printf ( "gpmc %08x\n", psp->gpmc_a7 );
-    printf ( "gpmc %08x\n", psp->gpmc_a8 );
-#endif
+    psp[MUX_I2C0_SDA] = MODE(0) | PULLUDEN | RXACTIVE | SLEWCTRL;
+    psp[MUX_I2C0_SCL] = MODE(0) | PULLUDEN | RXACTIVE | SLEWCTRL;
+}
+
+void
+setup_i2c1_mux ( void )
+{
+    int *psp = (int *) MUX_BASE;
+
+    psp[MUX_I2C1_SDA] = MODE(2) | PULLUDEN | RXACTIVE | SLEWCTRL;
+    psp[MUX_I2C1_SCL] = MODE(2) | PULLUDEN | RXACTIVE | SLEWCTRL;
+}
+
+void
+setup_i2c2_mux ( void )
+{
+    int *psp = (int *) MUX_BASE;
+
+    psp[MUX_I2C2_SDA] = MODE(2) | PULLUDEN | RXACTIVE | SLEWCTRL;
+    psp[MUX_I2C2_SCL] = MODE(2) | PULLUDEN | RXACTIVE | SLEWCTRL;
+}
+
+void
+setup_spi0_mux ( void )
+{
+    int *psp = (int *) MUX_BASE;
+
+    psp[MUX_SPI0_SCLK] = MODE(0) | PULLUDEN | RXACTIVE;
+    psp[MUX_SPI0_D0]  =  MODE(0) | PULLUDEN | PULLUP_EN | RXACTIVE;
+    psp[MUX_SPI0_D1]  =  MODE(0) | PULLUDEN | RXACTIVE;
+    psp[MUX_SPI0_CS0]  = MODE(0) | PULLUDEN | PULLUP_EN | RXACTIVE;
+}
+
+void
+setup_led_mux ( void )
+{
+    int *psp = (int *) MUX_BASE;
 
     psp[MUX_GPMC_A5] = MODE(7) | PULLUDDIS;
     psp[MUX_GPMC_A6] = MODE(7) | PULLUDDIS;

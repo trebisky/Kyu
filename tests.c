@@ -9,9 +9,7 @@
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
-/*
-#include "intel.h"
-*/
+#include "malloc.h"
 
 #define HZ	100
 
@@ -444,6 +442,22 @@ rom_search ( void )
 }
 #endif
 
+void
+malloc_test ()
+{
+	char *p;
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+
+	free ( p );
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+}
+
 static void
 help_tests ( struct test *tp, int nt )
 {
@@ -726,6 +740,10 @@ tester ( void )
 		printf ("Lets try a divide by zero ...\n");
 		a = a / b;
 		printf ("... All done!\n");
+	    }
+
+	    if ( **wp == 'm' ) {
+		malloc_test ();
 	    }
 
 #ifdef notdef

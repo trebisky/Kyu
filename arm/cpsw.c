@@ -17,9 +17,7 @@
  * GNU General Public License for more details.
  */
 
-#define TJT
-
-#ifndef TJT
+#ifndef KYU
 #include <common.h>
 #include <command.h>
 #include <net.h>
@@ -33,15 +31,13 @@
 #include <asm/arch/cpu.h>
 #endif
 
-#ifdef TJT
+#include <malloc.h>
+
+#ifdef KYU
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 /* From: ./arch/arm/include/asm/arch-am33xx/cpu.h: */
 #define BIT(x)				(1 << x)
-
-void *calloc ( int, int );
-void *malloc ( int );
-void free ( void *);
 
 struct mii_dev *miiphy_get_dev_by_name ( char * );
 
@@ -98,7 +94,37 @@ extern unsigned char            *NetRxPackets[PKTBUFSRX];
 
 #endif
 
-#include <cpsw.h>
+struct cpsw_slave_data {
+	u32		slave_reg_ofs;
+	u32		sliver_reg_ofs;
+	int		phy_addr;
+	int		phy_if;
+};
+
+enum {
+	CPSW_CTRL_VERSION_1 = 0,
+	CPSW_CTRL_VERSION_2	/* am33xx like devices */
+};
+
+struct cpsw_platform_data {
+	u32	mdio_base;
+	u32	cpsw_base;
+	int	mdio_div;
+	int	channels;	/* number of cpdma channels (symmetric)	*/
+	u32	cpdma_reg_ofs;	/* cpdma register offset		*/
+	int	slaves;		/* number of slave cpgmac ports		*/
+	u32	ale_reg_ofs;	/* address lookup engine reg offset	*/
+	int	ale_entries;	/* ale table size			*/
+	u32	host_port_reg_ofs;	/* cpdma host port registers	*/
+	u32	hw_stats_reg_ofs;	/* cpsw hw stats counters	*/
+	u32	bd_ram_ofs;		/* Buffer Descriptor RAM offset */
+	u32	mac_control;
+	struct cpsw_slave_data	*slave_data;
+	void	(*control)(int enabled);
+	u32	host_port_num;
+	u32	active_slave;
+	u8	version;
+};
 
 #define BITMASK(bits)		(BIT(bits) - 1)
 #define PHY_REG_MASK		0x1f
@@ -276,6 +302,11 @@ struct cpdma_chan {
 	struct cpdma_desc	*head, *tail;
 	void			*hdp, *cp, *rxfree;
 };
+
+#ifdef KYU
+#define __raw_writel(v,a)	(*((unsigned long *)a) = (v))
+#define __raw_readl(a)		(*((unsigned long *)a))
+#endif
 
 #define desc_write(desc, fld, val)	__raw_writel((u32)(val), &(desc)->fld)
 #define desc_read(desc, fld)		__raw_readl(&(desc)->fld)
@@ -595,7 +626,7 @@ static int cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
 	return 0;
 }
 
-#ifdef TJT_MDIO
+#ifdef KYU_MDIO
 static void cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 {
 	struct mii_dev *bus = mdio_alloc();
@@ -642,7 +673,7 @@ static void cpsw_set_slave_mac(struct cpsw_slave *slave,
 	__raw_writel(mac_lo(priv->dev->enetaddr), &slave->regs->sa_lo);
 }
 
-#ifdef TJTPHY
+#ifdef KYUPHY
 static void cpsw_slave_update_link(struct cpsw_slave *slave,
 				   struct cpsw_priv *priv, int *link)
 {
@@ -938,8 +969,8 @@ static void cpsw_halt(struct eth_device *dev)
 {
 	struct cpsw_priv	*priv = dev->priv;
 
-	writel(0, priv->dma_regs + CPDMA_TXCONTROL);
-	writel(0, priv->dma_regs + CPDMA_RXCONTROL);
+	__raw_writel(0, priv->dma_regs + CPDMA_TXCONTROL);
+	__raw_writel(0, priv->dma_regs + CPDMA_RXCONTROL);
 
 	/* soft reset the controller and initialize priv */
 	setbit_and_wait_for_clear32(&priv->regs->soft_reset);
@@ -973,7 +1004,8 @@ static int cpsw_send(struct eth_device *dev, void *packet, int length)
 	return cpdma_submit(priv, &priv->tx_chan, packet, length);
 }
 
-static int cpsw_recv(struct eth_device *dev)
+static int
+cpsw_recv(struct eth_device *dev)
 {
 	struct cpsw_priv	*priv = dev->priv;
 	void *buffer;
@@ -982,14 +1014,18 @@ static int cpsw_recv(struct eth_device *dev)
 	while (cpdma_process(priv, &priv->rx_chan, &buffer, &len) >= 0) {
 		invalidate_dcache_range((unsigned long)buffer,
 					(unsigned long)buffer + PKTSIZE_ALIGN);
+#ifndef KYU
+		/* XXX - in U-boot this gets called for every packet received */
 		NetReceive(buffer, len);
+#endif
 		cpdma_submit(priv, &priv->rx_chan, buffer, PKTSIZE);
 	}
 
 	return 0;
 }
 
-static void cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
+static void
+cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
 			    struct cpsw_priv *priv)
 {
 	void			*regs = priv->regs;
@@ -1000,7 +1036,7 @@ static void cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
 	slave->sliver	= regs + data->sliver_reg_ofs;
 }
 
-#ifdef TJTPHY
+#ifdef KYUPHY
 static int cpsw_phy_init(struct eth_device *dev, struct cpsw_slave *slave)
 {
 	struct cpsw_priv *priv = (struct cpsw_priv *)dev->priv;
@@ -1025,7 +1061,8 @@ static int cpsw_phy_init(struct eth_device *dev, struct cpsw_slave *slave)
 }
 #endif
 
-int cpsw_register(struct cpsw_platform_data *data)
+int
+cpsw_register(struct cpsw_platform_data *data)
 {
 	struct cpsw_priv	*priv;
 	struct cpsw_slave	*slave;
@@ -1074,7 +1111,12 @@ int cpsw_register(struct cpsw_platform_data *data)
 	dev->recv	= cpsw_recv;
 	dev->priv	= priv;
 
+#ifndef KYU
+/* In U-boot, this would get called, and it in turn will call
+ */
 	eth_register(dev);
+#endif
+
 
 	cpsw_mdio_init(dev->name, data->mdio_base, data->mdio_div);
 	priv->bus = miiphy_get_dev_by_name(dev->name);
@@ -1082,6 +1124,150 @@ int cpsw_register(struct cpsw_platform_data *data)
 		cpsw_phy_init(dev, slave);
 
 	return 1;
+}
+
+/* The following from U-boot sources
+ *  board/ti/am335x/board.c
+ */
+
+static void cpsw_control(int enabled)
+{
+	/* VTP can be added here */
+	return;
+}
+
+static struct cpsw_slave_data cpsw_slaves[] = {
+	{
+		.slave_reg_ofs	= 0x208,
+		.sliver_reg_ofs	= 0xd80,
+		.phy_addr	= 0,
+	},
+	{
+		.slave_reg_ofs	= 0x308,
+		.sliver_reg_ofs	= 0xdc0,
+		.phy_addr	= 1,
+	},
+};
+
+static struct cpsw_platform_data cpsw_data = {
+	.mdio_base		= CPSW_MDIO_BASE,
+	.cpsw_base		= CPSW_BASE,
+	.mdio_div		= 0xff,
+	.channels		= 8,
+	.cpdma_reg_ofs		= 0x800,
+	.slaves			= 1,
+	.slave_data		= cpsw_slaves,
+	.ale_reg_ofs		= 0xd00,
+	.ale_entries		= 1024,
+	.host_port_reg_ofs	= 0x108,
+	.hw_stats_reg_ofs	= 0x900,
+	.bd_ram_ofs		= 0x2000,
+	.mac_control		= (1 << 5),
+	.control		= cpsw_control,
+	.host_port_num		= 0,
+	.version		= CPSW_CTRL_VERSION_2,
+};
+
+/*
+ * This function will:
+ * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
+ * in the environment
+ * Perform fixups to the PHY present on certain boards.  We only need this
+ * function in:
+ * - SPL with either CPSW or USB ethernet support
+ * - Full U-Boot, with either CPSW or USB ethernet
+ * Build in only these cases to avoid warnings about unused variables
+ * when we build an SPL that has neither option but full U-Boot will.
+ */
+int board_eth_init(bd_t *bis)
+{
+	int rv, n = 0;
+	__maybe_unused struct am335x_baseboard_id header;
+
+#ifdef KYU_MAC
+	uint8_t mac_addr[6];
+	uint32_t mac_hi, mac_lo;
+
+	/* try reading mac address from efuse */
+	mac_lo = readl(&cdev->macid0l);
+	mac_hi = readl(&cdev->macid0h);
+	mac_addr[0] = mac_hi & 0xFF;
+	mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+	mac_addr[2] = (mac_hi & 0xFF0000) >> 16;
+	mac_addr[3] = (mac_hi & 0xFF000000) >> 24;
+	mac_addr[4] = mac_lo & 0xFF;
+	mac_addr[5] = (mac_lo & 0xFF00) >> 8;
+
+	if (!getenv("ethaddr")) {
+		printf("<ethaddr> not set. Validating first E-fuse MAC\n");
+
+		if (is_valid_ether_addr(mac_addr))
+			eth_setenv_enetaddr("ethaddr", mac_addr);
+	}
+
+	mac_lo = readl(&cdev->macid1l);
+	mac_hi = readl(&cdev->macid1h);
+	mac_addr[0] = mac_hi & 0xFF;
+	mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+	mac_addr[2] = (mac_hi & 0xFF0000) >> 16;
+	mac_addr[3] = (mac_hi & 0xFF000000) >> 24;
+	mac_addr[4] = mac_lo & 0xFF;
+	mac_addr[5] = (mac_lo & 0xFF00) >> 8;
+
+	if (!getenv("eth1addr")) {
+		if (is_valid_ether_addr(mac_addr))
+			eth_setenv_enetaddr("eth1addr", mac_addr);
+	}
+#endif
+
+#ifdef KYU_EEPROM
+
+	if (read_eeprom(&header) < 0)
+		puts("Could not get board ID.\n");
+
+	if (board_is_bone(&header) || board_is_bone_lt(&header) ||
+	    board_is_idk(&header)) {
+		writel(MII_MODE_ENABLE, &cdev->miisel);
+		cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if =
+				PHY_INTERFACE_MODE_MII;
+	} else {
+		writel((RGMII_MODE_ENABLE | RGMII_INT_DELAY), &cdev->miisel);
+		cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if =
+				PHY_INTERFACE_MODE_RGMII;
+	}
+#endif
+
+	rv = cpsw_register(&cpsw_data);
+	if (rv < 0)
+		printf("Error %d registering CPSW switch\n", rv);
+	else
+		n += rv;
+
+#ifdef KYU_EEPROM
+	/*
+	 *
+	 * CPSW RGMII Internal Delay Mode is not supported in all PVT
+	 * operating points.  So we must set the TX clock delay feature
+	 * in the AR8051 PHY.  Since we only support a single ethernet
+	 * device in U-Boot, we only do this for the first instance.
+	 */
+#define AR8051_PHY_DEBUG_ADDR_REG	0x1d
+#define AR8051_PHY_DEBUG_DATA_REG	0x1e
+#define AR8051_DEBUG_RGMII_CLK_DLY_REG	0x5
+#define AR8051_RGMII_TX_CLK_DLY		0x100
+
+	if (board_is_evm_sk(&header) || board_is_gp_evm(&header)) {
+		const char *devname;
+		devname = miiphy_get_current_dev();
+
+		miiphy_write(devname, 0x0, AR8051_PHY_DEBUG_ADDR_REG,
+				AR8051_DEBUG_RGMII_CLK_DLY_REG);
+		miiphy_write(devname, 0x0, AR8051_PHY_DEBUG_DATA_REG,
+				AR8051_RGMII_TX_CLK_DLY);
+	}
+#endif
+
+	return n;
 }
 
 /* THE END */
