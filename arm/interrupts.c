@@ -5,6 +5,7 @@
 #include <kyu.h>
 #include <thread.h>
 
+#include "hardware.h"
 #include "omap_ints.h"
 
 extern struct thread *cur_thread;
@@ -115,7 +116,9 @@ irq_hookup ( int irq, irq_fptr func, void *arg )
 	if ( irq < 0 || irq >= NUM_INTS )
 	    panic ( "irq_hookup: not available" );
 
+	/*
 	printf ( "irq_hookup: %d, %08x, %d\n", irq, func, (int) arg );
+	*/
 
 	if ( func ) {
 	    irq_table[irq].func = func;

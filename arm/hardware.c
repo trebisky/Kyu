@@ -6,15 +6,20 @@
  */
 
 #include "kyu.h"
+#include "hardware.h"
 
 void
 hardware_init ( void )
 {
+
+	mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
+
 #ifdef ARCH_ARM
 	wdt_disable ();
 
 	mux_init ();
 	intcon_init ();
+	cm_init ();
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );

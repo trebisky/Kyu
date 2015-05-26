@@ -6,19 +6,6 @@
 #define NULL	(0)
 #endif
 
-/* XXX XXX - should be in some hardware specific include file */
-#ifdef ARCH_X86
-#define THR_STACK_BASE	0x70000
-#define THR_STACK_LIMIT	4096 * 32 /* (0x20000) */
-#endif
-
-#ifdef ARCH_ARM
-#define THR_STACK_BASE	0x98000000
-#define THR_STACK_LIMIT	4096 * 128
-
-#define EVIL_STACK_BASE 0x9a000000
-#endif
-
 enum console_mode { SERIAL, VGA, SIO_0, SIO_1 };
 
 typedef void (*tfptr) ( int );

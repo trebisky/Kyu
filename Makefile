@@ -18,7 +18,7 @@ include Makefile.inc
 OBJS =  machine.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
-    random.o kyulib.o
+    dlmalloc.o random.o kyulib.o
 
 all: tags install
 
@@ -34,6 +34,8 @@ machine.o:	bogus
 	cd arm ; make
 
 bogus:
+
+dlmalloc.o:	malloc.h
 
 #.PHONY: subdirs $(SUBDIRS)
 #

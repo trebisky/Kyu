@@ -7,6 +7,7 @@
 #include "kyulib.h"
 #include "thread.h"
 
+#include "hardware.h"
 #include "cpu.h"
 
 /* XXX - still doesn't work (w/ yield).

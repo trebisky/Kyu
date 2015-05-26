@@ -35,6 +35,10 @@ void cq_add ( struct cqueue *, int );
 int cq_remove ( struct cqueue * );
 int cq_count ( struct cqueue * );
 
+#ifndef NULL
+#define NULL	(0)
+#endif
+
 #ifdef ARCH_X86
 extern inline void cpu_enter ( void )
 {
