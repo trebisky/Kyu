@@ -34,6 +34,9 @@
 #include <malloc.h>
 
 #ifdef KYU
+#define CPSW_BASE                       0x4A100000
+#define CPSW_MDIO_BASE                  0x4A101000
+
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 /* From: ./arch/arm/include/asm/arch-am33xx/cpu.h: */
@@ -1169,6 +1172,30 @@ static struct cpsw_platform_data cpsw_data = {
 };
 
 /*
+ * TI AM335x parts define a system EEPROM that defines certain sub-fields.
+ * We use these fields to in turn see what board we are on, and what
+ * that might require us to set or not set.
+ */
+#define HDR_NO_OF_MAC_ADDR	3
+#define HDR_ETH_ALEN		6
+#define HDR_NAME_LEN		8
+
+struct am335x_baseboard_id {
+	unsigned int  magic;
+	char name[HDR_NAME_LEN];
+	char version[4];
+	char serial[12];
+	char config[32];
+	char mac_addr[HDR_NO_OF_MAC_ADDR][HDR_ETH_ALEN];
+};
+
+static inline int
+board_is_bone(struct am335x_baseboard_id *header)
+{
+	return !strncmp(header->name, "A335BONE", HDR_NAME_LEN);
+}
+
+/*
  * This function will:
  * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
  * in the environment
@@ -1179,10 +1206,11 @@ static struct cpsw_platform_data cpsw_data = {
  * Build in only these cases to avoid warnings about unused variables
  * when we build an SPL that has neither option but full U-Boot will.
  */
-int board_eth_init(bd_t *bis)
+int
+board_eth_init ( void )
 {
 	int rv, n = 0;
-	__maybe_unused struct am335x_baseboard_id header;
+	struct am335x_baseboard_id header;
 
 #ifdef KYU_MAC
 	uint8_t mac_addr[6];
@@ -1225,6 +1253,15 @@ int board_eth_init(bd_t *bis)
 	if (read_eeprom(&header) < 0)
 		puts("Could not get board ID.\n");
 
+	if ( ! board_is_bone(&header) )
+	    puts("Bogus Juju in eeprom?!\n" );
+
+	writel(MII_MODE_ENABLE, &cdev->miisel);
+	cpsw_slaves[0].phy_if = 
+	    cpsw_slaves[1].phy_if =
+		    PHY_INTERFACE_MODE_MII;
+
+#ifdef KYU_OLD
 	if (board_is_bone(&header) || board_is_bone_lt(&header) ||
 	    board_is_idk(&header)) {
 		writel(MII_MODE_ENABLE, &cdev->miisel);
@@ -1235,6 +1272,7 @@ int board_eth_init(bd_t *bis)
 		cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if =
 				PHY_INTERFACE_MODE_RGMII;
 	}
+#endif
 #endif
 
 	rv = cpsw_register(&cpsw_data);
