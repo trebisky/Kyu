@@ -1039,7 +1039,6 @@ cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
 	slave->sliver	= regs + data->sliver_reg_ofs;
 }
 
-#ifdef KYUPHY
 static int cpsw_phy_init(struct eth_device *dev, struct cpsw_slave *slave)
 {
 	struct cpsw_priv *priv = (struct cpsw_priv *)dev->priv;
@@ -1062,7 +1061,6 @@ static int cpsw_phy_init(struct eth_device *dev, struct cpsw_slave *slave)
 
 	return 1;
 }
-#endif
 
 int
 cpsw_register(struct cpsw_platform_data *data)
