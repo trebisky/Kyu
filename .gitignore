@@ -1,5 +1,6 @@
 *.o
 *.s
+*.e
 tags
 kyu
 kyu.bin
@@ -9,6 +10,7 @@ kyu.syms
 *.OLD
 OLD
 OLD/*
+arm/OLD
 z
 zz
 zzz

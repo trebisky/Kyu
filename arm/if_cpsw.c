@@ -17,6 +17,18 @@
  * GNU General Public License for more details.
  */
 
+/* Kyu project
+ * Tom Trebisky 5-26-2015
+ * Copied from the U-boot (2015.01) sources (from cpsw.c)
+ *  many other files merged in to make it stand alone
+ *
+ * The cpsw is a 3 port ethernet switch capable of gigabit
+ *  two ports are ethernet, one is CPPI
+ *  on the BBB only one port is used and has
+ *   only a 10/100 media interface.
+ * The media interface is a SMSC "LAN8710" chip.
+ */
+
 #ifndef KYU
 #include <common.h>
 #include <command.h>
@@ -31,9 +43,15 @@
 #include <asm/arch/cpu.h>
 #endif
 
-#include <malloc.h>
-
 #ifdef KYU
+
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned int u32;
+
+#include <malloc.h>
+#include <phy.h>
+
 #define CPSW_BASE                       0x4A100000
 #define CPSW_MDIO_BASE                  0x4A101000
 
@@ -44,15 +62,16 @@
 
 struct mii_dev *miiphy_get_dev_by_name ( char * );
 
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-
+/* XXX */
 #define ENOENT          2       /* No such file or directory */
 #define ENOMEM          12      /* Out of memory */
 #define EBUSY           16      /* Device or resource busy */
 #define EINVAL          22      /* Invalid argument */
 #define ETIMEDOUT       110     /* Connection timed out */
+
+#ifdef notdef
+/* XXX - we don't plant to keep this either */
+/* Now pulled in via phy.h */
 
 struct eth_device {
         char name[16];
@@ -75,6 +94,7 @@ struct eth_device {
         int index;
         void *priv;
 };
+#endif
 
 /*
  * Maximum packet size; used to allocate packet storage.
@@ -95,7 +115,7 @@ extern unsigned char            NetBcastAddr[6];
 # define PKTBUFSRX      4
 extern unsigned char            *NetRxPackets[PKTBUFSRX];
 
-#endif
+#endif	/* KYU */
 
 struct cpsw_slave_data {
 	u32		slave_reg_ofs;
@@ -171,6 +191,7 @@ struct cpsw_platform_data {
 struct cpsw_mdio_regs {
 	u32	version;
 	u32	control;
+
 #define CONTROL_IDLE		BIT(31)
 #define CONTROL_ENABLE		BIT(30)
 
@@ -564,7 +585,8 @@ static inline void cpsw_ale_port_state(struct cpsw_priv *priv, int port,
 static struct cpsw_mdio_regs *mdio_regs;
 
 /* wait until hardware is ready for another user access */
-static inline u32 wait_for_user_access(void)
+static inline u32
+wait_for_user_access(void)
 {
 	u32 reg = 0;
 	int timeout = MDIO_TIMEOUT;
@@ -577,11 +599,13 @@ static inline u32 wait_for_user_access(void)
 		printf("wait_for_user_access Timeout\n");
 		return -ETIMEDOUT;
 	}
+
 	return reg;
 }
 
 /* wait until hardware state machine is idle */
-static inline void wait_for_idle(void)
+static inline void
+wait_for_idle(void)
 {
 	int timeout = MDIO_TIMEOUT;
 
@@ -593,7 +617,8 @@ static inline void wait_for_idle(void)
 		printf("wait_for_idle Timeout\n");
 }
 
-static int cpsw_mdio_read(struct mii_dev *bus, int phy_id,
+static int
+cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 				int dev_addr, int phy_reg)
 {
 	int data;
@@ -612,7 +637,8 @@ static int cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 	return data;
 }
 
-static int cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
+static int
+cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
 				int phy_reg, u16 data)
 {
 	u32 reg;
@@ -1121,8 +1147,9 @@ cpsw_register(struct cpsw_platform_data *data)
 
 	cpsw_mdio_init(dev->name, data->mdio_base, data->mdio_div);
 	priv->bus = miiphy_get_dev_by_name(dev->name);
+
 	for_active_slave(slave, priv)
-		cpsw_phy_init(dev, slave);
+	    cpsw_phy_init(dev, slave);
 
 	return 1;
 }
