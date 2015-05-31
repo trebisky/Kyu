@@ -1,6 +1,5 @@
 #ifdef KYU
 typedef unsigned long ulong;
-typedef unsigned long size_t;
 typedef unsigned long ptrdiff_t;
 #endif
 /*

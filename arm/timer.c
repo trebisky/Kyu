@@ -106,6 +106,18 @@ delay10 ( void )
 	;
 }
 
+/* Use for sub millisecond delays
+ * argument is microseconds.
+ */
+void
+_udelay ( int n )
+{
+    volatile long x = 250 * n;
+
+    while ( x-- > 0 )
+	;
+}
+
 void
 timer_hookup ( vfptr new )
 {

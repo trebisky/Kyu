@@ -5,7 +5,32 @@
 void dump_w ( void *, int );
 void dump_l ( void *, int );
 
+/* We rely on the gcc builtins for these,
+ * but need to provide prototypes.
+ */
+typedef int size_t;
+
+#ifdef notyet
+#define memcpy(x,y,z) __builtin_memcpy((x), (y), (z))
+#endif
+
+/* This whole gcc builtin thing is a pain in the butt.
+ * We would like to use the compiler builtins, but
+ * getting it all straight is a big headache right now.
+ * tjt 5-39-2015
+ */
+void *memset( void *s, int c, size_t n );
 int strcmp ( const char *, const char * );
+char *strcpy ( char *, const char * );
+char *strncpy( char *, const char *, size_t );
+
+/* We provide these (at least thus far */
+int printf(const char *, ...);
+int sprintf(char *, const char *, ...);
+/*
+int snprintf(char *str, size_t size, const char *format, ...);
+*/
+
 
 #ifdef LED_DEBUG
 void flash ( void );

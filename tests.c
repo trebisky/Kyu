@@ -288,7 +288,7 @@ static int test_running;
 /* This gets launched as a thread to run each test
  *  repeating the test as many times as indicated.
  */
-void
+static void
 wrapper ( int arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
@@ -682,14 +682,15 @@ tester ( void )
 	    }
 #endif
 
-	    if ( **wp == 'o' && nw == 2 ) {
-	    	int flags = 0;
+	    if ( **wp == 'o' ) {
 		if ( nw > 1 )
-		    flags = atoi ( wp[1] );
-		thr_debug ( flags );
+		    thr_debug ( atoi (wp[1]) );
+		else
+		    thr_debug ( 0 );
 	    }
 
 	    /* Show threads */
+	    /* Conflicts with t for test mode below */
 	    if ( **wp == 't' && nw == 1 ) {
 	    	thr_show ();
 	    }
@@ -744,6 +745,14 @@ tester ( void )
 
 	    if ( **wp == 'm' ) {
 		malloc_test ();
+	    }
+
+	    /* cpsw test */
+	    if ( **wp == 'c' ) {
+		if ( nw < 2 )
+		    eth_test ( 0 );
+		else
+		    eth_test ( atoi(wp[1]) );
 	    }
 
 #ifdef notdef

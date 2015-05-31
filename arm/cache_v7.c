@@ -229,6 +229,7 @@ static void v7_dcache_inval_range(u32 start, u32 stop, u32 line_len)
 	if (start & (line_len - 1)) {
 		printf("ERROR: %s - start address is not aligned - 0x%08x\n",
 			__func__, start);
+		printf ( "KYU --- line_len is: %d\n", line_len );
 		/* move to next cache line */
 		start = (start + line_len - 1) & ~(line_len - 1);
 	}

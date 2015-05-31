@@ -7,6 +7,8 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
+#	if_cpsw.o miiphyutil.o phy.o smsc.o \
+#	if_cpsw.o phy.o smsc.o \
 
 # locore must be first
 OBJS =  locore.o hardware.o \

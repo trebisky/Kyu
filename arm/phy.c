@@ -28,13 +28,14 @@
 
 #ifdef KYU
 typedef unsigned long u32;
+#include <kyulib.h>
 #include <malloc.h>
 #include <miiphy.h>
 #include <phy.h>
 
-/* XXX ditch this */
-#define EINTR           4       /* Interrupted system call */
-#define EIO             5       /* I/O error */
+#define debug	printf
+
+#define ffs(x)	__builtin_ffs(x)
 #endif
 
 /* Generic PHY support and helper functions */
@@ -247,6 +248,7 @@ genphy_update_link(struct phy_device *phydev)
 
 		printf("%s Waiting for PHY auto negotiation to complete",
 			phydev->dev->name);
+
 		while (!(mii_reg & BMSR_ANEGCOMPLETE)) {
 			/*
 			 * Timeout reached ?
@@ -257,11 +259,13 @@ genphy_update_link(struct phy_device *phydev)
 				return 0;
 			}
 
+#ifndef KYU
 			if (ctrlc()) {
 				puts("user interrupt!\n");
 				phydev->link = 0;
 				return -EINTR;
 			}
+#endif
 
 			if ((i++ % 500) == 0)
 				printf(".");
@@ -478,7 +482,8 @@ phy_init(void)
 	return 0;
 }
 
-int phy_register(struct phy_driver *drv)
+int
+phy_register(struct phy_driver *drv)
 {
 	INIT_LIST_HEAD(&drv->list);
 	list_add_tail(&drv->list, &phy_drivers);
@@ -512,29 +517,25 @@ generic_for_interface(phy_interface_t interface)
 }
 
 static struct phy_driver *
-get_phy_driver(struct phy_device *phydev,
-				phy_interface_t interface)
+get_phy_driver(struct phy_device *phydev, phy_interface_t interface)
 {
 	struct list_head *entry;
 	int phy_id = phydev->phy_id;
 	struct phy_driver *drv = NULL;
 
-#ifdef KYU_NOTHYET
 	list_for_each(entry, &phy_drivers) {
 		drv = list_entry(entry, struct phy_driver, list);
 		if ((drv->uid & drv->mask) == (phy_id & drv->mask))
 			return drv;
 	}
-#endif
 
 	/* If we made it here, there's no driver for this PHY */
 	return generic_for_interface(interface);
 }
 
 static struct phy_device *
-phy_device_create(struct mii_dev *bus, int addr,
-					    int phy_id,
-					    phy_interface_t interface)
+phy_device_create(struct mii_dev *bus,
+	int addr, int phy_id, phy_interface_t interface)
 {
 	struct phy_device *dev;
 
@@ -587,7 +588,7 @@ get_phy_id(struct mii_dev *bus, int addr, int devad, u32 *phy_id)
 	phy_reg = bus->read(bus, addr, devad, MII_PHYSID1);
 
 	if (phy_reg < 0)
-		return -EIO;
+		return -1;
 
 	*phy_id = (phy_reg & 0xffff) << 16;
 
@@ -595,13 +596,14 @@ get_phy_id(struct mii_dev *bus, int addr, int devad, u32 *phy_id)
 	phy_reg = bus->read(bus, addr, devad, MII_PHYSID2);
 
 	if (phy_reg < 0)
-		return -EIO;
+		return -1;
 
 	*phy_id |= (phy_reg & 0xffff);
 
 	return 0;
 }
 
+/* XXX - does not handle error return from above */
 static struct phy_device *
 create_phy_by_mask(struct mii_dev *bus,
 		unsigned phy_mask, int devad, phy_interface_t interface)
@@ -649,10 +651,7 @@ get_phy_device_by_mask(struct mii_dev *bus,
 	for (i = 0; i < 5; i++) {
 		phydev = create_phy_by_mask(bus, phy_mask,
 				i ? i : MDIO_DEVAD_NONE, interface);
-		if (IS_ERR(phydev))
-			return NULL;
-		if (phydev)
-			return phydev;
+		return phydev;
 	}
 	printf("Phy %d not found\n", ffs(phy_mask) - 1);
 	return phy_device_create(bus, ffs(phy_mask) - 1, 0xffffffff, interface);
@@ -729,6 +728,7 @@ phy_reset(struct phy_device *phydev)
 	return 0;
 }
 
+#ifndef KYU
 int
 miiphy_reset(const char *devname, unsigned char addr)
 {
@@ -744,6 +744,7 @@ miiphy_reset(const char *devname, unsigned char addr)
 
 	return phy_reset(phydev);
 }
+#endif
 
 struct phy_device *
 phy_find_by_mask(struct mii_dev *bus, unsigned phy_mask,
@@ -763,6 +764,7 @@ phy_connect_dev(struct phy_device *phydev, struct eth_device *dev)
 {
 	/* Soft Reset the PHY */
 	phy_reset(phydev);
+
 	if (phydev->dev) {
 		printf("%s:%d is connected to %s.  Reconnecting to %s\n",
 				phydev->bus->name, phydev->addr,

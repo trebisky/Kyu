@@ -34,6 +34,7 @@ hardware_init ( void )
 	/* Must call trap_init() first */
 	trap_init ();
 	timer_init ();
+	/* timer_init ( DEFAULT_TIMER_RATE ); */
 	kb_init ();
 	sio_init ();
 #endif

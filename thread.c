@@ -1796,7 +1796,6 @@ void cpu_leave_s ( void )
 }
 #endif
 
-#ifdef notyet
 /* Just some "sugar" to make the cpu_xxx() calls all nice
  * and analogous to the cv_xxx() calls.
  */
@@ -1812,6 +1811,7 @@ cpu_signal ( struct sem *xp )
 	sem_unblock ( xp );
 }
 
+#ifdef notyet
 /* This works, but still has race conditions
  * this gets called with interrupts masked off.
  * we want to block and release interrupts in one

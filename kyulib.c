@@ -1,15 +1,32 @@
 /* kyulib.c
  * A library of odds and ends for skidoo
  *
- *	Tom Trebisky 12/1/2001
+ *	Tom Trebisky 12/1/2001 5/28/2015
  *
  * Right now we have:
  *	character circular buffer handling.
  *	memory dump routines.
+ *	string routines
  */
 #include "kyu.h"
 #include "thread.h"
 #include "kyulib.h"
+
+/* Argument in microseconds.
+ * silly to try to make this "fast"
+ * XXX - this could be more clever.
+ */
+void
+udelay ( int count )
+{
+	if ( count <= 0 )
+	    return;
+
+	if ( count >= 1000 )
+	    thr_delay ( (count+999)/1000 );
+	else
+	    _udelay ( count );
+}
 
 int
 hextoi ( char *s )
@@ -133,8 +150,6 @@ net_dots ( char *buf, unsigned char *iaddr )
 	return 1;
 }
 
-typedef unsigned int size_t;
-
 void *
 memcpy ( void *s1, char *s2, size_t count )
 {
@@ -147,20 +162,6 @@ memcpy ( void *s1, char *s2, size_t count )
 	    *p++ = *s2++;
 
 	return s1;
-}
-
-void *
-memset ( void *buf, int val, size_t count )
-{
-	char *p, *end;
-
-	p=(char *)buf;
-	end = &p[count];
-
-	while ( p<end ) 
-	    *p++ = val;
-
-	return buf;
 }
 
 /* Usually just used to detect match or not */
@@ -437,6 +438,19 @@ strcmp ( const char *s1, const char *s2 )
 	return 0;
 }
 
+int
+strlen ( const char *s )
+{
+	int len = 0;
+
+	while ( *s++ )
+	    len++;
+
+	return len;
+}
+
+#define NO_USE_GCC_BUILTINS
+#ifdef NO_USE_GCC_BUILTINS
 char *
 strcpy ( char *ds, const char *ss )
 {
@@ -448,6 +462,40 @@ strcpy ( char *ds, const char *ss )
 	} while ( cc );
 	return ds;
 }
+
+char *
+strncpy ( char *ds, const char *ss, int n )
+{
+	char cc;
+	char *dp = ds;
+
+	if ( n <= 0 ) {
+	    *ds = '\0';
+	    return ds;
+	}
+
+	do {
+	    *dp++ = cc = *ss++;
+	    n --;
+	} while ( n && cc );
+	return ds;
+}
+
+void *
+memset ( void *buf, int val, size_t count )
+{
+	char *p, *end;
+
+	p=(char *)buf;
+	end = &p[count];
+
+	while ( p<end ) 
+	    *p++ = val;
+
+	return buf;
+}
+
+#endif /* NO_USE_GCC_BUILTINS */
 
 /* Wrapper function to catch troubles when making new threads.
  */

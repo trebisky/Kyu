@@ -43,6 +43,20 @@
 */
 #define INITIAL_CONSOLE		SERIAL
 
-#define DEFAULT_TIMER_RATE	100
+/* This lets udelay work right */
+#define DEFAULT_TIMER_RATE	1000
+
+/* XXX there should be a better place for all this ..
+ * maybe types.h ?
+ */
+#ifndef NULL
+#define NULL (0)
+#endif
+
+typedef unsigned long u32;
+typedef unsigned short u16;
+typedef unsigned char u8;
+
+typedef volatile unsigned long vu32;
 
 /* THE END */

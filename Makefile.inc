@@ -9,9 +9,22 @@
 # here by default.
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
 
+# I should find a way to cooperate with gcc and printf.
+# It optimizes simple calls to just a puts call, which ought to
+# be fine.  I need the builtin ffs() function, so I need to selectively
+# turn off printf
+
+#NOB = -fno-builtin-printf -fno-builtin-putchar -fno-builtin-puts
+NOB = -fno-builtin
+
 CCX = arm-linux-gnu-gcc
-COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float $(INCS)
+#COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float $(INCS)
+#COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)
+#COPTS = -DKYU -nostdinc $(NOB) -marm -march=armv7-a -msoft-float $(INCS)
+
+COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)
+
 CC = $(CCX) $(COPTS)
 
 # It is a bug that we cannot invoke gcc to do this,

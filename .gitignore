@@ -2,6 +2,7 @@
 *.s
 *.e
 tags
+cpu.h
 kyu
 kyu.bin
 kyu.dump

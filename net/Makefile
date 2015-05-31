@@ -1,0 +1,20 @@
+# Makefile for Kyu on the ARM processor
+#
+# build net.o
+#
+# Tom Trebisky  5-18-2015
+
+INCS = -I. -I..
+include ../Makefile.inc
+
+OBJS =  net_main.o in_cksum.o \
+    net_arp.o net_icmp.o net_ip.o \
+    net_tcp.o net_udp.o dns.o
+
+all: ../net.o
+
+../net.o: $(OBJS)
+	$(LD) -r -o ../net.o $(OBJS)
+
+clean:
+	rm -f *.o
