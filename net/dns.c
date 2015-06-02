@@ -21,6 +21,9 @@ nameserver 208.67.220.220
 */
 #define RESOLVER "192.168.0.1"
 
+/* In seconds */
+#define LOOKUP_TIMEOUT	30
+
 struct dns_info {
 	unsigned short id;
 	unsigned short flags;
@@ -84,6 +87,7 @@ unsigned long dns_lookup ( char * );
 static struct dns_data * dns_alloc ( void );
 static unsigned long dns_cache_lookup ( char * );
 void dns_show ( char * );
+void dns_cache_show ( void );
 
 /* Take a string of the form fred.dingus.edu
  * and convert it to a DNS packet string.
@@ -127,12 +131,17 @@ dns_unpack ( char *pkt, char *data, char *buf )
     	char *p = data;
 	int n;
 	char *rv = (char *) 0;
+	short val;
 
 	while ( *p ) {
 	    if ( (*p & 0xc0) == 0xc0 ) {
 		if ( rv == (char *) 0 )
 		    rv = p + 2;
+		/*
 		n = ntohs(*(short *)p) & 0x3fff;
+		*/
+		memcpy ( &val, p, sizeof(short) );
+		n = ntohs(val) & 0x3fff;
 		p = &pkt[n];
 		continue;
 	    }
@@ -206,7 +215,11 @@ dns_lookup_t ( char *host, int timeout )
 
 	/* build request packet */
 	dp = (struct dns_info *) dns_buf;
+	/*
 	dp->id = htons(dns_id++);
+	*/
+	dp->id = htons(dns_id);
+
 	dp->flags = htons ( STD_REQ );
 	dp->nquery = htons ( 1 );
 	dp->n_ans = 0;
@@ -221,16 +234,18 @@ dns_lookup_t ( char *host, int timeout )
 	np += 2;
 	val = htons ( C_IN );
 	memcpy ( np, &val, 2 );
+	np += 2;
 
 	/* build cache entry */
 	dcp = dns_alloc ();
 	dcp->flags = F_PENDING;
 	dcp->ttl = timeout;
-	dcp->id = dns_id - 1;
+	dcp->id = dns_id++;
 	strcpy ( dcp->name, host );
 
-	/*
+	dns_cache_show ();
 	printf ("Waiting on DNS ID: %d\n", dcp->id );
+	/*
 	*/
 
 	dcp->sem = sem_signal_new ( SEM_FIFO );
@@ -242,8 +257,10 @@ dns_lookup_t ( char *host, int timeout )
 	udp_send ( dns_ip, REPLY_PORT, DNS_PORT, (char *) dp, (char *)np - dns_buf );
 
 	sem_block ( dcp->sem );
-
 	sem_destroy ( dcp->sem );
+
+	dns_cache_show ();
+
 	if ( dcp->flags & F_VALID ) {
 	    /*
 	    printf ("DNS got it: %s\n", ip2strl ( dcp->ip_addr ) );
@@ -253,8 +270,8 @@ dns_lookup_t ( char *host, int timeout )
 
 	/* timed out or failed */
 	/*
-	printf ("DNS failed\n");
 	*/
+	printf ("DNS failed: %d\n", dcp->flags);
 	dcp->flags = 0;
 	return 0;
 }
@@ -262,7 +279,7 @@ dns_lookup_t ( char *host, int timeout )
 unsigned long
 dns_lookup ( char *host )
 {
-	return dns_lookup_t ( host, 30 );
+	return dns_lookup_t ( host, LOOKUP_TIMEOUT );
 }
 
 void
@@ -274,6 +291,8 @@ dns_resp_show ( struct netbuf *nbp )
 	int rcode;
 	char *cp;
 	unsigned long ip;
+	unsigned short sval;
+	unsigned long lval;
 
 	dp = (struct dns_info *) nbp->dptr;
 
@@ -296,10 +315,14 @@ dns_resp_show ( struct netbuf *nbp )
 	rp = (struct rr_info *) dns_unpack ( (char *) dp, cp, buf );
 	printf ("name = %s\n", buf );
 	printf ("next: %d\n", ((char *)rp)-((char *)dp) );
-	printf ("ttl = %d\n", ntohl(rp->ttl));
-	printf ("rlen = %d\n", ntohs(rp->len));
 
-	ip = *(unsigned long *) rp->buf;
+	memcpy ( &lval, &rp->ttl, 4);
+	printf ("ttl = %d\n", ntohl(lval));
+
+	memcpy ( &sval, &rp->len, 2);
+	printf ("rlen = %d\n", ntohs(sval));
+
+	memcpy ( &ip, rp->buf, 4);
 	printf ("IP = %s\n", ip2strl ( ip ) );
 }
 
@@ -313,9 +336,11 @@ dns_rcv ( struct netbuf *nbp )
 	char *cp;
 	unsigned long ip;
 	int i;
+	int len;
+	unsigned long ttl;
 
-	/*
 	dns_resp_show ( nbp );
+	/*
 	*/
 
 	dp = (struct dns_info *) nbp->dptr;
@@ -339,10 +364,17 @@ dns_rcv ( struct netbuf *nbp )
 
 	/* get the resource record */
 	rp = (struct rr_info *) dns_unpack ( (char *) dp, cp, buf );
-	if ( ntohs(rp->len) != 4 )
+
+	/* ARM alignment issues */
+	memcpy ( &len, &rp->len, 2 );
+	if ( ntohs(len) != 4 )
 	    return;
 
+	/* ARM alignment issues */
+	/*
 	ip = *(unsigned long *) rp->buf;
+	*/
+	memcpy ( &ip, rp->buf, 4 );
 	/*
 	printf ("IP = %s\n", ip2strl(ip) );
 	*/
@@ -352,11 +384,14 @@ dns_rcv ( struct netbuf *nbp )
 	    if ( (ap->flags & F_PENDING) &&
 		ap->id == ntohs ( dp->id ) ) {
 		    ap->flags = F_VALID;
-		    ap->ttl = ntohl(rp->ttl);
+		    memcpy ( &ttl, &rp->ttl, sizeof(long) );
+		    ap->ttl = ntohl(ttl);
 		    ap->ip_addr = ip;
+		    printf ( "Adding entry for %s\n", ip2strl ( ip ) );
 		    sem_unblock ( ap->sem );
 		}
 	}
+	printf ( "dns_rcv is done\n" );
 }
 
 void

@@ -2602,6 +2602,7 @@ test_netping ( int test )
 	ping ( test_ip );
 }
 
+/* Should broadcast BOOTP packet */
 static void
 test_netudp ( int test )
 {

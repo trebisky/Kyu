@@ -36,6 +36,7 @@ unsigned long test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 static unsigned char our_mac[ETH_ADDR_SIZE];
 
+static int system_clock_rate;
 static void slow_net ( int );
 static void fast_net ( void );
 
@@ -116,6 +117,7 @@ net_init ( void )
     (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
     (void) safe_thr_new ( "net_slow", slow_net, (void *) 0, 11, 0 );
 
+    system_clock_rate = timer_rate_get();
     slow_net_sem = sem_signal_new ( SEM_FIFO );
     net_timer_hookup ( fast_net );
 
@@ -194,11 +196,13 @@ slow_net ( int arg )
 
 static int fast_net_clock = 0;
 
-/* Called roughly at 100 Hz */
+/* Called at the system clock rate
+ * (either 100 or 1000 Hz probably)
+ */
 static void
 fast_net ( void )
 {
-	if ( (fast_net_clock++ % 100) == 0 )
+	if ( ( fast_net_clock++ % system_clock_rate ) == 0 )
 	    sem_unblock ( slow_net_sem );
 }
 

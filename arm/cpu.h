@@ -65,6 +65,7 @@ typedef unsigned long __u32;
                 (((__u32)(x) & (__u32)0x00ff0000UL) >>  8) | \
                 (((__u32)(x) & (__u32)0xff000000UL) >> 24) ))
 
+/* XXX - evil if we do htons(x++) */
 #define htons(x)        ___swab16(x)
 #define ntohs(x)        ___swab16(x)
 

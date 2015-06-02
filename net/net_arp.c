@@ -254,6 +254,7 @@ ip_arp_send ( struct netbuf *nbp )
 	arp_request ( dest_ip );
 }
 
+/* Argument in network byte order */
 int
 arp_ping ( unsigned long target_ip, char *ether )
 {
@@ -267,10 +268,10 @@ arp_ping ( unsigned long target_ip, char *ether )
 	busy = 1;
 	ap = arp_alloc ();
 
-	ap->ip_addr = htonl ( target_ip );
+	ap->ip_addr = target_ip;
 	ap->flags = F_PING;
 
-	printf ("ARP ping request sent for %s\n", ip2strl ( ap->ip_addr ) );
+	printf ("ARP ping request sent for %s\n", ip2strl ( target_ip ) );
 
 	/* We only wait 10 seconds.
 	 */
@@ -294,14 +295,15 @@ arp_ping ( unsigned long target_ip, char *ether )
 }
 
 void
-show_arp_ping ( unsigned long arg )
+show_arp_ping ( unsigned long target_ip )
 {
     	unsigned char ether[ETH_ADDR_SIZE];
+	unsigned long net_ip = htonl(target_ip);
 
-	if ( arp_ping ( arg, ether ) )
-	    printf ("%s is at %s\n", ip2strl ( arg ), ether2str (ether) );
+	if ( arp_ping ( net_ip, ether ) )
+	    printf ("%s is at %s\n", ip2strl ( net_ip ), ether2str (ether) );
 	else
-	    printf ("No response from: %s\n", ip2strl ( arg ) );
+	    printf ("No response from: %s\n", ip2strl ( net_ip ) );
 }
 
 /* emit a gratuitous ARP message.

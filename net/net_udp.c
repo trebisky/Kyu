@@ -37,18 +37,21 @@ udp_rcv ( struct netbuf *nbp )
 	nbp->dlen = nbp->plen - sizeof(struct udp_hdr);
 	nbp->dptr = nbp->pptr + sizeof(struct udp_hdr);
 
-	/* XXX - validate checksum of received packets
-	 */
-	if ( BOOTP_PORT2 == ntohs(udp->dport) )
-	    bootp_rcv ( nbp );
-
-	if ( DNS_PORT == ntohs(udp->dport) )
-	    dns_rcv ( nbp );
-
 #ifdef DEBUG_UDP
 	printf ( "UDP from %s: src/dst = %d/%d\n",
 		ip2strl ( nbp->iptr->src ), ntohs(udp->sport), ntohs(udp->dport) );
 #endif
+
+	/* XXX - validate checksum of received packets
+	 */
+	if ( BOOTP_PORT2 == ntohs(udp->dport) ) {
+	    bootp_rcv ( nbp );
+	}
+
+	if ( DNS_PORT == ntohs(udp->dport) ) {
+	    dns_rcv ( nbp );
+	}
+
 }
 
 struct bogus_ip {
