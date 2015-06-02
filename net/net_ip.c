@@ -79,8 +79,8 @@ ip_rcv ( struct netbuf *nbp )
 
 /* typically called to return an icmp packet.
  * (also to do a RST/ACK on a tcp connection.)
- * We take some big short cuts here, recycling the
- * netbuf already received.
+ * We take some significant short cuts here,
+ *  recycling the netbuf already received.
  */
 void
 ip_reply ( struct netbuf *nbp )

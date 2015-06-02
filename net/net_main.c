@@ -378,6 +378,7 @@ net_send ( struct netbuf *nbp )
     else
 	ee_send ( nbp );
 #endif
+    printf ("Sending packet\n" );
     cpsw_send ( nbp );
 
     /* XXX - Someday we may have a transmit queue

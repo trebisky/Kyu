@@ -88,7 +88,7 @@ static void test_gpio ( int );
 static void test_net ( int );
 static void test_netarp ( int );
 static void test_netping ( int );
-static void test_netudp ( int );
+static void test_bootp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
 static void test_netshow ( int );
@@ -151,7 +151,7 @@ struct test io_test_list[] = {
 struct test net_test_list[] = {
 	test_netshow,	"Net show",		0,
 	test_netarp,	"send ARP",		0,
-	test_netudp,	"send UDP",		0,
+	test_bootp,	"test BOOTP",		0,
 	test_netping,	"Net ping",		0,
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
@@ -2604,9 +2604,9 @@ test_netping ( int test )
 
 /* Should broadcast BOOTP packet */
 static void
-test_netudp ( int test )
+test_bootp ( int test )
 {
-	udp_test();
+	bootp_test();
 }
 
 static void

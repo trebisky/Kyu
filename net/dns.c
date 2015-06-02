@@ -18,8 +18,9 @@ nameserver 208.67.220.220
 /*
 #define RESOLVER "10.0.0.54"
 #define RESOLVER "128.196.100.50"
-*/
 #define RESOLVER "192.168.0.1"
+*/
+#define RESOLVER "208.67.222.222"
 
 /* In seconds */
 #define LOOKUP_TIMEOUT	30
