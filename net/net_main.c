@@ -90,9 +90,10 @@ net_init ( void )
     printf ( "Addr = %08x, %s\n", xxx, ip2strl ( xxx ) );
     */
 
-    netbuf_init();
-    arp_init();
-    dns_init();
+    netbuf_init ();
+    arp_init ();
+    dns_init ();
+    bootp_init ();
 
     inq_head = (struct netbuf *) 0;
     inq_tail = (struct netbuf *) 0;
@@ -181,6 +182,14 @@ net_init ( void )
     ping ( cholla_ip );
     */
 }
+
+/* XXX - there are definitely better ways to do this.
+ * Since slow_net is a thread, it could just do a
+ * thread delay if we didn't mind timings being a
+ * bit sloppy.  What would be better would be for
+ * a thread to register for periodic activations,
+ * maybe as a continuation !!
+ */
 
 /* Activated roughly at 1 Hz */
 static void
@@ -312,8 +321,10 @@ net_handle ( struct netbuf *nbp )
 	++total_count;
 
 	if ( ehp->type == ETH_ARP_SWAP ) {
+	    /*
 	    printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
 	    printf ( "(ARP)\n" );
+	    */
 	    arp_rcv ( nbp );
 	    return;
 	}
@@ -331,8 +342,10 @@ net_handle ( struct netbuf *nbp )
 	}
 
 	if ( ehp->type == ETH_IP_SWAP ) {
+	    /*
 	    printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
 	    printf ( "(IP)\n" );
+	    */
 	    /*
 	    dump_buf ( nbp->eptr, nbp->elen );
 	    */
@@ -362,6 +375,7 @@ net_show ( void )
 
 	netbuf_show ();
 	arp_show ();
+	dns_cache_show ();
 }
 
 /* ----------------------------------------- */
@@ -378,7 +392,9 @@ net_send ( struct netbuf *nbp )
     else
 	ee_send ( nbp );
 #endif
+    /*
     printf ("Sending packet\n" );
+    */
     cpsw_send ( nbp );
 
     /* XXX - Someday we may have a transmit queue
@@ -432,6 +448,7 @@ netbuf_init ( void )
 	    free = ap;
 	    ++count;
 	}
+
 	printf ("%d net buffers initialized\n", count );
 	netbuf_show ();
 }
@@ -442,8 +459,13 @@ netbuf_show ( void )
 	int count = 0;
 	struct netbuf *ap;
 
-	for ( ap = free; ap; ap = ap->next )
+	printf ( "Netbuf head shows: %08x\n", free );
+
+	for ( ap = free; ap; ap = ap->next ) {
 	    count++;
+	    if ( count > (NUM_NETBUF+10) )	/* XXX */
+		break;
+	}
 
 	printf ( "%d buffers free of %d\n", count, NUM_NETBUF );
 }
@@ -476,6 +498,7 @@ netbuf_alloc_i ( void )
 	rv = free;
 	free = free->next;
 
+	rv->refcount = 1;
 	rv->bptr = rv->data;
 	rv->eptr = (struct eth_hdr *) (rv->bptr + NETBUF_PREPAD);
 	rv->iptr = (struct ip_hdr *) ((char *) rv->eptr + sizeof ( struct eth_hdr ));
@@ -488,6 +511,10 @@ netbuf_alloc_i ( void )
 void
 netbuf_free ( struct netbuf *old )
 {
+	old->refcount--;
+	if ( old->refcount > 0 )
+	    return;
+
 	old->next = free;
 	free = old;
 }

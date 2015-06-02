@@ -21,7 +21,7 @@ bootp_test ( int arg )
 {
 	int i;
 
-	for ( i=0; i<100; i++ ) {
+	for ( i=0; i<4; i++ ) {
 	    bootp_send ();
 	    thr_delay ( 10 );
 	}
@@ -122,6 +122,12 @@ bootp_rcv ( struct netbuf *nbp )
 		ip2strl ( bpp->server_ip ),
 		ether2str ( nbp->eptr->src ), dst );
 	printf (" gives my IP as: %s\n", ip2strl ( bpp->your_ip ) );
+}
+
+void
+bootp_init ( void )
+{
+	udp_hookup ( BOOTP_PORT2, bootp_rcv );
 }
 
 /* THE END */

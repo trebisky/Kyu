@@ -11,6 +11,8 @@
 #define BOOTP_PORT2	68	/* receive on this port */
 #define DNS_PORT	53
 
+typedef void (*ufptr) ( struct netbuf * );
+
 void bootp_rcv ( struct netbuf * );
 
 /* 8 bytes */
@@ -24,6 +26,26 @@ struct udp_hdr {
 
 extern unsigned long my_ip;
 
+struct udp_proto {
+	struct udp_proto *next;
+	int port;
+	ufptr func;
+};
+
+static struct udp_proto *head = (struct udp_proto *) 0;
+
+void
+udp_hookup ( int port, ufptr func )
+{
+	struct udp_proto *pp;
+
+	pp = (struct udp_proto *) malloc ( sizeof(struct udp_proto) );
+	pp->port = port;
+	pp->func = func;
+	pp->next = head;
+	head = pp;
+}
+
 void
 udp_rcv ( struct netbuf *nbp )
 {
@@ -31,6 +53,8 @@ udp_rcv ( struct netbuf *nbp )
 	struct udp_phdr *psp;
 	int sum;
 	char *cptr;
+	struct udp_proto *pp;
+	int port;
 
 	udp = (struct udp_hdr *) nbp->pptr;
 	nbp->dlen = nbp->plen - sizeof(struct udp_hdr);
@@ -44,7 +68,14 @@ udp_rcv ( struct netbuf *nbp )
 	/* XXX - validate checksum of received packets
 	 */
 
-	/* XXX - Generalize this with port lookup and hookup table */
+	port = ntohs(udp->dport);
+
+	for ( pp = head; pp; pp = pp->next ) {
+	    if ( port == pp->port )
+		( *pp->func ) ( nbp );
+	}
+
+#ifdef notdef
 	if ( BOOTP_PORT2 == ntohs(udp->dport) ) {
 	    bootp_rcv ( nbp );
 	}
@@ -52,7 +83,7 @@ udp_rcv ( struct netbuf *nbp )
 	if ( DNS_PORT == ntohs(udp->dport) ) {
 	    dns_rcv ( nbp );
 	}
-
+#endif
 }
 
 struct bogus_ip {

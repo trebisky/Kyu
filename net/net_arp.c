@@ -24,10 +24,11 @@
 #include "netbuf.h"
 #include "cpu.h"
 
-#define DEBUG_ARP
-
 #define ARP_SIZE	28
 #define ARP_MIN		60
+
+static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+static unsigned char zeros[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 /* Gcc has special ideas about alignment in this structure
  * that frustrates my attempts to declare spa and tpa as longs.
@@ -92,6 +93,21 @@ arp_show_stuff ( char *str, struct eth_arp *eap )
 	printf ( " (%s)\n", ip2str ( eap->tpa ) );
 }
 
+struct arp_data *
+arp_lookup_e ( unsigned long ip_addr )
+{
+	int i;
+	struct arp_data *ap;
+
+	for ( i=0; i<MAX_ARP_CACHE; i++ ) {
+	    ap = &arp_cache[i];
+	    if ( ap->ip_addr == ip_addr )
+		return ap;
+	}
+
+	return (struct arp_data *) 0;
+}
+
 /* -------------------------- */
 
 #ifdef ARCH_X86
@@ -151,9 +167,6 @@ arp_rcv ( struct netbuf *nbp )
 	    netbuf_free ( nbp );
 	}
 }
-
-static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-static unsigned char zeros[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 void
 arp_reply ( struct netbuf *nbp )
@@ -221,6 +234,13 @@ ip_arp_send ( struct netbuf *nbp )
 
 	nbp->eptr->type = ETH_IP_SWAP;
 
+	/* broadcast is easy */
+	if ( dest_ip == IP_BROADCAST ) {
+	    memcpy ( nbp->eptr->dst, broad, ETH_ADDR_SIZE );
+	    net_send ( nbp );
+	    return;
+	}
+
 	/*  XXX - here is the sum total of our IP routing.
 	 * maybe this should be going to the gateway.
 	 */
@@ -228,7 +248,9 @@ ip_arp_send ( struct netbuf *nbp )
 	    dest_ip = gate_ip;
 	}
 
-	if ( arp_lookup ( nbp->eptr->dst, dest_ip ) ) {
+	ap = arp_lookup_e ( dest_ip );
+	if ( ap ) {
+	    memcpy ( nbp->eptr->dst, ap->ether, ETH_ADDR_SIZE );
 	    net_send ( nbp );
 	    return;
 	}
@@ -240,21 +262,30 @@ ip_arp_send ( struct netbuf *nbp )
 	ap->ip_addr = dest_ip;
 	ap->flags = F_PENDING;
 
+	/*
 	printf ("ARP request sent for %s\n", ip2strl ( dest_ip ) );
+	*/
 
 	/* We only wait 20 seconds.
 	 * (BSD waits 3 minutes)
 	 */
 	ap->ttl = 20;
 	nbp->next = ap->outq;
+	nbp->refcount++;
 	ap->outq = nbp;
 
+	/*
 	printf ("Pending packet queued\n");
+	*/
 
 	arp_request ( dest_ip );
 }
 
-/* Argument in network byte order */
+/* Funky old test fixture to test the stack when all
+ * we had was the ARP facility.
+ * Argument in network byte order.
+ * This must take care if there already is an entry in the cache.
+ */
 int
 arp_ping ( unsigned long target_ip, char *ether )
 {
@@ -264,14 +295,18 @@ arp_ping ( unsigned long target_ip, char *ether )
 
 	if ( busy )
 	    return 0;
-
 	busy = 1;
-	ap = arp_alloc ();
+
+	ap = arp_lookup_e ( target_ip ); 
+	if ( ! ap )
+	    ap = arp_alloc ();
 
 	ap->ip_addr = target_ip;
 	ap->flags = F_PING;
 
+	/*
 	printf ("ARP ping request sent for %s\n", ip2strl ( target_ip ) );
+	*/
 
 	/* We only wait 10 seconds.
 	 */
@@ -294,6 +329,9 @@ arp_ping ( unsigned long target_ip, char *ether )
 	return rv;
 }
 
+/* Actually kind of bogus, but an early test
+ * of this network setup
+ */
 void
 show_arp_ping ( unsigned long target_ip )
 {
@@ -353,7 +391,9 @@ arp_expire ( struct arp_data *ap )
 {
 	struct netbuf *nbp, *xbp;
 
+	/*
 	printf ( "ARP entry for %s expired\n", ip2strl ( ap->ip_addr ) );
+	*/
 
 	ap->ip_addr = 0;
 
@@ -473,14 +513,19 @@ arp_save ( char *ether, unsigned char *ip_addr )
 		}
 
 		if ( ap->flags & F_PENDING ) {
+		    /*
 		    printf ("Pending ARP for %s satisfied\n", ip2strl ( ap->ip_addr ) );
+		    */
 		    ap->flags &= ~F_PENDING;
 
 		    for ( nbp = ap->outq; nbp; nbp = xbp ) {
 			memcpy ( nbp->eptr->dst, ap->ether, ETH_ADDR_SIZE );
 			xbp = nbp->next;
 			net_send ( nbp );
+			netbuf_free ( nbp );
+			/*
 			printf ("Pending packet sent\n");
+			*/
 		    }
 		    ap->outq = (struct netbuf *) 0;
 		}
@@ -515,31 +560,12 @@ void
 arp_save_icmp ( char *ether, unsigned char *ip_addr )
 {
 	if ( arp_save ( ether, ip_addr ) ) {
+	    /*
 	    printf ( "Sneaky ARP from ICMP: " );
 	    printf ( "machine: %s", ether2str(ether) );
 	    printf ( " (%s)\n", ip2str ( ip_addr ) );
+	    */
 	}
-}
-
-int
-arp_lookup ( char *ether, unsigned long ip_addr )
-{
-	int i;
-
-	/* broadcast is easy */
-	if ( ip_addr == IP_BROADCAST ) {
-	    memcpy ( ether, broad, ETH_ADDR_SIZE );
-	    return 1;
-	}
-
-	for ( i=0; i<MAX_ARP_CACHE; i++ ) {
-	    if ( arp_cache[i].ip_addr == ip_addr ) {
-		memcpy ( ether, arp_cache[i].ether, ETH_ADDR_SIZE );
-	    	return 1;
-	    }
-	}
-
-	return 0;
 }
 
 /* THE END */

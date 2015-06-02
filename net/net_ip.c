@@ -37,10 +37,12 @@ ip_rcv ( struct netbuf *nbp )
 
 	/* XXX - verify that it is addressed to us, or to a broadcast */
 
+	/*
 	printf ( "IP packet: Source: %s", ip2strl ( ipp->src ) );
 	printf ( "   " );
 	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
 	printf ( "\n" );
+	*/
 
 	if ( ipp->proto == IPPROTO_ICMP ) {
 	    /*
@@ -48,11 +50,13 @@ ip_rcv ( struct netbuf *nbp )
 	    dump_buf ( nbp->iptr, nbp->ilen );
 	    */
 	    icmp_rcv ( nbp );
+	    /* Don't free the net_buf here */
 	} else if ( ipp->proto == IPPROTO_UDP ) {
 	    udp_rcv ( nbp );
 	    netbuf_free ( nbp );
 	} else if ( ipp->proto == IPPROTO_TCP ) {
 	    tcp_rcv ( nbp );
+	    /* Don't free the net_buf here */
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",
 		    ip2strl ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );

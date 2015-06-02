@@ -29,6 +29,7 @@
 struct netbuf {
 	struct netbuf *next;
 	int flags;
+	int refcount;
 	char *bptr;		/* base pointer */
 	char *cptr;		/* controller info pointer */
 	/* */

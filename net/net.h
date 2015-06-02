@@ -11,7 +11,6 @@
 #define DEBUG_TCP
 */
 
-#define DEBUG_ICMP
 #define DEBUG_TCP
 
 #define ETH_ARP		0x0806

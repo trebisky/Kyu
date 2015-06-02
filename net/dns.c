@@ -167,16 +167,19 @@ static unsigned long dns_ip;
 #define REPLY_PORT	32770
 */
 
+/* Often dynamically generated */
 #define REPLY_PORT	53
+
 #define DNS_PORT	53
 
 void
 dns_test ( void )
 {
 	dns_show ( "sol.as.arizona.edu" );
-	dns_show ( "sol.as.arizona.edu" );
-	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "fish.edu" );
+	/*
+	dns_show ( "sol.as.arizona.edu" );
+	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "www.the-oasis.org" );
 	dns_show ( "www.the-oasis.org" );
 	dns_show ( "prep.ai.mit.edu" );
@@ -184,6 +187,7 @@ dns_test ( void )
 	dns_show ( "hacksaw.mmto.arizona.edu" );
 	dns_show ( "mount.mmto.arizona.edu" );
 	dns_show ( "mmtvme1.mmto.arizona.edu" );
+	*/
 }
 
 void
@@ -244,9 +248,9 @@ dns_lookup_t ( char *host, int timeout )
 	dcp->id = dns_id++;
 	strcpy ( dcp->name, host );
 
+	/*
 	dns_cache_show ();
 	printf ("Waiting on DNS ID: %d\n", dcp->id );
-	/*
 	*/
 
 	dcp->sem = sem_signal_new ( SEM_FIFO );
@@ -260,7 +264,9 @@ dns_lookup_t ( char *host, int timeout )
 	sem_block ( dcp->sem );
 	sem_destroy ( dcp->sem );
 
+	/*
 	dns_cache_show ();
+	*/
 
 	if ( dcp->flags & F_VALID ) {
 	    /*
@@ -271,8 +277,8 @@ dns_lookup_t ( char *host, int timeout )
 
 	/* timed out or failed */
 	/*
-	*/
 	printf ("DNS failed: %d\n", dcp->flags);
+	*/
 	dcp->flags = 0;
 	return 0;
 }
@@ -298,12 +304,12 @@ dns_resp_show ( struct netbuf *nbp )
 	dp = (struct dns_info *) nbp->dptr;
 
     	printf ("Received DNS reply (%d bytes)\n", nbp->dlen );
-
 	printf ("id = %d\n", ntohs(dp->id));
 	printf ("flags = %04x\n", ntohs(dp->flags));
+
 	rcode = ntohs(dp->flags) & 0x000f;
 	if ( rcode ) {
-	    printf ("OOPs, DNS return code: %d\n", rcode );
+	    printf ("DNS return code: %d (request failed)\n", rcode );
 	    return;
 	}
 
@@ -318,13 +324,27 @@ dns_resp_show ( struct netbuf *nbp )
 	printf ("next: %d\n", ((char *)rp)-((char *)dp) );
 
 	memcpy ( &lval, &rp->ttl, 4);
-	printf ("ttl = %d\n", ntohl(lval));
-
 	memcpy ( &sval, &rp->len, 2);
-	printf ("rlen = %d\n", ntohs(sval));
-
 	memcpy ( &ip, rp->buf, 4);
+
+	printf ("ttl = %d\n", ntohl(lval));
+	printf ("rlen = %d\n", ntohs(sval));
 	printf ("IP = %s\n", ip2strl ( ip ) );
+}
+
+static struct dns_data *
+find_pending ( int id )
+{
+	struct dns_data *ap;
+	int i;
+
+	for ( i=0; i<MAX_DNS_CACHE; i++ ) {
+	    ap = &dns_cache[i];
+	    if ( (ap->flags & F_PENDING) && ap->id == id )
+		return ap;
+	}
+
+	return (struct dns_data *) 0;
 }
 
 void
@@ -336,12 +356,11 @@ dns_rcv ( struct netbuf *nbp )
 	char buf[128];
 	char *cp;
 	unsigned long ip;
-	int i;
 	int len;
 	unsigned long ttl;
 
-	dns_resp_show ( nbp );
 	/*
+	dns_resp_show ( nbp );
 	*/
 
 	dp = (struct dns_info *) nbp->dptr;
@@ -353,12 +372,16 @@ dns_rcv ( struct netbuf *nbp )
 	if ( ! (ntohs(dp->flags) & F_RESP)  )
 	    return;
 
-	/* If we have a pending entry and get an error,
-	 * we should wake it up, but we just let it timeout
-	 * for now XXX XXX */
-
-	if ( ntohs(dp->flags) & 0x000f )
+	/* The response indicates an error.
+	 * We used to just ignore this and let the
+	 * request timeout, but it is a lot cleaner
+	 * to wake up the pending request.
+	 */
+	if ( ntohs(dp->flags) & 0x000f ) {
+	    ap = find_pending ( ntohs ( dp->id ) );
+	    sem_unblock ( ap->sem );
 	    return;
+	}
 
 	/* skip the Query */
 	cp = 4 + dns_unpack ( (char *) dp, dp->buf, buf );
@@ -380,19 +403,17 @@ dns_rcv ( struct netbuf *nbp )
 	printf ("IP = %s\n", ip2strl(ip) );
 	*/
 
-	for ( i=0; i<MAX_DNS_CACHE; i++ ) {
-	    ap = &dns_cache[i];
-	    if ( (ap->flags & F_PENDING) &&
-		ap->id == ntohs ( dp->id ) ) {
-		    ap->flags = F_VALID;
-		    memcpy ( &ttl, &rp->ttl, sizeof(long) );
-		    ap->ttl = ntohl(ttl);
-		    ap->ip_addr = ip;
-		    printf ( "Adding entry for %s\n", ip2strl ( ip ) );
-		    sem_unblock ( ap->sem );
-		}
+	ap = find_pending ( ntohs ( dp->id ) );
+	if ( ap ) {
+	    ap->flags = F_VALID;
+	    memcpy ( &ttl, &rp->ttl, sizeof(long) );
+	    ap->ttl = ntohl(ttl);
+	    ap->ip_addr = ip;
+	    /*
+	    printf ( "Adding entry for %s\n", ip2strl ( ip ) );
+	    */
+	    sem_unblock ( ap->sem );
 	}
-	printf ( "dns_rcv is done\n" );
 }
 
 void
@@ -405,6 +426,8 @@ dns_init ( void )
 
 	for ( i=0; i<MAX_DNS_CACHE; i++ )
 	    dns_cache[i].flags = 0;
+
+	udp_hookup ( DNS_PORT, dns_rcv );
 }
 
 /* This is called once a second */

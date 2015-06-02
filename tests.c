@@ -150,7 +150,7 @@ struct test io_test_list[] = {
 #ifdef WANT_NET 
 struct test net_test_list[] = {
 	test_netshow,	"Net show",		0,
-	test_netarp,	"send ARP",		0,
+	test_netarp,	"ARP ping",		0,
 	test_bootp,	"test BOOTP",		0,
 	test_netping,	"Net ping",		0,
 	test_dns,	"Test DNS",		0,
