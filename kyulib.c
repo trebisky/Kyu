@@ -109,7 +109,9 @@ split ( char *buf, char **bufp, int max )
 
 /* Take a string of the form 128.196.100.52
  * and convert it to a packed integer in network
- * byte order.
+ * byte order.  Note that Kyu keeps IP addresses
+ * in network byte order regardless of the host order
+ * and compares them as opaque objects.
  */
 int
 net_dots ( char *buf, unsigned char *iaddr )
@@ -150,40 +152,6 @@ net_dots ( char *buf, unsigned char *iaddr )
 	return 1;
 }
 
-void *
-memcpy ( void *s1, char *s2, size_t count )
-{
-	char *p, *end;
-
-	p=(char *)s1;
-	end = &p[count];
-
-	while ( p<end ) 
-	    *p++ = *s2++;
-
-	return s1;
-}
-
-/* Usually just used to detect match or not */
-int
-memcmp ( void *s1, void *s2, size_t count )
-{
-	char *p, *q, *end;
-
-	p=(char *)s1;
-	q=(char *)s2;
-	end = &p[count];
-
-	while ( p < end ) {
-	    if ( *p++ < *q++ )
-		return -1;
-	    if ( *p++ > *q++ )
-		return 1;
-	}
-
-	return 0;
-}
-
 /* single line dump, byte by byte.
  *  count gives bytes.
  *  (gives true byte order).
@@ -201,6 +169,33 @@ dump_v ( void *addr, int n )
 
 	for ( i=0; i<n; i++ )
 	    printf ( "%02x ", *p++ );
+}
+
+/* multi line dump, byte by byte.
+ *  count gives size of buffer
+ */
+void
+dump_buf ( void *addr, int len )
+{
+	unsigned char *p;
+	int i;
+
+	p = (unsigned char *) addr;
+
+	for ( i=0; i<len; i++ ) {
+	    if ( (i % 16) == 0 )
+		printf ( "%08x  ", (long) addr );
+
+	    printf ( "%02x ", *p++ );
+
+	    if ( i > 0 && ((i+1) % 16) == 0 ) {
+		printf ( "\n" );
+		addr += 16;
+	    }
+	}
+
+	if ( (len % 16) != 0 )
+	    printf ( "\n" );
 }
 
 /* multi line dump, byte by byte.
@@ -411,6 +406,7 @@ cq_remove ( struct cqueue *qp )
 	return ch;
 }
 
+#ifndef USE_GCC_BUILTINS
 /* gcc didn't like this prototype until the const
  *  got added to the arguments.
  *
@@ -449,8 +445,6 @@ strlen ( const char *s )
 	return len;
 }
 
-#define NO_USE_GCC_BUILTINS
-#ifdef NO_USE_GCC_BUILTINS
 char *
 strcpy ( char *ds, const char *ss )
 {
@@ -480,6 +474,42 @@ strncpy ( char *ds, const char *ss, int n )
 	} while ( n && cc );
 	return ds;
 }
+
+
+void *
+memcpy ( void *s1, char *s2, size_t count )
+{
+	char *p, *end;
+
+	p=(char *)s1;
+	end = &p[count];
+
+	while ( p<end ) 
+	    *p++ = *s2++;
+
+	return s1;
+}
+
+/* Usually just used to detect match or not */
+int
+memcmp ( void *s1, void *s2, size_t count )
+{
+	char *p, *q, *end;
+
+	p=(char *)s1;
+	q=(char *)s2;
+	end = &p[count];
+
+	while ( p < end ) {
+	    if ( *p++ < *q++ )
+		return -1;
+	    if ( *p++ > *q++ )
+		return 1;
+	}
+
+	return 0;
+}
+
 
 void *
 memset ( void *buf, int val, size_t count )

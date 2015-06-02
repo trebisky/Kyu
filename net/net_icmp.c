@@ -5,6 +5,7 @@
 
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
 
 /* bit fields work on little endian */
 struct icmp_hdr {
@@ -19,15 +20,15 @@ struct icmp_hdr {
 #define TY_ECHO_REPLY	0
 #define TY_ECHO_REQ	8
 
-void icmp_reply ( struct netbuf * );
+static void icmp_reply ( struct netbuf *, int );
 
 /* Pull the arp information out of the ICMP
  * request packet -- nasty and shouldn't but ...
  */
-void
+static void
 icmp_arp_evil ( struct netbuf *nbp )
 {
-    	arp_save_icmp ( nbp->eptr->src, nbp->iptr->src );
+    	arp_save_icmp ( nbp->eptr->src, (unsigned char *) &nbp->iptr->src );
 }
 
 void
@@ -35,9 +36,16 @@ icmp_rcv ( struct netbuf *nbp )
 {
 	struct icmp_hdr *icp;
 	int sum;
+	int len;
 
 	icp = (struct icmp_hdr *) nbp->pptr;
-	sum = in_cksum ( (char *) icp, nbp->plen);
+	len = ntohs(nbp->iptr->len) - sizeof(struct ip_hdr);
+	sum = in_cksum ( (char *) icp, len);
+
+	/*
+	printf ( "ICMP plen = %d, csum = %04x\n", nbp->plen, in_cksum ( nbp->pptr, nbp->plen ) );
+	printf ( "ICMP ilen = %d, csum = %04x\n", len, in_cksum ( nbp->pptr, len ) );
+	*/
 
 #ifdef DEBUG_ICMP
 	if ( icp->type == TY_ECHO_REQ ) {
@@ -57,7 +65,7 @@ icmp_rcv ( struct netbuf *nbp )
 	    printf ( "Sending reply\n" );
 	    */
 	    icmp_arp_evil ( nbp );
-	    icmp_reply ( nbp );
+	    icmp_reply ( nbp, len );
 	    /* XXX - special, do NOT free the netbuf,
 	     * as it is being recycled to handle the reply.
 	     */
@@ -68,15 +76,15 @@ icmp_rcv ( struct netbuf *nbp )
 
 /* Funky short cut, modify the packet and return it
  */
-void
-icmp_reply ( struct netbuf *nbp )
+static void
+icmp_reply ( struct netbuf *nbp, int len )
 {
 	struct icmp_hdr *icp;
 
 	icp = (struct icmp_hdr *) nbp->pptr;
 	icp->type = TY_ECHO_REPLY;
 	icp->sum = 0;
-	icp->sum = in_cksum ( (char *) icp, nbp->plen );
+	icp->sum = in_cksum ( (char *) icp, len );
 	ip_reply ( nbp );
 }
 
@@ -113,14 +121,16 @@ icmp_ping ( unsigned long target_ip )
 	icp->id = icmp_id++;
 	icp->sum = 0;
 	icp->sum = in_cksum ( (char *) icp, nbp->plen );
+	/* XXX */
 
 	ip_send ( nbp, target_ip );
 }
 
+/* Argument in host order */
 void
 ping ( unsigned long arg )
 {
-    	icmp_ping ( arg );
+    	icmp_ping ( htonl(arg) );
 }
 
 /* THE END */

@@ -9,6 +9,7 @@
 #define GPIO2_BASE      ( (struct gpio *) 0x48A1C000 )
 #define GPIO3_BASE      ( (struct gpio *) 0x48A1E000 )
 
+#include <kyulib.h>
 #include <omap_gpio.h>
 
 struct gpio {

@@ -22,13 +22,18 @@
 
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
+
+#define DEBUG_ARP
 
 #define ARP_SIZE	28
 #define ARP_MIN		60
 
 /* Gcc has special ideas about alignment in this structure
- * that frustrates my attempts to declare spa and tpa as
- * longs.
+ * that frustrates my attempts to declare spa and tpa as longs.
+ * And, when this code was ported from the x86 to the ARM
+ * I get data faults because these longs are not properly aligned.
+ * The problem is the 6 byte length of the ethernet addresses.
  */
 struct eth_arp {
 	unsigned short hfmt;
@@ -71,27 +76,41 @@ struct arp_data {
 } arp_cache[MAX_ARP_CACHE];
 
 void arp_reply ( struct netbuf * );
-static int arp_save ( char *, unsigned long );
-void arp_save_icmp ( char *, unsigned long );
+static int arp_save ( char *, unsigned char * );
+void arp_save_icmp ( char *, unsigned char * );
 static struct arp_data * arp_alloc ( void );
 
 static void
 arp_show_stuff ( char *str, struct eth_arp *eap )
 {
-	unsigned long ip;
-
 	printf ( "%s\n", str );
 
 	printf ( "Source: %s", ether2str(eap->sha) );
-	ip = *(unsigned long *) eap->spa;
-	printf ( " (%s) ", ip2str ( ip ) );
+	printf ( " (%s) ", ip2str ( eap->spa ) );
 
 	printf ( "Target: %s", ether2str(eap->tha) );
-	ip = *(unsigned long *) eap->spa;
-	printf ( " (%s)\n", ip2str ( ip ) );
+	printf ( " (%s)\n", ip2str ( eap->tpa ) );
 }
 
 /* -------------------------- */
+
+#ifdef ARCH_X86
+/* This works on the x86 */
+#define IP(x)	(*(long *) (x))
+#endif
+
+#ifdef ARCH_ARM
+/* Workaround for ARM alignment issues */
+static inline unsigned long __ul_ip ( unsigned char *x )
+{
+	unsigned long rv;
+
+	memcpy ( &rv, x, 4);
+	return rv;
+}
+
+#define IP(x)	__ul_ip((x))
+#endif
 
 void
 arp_rcv ( struct netbuf *nbp )
@@ -108,7 +127,7 @@ arp_rcv ( struct netbuf *nbp )
 	}
 #endif
 
-	if ( * (long *) eap->tpa != my_ip ) {
+	if ( IP(eap->tpa) != my_ip ) {
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -122,13 +141,13 @@ arp_rcv ( struct netbuf *nbp )
 #endif
 
 	if ( eap->op == OP_REQ_SWAP ) {
-	    (void) arp_save ( eap->sha, * (long *) eap->spa );
+	    (void) arp_save ( eap->sha, eap->spa );
 	    /* XXX - we recycle the packet to return the reply
 	     * -- so be careful about how the netbuf is disposed of.
 	     */
 	    arp_reply ( nbp );
 	} else {
-	    (void) arp_save ( eap->sha, * (long *) eap->spa );
+	    (void) arp_save ( eap->sha, eap->spa );
 	    netbuf_free ( nbp );
 	}
 }
@@ -162,11 +181,11 @@ arp_reply ( struct netbuf *nbp )
 #define ARP_ETHER_SWAP	0x0100
 
 void
-arp_request ( unsigned long arg )
+arp_request ( unsigned long target_ip )
 {
 	struct netbuf *nbp;
 	struct eth_arp *eap;
-	unsigned long unknown = arg;
+	unsigned long unknown = target_ip;
 
 	/* get a netbuf for this */
 	if ( ! (nbp = netbuf_alloc ()) )
@@ -221,7 +240,7 @@ ip_arp_send ( struct netbuf *nbp )
 	ap->ip_addr = dest_ip;
 	ap->flags = F_PENDING;
 
-	printf ("ARP request sent for %s\n", ip2str ( dest_ip) );
+	printf ("ARP request sent for %s\n", ip2strl ( dest_ip ) );
 
 	/* We only wait 20 seconds.
 	 * (BSD waits 3 minutes)
@@ -236,7 +255,7 @@ ip_arp_send ( struct netbuf *nbp )
 }
 
 int
-arp_ping ( unsigned long arg, char *ether )
+arp_ping ( unsigned long target_ip, char *ether )
 {
 	static int busy = 0;	/* paranoid */
 	struct arp_data *ap;
@@ -248,17 +267,17 @@ arp_ping ( unsigned long arg, char *ether )
 	busy = 1;
 	ap = arp_alloc ();
 
-	ap->ip_addr = arg;
+	ap->ip_addr = htonl ( target_ip );
 	ap->flags = F_PING;
 
-	printf ("ARP ping request sent for %s\n", ip2str ( arg ) );
+	printf ("ARP ping request sent for %s\n", ip2strl ( ap->ip_addr ) );
 
 	/* We only wait 10 seconds.
 	 */
 	ap->ttl = 10;
 	ap->outq = (struct netbuf *) 0;
 
-    	arp_request ( arg );
+    	arp_request ( target_ip );
 
 	sem_block ( arp_ping_sem );
 
@@ -280,9 +299,9 @@ show_arp_ping ( unsigned long arg )
     	unsigned char ether[ETH_ADDR_SIZE];
 
 	if ( arp_ping ( arg, ether ) )
-	    printf ("%s is at %s\n", ip2str ( arg ), ether2str (ether) );
+	    printf ("%s is at %s\n", ip2strl ( arg ), ether2str (ether) );
 	else
-	    printf ("No response from: %s\n", ip2str ( arg ) );
+	    printf ("No response from: %s\n", ip2strl ( arg ) );
 }
 
 /* emit a gratuitous ARP message.
@@ -332,7 +351,7 @@ arp_expire ( struct arp_data *ap )
 {
 	struct netbuf *nbp, *xbp;
 
-	printf ( "ARP entry for %s expired\n", ip2str ( ap->ip_addr ) );
+	printf ( "ARP entry for %s expired\n", ip2strl ( ap->ip_addr ) );
 
 	ap->ip_addr = 0;
 
@@ -391,7 +410,7 @@ arp_show ( void )
 		continue;
 
 	    printf ( "arp: %s at %s (ttl= %d)",
-		ip2str ( ap->ip_addr ),
+		ip2strl ( ap->ip_addr ),
 		ether2str( ap->ether), ap->ttl );
 	    if ( ap->flags )
 		printf ( " %04x", ap->flags );
@@ -430,7 +449,7 @@ arp_alloc ( void )
 }
 
 static int
-arp_save ( char *ether, unsigned long ip_addr )
+arp_save ( char *ether, unsigned char *ip_addr )
 {
 	int i;
 	struct arp_data *ap;
@@ -441,7 +460,7 @@ arp_save ( char *ether, unsigned long ip_addr )
 
 	for ( i=0; i<MAX_ARP_CACHE; i++ ) {
 	    ap = &arp_cache[i];
-	    if ( ap->ip_addr == ip_addr ) {
+	    if ( ap->ip_addr == IP(ip_addr) ) {
 		/* Refresh entry or filling a pending request */
 		memcpy ( ap->ether, ether, ETH_ADDR_SIZE ); 
 		ap->ttl = 20 * 60;
@@ -452,7 +471,7 @@ arp_save ( char *ether, unsigned long ip_addr )
 		}
 
 		if ( ap->flags & F_PENDING ) {
-		    printf ("Pending ARP for %s satisfied\n", ip2str ( ap->ip_addr ) );
+		    printf ("Pending ARP for %s satisfied\n", ip2strl ( ap->ip_addr ) );
 		    ap->flags &= ~F_PENDING;
 
 		    for ( nbp = ap->outq; nbp; nbp = xbp ) {
@@ -478,7 +497,7 @@ arp_save ( char *ether, unsigned long ip_addr )
 	zp = arp_alloc ();
 
 	/* New entry */
-	zp->ip_addr = ip_addr;
+	memcpy ( &zp->ip_addr, ip_addr, 4 );
 	memcpy ( zp->ether, ether, ETH_ADDR_SIZE );
 	zp->flags = 0;
 	zp->ttl = 20 * 60;
@@ -491,7 +510,7 @@ arp_save ( char *ether, unsigned long ip_addr )
  * Same as above, but allows debug.
  */
 void
-arp_save_icmp ( char *ether, unsigned long ip_addr )
+arp_save_icmp ( char *ether, unsigned char *ip_addr )
 {
 	if ( arp_save ( ether, ip_addr ) ) {
 	    printf ( "Sneaky ARP from ICMP: " );

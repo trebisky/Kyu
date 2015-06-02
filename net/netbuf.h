@@ -17,6 +17,13 @@
  */
 
 /* Need some extra space for prepad stuff */
+/* Strictly speaking 1518 would do,
+ * there are alignment issues on the ARM to get
+ * the IP fields aligned (prepad by 2) and there are
+ * more subtle issues to get the buffer aligned on
+ * cache lines to get optimal DMA, but we don't
+ * fret over that kind of stuff as yet.
+ */
 #define NETBUF_MAX	1600
 
 struct netbuf {
@@ -51,7 +58,10 @@ void netbuf_free ( struct netbuf * );
  *
  * If we add other drivers we want to be clever with, we may
  * need the make this the max of the requirements.
+ *
+ * We add the 2 bytes on the ARM to get 4 byte alignment
+ * of the IP addresses in the IP header.
  */
-#define NETBUF_PREPAD	(8 * sizeof(long))
+#define NETBUF_PREPAD	2 + (8 * sizeof(long))
 
 /* THE END */

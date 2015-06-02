@@ -15,12 +15,12 @@ include Makefile.inc
 
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
-OBJS =  machine.o \
+OBJS =  machine.o net.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
     dlmalloc.o random.o kyulib.o
 
-all: tags install
+all: tags install dump
 
 dump: kyu.dump
 
@@ -32,6 +32,7 @@ tags:
 
 machine.o:	bogus
 	cd arm ; make
+	cd net ; make
 
 bogus:
 
@@ -68,3 +69,4 @@ kyu.bin: kyu
 clean:
 	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.syms
 	cd arm ; make clean
+	cd net ; make clean

@@ -17,13 +17,16 @@
 #NOB = -fno-builtin-printf -fno-builtin-putchar -fno-builtin-puts
 NOB = -fno-builtin
 
+#OPT = -Os
+OPT =
+
 CCX = arm-linux-gnu-gcc
 #COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc $(NOB) -marm -march=armv7-a -msoft-float $(INCS)
 
-COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)
+COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS)
 
 CC = $(CCX) $(COPTS)
 

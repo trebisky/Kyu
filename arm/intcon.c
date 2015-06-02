@@ -4,6 +4,7 @@
  *   see TRM pages 212 and therabouts
  * 
  */
+#include "kyulib.h"
 #include "omap_ints.h"
 
 #define INTCON_BASE      0x48200000

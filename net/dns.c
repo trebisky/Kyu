@@ -7,12 +7,19 @@
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
+
+/*
+nameserver 208.67.222.222
+nameserver 208.67.220.220
+#nameserver 192.168.0.1
+*/
 
 /*
 #define RESOLVER "10.0.0.54"
 #define RESOLVER "128.196.100.50"
 */
-#define RESOLVER "128.196.100.50"
+#define RESOLVER "192.168.0.1"
 
 struct dns_info {
 	unsigned short id;
@@ -175,7 +182,7 @@ dns_show ( char *host )
 	unsigned long ip;
 
 	if ( ip = dns_lookup_t ( host, 2 ) )
-	    printf ( "DNS lookup: %s --> %s\n", host, ip2str ( ip ) );
+	    printf ( "DNS lookup: %s --> %s\n", host, ip2strl ( ip ) );
 	else
 	    printf ( "DNS lookup: %s --> FAILED!\n", host );
 }
@@ -185,9 +192,10 @@ dns_lookup_t ( char *host, int timeout )
 {
 	char dns_buf[128];
 	struct dns_info *dp;
-	unsigned short *np;
+	char *np;
 	unsigned long ipnum;
 	struct dns_data *dcp;
+	unsigned short val;
 
 	/*
 	printf ("DNS lookup started for %s\n", host );
@@ -204,9 +212,15 @@ dns_lookup_t ( char *host, int timeout )
 	dp->n_ans = 0;
 	dp->n_auth = 0;
 	dp->n_add = 0;
-	np = (unsigned short *) dns_pack ( host, dp->buf );
-	*np++ = htons ( Q_A );
-	*np++ = htons ( C_IN );
+
+	np = dns_pack ( host, dp->buf );
+
+	/* must be careful about ARM alignment */
+	val = htons ( Q_A );
+	memcpy ( np, &val, 2 );
+	np += 2;
+	val = htons ( C_IN );
+	memcpy ( np, &val, 2 );
 
 	/* build cache entry */
 	dcp = dns_alloc ();
@@ -222,7 +236,7 @@ dns_lookup_t ( char *host, int timeout )
 	dcp->sem = sem_signal_new ( SEM_FIFO );
 
 	/*
-	printf ("DNS udp, sending to %s\n", ip2str ( dns_ip ) );
+	printf ("DNS udp, sending to %s\n", ip2strl ( dns_ip ) );
 	*/
 
 	udp_send ( dns_ip, REPLY_PORT, DNS_PORT, (char *) dp, (char *)np - dns_buf );
@@ -232,7 +246,7 @@ dns_lookup_t ( char *host, int timeout )
 	sem_destroy ( dcp->sem );
 	if ( dcp->flags & F_VALID ) {
 	    /*
-	    printf ("DNS got it: %s\n", ip2str ( dcp->ip_addr ) );
+	    printf ("DNS got it: %s\n", ip2strl ( dcp->ip_addr ) );
 	    */
 	    return dcp->ip_addr;
 	}
@@ -286,7 +300,7 @@ dns_resp_show ( struct netbuf *nbp )
 	printf ("rlen = %d\n", ntohs(rp->len));
 
 	ip = *(unsigned long *) rp->buf;
-	printf ("IP = %s\n", ip2str ( ip ) );
+	printf ("IP = %s\n", ip2strl ( ip ) );
 }
 
 void
@@ -330,7 +344,7 @@ dns_rcv ( struct netbuf *nbp )
 
 	ip = *(unsigned long *) rp->buf;
 	/*
-	printf ("IP = %s\n", ip2str(ip) );
+	printf ("IP = %s\n", ip2strl(ip) );
 	*/
 
 	for ( i=0; i<MAX_DNS_CACHE; i++ ) {
@@ -408,7 +422,7 @@ dns_cache_show ( void )
 		continue;
 
 	    printf ( "dns: %s at %s (ttl= %d)", ap->name,
-		ip2str ( ap->ip_addr ), ap->ttl );
+		ip2strl ( ap->ip_addr ), ap->ttl );
 	    printf ( " %04x\n", ap->flags );
 	}
 }

@@ -20,6 +20,7 @@
  *  as U-boot typically leaves a 60 second timer
  *  running when it transfers control to us.
  */
+#include <kyulib.h>
 
 #define WDT_BASE      0x44E35000
 

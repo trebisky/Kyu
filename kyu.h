@@ -30,6 +30,7 @@
 #define WANT_BENCH
 #define WANT_USER
 */
+#define WANT_NET
 #define WANT_USER
 
 /* define this even if not using serial console.

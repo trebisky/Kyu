@@ -5,13 +5,22 @@
 void dump_w ( void *, int );
 void dump_l ( void *, int );
 
-/* We rely on the gcc builtins for these,
- * but need to provide prototypes.
- */
+/* from linux/compiler.h */
+/* I don't use these, but they look interesting */
+
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 typedef int size_t;
 
-#ifdef notyet
-#define memcpy(x,y,z) __builtin_memcpy((x), (y), (z))
+#ifdef USE_GCC_BUILTINS
+#define memcpy(a,b,c)   __builtin_memcpy((a),(b),(c))
+#define memcmp(a,b,c)   __builtin_memcmp((a),(b),(c))
+#define memset(a,b,c)   __builtin_memset((a),(b),(c))
+#define strcmp(a,b)     __builtin_strcmp((a),(b))
+#define strcpy(a,b,c)   __builtin_strcpy((a),(b),(c))
+#define strncpy(a,b,c)  __builtin_strncpy((a),(b),(c))
+#define strlen(a)       __builtin_strlen((a))
 #endif
 
 /* This whole gcc builtin thing is a pain in the butt.
@@ -19,18 +28,18 @@ typedef int size_t;
  * getting it all straight is a big headache right now.
  * tjt 5-39-2015
  */
-void *memset( void *s, int c, size_t n );
-int strcmp ( const char *, const char * );
-char *strcpy ( char *, const char * );
-char *strncpy( char *, const char *, size_t );
 
 /* We provide these (at least thus far */
 int printf(const char *, ...);
 int sprintf(char *, const char *, ...);
+
 /*
+int strcmp ( const char *, const char * );
+char *strncpy( char *, const char *, size_t );
+char *strcpy ( char *, const char * );
+void *memset( void *s, int c, size_t n );
 int snprintf(char *str, size_t size, const char *format, ...);
 */
-
 
 #ifdef LED_DEBUG
 void flash ( void );

@@ -6,6 +6,7 @@
 #include "kyulib.h"
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
 
 #define BOOTP_PORT	67
 #define BOOTP_PORT2	68
@@ -46,7 +47,7 @@ udp_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_UDP
 	printf ( "UDP from %s: src/dst = %d/%d\n",
-		ip2str ( nbp->iptr->src ), ntohs(udp->sport), ntohs(udp->dport) );
+		ip2strl ( nbp->iptr->src ), ntohs(udp->sport), ntohs(udp->dport) );
 #endif
 }
 
@@ -190,9 +191,9 @@ bootp_rcv ( struct netbuf *nbp )
 	bpp = (struct bootp *) nbp->dptr;
 	strcpy ( dst, ether2str ( nbp->eptr->dst ) );
 	printf (" Server %s (%s) to %s\n",
-		ip2str ( bpp->server_ip ),
+		ip2strl ( bpp->server_ip ),
 		ether2str ( nbp->eptr->src ), dst );
-	printf (" gives my IP as: %s\n", ip2str ( bpp->your_ip ) );
+	printf (" gives my IP as: %s\n", ip2strl ( bpp->your_ip ) );
 }
 
 /* THE END */

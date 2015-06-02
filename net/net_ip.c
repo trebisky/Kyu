@@ -5,6 +5,7 @@
 
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
 
 extern unsigned long my_ip;
 
@@ -19,14 +20,14 @@ ip_rcv ( struct netbuf *nbp )
 
 	if ( cksum ) {
 	    printf ( "bad IP packet from %s (%d) proto = %d, sum= %04x\n",
-		    ip2str ( ipp->src ), nbp->ilen, ipp->proto, cksum );
+		    ip2strl ( ipp->src ), nbp->ilen, ipp->proto, cksum );
 	    netbuf_free ( nbp );
 	    return;
 	}
 
 	if ( ipp->offset & IP_OFFMASK_SWAP ) {
 	    printf ( "Fragmented (%04x) IP packet from %s (%d) proto = %d, sum= %04x\n",
-		    ipp->offset, ip2str ( ipp->src ), nbp->ilen, ipp->proto, cksum );
+		    ipp->offset, ip2strl ( ipp->src ), nbp->ilen, ipp->proto, cksum );
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -36,7 +37,16 @@ ip_rcv ( struct netbuf *nbp )
 
 	/* XXX - verify that it is addressed to us, or to a broadcast */
 
+	printf ( "IP packet: Source: %s", ip2strl ( ipp->src ) );
+	printf ( "   " );
+	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
+	printf ( "\n" );
+
 	if ( ipp->proto == IPPROTO_ICMP ) {
+	    /*
+	    printf ( "ip_rcv: ilen, plen, len = %d %d %d\n", nbp->ilen, nbp->plen, ntohs(ipp->len) );
+	    dump_buf ( nbp->iptr, nbp->ilen );
+	    */
 	    icmp_rcv ( nbp );
 	} else if ( ipp->proto == IPPROTO_UDP ) {
 	    udp_rcv ( nbp );
@@ -45,7 +55,7 @@ ip_rcv ( struct netbuf *nbp )
 	    tcp_rcv ( nbp );
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",
-		    ip2str ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );
+		    ip2strl ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );
 	    netbuf_free ( nbp );
 	}
 
@@ -60,9 +70,9 @@ ip_rcv ( struct netbuf *nbp )
 	    printf ( "IP packet (size:%d) proto = %d, sum= %04x", nbp->plen, ipp->proto, ipp->sum );
 	}
 
-	printf ( " Source: %s", ip2str ( ipp->src ) );
+	printf ( " Source: %s", ip2strl ( ipp->src ) );
 	printf ( "   " );
-	printf ( "Dest: %s", ip2str ( ipp->dst ) );
+	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
 	printf ( "\n" );
 #endif
 }

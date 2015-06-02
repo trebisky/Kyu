@@ -31,7 +31,8 @@
 
 #define IP_BROADCAST	0xffffffff
 
-char * ip2str ( unsigned long );
+char * ip2str ( unsigned char * );
+char * ip2strl ( unsigned long );
 char * ether2str ( unsigned char * );
 
 struct eth_hdr {

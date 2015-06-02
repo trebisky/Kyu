@@ -5,6 +5,7 @@
 
 #include "net.h"
 #include "netbuf.h"
+#include "cpu.h"
 
 static void tcp_reply_rst ( struct netbuf * );
 
@@ -50,7 +51,7 @@ tcp_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_TCP
 	printf ( "TCP from %s: src/dst = %d/%d, size = %d\n",
-		ip2str ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
+		ip2strl ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
 #endif
 
 	if ( tcp->flags == TH_SYN ) {

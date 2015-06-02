@@ -991,8 +991,9 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan,
 	return 0;
 }
 
+/* Was cpsw_init */
 static int
-cpsw_init(struct eth_device *dev)
+cpsw_setup(struct eth_device *dev)
 {
 	struct cpsw_priv	*priv = dev->priv;
 	struct cpsw_slave	*slave;
@@ -1101,7 +1102,9 @@ cpsw_init(struct eth_device *dev)
 		}
 	}
 
-	printf ( "cpsw_init done\n" );
+	/*
+	printf ( "cpsw_setup done\n" );
+	*/
 	return 0;
 }
 
@@ -1158,7 +1161,7 @@ cpsw_halt(struct eth_device *dev)
 }
 
 static int
-cpsw_send(struct eth_device *dev, void *packet, int length)
+cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 {
 	struct cpsw_priv	*priv = dev->priv;
 	void *buffer;
@@ -1287,9 +1290,9 @@ cpsw_register(struct cpsw_platform_data *data)
 
 	strcpy(dev->name, "cpsw");
 	dev->iobase	= 0;
-	dev->init	= cpsw_init;
+	dev->init	= cpsw_setup;
 	dev->halt	= cpsw_halt;
-	dev->send	= cpsw_send;
+	dev->send	= cpsw_sendpk;
 	dev->recv	= cpsw_recv;
 	dev->priv	= priv;
 
@@ -1507,12 +1510,27 @@ board_eth_init ( void )
 }
 
 /* This is what we are using (for now) to kick off this driver */
-static void
+static int
 eth_init ( void )
+{
+	phy_init ();
+	board_eth_init ();
+
+	if ( ! eth_device ) {
+	    printf ( "No ethernet\n" );
+	    return 0;
+	}
+
+	return 1;
+}
+
+static void
+eth_start ( void )
 {
 	int i;
 	unsigned long pkaddr;
 
+	/* These packets are used by cpsw_setup () */
 	/* Tricky alignment on 64 byte multiples */
 	for ( i=0; i < NUM_RX; i++ ) {
 	    pkaddr = (unsigned long ) malloc ( PKTSIZE_ALIGN2 );
@@ -1521,19 +1539,12 @@ eth_init ( void )
 	    NetRxPackets[i] = (char *) ((pkaddr+63) & ~0x3f);
 	}
 
-	phy_init ();
-	board_eth_init ();
-
-	/* reset_phy () */
-
-	if ( ! eth_device ) {
-	    printf ( "No ethernet\n" );
-	    return;
-	}
-
-	printf ("Calling cpsw_init\n" );
-	cpsw_init ( eth_device );
-	printf ("Done with cpsw_init\n" );
+	/*
+	printf ("Calling cpsw_setup\n" );
+	cpsw_setup ( eth_device );
+	printf ("Done with cpsw_setup\n" );
+	*/
+	cpsw_setup ( eth_device );
 
 #ifdef notdef
 	printf ("Waiting for packets\n" );
@@ -1606,12 +1617,14 @@ eth_test ( int arg )
 	int i;
 	unsigned long dmastat;
 
-	eth_init ();
+	(void) eth_init ();
 
 	for ( i=0; i<128; i++ )
 	    buf[i] = 0xdeadbeef;
 
 	printf ( "Begin test on ethernet device: %s\n", eth_device->name );
+
+	eth_start ();
 
 	/*
 	show_dmastatus ();
@@ -1623,7 +1636,7 @@ eth_test ( int arg )
 	    cpsw_recv ( eth_device );
 	    dmastat = get_dmastat ( eth_device );
 	    printf ( "Sending %d (dma status: %08x\n", i, dmastat );
-	    cpsw_send ( eth_device, buf, 128*sizeof(unsigned long) );
+	    cpsw_sendpk ( eth_device, buf, 128*sizeof(unsigned long) );
 	    thr_delay ( 100 );
 	}
 
@@ -1694,6 +1707,115 @@ eth_register(struct eth_device *dev)
         dev->index = index++;
 
         return 0;
+}
+
+/* The current set of official Kyu entry points */
+
+#include "netbuf.h"
+#include "net.h"
+
+static int rx_count = 0;
+static int tx_count = 0;
+
+/* As a funky hack til we make interrupt works,
+ * we launch this thread to harvest packets.
+ * Mostly copied from cpsw_recv() above.
+ */
+static void
+cpsw_reaper ( int xxx )
+{
+	struct eth_device *dev = eth_device;
+	struct cpsw_priv *priv = dev->priv;
+	struct cpdma_chan *rx_chan = &priv->rx_chan;
+	void *buffer;
+	int len;
+	struct netbuf *nbp;
+
+	for ( ;; ) {
+	    if ( cpdma_process ( priv, rx_chan, &buffer, &len ) >= 0 ) {
+		invalidate_dcache_range((unsigned long)buffer,
+					(unsigned long)buffer + PKTSIZE_ALIGN);
+
+		++rx_count;
+
+		/* KYU */
+		/* get a netbuf and copy the packet into it */
+
+		/* XXX only at interrupt level */
+		/*
+		nbp = netbuf_alloc_i ();
+		*/
+		nbp = netbuf_alloc ();
+
+		if ( ! nbp ) {
+		    thr_delay ( 1 );
+		    continue;
+		}
+
+		nbp->elen = len;
+		memcpy ( (char *) nbp->eptr, buffer, len );
+
+		net_rcv ( nbp );
+
+		/* recycle receive buffer */
+		cpdma_submit ( priv, rx_chan, buffer, PKTSIZE );
+	    } else {
+		thr_delay ( 1 );
+	    }
+	}
+}
+
+/* Called first to initialize the device */
+int
+cpsw_init ( void )
+{
+	eth_init ();
+	return 1;
+}
+
+/* Needs to be above 30 while the
+ * test thread runs at 30 with polling
+ */
+#define PRI_REAPER	25
+
+int
+cpsw_activate ( void )
+{
+	eth_start ();
+
+	(void) thr_new ( "cpsw_reaper", cpsw_reaper, (void *) 0, PRI_REAPER, 0 );
+}
+
+void
+get_cpsw_addr ( char *buf )
+{
+	memcpy ( buf, eth_device->enetaddr, ETH_ADDR_SIZE );
+}
+
+void
+cpsw_show ( void )
+{
+	printf ( "Receive count: %d\n", rx_count );
+	printf ( "Transmit count: %d\n", tx_count );
+}
+
+void
+cpsw_send ( struct netbuf *nbp )
+{
+	int len;
+
+	/* Put our ethernet address in the packet */
+	memcpy ( nbp->eptr->src, eth_device->enetaddr, ETH_ADDR_SIZE );
+
+	len = nbp->ilen + sizeof(struct eth_hdr);
+
+	/* Not needed if cpsw autopads */
+	if ( len < ETH_MIN_SIZE )
+	    len = ETH_MIN_SIZE;
+
+	++tx_count;
+
+	cpsw_sendpk ( eth_device, nbp->eptr, len );
 }
 
 /* THE END */

@@ -1536,6 +1536,9 @@ sem_destroy ( struct sem *sp )
 }
 
 /* OK from interrupt code.
+ * note that my use of "SET" and "CLEAR" are
+ *  perhaps surprising.  A semaphore is CLEAR
+ *  when we will block on it.
  */
 void
 sem_unblock ( struct sem *sem )
@@ -1608,13 +1611,15 @@ sem_add ( struct sem *sem )
 	}
 }
 
-/* XXX - should never be called from interrupt code,
- * perhaps should be a panic if we do ??
+/* This MUST be called holding the cpu lock.
+ * rarely used directly.
+ * NEVER called from interrupt code.
+ * intended to fix a race with interrupt code.
+ * XXX - but does it?
  */
 void
-sem_block ( struct sem *sem )
+sem_block_cpu ( struct sem *sem )
 {
-	cpu_enter ();	/* XXX */
 	if ( sem->state == SET ) {
 	    sem->state = CLEAR;
 	    cpu_leave ();
@@ -1628,6 +1633,17 @@ sem_block ( struct sem *sem )
 	/* usually does not return here,
 	 * but can if this is the only thread.
 	 */
+}
+
+
+/* XXX - should never be called from interrupt code,
+ * perhaps should be a panic if we do ??
+ */
+void
+sem_block ( struct sem *sem )
+{
+	cpu_enter ();
+	sem_block_cpu ( sem );
 }
 
 void

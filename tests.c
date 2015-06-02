@@ -155,10 +155,8 @@ struct test net_test_list[] = {
 	test_netping,	"Net ping",		0,
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
-	test_arp,	"8 gratu arp",	8,
-	/*
+	test_arp,	"8 gratu arp",		8,
 	test_net,	"Net init",		0,
-	*/
 	0,		0,			0
 };
 #endif
@@ -2580,7 +2578,8 @@ kb_test_5 ( void )
 static void
 test_net ( int test )
 {
-	net_init ();
+	/*
+	*/
 }
 
 static void
@@ -2589,18 +2588,18 @@ test_netshow ( int test )
 	net_show ();
 }
 
-extern unsigned long cholla_ip;
+extern unsigned long test_ip;
 
 static void
 test_netarp ( int test )
 {
-	show_arp_ping ( cholla_ip );
+	show_arp_ping ( test_ip );
 }
 
 static void
 test_netping ( int test )
 {
-	ping ( cholla_ip );
+	ping ( test_ip );
 }
 
 static void
