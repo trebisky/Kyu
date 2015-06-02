@@ -723,24 +723,23 @@ cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 	sprintf(bus->name, name);
 
 	mdio_register(bus);
+	/*
 	printf ( "Register %s\n", name );
+	*/
 }
 #endif
 
-#ifdef KYU
+#ifdef KYU_SPIN
 /* The following function was compiling
- * in some evil way until I added the printf
- * statements, then it began to work.
- * The compile was even hiding statments
- * following the call in some odd way.
- * XXX - needs further study.
+ *   in some evil way until I added the printf
+ *   statements, then it began to work.
+ * Apparently this was somehow related to a faulty
+ *   definition for the __raw_writel() macro I wrote.
  * I see no reason to have this inline as it gets
- *  called only a few times during initialization
- *  or shutdown of the device.
+ *   called only a few times during initialization
+ *   or shutdown of the device.
+ * It seems OK in the original form now.
  */
-/*
-static inline void
-*/
 static void
 setbit_and_wait_for_clear32(volatile u32 *addr)
 {
@@ -760,7 +759,7 @@ setbit_and_wait_for_clear32(volatile u32 *addr)
 #else
 /* Set a self-clearing bit in a register, and wait for it to clear */
 static inline void
-setbit_and_wait_for_clear32(void *addr)
+setbit_and_wait_for_clear32(volatile void *addr)
 {
 	__raw_writel(CLEAR_BIT, addr);
 	while (__raw_readl(addr) & CLEAR_BIT)
@@ -776,8 +775,10 @@ static void
 cpsw_set_slave_mac(struct cpsw_slave *slave,
 			       struct cpsw_priv *priv)
 {
+	/*
 	printf ( "Setting MAC address: %08x %08x\n", 
 	    mac_hi(priv->dev->enetaddr), mac_lo(priv->dev->enetaddr) );
+	*/
 
 	__raw_writel(mac_hi(priv->dev->enetaddr), &slave->regs->sa_hi);
 	__raw_writel(mac_lo(priv->dev->enetaddr), &slave->regs->sa_lo);
@@ -848,10 +849,14 @@ cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv)
 {
 	u32     slave_port;
 
+	/*
 	printf ("Resetting slave %d\n", slave->slave_num );
 	printf ( "Using:  %08x\n", &slave->sliver->soft_reset );
+	*/
 	setbit_and_wait_for_clear32(&slave->sliver->soft_reset);
+	/*
 	printf ("Reset done\n");
+	*/
 
 	/* setup priority mapping */
 	__raw_writel(0x76543210, &slave->sliver->rx_pri_map);
@@ -999,10 +1004,14 @@ cpsw_setup(struct eth_device *dev)
 	struct cpsw_slave	*slave;
 	int i, ret;
 
+	/*
 	printf ( "Resetting controller using %08x\n", &priv->regs->soft_reset );
+	*/
 	/* soft reset the controller and initialize priv */
 	setbit_and_wait_for_clear32(&priv->regs->soft_reset);
+	/*
 	printf ( "Reset done\n" );
+	/*
 
 	/* initialize and reset the address lookup engine */
 	cpsw_ale_enable(priv, 1);
@@ -1107,41 +1116,6 @@ cpsw_setup(struct eth_device *dev)
 	*/
 	return 0;
 }
-
-#ifdef notdef
-static struct s1 {
-	int pad;
-	int dummy;
-} ss1;
-
-static struct s2 {
-	void *pd;
-} ss2;
-
-void xwrapper ( void )
-{
-	struct s2 *xp;
-
-	ss2.pd = &ss1;
-	ss1.dummy = 0xdeadbeef;
-	xp = &ss2;
-
-	printf ("Dummy before: %08x\n", ss1.dummy );
-
-	__raw_writel ( 1, xp->pd + 4);
-
-	printf ("Dummy after: %08x\n", ss1.dummy );
-}
-
-/* For disassembly */
-void wrapper ( void )
-{
-	struct eth_device *dev = eth_device;
-	struct cpsw_priv	*priv = dev->priv;
-
-	__raw_writel(1, priv->dma_regs + CPDMA_RXCONTROL);
-}
-#endif
 
 static void
 cpsw_halt(struct eth_device *dev)
@@ -1283,7 +1257,9 @@ cpsw_register(struct cpsw_platform_data *data)
 	int idx = 0;
 
 	for_each_slave(slave, priv) {
+		/*
 		printf ( "cpsw slave setup %d\n", idx );
+		*/
 		cpsw_slave_setup(slave, idx, priv);
 		idx = idx + 1;
 	}
@@ -1304,7 +1280,9 @@ cpsw_register(struct cpsw_platform_data *data)
  */
 	eth_register(dev);
 
+	/*
 	printf ( "cpsw mdio init\n" );
+	*/
 	cpsw_mdio_init(dev->name, data->mdio_base, data->mdio_div);
 
 #ifdef KYU
@@ -1319,7 +1297,9 @@ cpsw_register(struct cpsw_platform_data *data)
 
 	/* Does this for one slave, if active */
 	for_active_slave(slave, priv) {
+	    /*
 	    printf ( "Initialize slave %d\n", slave->slave_num );
+	    */
 	    cpsw_phy_init(dev, slave);
 	}
 

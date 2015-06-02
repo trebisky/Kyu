@@ -364,6 +364,8 @@ void
 net_show ( void )
 {
 	printf ( "My IP address is: %s (%08x)\n", ip2strl ( my_ip ), my_ip );
+	printf ( "My MAC address is: %s\n", ether2str(our_mac) );
+
 	printf ( "Gateway: %s\n", ip2strl ( gate_ip ) );
 	printf ( "Packets processed: %d total (%d oddballs)\n", total_count, oddball_count );
 

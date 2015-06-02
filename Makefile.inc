@@ -17,8 +17,8 @@
 #NOB = -fno-builtin-printf -fno-builtin-putchar -fno-builtin-puts
 NOB = -fno-builtin
 
-#OPT = -Os
-OPT =
+OPT = -Os
+#OPT =
 
 CCX = arm-linux-gnu-gcc
 #COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float $(INCS)

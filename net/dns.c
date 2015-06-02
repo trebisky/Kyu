@@ -9,6 +9,16 @@
 #include "netbuf.h"
 #include "cpu.h"
 
+/* XXX - Still not fully complete.
+ * For example it fails to resolve pre.ai.mit.edu
+ * This is now an alias for ftp.gnu.org
+ * nslookup shows this as:
+ * prep.ai.mit.edu	canonical name = ftp.gnu.org
+ *
+ * So, I am not handling this canonical name properly.
+ * Fine for things on the local LAN.
+ */
+
 /*
 nameserver 208.67.222.222
 nameserver 208.67.220.220
@@ -177,7 +187,6 @@ dns_test ( void )
 {
 	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "fish.edu" );
-	/*
 	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "www.the-oasis.org" );
@@ -187,6 +196,7 @@ dns_test ( void )
 	dns_show ( "hacksaw.mmto.arizona.edu" );
 	dns_show ( "mount.mmto.arizona.edu" );
 	dns_show ( "mmtvme1.mmto.arizona.edu" );
+	/*
 	*/
 }
 
