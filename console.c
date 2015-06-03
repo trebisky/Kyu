@@ -295,7 +295,7 @@ panic ( char *msg )
 	 */
 #endif
 
-	thr_fault ( F_PANIC );
+	thr_suspend ( F_PANIC );
 	spin ();
 
 }

@@ -83,6 +83,7 @@ static void test_mutex ( int );
 
 /* XXX should be in arch dependent menu */
 static void test_gpio ( int );
+static void test_fault ( int );
 
 #ifdef WANT_NET
 static void test_net ( int );
@@ -128,6 +129,7 @@ struct test std_test_list[] = {
 	test_cv1,	"CV test",		0,
 	test_join,	"Join test",		0,
 	test_mutex,	"Mutex test",		0,
+	test_fault,	"Fault test",		0,
 	test_gpio,	"BBB gpio test",	0,
 	0,		0,			0
 };
@@ -298,7 +300,9 @@ wrapper ( int arg )
 	    (*ip->func) ( ip->arg );
 	}
 
+	/*
 	sem_unblock ( ip->sem );
+	*/
 }
 
 static void
@@ -308,7 +312,9 @@ single_test ( struct test *tstp, int times )
 
 	info.func = tstp->func;
 	info.arg = tstp->arg;
+	/*
 	info.sem = safe_sem_new ( CLEAR );
+	*/
 	info.times = times;
 
 	test_running = 1;
@@ -316,10 +322,16 @@ single_test ( struct test *tstp, int times )
 	(void) safe_thr_new ( 
 	    "wrapper", wrapper, (void *) &info, PRI_WRAP, 0 );
 
+/* This nice synchronization does not give us
+ * the desired result when a thread faults.
+ * So we launch the test and return to the
+ * command line.
+ */
+#ifdef notdef
 	/* Or we could do a join */
 	sem_block ( info.sem );
-
 	sem_destroy ( info.sem );
+#endif
 }
 
 /* ---------------------------------------------------------------
@@ -1963,6 +1975,17 @@ test_mutex ( int count )
 	printf ( "Join OK\n");
 
 	sem_destroy ( mutex );
+}
+/* -------------------------------------------- */
+
+/* Generate a data fault */
+static void
+test_fault ( int xxx )
+{
+	volatile int junk;
+	char *p = (char *) 0;
+
+	junk = *p;
 }
 
 /* -------------------------------------------- */

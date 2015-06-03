@@ -57,11 +57,24 @@ evil_exception ( char *msg, int code )
 	printf ( "\n" );
 	printf ( "%s in thread %s\n", msg, cur_thread->name );
 	show_thread_regs ( cur_thread );
+
+	/*
 	spin();
+	*/
 
-	thr_fault ( code );
+	thr_show ();
 
+	/* There is no plan B if thr_suspend() returns */
+	for ( ;; ) {
+	    printf ( "Suspending thread: %s\n", cur_thread->name );
+	    thr_suspend ( code );
+	    printf ("Uh oh\n");
+	    spin();
+	}
+
+	/*
 	finish_interrupt ();
+	*/
 }
 
 void

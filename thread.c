@@ -672,44 +672,6 @@ cleanup_thread ( struct thread *xp )
 	thread_avail = xp;
 }
 
-/* Called from interrupt level when
- * current thread does something evil like
- * addressing invalid memory or trying to
- * execute an invalid instruction.
- */
-void
-thr_fault ( int why )
-{
-	struct thread *tp;
-
-	cur_thread->state = FAULT;
-	cur_thread->fault = why;
-
-	/* XXX this isn't quite right.
-	 * we really want to call thr_block,
-	 * but that routine is not yet ready
-	 * to be called from interrupt level
-	 */
-
-	/* Find some other thread to run */
-	for ( tp=thread_ready; tp; tp = tp->next ) {
-	    if ( tp->state != READY ) {
-	    	in_newtp = tp;
-		return;
-	    }
-	}
-
-	/* XXX */
-	spin ();
-	/*
-	kyu_startup ();
-	*/
-
-	/* NOTREACHED */
-
-	panic ( "thr_fault - resched" );
-}
-
 void
 thr_exit ( void )
 {
@@ -1001,6 +963,65 @@ thr_unblock ( struct thread *tp )
 	}
 #endif
 }
+
+/* Added 6-2-2015
+ * A close brother to thr_unblock in an odd way
+ * Should always be called from interrupt level
+ * when something evil has happened in the current thread.
+ */
+void
+thr_suspend ( int why )
+{
+	if ( thread_debug )
+	    printf ( "thr_suspend: %s\n", cur_thread->name );
+
+	cur_thread->state = FAULT;
+	cur_thread->fault = why;
+
+	resched ( 0 );
+
+	/* NOTREACHED ? */
+}
+
+#ifdef notdef
+/* Called from interrupt level when
+ * current thread does something evil like
+ * addressing invalid memory or trying to
+ * execute an invalid instruction.
+ */
+void
+thr_fault ( int why )
+{
+	struct thread *tp;
+
+	cur_thread->state = FAULT;
+	cur_thread->fault = why;
+
+	/* XXX this isn't quite right.
+	 * we really want to call thr_block,
+	 * but that routine is not yet ready
+	 * to be called from interrupt level
+	 */
+
+	/* Find some other thread to run */
+	for ( tp=thread_ready; tp; tp = tp->next ) {
+	    if ( tp->state != READY ) {
+	    	in_newtp = tp;
+		return;
+	    }
+	}
+
+	/* XXX */
+	spin ();
+	/*
+	kyu_startup ();
+	*/
+
+	/* NOTREACHED */
+
+	panic ( "thr_fault - resched" );
+}
+#endif
 
 /* put a thread on a waiting list till
  * a certain number of clock ticks elapses.
