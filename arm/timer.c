@@ -18,8 +18,7 @@ void timer_irqdis ( void );
 extern struct thread *cur_thread;
 
 void timer_int ( int );
-
-static void timer_add_wait_int ( struct thread *, int );
+void thread_tick ( void );
 
 #define TIMER0_BASE      0x44E05000
 
@@ -72,7 +71,7 @@ struct dmtimer {
 static volatile long timer_count_t;
 static volatile long timer_count_s;
 
-/* a kindness to the linux emulator.
+/* Needed by imported linux code.
  */
 volatile unsigned long jiffies;
 
@@ -80,9 +79,6 @@ static vfptr timer_hook;
 static vfptr net_timer_hook;
 
 static int timer_rate;
-
-/* Holds list of threads waiting on delays */
-static struct thread *timer_wait;
 
 /* The following have been crudely calibrated
  * by guessing and using a stopwatch.
@@ -185,8 +181,6 @@ timer_init ( int rate )
 	timer_hook = (vfptr) 0;
 	net_timer_hook = (vfptr) 0;
 
-	timer_wait = (struct thread *) 0;
-
 #ifdef notdef
 	printf ( "Timer id: %08x\n", base->id );
 #endif
@@ -259,25 +253,23 @@ timer_irqack ( void )
 	base->irq_st = TIMER_OVF;
 }
 
+/* Handle a timer interrupt */
 void
 timer_int ( int xxx )
 {
-	struct thread *tp;
 	static int subcount;
 
 	timer_irqack ();
 
 	++jiffies;
 
-	/* These counts are bogus, but really handy
-	 * when first bringing up the timer and
-	 * interrupt system.
-	/* old baloney - really the count
-	 * would do (if we chose to export it).
-	 * Accessing these externally is tacky,
-	 *  and folks should make method calls
-	 *  for timer facilities....
-	 * XXX maybe ditch these counts
+	/* These counts are somewhat bogus,
+	 * but handy when first bringing up the timer
+	 * and interrupt system.
+	 *
+	 * We used to make then available as global variables,
+	 * but that was tacky.  Now we provide access to them
+	 * via function calls.
 	 */
 	++timer_count_t;
 
@@ -291,89 +283,16 @@ timer_int ( int xxx )
 
 	++cur_thread->prof;
 
-	if ( timer_wait ) {
-	    --timer_wait->delay;
-	    while ( timer_wait && timer_wait->delay == 0 ) {
-		tp = timer_wait;
-		timer_wait = timer_wait->wnext;
-		/*
-		if ( timer_debug ) {
-		    printf ( "Remove wait: %s\n", tp->name );
-		}
-		*/
-		/* It worries me to add entries while we
-		 * are looping through the list, but it is
-		 * OK because (1) we don't hold any state
-		 * about the list and (2) we only look at
-		 * the first list item on each pass.
-		 */
-		if ( tp->flags & TF_REPEAT )
-		    timer_add_wait_int ( tp, tp->repeat );
-		/* XXX - need some way to display this */
-		if ( tp->state == READY )
-		    tp->overruns++;
-	    	thr_unblock ( tp );
-	    }
-	}
+	thread_tick ();
 
 	if ( timer_hook ) {
 	    (*timer_hook) ();
 	}
 
+	/* XXX - On the way out */
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
-}
-
-/* maintain a linked list of folks waiting on
- * timer delay activations.
- * In time-honored fashion, the list is kept in
- * sorted order, with the soon to be scheduled
- * entries at the front.  Each tick then just
- * needs to decrement the leading entry, and
- * when it becomes zero, one or more entries
- * get launched.
- *
- * XXX - these are standard Kyu features and
- *  could be moved into common code.
- */
-static void
-timer_add_wait_int ( struct thread *tp, int delay )
-{
-	struct thread *p, *lp;
-
-	p = timer_wait;
-
-	while ( p && p->delay <= delay ) {
-	    delay -= p->delay;
-	    lp = p;
-	    p = p->wnext;
-	}
-
-	if ( p )
-	    p->delay -= delay;
-
-	tp->delay = delay;
-	tp->wnext = p;
-
-	if ( p == timer_wait )
-	    timer_wait = tp;
-	else
-	    lp->wnext = tp;
-	/*
-	printf ( "Add wait: %d\n", delay );
-	*/
-}
-
-/* Public entry point */
-void
-timer_add_wait ( struct thread *tp, int delay )
-{
-	int x = splhigh ();
-
-	timer_add_wait_int ( tp, delay );
-
-	splx ( x );
 }
 
 /* THE END */

@@ -40,6 +40,10 @@ static struct thread *thread_avail;
  */
 static struct thread *thread_ready;
 
+/* Holds list of threads waiting on delays.
+ */
+static struct thread *timer_wait;
+
 /* change via thr_debug()
  */
 static int thread_debug;
@@ -66,6 +70,9 @@ static void cleanup_thread ( struct thread * );
 static void change_thread ( struct thread *, int );
 static void resched ( int );
 static void setup_c ( struct thread *, tfptr, void * );
+
+static void timer_add_wait_int ( struct thread *, int );
+static void timer_add_wait ( struct thread *tp, int );
 
 void sys_init ( int );
 
@@ -211,6 +218,8 @@ thr_init ( void )
 	cur_thread = (struct thread *) 0;
 
 	thread_ready = (struct thread *) 0;
+
+	timer_wait = (struct thread *) 0;
 
 	/*
 	stack_db ( "thread kickoff" );
@@ -1993,5 +2002,96 @@ cpu_wait ( struct sem *xp )
 	cpu_enter ();
 }
 #endif
+
+/* --------------
+ * timer related stuff follows
+ * (delays and repeats).
+ * --------------
+ */
+
+/* Called once for every timer interrupt.
+ * Runs at interrupt level.
+ * Handles delays and repeats.
+ */
+void
+thread_tick ( void )
+{
+	struct thread *tp;
+
+	if ( timer_wait ) {
+	    --timer_wait->delay;
+	    while ( timer_wait && timer_wait->delay == 0 ) {
+		tp = timer_wait;
+		timer_wait = timer_wait->wnext;
+		/*
+		if ( timer_debug ) {
+		    printf ( "Remove wait: %s\n", tp->name );
+		}
+		*/
+		/* It worries me to add entries while we
+		 * are looping through the list, but it is
+		 * OK because (1) we don't hold any state
+		 * about the list and (2) we only look at
+		 * the first list item on each pass.
+		 */
+		if ( tp->flags & TF_REPEAT )
+		    timer_add_wait_int ( tp, tp->repeat );
+		/* XXX - need some way to display this */
+		if ( tp->state == READY )
+		    tp->overruns++;
+	    	thr_unblock ( tp );
+	    }
+	}
+}
+
+/* maintain a linked list of folks waiting on
+ * timer delay activations.
+ * In time-honored fashion, the list is kept in
+ * sorted order, with the soon to be scheduled
+ * entries at the front.  Each tick then just
+ * needs to decrement the leading entry, and
+ * when it becomes zero, one or more entries
+ * get launched.
+ *
+ * XXX - these are standard Kyu features and
+ *  could be moved into common code.
+ */
+static void
+timer_add_wait_int ( struct thread *tp, int delay )
+{
+	struct thread *p, *lp;
+
+	p = timer_wait;
+
+	while ( p && p->delay <= delay ) {
+	    delay -= p->delay;
+	    lp = p;
+	    p = p->wnext;
+	}
+
+	if ( p )
+	    p->delay -= delay;
+
+	tp->delay = delay;
+	tp->wnext = p;
+
+	if ( p == timer_wait )
+	    timer_wait = tp;
+	else
+	    lp->wnext = tp;
+	/*
+	printf ( "Add wait: %d\n", delay );
+	*/
+}
+
+static void
+timer_add_wait ( struct thread *tp, int delay )
+{
+	int x = splhigh ();
+
+	timer_add_wait_int ( tp, delay );
+
+	splx ( x );
+}
 
 /* THE END */
