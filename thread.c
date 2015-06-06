@@ -60,7 +60,9 @@ void thr_exit ( void );
 void thr_yield ( void );
 void thr_block ( enum thread_state );
 void thr_unblock ( struct thread * );
+void thr_block_q ( enum thread_state );
 
+static void cleanup_thread ( struct thread * );
 static void change_thread ( struct thread *, int );
 static void resched ( int );
 static void setup_c ( struct thread *, tfptr, void * );
@@ -131,7 +133,7 @@ static struct stack_list *stack_avail;
 /* allocate a thread stack.
  */
 static char *
-thr_alloc ( int size )
+thr_alloc_stack ( int size )
 {
 	char *stack;
 	struct stack_list *xp, *lp;
@@ -502,33 +504,17 @@ setup_c ( struct thread *tp, tfptr func, void *arg )
 	tp->mode = CONT;
 }
 
-/* PUBLIC - make and start a new thread.
+/* Allocate a new thread structure
+ * with stack.
+ * The panic calls are mostly for development,
+ * we could later remove them and trust users
+ * to check return values.
  */
-struct thread *
-thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
+static struct thread *
+thr_alloc ( void )
 {
 	struct thread *tp;
 	char *stack;
-	struct thread *p, *lp;
-
-	if ( flags & TF_FPU )
-	    panic ( "thr_new no floating point yet" );
-
-	/* first get the stack.
-	 */
-	if ( ! (stack = thr_alloc(STACK_SIZE)) ) {
-	    /* XXX - bad bugs come when we
-	     * don't check return values.
-	     */
-	    panic ( "thread stacks all gone" );
-	    return (struct thread *) 0;
-	}
-
-#ifdef notdef
-	/* XXX */
-	fill_l ( stack, 0x0f0f0e0e, STACK_SIZE/sizeof(long) );
-	printf ( "thr_new: stack at %08x\n", stack );
-#endif
 
 	if ( ! thread_avail ) {
 	    thr_free ( stack, STACK_SIZE );
@@ -544,6 +530,98 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	tp = thread_avail;
 	thread_avail = tp->next;
 
+	if ( ! (stack = thr_alloc_stack(STACK_SIZE)) ) {
+	    /* XXX - bad bugs come when we
+	     * don't check return values.
+	     */
+	    cleanup_thread ( tp );
+	    panic ( "thread stacks all gone" );
+	    return (struct thread *) 0;
+	}
+
+	memset ( tp, 0, sizeof(struct thread) );
+
+#ifdef notdef
+	/* XXX */
+	fill_l ( stack, 0x0f0f0e0e, STACK_SIZE/sizeof(long) );
+	printf ( "thr_new: stack at %08x\n", stack );
+#endif
+
+	tp->stack = stack;
+	tp->stack_size = STACK_SIZE;
+	tp->flags = 0;
+
+	return tp;
+}
+
+/* Common code for thr_exit() and thr_join()
+ * XXX ( does this need a lock?)
+ */
+static void
+cleanup_thread ( struct thread *xp )
+{
+	struct thread *tp;
+
+	/* release stack memory.
+	 */
+	if ( xp->stack )
+	    thr_free ( xp->stack, xp->stack_size );
+
+	/* pull off ready list.
+	 */
+	if ( thread_ready == xp ) {
+	    thread_ready = xp->next;	
+	} else {
+	    for ( tp = thread_ready; tp; tp = tp->next ) {
+	    	if ( tp->next == xp )
+		    tp->next = xp->next;
+	    }
+	}
+
+	/* put onto free list.
+	 */
+	xp->next = thread_avail;
+	thread_avail = xp;
+}
+
+/* This used to be thr_new, now common code for
+ * thr_new and thr_new_repeat
+ * XXX ( does this need a lock?)
+ */
+static void
+initialize_thread ( struct thread *tp, char *name, tfptr func, void *arg, int prio, int flags )
+{
+	struct thread *p, *lp;
+
+#ifdef notdef
+	/* get the stack.
+	 */
+	if ( ! (stack = thr_alloc_stack(STACK_SIZE)) ) {
+	    /* XXX - bad bugs come when we
+	     * don't check return values.
+	     */
+	    panic ( "thread stacks all gone" );
+	    return (struct thread *) 0;
+	}
+
+	if ( ! thread_avail ) {
+	    thr_free ( stack, STACK_SIZE );
+	    /* XXX - bad bugs come when we
+	     * don't check return values.
+	     */
+	    panic ( "threads all gone" );
+	    return (struct thread *) 0;
+	}
+
+	/* grab the available thread
+	 */
+	tp = thread_avail;
+	thread_avail = tp->next;
+#endif
+
+	if ( flags & TF_FPU )
+	    panic ( "thr_new no floating point yet" );
+
 	/* XXX - be sure nobody is less urgent than
 	 * the idle thread (or they never run).
 	 * although I don't use it now, I also
@@ -555,17 +633,17 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	    if ( prio < 10 )
 		prio = 10;
 	}
+	tp->pri = prio;
 
-	tp->stack = stack;
-	tp->stack_size = STACK_SIZE;
 	if ( name )
 	    thrcp ( tp->name, name, MAX_TNAME-1 );
 	else
 	    thrnm ( tp->name );
 
-	tp->pri = prio;
+	tp->flags |= flags;
+	/* XXX - we could rely on memset */
 	tp->prof = 0;
-	tp->flags = flags;
+	tp->overruns = 0;
 	tp->join = (struct thread *) 0;
 	tp->yield = (struct thread *) 0;
 
@@ -627,11 +705,52 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	 *  time this is called.
 	 */
 	if ( ! cur_thread || ! threads_running )
-	    return tp;
+	    return;
 
 	if ( tp->pri < cur_thread->pri && tp->state == READY )
 	    change_thread ( tp, 0 );
 
+	return;
+}
+
+/* PUBLIC - make and start a new thread.
+ */
+struct thread *
+thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
+{
+	struct thread *tp;
+
+	tp = thr_alloc ();
+	if ( ! tp ) {
+	    panic ( "threads all gone" );
+	    return (struct thread *) 0;
+	}
+
+	initialize_thread ( tp, name, func, arg, prio, flags );
+	return tp;
+}
+
+/* PUBLIC - make and start a new thread that repeats
+ */
+struct thread *
+thr_new_repeat ( char *name, tfptr func, void *arg, int prio, int flags, int nticks )
+{
+	struct thread *tp;
+
+	tp = thr_alloc ();
+	if ( ! tp ) {
+	    panic ( "threads all gone" );
+	    return (struct thread *) 0;
+	}
+
+	/* Just a regular thread unless a delay value is given */
+	if ( nticks > 0 ) {
+	    tp->flags |= TF_REPEAT;
+	    tp->repeat = nticks;
+	    timer_add_wait ( tp, nticks );
+	}
+
+	initialize_thread ( tp, name, func, arg, prio, flags );
 	return tp;
 }
 
@@ -644,34 +763,6 @@ thr_self ( void )
 	return cur_thread;
 }
 
-/* Common code for thr_exit() and thr_join()
- */
-static void
-cleanup_thread ( struct thread *xp )
-{
-	struct thread *tp;
-
-	/* release stack memory.
-	 */
-	thr_free ( xp->stack, xp->stack_size );
-
-	/* pull off ready list.
-	 */
-	if ( thread_ready == xp ) {
-	    thread_ready = xp->next;	
-	} else {
-	    for ( tp = thread_ready; tp; tp = tp->next ) {
-	    	if ( tp->next == xp )
-		    tp->next = xp->next;
-	    }
-	}
-
-	/* put onto free list.
-	 */
-	xp->next = thread_avail;
-	thread_avail = xp;
-}
-
 void
 thr_exit ( void )
 {
@@ -680,6 +771,11 @@ thr_exit ( void )
 	if ( thread_debug ) {
 	    printf ( "exit of %s\n", cur_thread->name );
 	    printf ( "exit, prof = %d\n", cur_thread->prof );
+	}
+
+	if ( cur_thread->flags & TF_REPEAT ) {
+	    thr_block_q ( DELAY );
+	    /* NOTREACHED */
 	}
 
 	cur_thread->state = DEAD;
@@ -897,9 +993,22 @@ thr_unblock ( struct thread *tp )
 		printf ( "thr_unblock: %s\n", tp->name );
 	}
 
+	/* This would mean we ran over our tail in
+	 * some time delay loop or something of the
+	 * sort.  If the thread is ready we don't
+	 * have much we can do, so should just return
+	 * not panic.  Note that this often gets
+	 * called from interrupt code.
+	 */
+	if ( tp->state == READY )
+	    return;
+
+#ifdef notdef
 	/* XXX - should this really be a panic ?? */
+	/* see above */
 	if ( tp->state == READY )
 	    panic ( "unblock, already ready" );
+#endif
 
 	/* We may be marking the current thread
 	 * ready, (if so, it is looping watching
@@ -1067,6 +1176,23 @@ thr_delay_q ( int nticks )
 	}
 }
 
+/* repeat over and over with an continuation
+ */
+void
+thr_repeat_c ( int nticks, tfptr func, void *arg )
+{
+	if ( thread_debug )
+	    printf ( "thr_repeat_c(%d) for %s\n", nticks, cur_thread->name );
+
+	 cur_thread->flags |= TF_REPEAT;
+	 cur_thread->repeat = nticks;
+
+	if ( nticks > 0 ) {
+	    timer_add_wait ( cur_thread, nticks );
+	    thr_block_c ( DELAY, func, arg );
+	}
+}
+
 /* PUBLIC - offer to yield the processor.
  * (never an internal call, but rather a
  *  politeness call, we prefer to let another
@@ -1075,10 +1201,14 @@ thr_delay_q ( int nticks )
  *  other than the current one to run, i.e. this
  *  will cause a violation of the usual principle
  *  that the highest priority ready thread is
- *  always the one running.  So this is evil.
- * I make is an empty function so some old tests
+ *  always the one running.  So this is EVIL.
+ *
+ * I make it an empty function so some old tests
  *  won't need to be recoded.  It was a kind of crutch
  *  during early testing, but caused trouble later.
+ *
+ * Probably in the category of "remove before flight"
+ *  so this should not make it to the production version.
  */
 
 #ifdef REAL_YIELD

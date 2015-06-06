@@ -19,6 +19,8 @@ extern struct thread *cur_thread;
 
 void timer_int ( int );
 
+static void timer_add_wait_int ( struct thread *, int );
+
 #define TIMER0_BASE      0x44E05000
 
 #define TIMER1MS_BASE    0x44E31000
@@ -299,6 +301,17 @@ timer_int ( int xxx )
 		    printf ( "Remove wait: %s\n", tp->name );
 		}
 		*/
+		/* It worries me to add entries while we
+		 * are looping through the list, but it is
+		 * OK because (1) we don't hold any state
+		 * about the list and (2) we only look at
+		 * the first list item on each pass.
+		 */
+		if ( tp->flags & TF_REPEAT )
+		    timer_add_wait_int ( tp, tp->repeat );
+		/* XXX - need some way to display this */
+		if ( tp->state == READY )
+		    tp->overruns++;
 	    	thr_unblock ( tp );
 	    }
 	}
@@ -321,16 +334,13 @@ timer_int ( int xxx )
  * when it becomes zero, one or more entries
  * get launched.
  *
- * XXX - this is a standard Kyu feature and ought
- * to get moved into common code.
+ * XXX - these are standard Kyu features and
+ *  could be moved into common code.
  */
-void
-timer_add_wait ( struct thread *tp, int delay )
+static void
+timer_add_wait_int ( struct thread *tp, int delay )
 {
 	struct thread *p, *lp;
-	int x;
-
-	x = splhigh ();
 
 	p = timer_wait;
 
@@ -353,6 +363,16 @@ timer_add_wait ( struct thread *tp, int delay )
 	/*
 	printf ( "Add wait: %d\n", delay );
 	*/
+}
+
+/* Public entry point */
+void
+timer_add_wait ( struct thread *tp, int delay )
+{
+	int x = splhigh ();
+
+	timer_add_wait_int ( tp, delay );
+
 	splx ( x );
 }
 

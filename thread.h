@@ -50,6 +50,7 @@ struct thread * safe_thr_new ( char *, tfptr, void *, int, int );
 #define	TF_BLOCK	0x0001
 #define	TF_FPU		0x0002
 #define	TF_JOIN		0x0004
+#define	TF_REPEAT	0x0008
 
 /* flags for sem_new:
  */
@@ -164,6 +165,8 @@ struct thread {
 	int stack_size;
 	int pri;
 	int delay;
+	int repeat;
+	int overruns;
 	int fault;		/* why we are suspended */
 	char name[MAX_TNAME];
 #ifdef notdef
