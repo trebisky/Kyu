@@ -21,6 +21,8 @@
 #include "netbuf.h"
 #include "cpu.h"
 
+#define NEW_SLOW_WAY
+
 #ifdef notdef
 unsigned long agate_ip = 0x0100000a;	/* agate: 10.0.0.1 */
 unsigned long trona_ip = 0x3600000a;	/* trona: 10.0.0.54 */
@@ -36,7 +38,6 @@ unsigned long test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 static unsigned char our_mac[ETH_ADDR_SIZE];
 
-static int system_clock_rate;
 static void slow_net ( int );
 static void fast_net ( void );
 
@@ -75,7 +76,10 @@ static struct sem *inq_sem;
 static struct sem *outq_sem;
 */
 
+#ifndef NEW_SLOW_WAY
+static int system_clock_rate;
 static struct sem *slow_net_sem;
+#endif
 
 /* Called during startup if networking
  * is configured.
@@ -116,11 +120,17 @@ net_init ( void )
 
     /* XXX review and revise priorities someday */
     (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
+
+#ifdef NEW_SLOW_WAY
+    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0,
+	timer_rate_get() );
+#else
     (void) safe_thr_new ( "net_slow", slow_net, (void *) 0, 11, 0 );
 
     system_clock_rate = timer_rate_get();
     slow_net_sem = sem_signal_new ( SEM_FIFO );
     net_timer_hookup ( fast_net );
+#endif
 
 #ifdef ARCH_X86
     num_ee = ee_init ();
@@ -183,14 +193,18 @@ net_init ( void )
     */
 }
 
-/* XXX - there are definitely better ways to do this.
- * Since slow_net is a thread, it could just do a
- * thread delay if we didn't mind timings being a
- * bit sloppy.  What would be better would be for
- * a thread to register for periodic activations,
- * maybe as a continuation !!
+#ifdef NEW_SLOW_WAY
+/* Do this now using a repeat.
+ * This makes the need for a special hook
+ * in the timer routine obsolete.
  */
-
+static void
+slow_net ( int xxx )
+{
+	arp_tick ();
+	dns_tick ();
+}
+#else
 /* Activated roughly at 1 Hz */
 static void
 slow_net ( int arg )
@@ -214,6 +228,7 @@ fast_net ( void )
 	if ( ( fast_net_clock++ % system_clock_rate ) == 0 )
 	    sem_unblock ( slow_net_sem );
 }
+#endif
 
 /* Called from interrupt level to place a
  * packet on input queue and awaken handler thread.
@@ -239,7 +254,7 @@ net_rcv ( struct netbuf *nbp )
 
 /* Thread to process queue of arriving packets */
 static void
-net_thread ( int arg )
+net_thread ( int xxx )
 {
     	struct netbuf *nbp;
 	int x;

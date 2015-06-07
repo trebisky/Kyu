@@ -76,7 +76,9 @@ static volatile long timer_count_s;
 volatile unsigned long jiffies;
 
 static vfptr timer_hook;
+#ifdef NET_TIMER
 static vfptr net_timer_hook;
+#endif
 
 static int timer_rate;
 
@@ -122,12 +124,13 @@ timer_hookup ( vfptr new )
 	timer_hook = new;
 }
 
+#ifdef NET_TIMER
 void
 net_timer_hookup ( vfptr new )
 {
 	net_timer_hook = new;
 }
-
+#endif
 
 /* Count in ticks */
 int
@@ -179,7 +182,9 @@ timer_init ( int rate )
 	timer_count_s = 0;
 
 	timer_hook = (vfptr) 0;
+#ifdef NET_TIMER
 	net_timer_hook = (vfptr) 0;
+#endif
 
 #ifdef notdef
 	printf ( "Timer id: %08x\n", base->id );
@@ -289,10 +294,11 @@ timer_int ( int xxx )
 	    (*timer_hook) ();
 	}
 
-	/* XXX - On the way out */
+#ifdef NET_TIMER
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
+#endif
 }
 
 /* THE END */
