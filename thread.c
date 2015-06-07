@@ -42,7 +42,8 @@ static struct thread *thread_ready;
 
 /* Holds list of threads waiting on delays.
  */
-static struct thread *timer_wait;
+static struct thread *wait_head;
+static struct thread *repeat_head;
 
 /* change via thr_debug()
  */
@@ -73,6 +74,8 @@ static void setup_c ( struct thread *, tfptr, void * );
 
 static void timer_add_wait_int ( struct thread *, int );
 static void timer_add_wait ( struct thread *tp, int );
+static void setup_repeat ( struct thread *, int );
+static void cancel_repeat ( struct thread * );
 
 void sys_init ( int );
 
@@ -219,7 +222,8 @@ thr_init ( void )
 
 	thread_ready = (struct thread *) 0;
 
-	timer_wait = (struct thread *) 0;
+	wait_head = (struct thread *) 0;
+	repeat_head = (struct thread *) 0;
 
 	/*
 	stack_db ( "thread kickoff" );
@@ -340,6 +344,9 @@ thr_show_state ( struct thread *tp )
 		break;
 	    case FAULT:
 		printf ( "  FAULT " );
+		break;
+	    case REPEAT:
+		printf ( " REPEAT " );
 		break;
 	    case DEAD:
 		printf ( "   DEAD " );
@@ -754,13 +761,20 @@ thr_new_repeat ( char *name, tfptr func, void *arg, int prio, int flags, int nti
 
 	/* Just a regular thread unless a delay value is given */
 	if ( nticks > 0 ) {
-	    tp->flags |= TF_REPEAT;
-	    tp->repeat = nticks;
-	    timer_add_wait ( tp, nticks );
+	    setup_repeat ( tp, nticks );
 	}
 
 	initialize_thread ( tp, name, func, arg, prio, flags );
 	return tp;
+}
+
+void
+thr_repeat_stop ( struct thread *tp )
+{
+	tp->flags &= ~TF_REPEAT;
+	cancel_repeat ( tp );
+	if ( tp->state == REPEAT )
+	    thr_unblock ( tp );
 }
 
 /* PUBLIC - find out who I am,
@@ -783,11 +797,20 @@ thr_exit ( void )
 	}
 
 	if ( cur_thread->flags & TF_REPEAT ) {
-	    thr_block_q ( DELAY );
+	    thr_block_q ( REPEAT );
 	    /* NOTREACHED */
 	}
 
 	cur_thread->state = DEAD;
+
+	/* We don't need to clean up any delay timers
+	 * (we are running after all, so how could a
+	 * delay be active?).
+	 * XXX - We probably don't even need to cancel a repeat.
+	 *  i.e. the following is silly but harmless.
+	 */
+	cancel_repeat ( cur_thread );
+
 
 #ifdef notdef
 	/* release stack memory.
@@ -851,6 +874,13 @@ thr_join ( struct thread *tp )
 	thr_block ( JOIN );
 }
 
+/* If this is the current thread, this is synonymous
+ * with thr_exit.  If not, we simply arrange things so
+ * that the next time the thread resumes it calls
+ * thr_exit().
+ * XXX - We could be more aggressive, but would have
+ *  more cleanup work to do if we were.
+ */
 void
 thr_kill ( struct thread *tp )
 {
@@ -942,14 +972,18 @@ thr_block_q ( enum thread_state why )
 	cpu_enter ();
 	cur_thread->state = why;
 
-	/* XXX - heck, this might just work
-	 * in any case, in particular, I think
-	 * that JMP would be just fine.
-	 * for now, the panic at least lets us
-	 * take a close look at things first.
+#ifdef notdef
+	/* This needs to be allowed in the case
+	 * where we have a repeating thread and
+	 * allow a thr_delay() call inside of it.
+	 * Note that we always have context to support
+	 * a CONT style resumption, since that is
+	 * how a thread gets launched.
 	 */
 	if ( cur_thread->mode != CONT )
 	    panic ( "thr_block_q" );
+#endif
+	cur_thread->mode = CONT;
 
 	resched ( RSF_CONT );
 
@@ -1193,11 +1227,8 @@ thr_repeat_c ( int nticks, tfptr func, void *arg )
 	if ( thread_debug )
 	    printf ( "thr_repeat_c(%d) for %s\n", nticks, cur_thread->name );
 
-	 cur_thread->flags |= TF_REPEAT;
-	 cur_thread->repeat = nticks;
-
 	if ( nticks > 0 ) {
-	    timer_add_wait ( cur_thread, nticks );
+	    setup_repeat ( cur_thread, nticks );
 	    thr_block_c ( DELAY, func, arg );
 	}
 }
@@ -2018,27 +2049,29 @@ thread_tick ( void )
 {
 	struct thread *tp;
 
-	if ( timer_wait ) {
-	    --timer_wait->delay;
-	    while ( timer_wait && timer_wait->delay == 0 ) {
-		tp = timer_wait;
-		timer_wait = timer_wait->wnext;
+	/* Process delays */
+	if ( wait_head ) {
+	    --wait_head->delay;
+	    while ( wait_head && wait_head->delay == 0 ) {
+		tp = wait_head;
+		wait_head = wait_head->wnext;
 		/*
 		if ( timer_debug ) {
 		    printf ( "Remove wait: %s\n", tp->name );
 		}
 		*/
-		/* It worries me to add entries while we
-		 * are looping through the list, but it is
-		 * OK because (1) we don't hold any state
-		 * about the list and (2) we only look at
-		 * the first list item on each pass.
-		 */
-		if ( tp->flags & TF_REPEAT )
-		    timer_add_wait_int ( tp, tp->repeat );
-		/* XXX - need some way to display this */
+	    	thr_unblock ( tp );
+	    }
+	}
+
+	/* Process repeats */
+	for ( tp=repeat_head; tp; tp = tp->rep_next ) {
+	    --tp->rep_count;
+	    if ( tp->rep_count < 1 ) {
+		/* XXX - need some way to display overruns */
 		if ( tp->state == READY )
 		    tp->overruns++;
+		tp->rep_count = tp->rep_reload;
 	    	thr_unblock ( tp );
 	    }
 	}
@@ -2053,15 +2086,14 @@ thread_tick ( void )
  * when it becomes zero, one or more entries
  * get launched.
  *
- * XXX - these are standard Kyu features and
- *  could be moved into common code.
+ * Only called (now) from timer_add_wait()
  */
 static void
 timer_add_wait_int ( struct thread *tp, int delay )
 {
 	struct thread *p, *lp;
 
-	p = timer_wait;
+	p = wait_head;
 
 	while ( p && p->delay <= delay ) {
 	    delay -= p->delay;
@@ -2075,13 +2107,56 @@ timer_add_wait_int ( struct thread *tp, int delay )
 	tp->delay = delay;
 	tp->wnext = p;
 
-	if ( p == timer_wait )
-	    timer_wait = tp;
+	if ( p == wait_head )
+	    wait_head = tp;
 	else
 	    lp->wnext = tp;
 	/*
 	printf ( "Add wait: %d\n", delay );
 	*/
+}
+
+static void
+setup_repeat ( struct thread *tp, int delay )
+{
+	 tp->flags |= TF_REPEAT;
+	 tp->rep_reload = delay;
+	 tp->rep_count = delay;
+
+	 /* add to front of list */
+	 tp->rep_next = repeat_head;
+	 repeat_head = tp;
+}
+
+static void
+cancel_repeat ( struct thread *tp )
+{
+	struct thread *cp;
+	struct thread *pp;
+	int x;
+
+	if ( ! repeat_head )
+	    return;
+
+	x = splhigh ();
+
+	if ( repeat_head == tp ) {
+	    repeat_head = tp->rep_next;
+	    splx ( x );
+	    return;
+	}
+
+	pp = repeat_head;
+	cp = pp->rep_next;
+	while ( cp ) {
+	    if ( cp == tp )
+		pp->rep_next = cp->rep_next;
+	    else
+		pp = cp;
+	    cp = pp->rep_next;
+	}
+
+	splx ( x );
 }
 
 static void

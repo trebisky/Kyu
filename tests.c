@@ -495,6 +495,31 @@ x_test ( void )
 	printf ( "F %08x\n", &cur_thread->iregs );
 }
 
+static void
+bbb_blinker ( int xx )
+{
+	/* Writing a "1" does turn the LED on */
+	gpio_led_set ( 1 );
+	thr_delay ( 100 );
+	gpio_led_set ( 0 );
+}
+
+static struct thread *bbb_tp;
+
+static void
+start_bbb_blink ( void )
+{
+	gpio_led_init ();
+	bbb_tp = thr_new_repeat ( "blinker", bbb_blinker, 0, 10, 0, 1000 );
+}
+
+static void
+stop_bbb_blink ( void )
+{
+	printf ( "Stop the blink\n" );
+	thr_repeat_stop ( bbb_tp );
+}
+
 #define MAXB	64
 #define MAXW	4
 
@@ -623,6 +648,16 @@ tester ( void )
 	    }
 
 #endif
+
+	    /* Run BBB blink test */
+	    if ( **wp == 'b' && nw == 1 ) {
+		start_bbb_blink ();
+	    }
+
+	    /* Stop BBB blink test */
+	    if ( **wp == 'b' && nw == 2 ) {
+		stop_bbb_blink ();
+	    }
 
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
 	    	dump_b ( (void *) atoi(wp[1]), atoi(wp[2]) );

@@ -31,10 +31,12 @@ enum thread_state {
 	JOIN,		/* 5 - waiting to join somebody */
 	ZOMBIE,		/* 6 - waiting to be joined */
 	FAULT,		/* 7 - did something bad */
-	DEAD		/* 8 - on free list */
+	REPEAT,		/* 8 - blocked on repeat event */
+	DEAD		/* 9 - on free list */
 };
 
 struct thread *thr_new ( char *, tfptr, void *, int, int );
+struct thread *thr_new_repeat ( char *, tfptr, void *, int, int, int );
 struct thread *thr_self ( void );
 void thr_kill ( struct thread * );
 void thr_exit ( void );
@@ -165,7 +167,9 @@ struct thread {
 	int stack_size;
 	int pri;
 	int delay;
-	int repeat;
+	int rep_reload;
+	int rep_count;
+	struct thread *rep_next;	/* list of repeating threads */
 	int overruns;
 	int fault;		/* why we are suspended */
 	char name[MAX_TNAME];
