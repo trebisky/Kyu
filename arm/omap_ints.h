@@ -3,22 +3,18 @@
  */
 
 /* List of fault codes */
-/* Note that IRQ is in general, not a fault
- * and will not be handled as one.
- */
+/* The first 8 are ARM hardware exceptions and interrupts */
 #define F_NONE	0
 #define F_UNDEF	1
 #define F_SWI	2
 #define F_PABT	3
 #define F_DABT	4
 #define F_NU	5
-#define F_FIQ	6
-#define F_IRQ	7
+#define F_FIQ	6	/* not a fault */
+#define F_IRQ	7	/* not a fault */
 
-/* Not a processor fault, but we try to
- * treat it like one.
- */
-#define F_PANIC	8
+#define F_DIVZ	8	/* pseudo for linux library */
+#define F_PANIC	9	/* pseudo for Kyu, user panic */
 
 /* List of interrupt numbers for the 3359 omap
  * There are 128 of these, we will fill out

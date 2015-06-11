@@ -9,6 +9,7 @@ include ../Makefile.inc
 
 #	if_cpsw.o miiphyutil.o phy.o smsc.o \
 #	if_cpsw.o phy.o smsc.o \
+#	eabi_stubs.o
 
 # locore must be first
 OBJS =  locore.o hardware.o \
@@ -16,8 +17,7 @@ OBJS =  locore.o hardware.o \
 	if_cpsw.o phy.o smsc.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
-	show_regs.o \
-	eabi_stubs.o
+	show_regs.o
 
 all: ../machine.o
 

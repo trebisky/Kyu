@@ -8,6 +8,9 @@
 # I probably should arange so the compiler looks
 # here by default.
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
+# And this option is the way to do it:
+
+ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
 
 # I should find a way to cooperate with gcc and printf.
 # It optimizes simple calls to just a puts call, which ought to
@@ -26,7 +29,7 @@ CCX = arm-linux-gnu-gcc
 #COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc $(NOB) -marm -march=armv7-a -msoft-float $(INCS)
 
-COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS)
+COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS) $(ABI) $(DEFS)
 
 CC = $(CCX) $(COPTS)
 
@@ -34,14 +37,21 @@ CC = $(CCX) $(COPTS)
 # but doing this directly gets the job done.
 LD = arm-linux-gnu-ld.bfd
 
-LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/4.9.2 -lgcc
+# Should we get this via linux arch/arm/asm/lib ??
+#LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/4.9.2 -lgcc
 
 BIN = arm-linux-gnu-objcopy -O binary
 DUMP = arm-linux-gnu-objdump -d
 NM = arm-linux-gnu-nm
 
 .c.o:
-	$(CC) -c $<
+	$(CC) -o $@ -c $<
+
+# from linux 4.0.5 build ---
+#  arm-linux-gnu-gcc -Wp,-MD,arch/arm/lib/.memcpy.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include -I./arch/arm/include -Iarch/arm/include/generated/uapi -Iarch/arm/include/generated  -Iinclude -I./arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I./include/uapi -Iinclude/generated/uapi -include ./include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-versatile/include -Iarch/arm/plat-versatile/include  -D__ASSEMBLY__ -mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -funwind-tables -marm -D__LINUX_ARM_ARCH__=5 -march=armv5te -mtune=arm9tdmi -include asm/unified.h -msoft-float         -c -o arch/arm/lib/memcpy.o arch/arm/lib/memcpy.S
+
+.S.o:
+	$(CC) $(AOPTS) -o $@ -c $<
 
 .c.s:
 	$(CC) -S $<

@@ -77,8 +77,7 @@ evil_exception ( char *msg, int code )
 	*/
 }
 
-void
-do_undefined_instruction ( void )
+void do_undefined_instruction ( void )
 {
 	evil_exception ("undefined instruction", F_UNDEF);
 }
@@ -107,6 +106,18 @@ void do_not_used ( void )
 void do_fiq ( void )
 {
 	evil_exception ("fast interrupt request", F_FIQ);
+}
+
+/* -------------------------------------------- */
+/* This is a pseudo exception to satisfy
+ * linux code for a divide by zero.
+ * It is called from:
+ *  ./arch/arm/lib/lib1funcs.S:	bl	__div0
+ *  ./arch/arm/lib/div64.S:	bl	__div0
+ */
+void __div0 ( void )
+{
+	evil_exception ("divide by zero", F_FIQ);
 }
 
 /* -------------------------------------------- */

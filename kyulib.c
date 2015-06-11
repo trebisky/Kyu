@@ -406,6 +406,8 @@ cq_remove ( struct cqueue *qp )
 	return ch;
 }
 
+/* XXX - actually we use linux library routines now */
+#define USE_GCC_BUILTINS
 #ifndef USE_GCC_BUILTINS
 /* gcc didn't like this prototype until the const
  *  got added to the arguments.

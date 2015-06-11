@@ -55,6 +55,10 @@ shex8( char *buf, char *end, int val )
 	return shex2(buf,end,val);
 }
 
+/* We now use routines in linux/lib
+ */
+#ifdef KYU_LOCAL_VPRINTF
+
 /*
  * Printn prints a number n in base b.
  * We don't use recursion to avoid deep kernel stacks.
@@ -297,5 +301,6 @@ int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
 	*end = '\0';
 										    return buf-abuf;
 }
+#endif	/* KYU_LOCAL_VPRINTF */
 
 /* THE END */

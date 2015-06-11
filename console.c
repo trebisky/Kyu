@@ -320,6 +320,38 @@ dpanic ( char *msg )
 /* ------------------------------------------ */
 /* ------------------------------------------ */
 
+/* simple and quick version to get some linux
+ * library routines online  6-11-2015
+ *
+ * Note that the real linux version does lots
+ * of nice and fancy things.  It puts messages
+ * into a circular buffer, perhaps sends them
+ * to syslog, watches for ugly scenarios, all
+ * desirable someday.
+ *
+ * see linux/printk.h and kernel/printk/prink.c
+ *
+ * Also note that linux messages may be prefixed
+ * by a 3 character logging priority that looks like
+ * <x> where x is 0-7 or "d" to get the current default.
+ * XXX - We could at least strip this off.
+ */
+
+int
+printk ( const char *fmt, ... )
+{
+	va_list args;
+	int rv;
+
+	va_start ( args, fmt );
+	rv = vprintf ( fmt, args );
+	va_end ( args );
+	return rv;
+}
+
+/* ------------------------------------------ */
+/* ------------------------------------------ */
+
 /* Really only ready/proper for x86
 #define PANIC_DEBUG
 */

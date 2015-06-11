@@ -2,20 +2,18 @@
 #
 # Tom Trebisky  4-15-2015
 
-# Note that I copied stdarg.h from here.
-# I probably should arrange so the compiler looks
-# here by default.
-#  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
-
 INCS = -I. -Iarm
 
 include Makefile.inc
 
 #subdirs = arm
 
+#    linux/i2c.o linux/mm.o \
+
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 OBJS =  machine.o net.o \
+    linux/linux-lib.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
     dlmalloc.o random.o kyulib.o
@@ -33,6 +31,7 @@ tags:
 machine.o:	bogus
 	cd arm ; make
 	cd net ; make
+	cd linux ; make
 
 bogus:
 
@@ -70,3 +69,4 @@ clean:
 	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.syms
 	cd arm ; make clean
 	cd net ; make clean
+	cd linux ; make clean
