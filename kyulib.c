@@ -297,9 +297,28 @@ fill_l ( void *addr, long data, int n )
  * for the linux memory allocators.
  */
 
+void * __kmalloc ( size_t size, int prio )
+{
+	return malloc ( size );
+}
+
 void * kmalloc ( size_t size, int prio )
 {
 	return malloc ( size );
+}
+
+void * krealloc ( void *addr, size_t size, int prio )
+{
+	return realloc ( addr, size );
+}
+
+/* see mm/util.c */
+void * kmemdup ( void *src, size_t len, int prio )
+{
+	void *p = malloc ( len );
+
+	memcpy(p, src, len);
+	return p;
 }
 
 void kfree ( void *addr )
