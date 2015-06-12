@@ -8,17 +8,19 @@ include Makefile.inc
 
 #subdirs = arm
 
-#    linux/i2c.o linux/mm.o \
+#    linux/linux-i2c.o \
+#    linux/linux-mm.o \
 
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 OBJS =  machine.o net.o \
     linux/linux-lib.o \
+    linux/linux-i2c.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
     dlmalloc.o random.o kyulib.o
 
-all: tags install dump
+all: install dump tags
 
 dump: kyu.dump
 

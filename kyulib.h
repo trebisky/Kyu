@@ -46,6 +46,16 @@ void flash ( void );
 void big_delay ( void );
 #endif
 
+#define SIMPLE_SLAB
+#ifdef SIMPLE_SLAB
+
+struct kmem_cache {
+	size_t size;
+};
+
+typedef struct kmem_cache kmem_cache_t;
+#endif
+
 /* XXX - the following fixed size should really
  * be an argument to cq_init() and be dynamically
  * allocated.

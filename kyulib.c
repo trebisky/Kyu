@@ -11,6 +11,7 @@
 #include "kyu.h"
 #include "thread.h"
 #include "kyulib.h"
+#include "malloc.h"
 
 /* Argument in microseconds.
  * silly to try to make this "fast"
@@ -290,6 +291,50 @@ fill_l ( void *addr, long data, int n )
 	while ( n-- )
 	    *p++ = data;
 }
+
+#ifdef SIMPLE_SLAB
+/* Provide trivial pass-through functions
+ * for the linux memory allocators.
+ */
+
+void * kmalloc ( size_t size, int prio )
+{
+	return malloc ( size );
+}
+
+void kfree ( void *addr )
+{
+	free ( addr );
+}
+
+kmem_cache_t * kmem_cache_create ( const char *name,
+	size_t size, size_t offset, unsigned long flags,
+	void (*constructor)(void *, kmem_cache_t *, unsigned long flags ),
+	void (*destructor)(void *, kmem_cache_t *, unsigned long flags )
+	)
+{
+	kmem_cache_t *cp;
+
+	cp = malloc ( sizeof(*cp) );
+	cp->size = size;
+	return cp;
+}
+
+int kmem_cache_destroy ( kmem_cache_t *cp )
+{
+	free ( cp );
+}
+
+void *kmem_cache_alloc ( kmem_cache_t *cp, int flags )
+{
+	return malloc ( cp->size );
+}
+
+void *kmem_cache_free ( kmem_cache_t *cache, void * addr )
+{
+	free ( addr );
+}
+#endif
 
 /* Allow 5 queues for now (1 for keyboard, and 2
  * for each of the two serial ports)
@@ -591,6 +636,5 @@ big_delay ( void )
 }
 #endif
 #endif
-
 
 /* THE END */
