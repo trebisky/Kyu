@@ -7,6 +7,7 @@
  * 
  */
 #include <kyu.h>
+#include <kyulib.h>
 #include <thread.h>
 
 #include <omap_ints.h>

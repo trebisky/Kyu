@@ -17,15 +17,16 @@ OBJS =  locore.o hardware.o \
 	if_cpsw.o phy.o smsc.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
-	show_regs.o
+	show_regs.o \
+	eabi_stubs.o
 
 all: ../machine.o
 
 ../machine.o: $(OBJS)
 	$(LD) -r -o ../machine.o $(OBJS)
 
-phy.e:	phy.c
-	$(CC) -E phy.c >phy.e
+if_cpsw.e:	if_cpsw.c
+	$(CC) -E if_cpsw.c >if_cpsw.e
 
 clean:
 	rm -f *.o

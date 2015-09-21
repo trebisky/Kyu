@@ -354,7 +354,11 @@ extern "C" {
 
 */
 
+/* KYU
 #define HAVE_MEMCPY
+*/
+
+#ifdef notdef_kyu
 
 #ifndef USE_MEMCPY
 #ifdef HAVE_MEMCPY
@@ -379,6 +383,8 @@ Void_t* memcpy();
 #endif
 #endif
 #endif
+
+#endif /* notdef_kyu */
 
 #if USE_MEMCPY
 

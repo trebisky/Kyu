@@ -3,15 +3,16 @@
  * T. Trebisky  4-11-2005
  */
 
-#include "kyulib.h"
+#include <kyu.h>
+#include <kyulib.h>
+#include <malloc.h>
+
 #include "net.h"
 #include "netbuf.h"
 #include "cpu.h"
 
 #define BOOTP_PORT2	68	/* receive on this port */
 #define DNS_PORT	53
-
-typedef void (*ufptr) ( struct netbuf * );
 
 void bootp_rcv ( struct netbuf * );
 
@@ -34,6 +35,12 @@ struct udp_proto {
 
 static struct udp_proto *head = (struct udp_proto *) 0;
 
+/* XXX - should add 2 features.
+ *	--- should search list if port already has a handler hooked up and
+ *		if so, replace it rather than adding another.
+ *	--- should add an "unhook" routine to find and unlink (and free)
+ *		a handler for a port that is no longer wanted.
+ */
 void
 udp_hookup ( int port, ufptr func )
 {
@@ -44,6 +51,21 @@ udp_hookup ( int port, ufptr func )
 	pp->func = func;
 	pp->next = head;
 	head = pp;
+}
+
+void
+udp_unhook ( int port )
+{
+	/* XXX */
+}
+
+int
+udp_get_sport ( struct netbuf *nbp )
+{
+	struct udp_hdr *udp;
+
+	udp = (struct udp_hdr *) nbp->pptr;
+	return ntohs ( udp->sport );
 }
 
 void

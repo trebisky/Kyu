@@ -10,15 +10,23 @@
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
 # And this option is the way to do it:
 
-ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
+#ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
+ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
 
-# I should find a way to cooperate with gcc and printf.
+# IMPORTANT --
+# I have tried several times to use the gcc builting functions
+# and it always leads to misery and heartache.  Be warned.
+
+# Perhaps I should find a way to cooperate with gcc and printf.
 # It optimizes simple calls to just a puts call, which ought to
-# be fine.  I need the builtin ffs() function, so I need to selectively
-# turn off printf
+# be fine.  I need the builtin ffs() function, (do I????)
+#  so I need to selectively turn off printf
 
 #NOB = -fno-builtin-printf -fno-builtin-putchar -fno-builtin-puts
-NOB = -fno-builtin
+#NOB = -fno-builtin
+# XXX - turning off these warnings is only a temporary thing,
+#  this should be enabled and all necessary prototypes added.
+NOB = -fno-builtin -Wno-implicit-function-declaration
 
 OPT = -Os
 #OPT =
@@ -38,7 +46,8 @@ CC = $(CCX) $(COPTS)
 LD = arm-linux-gnu-ld.bfd
 
 # Should we get this via linux arch/arm/asm/lib ??
-#LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/4.9.2 -lgcc
+# for LINUX comment this out -----
+LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/5.1.1 -lgcc
 
 BIN = arm-linux-gnu-objcopy -O binary
 DUMP = arm-linux-gnu-objdump -d

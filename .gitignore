@@ -12,6 +12,9 @@ kyu.syms
 OLD
 OLD/*
 arm/OLD
+linux/mm
+linux/mm/Makefile
+linux/mm/*
 z
 zz
 zzz

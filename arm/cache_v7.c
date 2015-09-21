@@ -18,6 +18,8 @@
 #endif
 
 #ifdef KYU
+#include <kyu.h>
+#include <kyulib.h>
 typedef unsigned long u32;
 typedef long s32;
 #include <armv7.h>

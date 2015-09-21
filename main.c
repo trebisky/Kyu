@@ -3,6 +3,7 @@
  */
 
 #include "kyu.h"
+#include "kyulib.h"
 /*
 #include "intel.h"
 */

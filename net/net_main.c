@@ -98,6 +98,7 @@ net_init ( void )
     arp_init ();
     dns_init ();
     bootp_init ();
+    tftp_init ();
 
     inq_head = (struct netbuf *) 0;
     inq_tail = (struct netbuf *) 0;
@@ -330,6 +331,10 @@ net_handle ( struct netbuf *nbp )
     	struct eth_hdr *ehp;
 
 	nbp->ilen = nbp->elen - sizeof ( struct eth_hdr );
+
+	/*
+	printf ( "net_handle: %d, %d\n", nbp->elen, nbp->ilen );
+	*/
 
 	ehp = nbp->eptr;
 
@@ -610,5 +615,22 @@ ether2str ( unsigned char *bytes )
 	return buf;
 }
 
+/* generate an ephemeral port number.
+ * Current practice recommends a number in
+ * the range 49152 to 65535.
+ * I just cycle through these numbers without
+ * worrying about conflicts.
+ */
+
+static int next_ephem = 49152;
+
+int
+get_ephem_port ( void )
+{
+	int rv = next_ephem++;
+	if ( next_ephem > 65535 )
+	    next_ephem = 49152;
+	return rv;
+}
 
 /* THE END */

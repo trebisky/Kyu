@@ -25,6 +25,7 @@
  */
 
 #include <kyu.h>
+#include <kyulib.h>
 #include <thread.h>
 
 struct thread *cur_thread;

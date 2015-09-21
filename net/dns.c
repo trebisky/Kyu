@@ -3,7 +3,9 @@
  * T. Trebisky  5-24-2005
  */
 
-#include "kyu.h"
+#include <kyu.h>
+#include <kyulib.h>
+
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
@@ -245,10 +247,10 @@ dns_lookup_t ( char *host, int timeout )
 
 	/* must be careful about ARM alignment */
 	val = htons ( Q_A );
-	memcpy ( np, &val, 2 );
+	memcpy ( np, (char *) &val, 2 );
 	np += 2;
 	val = htons ( C_IN );
-	memcpy ( np, &val, 2 );
+	memcpy ( np, (char *) &val, 2 );
 	np += 2;
 
 	/* build cache entry */
@@ -333,8 +335,8 @@ dns_resp_show ( struct netbuf *nbp )
 	printf ("name = %s\n", buf );
 	printf ("next: %d\n", ((char *)rp)-((char *)dp) );
 
-	memcpy ( &lval, &rp->ttl, 4);
-	memcpy ( &sval, &rp->len, 2);
+	memcpy ( &lval, (char *) &rp->ttl, 4);
+	memcpy ( &sval, (char *) &rp->len, 2);
 	memcpy ( &ip, rp->buf, 4);
 
 	printf ("ttl = %d\n", ntohl(lval));
@@ -400,7 +402,7 @@ dns_rcv ( struct netbuf *nbp )
 	rp = (struct rr_info *) dns_unpack ( (char *) dp, cp, buf );
 
 	/* ARM alignment issues */
-	memcpy ( &len, &rp->len, 2 );
+	memcpy ( &len, (char *) &rp->len, 2 );
 	if ( ntohs(len) != 4 )
 	    return;
 
@@ -416,7 +418,7 @@ dns_rcv ( struct netbuf *nbp )
 	ap = find_pending ( ntohs ( dp->id ) );
 	if ( ap ) {
 	    ap->flags = F_VALID;
-	    memcpy ( &ttl, &rp->ttl, sizeof(long) );
+	    memcpy ( &ttl, (char *) &rp->ttl, sizeof(long) );
 	    ap->ttl = ntohl(ttl);
 	    ap->ip_addr = ip;
 	    /*
@@ -431,7 +433,7 @@ dns_init ( void )
 {
 	int i;
 
-	if ( ! net_dots ( RESOLVER, &dns_ip ) )		/* mmt */
+	if ( ! net_dots ( RESOLVER, &dns_ip ) )
 	    panic ( "resolver netdots" );
 
 	for ( i=0; i<MAX_DNS_CACHE; i++ )

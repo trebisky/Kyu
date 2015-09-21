@@ -92,6 +92,7 @@ static void test_netping ( int );
 static void test_bootp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
+void test_tftp ( int );
 static void test_netshow ( int );
 #endif
 
@@ -158,6 +159,7 @@ struct test net_test_list[] = {
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
 	test_arp,	"8 gratu arp",		8,
+	test_tftp,	"Test TFTP",		0,
 	test_net,	"Net init",		0,
 	0,		0,			0
 };

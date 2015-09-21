@@ -2,6 +2,17 @@
  *	Tom Trebisky 12/1/2001
  */
 
+/* This whole gcc builtin thing is a pain in the butt.
+ * We would like to use the compiler builtins, but
+ * getting it all straight is a big headache right now.
+ * When we link with the linux subsystem, we must turn this off.
+ * tjt 5-39-2015
+ */
+
+/*
+#define USE_GCC_BUILTINS
+*/
+
 void dump_w ( void *, int );
 void dump_l ( void *, int );
 
@@ -18,20 +29,20 @@ typedef int size_t;
 #define memcmp(a,b,c)   __builtin_memcmp((a),(b),(c))
 #define memset(a,b,c)   __builtin_memset((a),(b),(c))
 #define strcmp(a,b)     __builtin_strcmp((a),(b))
-#define strcpy(a,b,c)   __builtin_strcpy((a),(b),(c))
+#define strcpy(a,b)     __builtin_strcpy((a),(b))
 #define strncpy(a,b,c)  __builtin_strncpy((a),(b),(c))
 #define strlen(a)       __builtin_strlen((a))
 #endif
 
-/* This whole gcc builtin thing is a pain in the butt.
- * We would like to use the compiler builtins, but
- * getting it all straight is a big headache right now.
- * tjt 5-39-2015
- */
-
 /* We provide these (at least thus far */
 int printf(const char *, ...);
 int sprintf(char *, const char *, ...);
+
+void * memcpy ( void *, char *, size_t );
+
+/* Defined in console.c */
+void putchar ( int );
+void puts ( char * );
 
 /*
 int strcmp ( const char *, const char * );

@@ -1732,8 +1732,11 @@ cpsw_reaper ( int xxx )
 		    continue;
 		}
 
-		nbp->elen = len;
-		memcpy ( (char *) nbp->eptr, buffer, len );
+		/* 5-21-2015 - there is a trailing 4 bytes that is being treasured
+		 * in the buffer that we don't want or need
+		 */
+		nbp->elen = len - 4;
+		memcpy ( (char *) nbp->eptr, buffer, len - 4 );
 
 		net_rcv ( nbp );
 

@@ -3,6 +3,7 @@
  */
 
 #include <kyu.h>
+#include <kyulib.h>
 #include <thread.h>
 
 #include "hardware.h"

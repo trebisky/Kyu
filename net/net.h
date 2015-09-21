@@ -10,6 +10,7 @@
 #define DEBUG_UDP
 #define DEBUG_TCP
 */
+#include "netbuf.h"
 
 #define DEBUG_TCP
 
@@ -30,9 +31,14 @@
 
 #define IP_BROADCAST	0xffffffff
 
+typedef void (*ufptr) ( struct netbuf * );
+
 char * ip2str ( unsigned char * );
 char * ip2strl ( unsigned long );
 char * ether2str ( unsigned char * );
+
+void udp_hookup ( int, ufptr );
+int get_ephem_port ( void );
 
 struct eth_hdr {
     	unsigned char dst[ETH_ADDR_SIZE];

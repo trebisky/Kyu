@@ -24,6 +24,10 @@
  * cache lines to get optimal DMA, but we don't
  * fret over that kind of stuff as yet.
  */
+
+#ifndef __NETBUF_H__
+#define __NETBUF_H__
+
 #define NETBUF_MAX	1600
 
 struct netbuf {
@@ -65,4 +69,5 @@ void netbuf_free ( struct netbuf * );
  */
 #define NETBUF_PREPAD	2 + (8 * sizeof(long))
 
+#endif /* __NETBUF_H__ */
 /* THE END */

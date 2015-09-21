@@ -10,6 +10,8 @@
  */
 #include <stdarg.h>
 
+#define KYU_LOCAL_VPRINTF
+
 /* these hex functions added by tjt  3/2/91
  */
 #define HEX(x)	((x)<10 ? '0'+(x) : 'A'+(x)-10)
@@ -231,7 +233,7 @@ int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
 	 */
 	if ( ! *fmt ) {
 	    PUTCHAR ( '%' );
-	    return;
+	    return buf-abuf;
 	}
 
 	c = *fmt++;
@@ -299,7 +301,8 @@ int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
 	*buf = '\0';
     else if (size > 0)
 	*end = '\0';
-										    return buf-abuf;
+
+    return buf-abuf;
 }
 #endif	/* KYU_LOCAL_VPRINTF */
 

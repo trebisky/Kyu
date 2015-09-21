@@ -3,6 +3,9 @@
  * T. Trebisky  4-8-2005
  */
 
+#include <kyu.h>
+#include <kyulib.h>
+
 #include "net.h"
 #include "netbuf.h"
 #include "cpu.h"

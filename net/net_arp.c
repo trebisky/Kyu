@@ -180,7 +180,7 @@ arp_reply ( struct netbuf *nbp )
 
 	memcpy ( eap->tpa, eap->spa, 4 );
 	memcpy ( eap->tha, eap->sha, ETH_ADDR_SIZE ); 
-	memcpy ( eap->spa, &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &my_ip, 4 );
 	eap->op = OP_REPLY_SWAP;
 
 	net_addr_get ( eap->sha );
@@ -212,10 +212,10 @@ arp_request ( unsigned long target_ip )
 	eap->plen = 4;
 
 	net_addr_get ( eap->sha );
-	memcpy ( eap->spa, &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &my_ip, 4 );
 
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
-	memcpy ( eap->tpa, &unknown, 4 );
+	memcpy ( eap->tpa, (char *) &unknown, 4 );
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;
@@ -369,9 +369,9 @@ arp_announce ( void )
 
 	net_addr_get ( eap->sha );
 
-	memcpy ( eap->spa, &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &my_ip, 4 );
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
-	memcpy ( eap->tpa, &my_ip, 4 );
+	memcpy ( eap->tpa, (char *) &my_ip, 4 );
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;

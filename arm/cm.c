@@ -6,6 +6,8 @@
  * Tom Trebisky  5-25-2015
  */
 
+#include <kyulib.h>
+
 #define CTRL_BASE	0x44e10000
 
 struct device_ctrl {

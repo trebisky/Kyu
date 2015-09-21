@@ -18,8 +18,10 @@ static void panic_debug ( void );
 
 void panic ( char * );
 
+/*
 void putchar ( int );
 void puts ( char * );
+*/
 
 /* -------------------------------------------- */
 

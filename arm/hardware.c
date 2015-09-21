@@ -6,12 +6,12 @@
  */
 
 #include "kyu.h"
+#include "kyulib.h"
 #include "hardware.h"
 
 void
 hardware_init ( void )
 {
-
 	mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 #ifdef ARCH_ARM
