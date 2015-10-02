@@ -93,6 +93,7 @@ static void test_bootp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
 void test_tftp ( int );
+static void test_udp ( int );
 static void test_netshow ( int );
 #endif
 
@@ -160,6 +161,7 @@ struct test net_test_list[] = {
 	test_arp,	"one gratu arp",	1,
 	test_arp,	"8 gratu arp",		8,
 	test_tftp,	"Test TFTP",		0,
+	test_udp,	"Test UDP",		1,
 	test_net,	"Net init",		0,
 	0,		0,			0
 };
@@ -485,6 +487,7 @@ help_tests ( struct test *tp, int nt )
 	}
 }
 
+#ifdef notdef
 /* Any old thing */
 static void
 x_test ( void )
@@ -496,6 +499,7 @@ x_test ( void )
 	printf ( "E %08x\n", cur_thread->iregs );
 	printf ( "F %08x\n", &cur_thread->iregs );
 }
+#endif
 
 static void
 bbb_blinker ( int xx )
@@ -626,11 +630,17 @@ tester ( void )
 		show_my_regs ();
 	    }
 
+#ifdef notdef
 	    if ( **wp == 'x' ) {
 		x_test ();
 	    }
+#endif
 
 #endif
+
+	    if ( **wp == 'x' ) {
+		shell_x ( &wp[1], nw-1 );
+	    }
 
 #ifdef ARCH_X86
 	    if ( **wp == 'R' ) {
@@ -2683,6 +2693,27 @@ test_arp ( int count )
 	for ( i=0; i < count; i++ ) {
 	    thr_delay ( 10 );
 	    arp_announce ();
+	}
+}
+
+#define DOOR_SERVER	"192.168.0.5"
+#define DOOR_PORT	9999
+
+static void
+test_udp ( int count )
+{
+	int i;
+	char *msg = "hello";
+	unsigned long door_ip;
+	int local_port;
+
+	local_port = get_ephem_port ();
+	(void) net_dots ( DOOR_SERVER, &door_ip );
+
+	for ( i=0; i < count; i++ ) {
+	    printf ("sending UDP\n");
+	    udp_send ( door_ip, local_port, DOOR_PORT, msg, strlen(msg) );
+	    thr_delay ( 10 );
 	}
 }
 

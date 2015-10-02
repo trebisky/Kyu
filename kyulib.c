@@ -470,7 +470,7 @@ cq_remove ( struct cqueue *qp )
 	return ch;
 }
 
-#ifndef USE_GCC_BUILTINS
+#ifndef USE_LINUX_STR
 /* gcc didn't like this prototype until the const
  *  got added to the arguments.
  *
@@ -538,8 +538,9 @@ strncpy ( char *ds, const char *ss, int n )
 	} while ( n && cc );
 	return ds;
 }
+#endif
 
-
+#ifndef USE_LINUX_MEM
 void *
 memcpy ( void *s1, char *s2, size_t count )
 {
@@ -588,8 +589,7 @@ memset ( void *buf, int val, size_t count )
 
 	return buf;
 }
-
-#endif /* NO_USE_GCC_BUILTINS */
+#endif
 
 /* Wrapper function to catch troubles when making new threads.
  */

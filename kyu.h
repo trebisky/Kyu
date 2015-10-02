@@ -32,6 +32,7 @@
 */
 #define WANT_NET
 #define WANT_USER
+#define WANT_SHELL
 
 /* define this even if not using serial console.
 #define CONSOLE_BAUD		38400

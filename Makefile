@@ -17,10 +17,16 @@ include Makefile.inc
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 
+# from below
+#    linux/linux-lib.o
+
 OBJS =  machine.o net.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
-    dlmalloc.o random.o kyulib.o
+    shell.o \
+    dlmalloc.o random.o \
+    kyulib.o \
+    linux/linux-lib.o
 
 # For experimenting with linux imported stuff
 #OBJS =  machine.o net.o \
@@ -30,11 +36,11 @@ OBJS =  machine.o net.o \
 #    console.o thread.o prf.o \
 #    dlmalloc.o random.o kyulib.o
 
-all: install dump tags
+all: install dump sym tags
 
 dump: kyu.dump
 
-syms: kyu.syms
+sym: kyu.sym
 
 .PHONY:	tags
 tags:
@@ -43,7 +49,7 @@ tags:
 machine.o:	bogus
 	cd arm ; make
 	cd net ; make
-#	cd linux ; make
+	cd linux ; make
 
 bogus:
 
@@ -59,14 +65,15 @@ thread.e:	thread.c
 #$(SUBDIRS):
 #	$(MAKE) -C $@
 
-install: kyu.bin
+install: kyu.bin kyu.sym
 	cp kyu.bin /var/lib/tftpboot/kyu.bin
+	cp kyu.sym /var/lib/tftpboot/kyu.sym
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump
 
-kyu.syms:	kyu
-	$(NM) kyu >kyu.syms
+kyu.sym:	kyu
+	$(NM) kyu >kyu.sym
 
 version:
 	$(CC) --version
@@ -74,14 +81,18 @@ version:
 help:
 	$(CC) --help=optimizers
 
+kyu:	kyu.lds
+
+#	$(LD) -g -Ttext 0x80300000 -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+
 kyu: $(OBJS)
-	$(LD) -g -Ttext 0x80300000 -e kern_startup -o kyu $(OBJS) $(LIBS)
+	$(LD) -g -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
 
 kyu.bin: kyu
 	$(BIN) kyu kyu.bin
 
 clean:
-	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.syms
+	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.sym
 	cd arm ; make clean
 	cd net ; make clean
 	cd linux ; make clean

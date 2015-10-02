@@ -9,8 +9,7 @@
  * Tom split the real printf off into console.c
  */
 #include <stdarg.h>
-
-#define KYU_LOCAL_VPRINTF
+#include <kyulib.h>
 
 /* these hex functions added by tjt  3/2/91
  */
@@ -59,8 +58,7 @@ shex8( char *buf, char *end, int val )
 
 /* We now use routines in linux/lib
  */
-#ifdef KYU_LOCAL_VPRINTF
-
+#ifndef USE_LINUX_PRF
 /*
  * Printn prints a number n in base b.
  * We don't use recursion to avoid deep kernel stacks.
@@ -304,6 +302,6 @@ int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
 
     return buf-abuf;
 }
-#endif	/* KYU_LOCAL_VPRINTF */
+#endif	/* USE_LINUX_PRF */
 
 /* THE END */

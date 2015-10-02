@@ -35,16 +35,18 @@ struct udp_proto {
 
 static struct udp_proto *head = (struct udp_proto *) 0;
 
-/* XXX - should add 2 features.
- *	--- should search list if port already has a handler hooked up and
- *		if so, replace it rather than adding another.
- *	--- should add an "unhook" routine to find and unlink (and free)
- *		a handler for a port that is no longer wanted.
- */
 void
 udp_hookup ( int port, ufptr func )
 {
 	struct udp_proto *pp;
+
+	/* replace any existing entry (untested) */
+	for ( pp = head; pp; pp = pp->next ) {
+	    if ( pp->port == port ) {
+		pp->func = func;
+		return;
+	    }
+	}
 
 	pp = (struct udp_proto *) malloc ( sizeof(struct udp_proto) );
 	pp->port = port;
@@ -53,10 +55,33 @@ udp_hookup ( int port, ufptr func )
 	head = pp;
 }
 
+/* XXX - untested */
 void
 udp_unhook ( int port )
 {
-	/* XXX */
+	struct udp_proto *pp;
+	struct udp_proto *prior;
+	struct udp_proto *save;
+
+	if ( ! head )
+	    return;
+
+	if ( head->port == port ) {
+	    save = head;
+	    head = save->next;
+	    free ( save );
+	    return;
+	}
+
+	prior = head;
+	for ( pp = prior->next; pp; pp = prior->next ) {
+	    if ( pp->port == port ) {
+		prior->next = pp->next;
+		free ( pp );
+		return;
+	    }
+	    prior = pp;
+	}
 }
 
 int

@@ -1,5 +1,6 @@
 /* kyulib.h
  *	Tom Trebisky 12/1/2001
+ *	Tom Trebisky 9/23/2015
  */
 
 /* This whole gcc builtin thing is a pain in the butt.
@@ -9,9 +10,14 @@
  * tjt 5-39-2015
  */
 
-/*
+/* OLD and bogus now (sorta)
 #define USE_GCC_BUILTINS
 */
+
+#define USE_LINUX_STR
+#define USE_LINUX_MEM
+/* in prf.c */
+#define USE_LINUX_PRF
 
 void dump_w ( void *, int );
 void dump_l ( void *, int );

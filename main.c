@@ -130,6 +130,10 @@ sys_init ( int xxx )
 	net_init ();
 #endif
 
+#ifdef WANT_SHELL
+	shell_init ();
+#endif
+
 #ifdef notyet
 	init_pcmcia_ds ();
 #endif
