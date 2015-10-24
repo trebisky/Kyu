@@ -647,6 +647,7 @@ cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 	int data;
 	u32 reg;
 
+	printf ( "CPSW_mdio_read - enter\n" );
 	if (phy_reg & ~PHY_REG_MASK || phy_id & ~PHY_ID_MASK)
 		return -EINVAL;
 
@@ -657,6 +658,7 @@ cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 	reg = wait_for_user_access();
 
 	data = (reg & USERACCESS_ACK) ? (reg & USERACCESS_DATA) : -1;
+	printf ( "CPSW_mdio_read - exit\n" );
 	return data;
 }
 

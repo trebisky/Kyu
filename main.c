@@ -149,6 +149,10 @@ sys_init ( int xxx )
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 }
 
+/* The usual case is that this is not defined and
+ * user_init() is provided by user.c
+ */
+
 #ifndef WANT_USER
 
 static int dregs[17];

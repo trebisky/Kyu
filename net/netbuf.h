@@ -25,6 +25,13 @@
  * fret over that kind of stuff as yet.
  */
 
+/* Note that all the pointers elen, .... may seem to
+ * imply some kind of scatter/gather is going on.
+ * This is emphatically NOT the case, these are simply
+ * convenience pointers into the data buffer, which must
+ * hold a contiguous packet.
+ */
+
 #ifndef __NETBUF_H__
 #define __NETBUF_H__
 

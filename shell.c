@@ -12,7 +12,11 @@
 /* ------------- */
 
 #define SYM_SIZE       200000
+
+/*
 static char sym_buf[SYM_SIZE];
+*/
+static char *sym_buf;
 static char *sym_last;
 static char *symp;
 
@@ -134,9 +138,11 @@ shell_init ( void )
 {
 	int count;
 
+	sym_buf = malloc ( SYM_SIZE );
 	count = tftp_fetch ( sym_file, sym_buf, SYM_SIZE );
 	printf ( "fetched symbol table: %d bytes\n", count );
 	parse_table (count);
+	free ( sym_buf );
 }
 
 /* --------------- */
@@ -153,10 +159,23 @@ is_number ( char *s )
 	return 1;
 }
 
+/* This handler is the bottom line once things are all set up.
+ *
+ * A command "x fish" calls fish(0);
+ * A command "x fish 12" calls fish(12);
+ * A command "x fish rat" calls fish("rat");
+ *
+ * At some point I will change the parset so that the leading
+ * "x" is not required (and make the current "test" fixture
+ * an optional thing off to the side.
+ */
+
 void
 shell_x ( char **arg, int narg )
 {
 	struct symtab *sp;
+	void (*ifp) ( int );
+	void (*sfp) ( char * );
 
 	printf ( "shell_x, narg = %d\n" );
 
@@ -171,13 +190,36 @@ shell_x ( char **arg, int narg )
 
 	printf ( "Call to address: %08x\n", sp->addr );
 
-	if ( narg == 1 )
+	if ( narg == 1 ) {
+	    ifp = (void (*)(int)) sp->addr;
+	    (*ifp)(0);
 	    return;
+	}
 
-	if ( is_number ( arg[1] ) )
+	/* OK, we have an argument, what flavor? */
+	if ( is_number ( arg[1] ) ) {
 	    printf ( " arg num = %d\n", atoi ( arg[1] ) );
-	else
+	    ifp = (void (*)(int)) sp->addr;
+	    (*ifp)( atoi(arg[1]));
+	} else {
 	    printf ( " arg string = %s\n", arg[1] );
+	    sfp = (void (*)(char *)) sp->addr;
+	    (*sfp)(arg[1]);
+	}
 }
+
+#ifdef notdef
+void
+shell_test1 ( int arg )
+{
+	printf ( "Called with %d\n", arg );
+}
+
+void
+shell_test2 ( char *arg )
+{
+	printf ( "Called with string: %s\n", arg );
+}
+#endif
 
 /* THE END */

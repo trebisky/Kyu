@@ -177,12 +177,16 @@ udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
 	 */
 	bip = (struct bogus_ip *) nbp->iptr;
 	memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
+
 	bip->proto = IPPROTO_UDP;
 	bip->len = udp->len;
 	bip->dst = dest_ip;
 	bip->src = my_ip;	/* should be zero for BOOTP */
 
+	/*
 	udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
+	*/
+	udp->sum = ~in_cksum_i ( nbp->iptr, nbp->ilen, 0 );
 
 	ip_send ( nbp, dest_ip );
 }

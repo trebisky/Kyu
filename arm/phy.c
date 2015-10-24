@@ -38,6 +38,29 @@ typedef unsigned long u32;
 #define ffs(x)	__builtin_ffs(x)
 #endif
 
+
+#ifdef KYU
+/* Normally an inline function in phy.h
+ * Here to facilitate Kyu debugging.
+ */
+static int phy_first = 1;
+
+static int phy_read(struct phy_device *phydev, int devad, int regnum)
+{
+	struct mii_dev *bus = phydev->bus;
+
+	if ( phy_first ) {
+	    printf ( "phy_read, name = %s\n", bus->name );
+	    printf ( "phy_read, read, write = %08x %08x\n",
+		(unsigned long) bus->read, (unsigned long) bus->write );
+	    phy_first = 0;
+	}
+
+	return bus->read(bus, phydev->addr, devad, regnum);
+}
+#endif
+
+
 /* Generic PHY support and helper functions */
 
 /**
@@ -270,7 +293,14 @@ genphy_update_link(struct phy_device *phydev)
 			if ((i++ % 500) == 0)
 				printf(".");
 
+	    /* This was hanging here after the first dot about
+	     * 1/3 of the boots.  Changed to thr_delay() 10-2-2015
+	     */
+#ifdef KYU
+			thr_delay ( 2 ); /* 2 ms */
+#else
 			udelay(1000);	/* 1 ms */
+#endif
 			mii_reg = phy_read(phydev, MDIO_DEVAD_NONE, MII_BMSR);
 		}
 		printf(" done\n");

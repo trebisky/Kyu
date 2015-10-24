@@ -60,6 +60,12 @@ static int num_eth = 0;
 
 static int use_rtl = 0;
 
+#define NET_IDLE	0
+#define NET_INIT	1
+#define NET_RUN		2
+
+static int net_state = NET_IDLE;
+
 /* XXX - This really should be part of an interface related
  * datastructure.
  */
@@ -76,10 +82,74 @@ static struct sem *inq_sem;
 static struct sem *outq_sem;
 */
 
-#ifndef NEW_SLOW_WAY
 static int system_clock_rate;
+
+#ifndef NEW_SLOW_WAY
 static struct sem *slow_net_sem;
 #endif
+
+static int net_debug_f = 0;
+
+void
+net_debug_arm ( void )
+{
+	net_debug_f = 1;
+}
+
+/* This now gets run as a thread (10-4-2015)
+ * on the ARM with the cpsw, sometimes the boot hangs with
+ * the message "Waiting for PHY auto negotiation to complete".
+ * I decided it would be much nicer to have this hung in its own
+ * thread and have he Kyu shell to help debug the situation.
+ */
+void
+net_hw_init ( int bogus )
+{
+
+#ifdef ARCH_X86
+    num_ee = ee_init ();
+    num_eth += num_ee;
+    num_rtl = rtl_init ();
+    num_eth += num_rtl;
+    num_el3 = el3_init ();
+    num_eth += num_el3;
+#endif
+
+    num_cpsw = cpsw_init ();
+    num_eth += num_cpsw;
+
+    cpsw_activate ();
+
+#ifdef ARCH_X86
+    /* XXX - need cleaner way to set these
+     */
+    if ( num_rtl > 0 ) {
+	if ( ! net_dots ( "128.196.100.15", &my_ip ) )		/* ringo */
+	    panic ( "netdots" );
+	if ( ! net_dots ( "128.196.100.1", &gate_ip ) )
+	    panic ( "netdots" );
+	my_net_mask = ntohl ( 0xffffff00 );
+	(void ) net_dots ( "128.196.100.0", &my_net );
+	/*
+	ee_activate ();
+	*/
+	rtl_activate ();
+	use_rtl = 1;
+    } else {
+	if ( ! net_dots ( "10.0.0.202", &my_ip ) )		/* chorizo */
+	    panic ( "netdots" );
+	if ( ! net_dots ( "10.0.0.1", &gate_ip ) )
+	    panic ( "netdots" );
+	my_net_mask = ntohl ( 0xffffff00 );
+	(void ) net_dots ( "10.0.0.0", &my_net );
+	ee_activate ();
+    }
+#endif
+
+    net_state = NET_RUN;
+}
+
+#define NET_STARTUP_WAIT	10
 
 /* Called during startup if networking
  * is configured.
@@ -87,6 +157,8 @@ static struct sem *slow_net_sem;
 void
 net_init ( void )
 {
+    int count;
+
     /*
     unsigned long xxx;
     if ( ! net_dots ( "128.196.100.54", &xxx ) )
@@ -94,7 +166,16 @@ net_init ( void )
     printf ( "Addr = %08x, %s\n", xxx, ip2strl ( xxx ) );
     */
 
+    (void) net_dots ( "192.168.0.11", &my_ip );
+    (void) net_dots ( "192.168.0.1", &gate_ip );
+    my_net_mask = ntohl ( 0xffffff00 );
+    (void ) net_dots ( "192.168.0.0", &my_net );
+
+    system_clock_rate = timer_rate_get();
+
     netbuf_init ();
+    tcp_init ();
+
     arp_init ();
     dns_init ();
     bootp_init ();
@@ -123,64 +204,26 @@ net_init ( void )
     (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
 
 #ifdef NEW_SLOW_WAY
-    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0,
-	timer_rate_get() );
+    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0, system_clock_rate );
 #else
     (void) safe_thr_new ( "net_slow", slow_net, (void *) 0, 11, 0 );
 
-    system_clock_rate = timer_rate_get();
     slow_net_sem = sem_signal_new ( SEM_FIFO );
     net_timer_hookup ( fast_net );
 #endif
 
-#ifdef ARCH_X86
-    num_ee = ee_init ();
-    num_eth += num_ee;
-    num_rtl = rtl_init ();
-    num_eth += num_rtl;
-    num_el3 = el3_init ();
-    num_eth += num_el3;
-#endif
-    num_cpsw = cpsw_init ();
-    num_eth += num_cpsw;
+    net_state = NET_INIT;
+    (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
-#ifdef ARCH_X86
-    /* XXX - need cleaner way to set these
-     */
-    if ( num_rtl > 0 ) {
-	if ( ! net_dots ( "128.196.100.15", &my_ip ) )		/* ringo */
-	    panic ( "netdots" );
-	if ( ! net_dots ( "128.196.100.1", &gate_ip ) )
-	    panic ( "netdots" );
-	my_net_mask = ntohl ( 0xffffff00 );
-	(void ) net_dots ( "128.196.100.0", &my_net );
-	/*
-	ee_activate ();
-	*/
-	rtl_activate ();
-	use_rtl = 1;
-    } else {
-	if ( ! net_dots ( "10.0.0.202", &my_ip ) )		/* chorizo */
-	    panic ( "netdots" );
-	if ( ! net_dots ( "10.0.0.1", &gate_ip ) )
-	    panic ( "netdots" );
-	my_net_mask = ntohl ( 0xffffff00 );
-	(void ) net_dots ( "10.0.0.0", &my_net );
-	ee_activate ();
+    while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT )
+	thr_delay ( system_clock_rate );
+
+    if ( num_eth == 0 ) {
+	net_state = NET_IDLE;
+	return;
     }
-#endif
-
-    (void) net_dots ( "192.168.0.11", &my_ip );
-    (void) net_dots ( "192.168.0.1", &gate_ip );
-    my_net_mask = ntohl ( 0xffffff00 );
-    (void ) net_dots ( "192.168.0.0", &my_net );
 
     net_addr_get ( our_mac );
-
-    cpsw_activate ();
-
-    if ( num_eth == 0 )
-	return;
 
     arp_announce ();
 
@@ -221,7 +264,7 @@ slow_net ( int arg )
 static int fast_net_clock = 0;
 
 /* Called at the system clock rate
- * (either 100 or 1000 Hz probably)
+ * (either 100 or 1000 Hz, probably)
  */
 static void
 fast_net ( void )
@@ -406,8 +449,39 @@ net_show ( void )
 /* ----------------------------------------- */
 
 void
+net_show_packet ( char *msg, struct netbuf *nbp )
+{
+	printf ( "%s, %d bytes\n", msg, nbp->elen );
+
+	printf ( "ether src: %s\n", ether2str(nbp->eptr->src) );
+	printf ( "ether dst: %s\n", ether2str(nbp->eptr->dst) );
+	printf ( "ether type: %04x\n", nbp->eptr->type );
+
+	if ( nbp->eptr->type == ETH_ARP_SWAP ) {
+	    printf ( "ARP packet\n" );
+	} else if ( nbp->eptr->type == ETH_IP_SWAP ) {
+	    printf ( "ip src: %s (%08x)\n", ip2strl(nbp->iptr->src), nbp->iptr->src );
+	    printf ( "ip dst: %s (%08x)\n", ip2strl(nbp->iptr->dst), nbp->iptr->dst );
+	    printf ( "ip proto: %d\n", nbp->iptr->proto );
+	} else
+	    printf ( "unknown packet type\n" );
+
+
+	dump_buf ( nbp->eptr, nbp->elen );
+}
+
+void
 net_send ( struct netbuf *nbp )
 {
+
+    nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+    if ( net_debug_f > 0 ) {
+	net_show_packet ( "net_send", nbp );
+	if ( net_debug_f == 1 )
+	    net_debug_f = 0;
+    }
+
 #ifdef ARCH_X86
     if ( use_rtl )
 	rtl_send ( nbp );

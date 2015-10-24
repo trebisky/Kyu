@@ -184,12 +184,14 @@ struct fixed_link {
 	int asym_pause;
 };
 
+#ifndef KYU
 static inline int phy_read(struct phy_device *phydev, int devad, int regnum)
 {
 	struct mii_dev *bus = phydev->bus;
 
 	return bus->read(bus, phydev->addr, devad, regnum);
 }
+#endif
 
 static inline int phy_write(struct phy_device *phydev, int devad, int regnum,
 			u16 val)

@@ -11,9 +11,9 @@
 #include "thread.h"
 #include "malloc.h"
 
-#define HZ	100
-
 extern struct thread *cur_thread;
+
+static int timer_rate;	/* ticks per second */
 
 #define PRI_DEBUG	5
 #define PRI_TEST	10
@@ -548,6 +548,8 @@ tester ( void )
 	 */
 	thr_yield ();
 
+	timer_rate = timer_rate_get ();
+
 #ifdef ARCH_X86
 	/* XXX - not the best place for these checks,
 	 * but it will do for now.
@@ -689,7 +691,7 @@ tester ( void )
 	    if ( **wp == 'w' && nw == 2 ) {
 		nw = atoi(wp[1]);
 		printf ("Delay for %d seconds\n", nw );
-		thr_delay ( nw * HZ );
+		thr_delay ( nw * timer_rate );
 	    }
 
 #ifdef notdef
@@ -2320,9 +2322,9 @@ static void f_croak ( int junk )
 static void f_linger ( int time )
 {
 	/*
-	thr_delay ( time * HZ );
+	thr_delay ( time * timer_rate );
 	*/
-	thr_delay_c ( time * HZ, f_croak, 0 );
+	thr_delay_c ( time * timer_rate, f_croak, 0 );
 	printf ( "Exit!\n");
 }
 
@@ -2377,7 +2379,7 @@ func_cv ( int xx )
 	printf ( "Waiting!\n");
 
 	for ( count = 6; count; count-- ) {
-	    thr_delay ( 5 * HZ );
+	    thr_delay ( 5 * timer_rate );
 	    printf ( "Ticked!\n");
 	}
 	cv_done_flag = 1;

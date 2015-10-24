@@ -37,6 +37,8 @@ static void tftp_start ( char * );
 
 /* ------------- */
 
+#define TEST_TFTP
+#ifdef TEST_TFTP
 #define TEST_SIZE	200000
 static char *test_file = "kyu.sym";
 static char test_buf[TEST_SIZE];
@@ -51,6 +53,7 @@ test_tftp ( int arg )
 	count = tftp_fetch ( test_file, test_buf, TEST_SIZE );
 	printf ( "TFTP test transfer finished: %d bytes\n", count );
 }
+#endif
 
 /* ------------- */
 
@@ -62,6 +65,7 @@ static int	tftp_limit;
 static int	tftp_count;
 static struct sem *tftp_sem;
 
+/* set the server to use */
 void
 tftp_server ( char *server )
 {
@@ -81,6 +85,55 @@ tftp_init ( void )
 	tftp_server ( TFTP_SERVER );
 }
 
+#define TFS_IDLE	0
+#define TFS_START	1
+#define TFS_RUN		2
+
+static int tftp_state = TFS_IDLE;
+
+/* Times in seconds to start and to finish */
+#define TFTP_START_WAIT		5
+#define TFTP_TOTAL_WAIT		60
+
+/* Handle timeouts.
+ * We are a bad boy and do timeouts our own way.
+ * We watch that the initial packet gets a
+ * response and that the whole transaction finishes
+ * within a reasonable time.  Doing this properly
+ * involves timing out each packet and handling
+ * retransmits.  Not that hard, but we are lazy.
+ */
+static void
+tftp_wdog ( int bogus )
+{
+	int delay;
+	int hz = timer_rate_get();
+
+	delay = TFTP_START_WAIT;
+
+	while ( tftp_state == TFS_START && delay-- )
+	    thr_delay ( hz );
+
+	if ( tftp_state == TFS_START ) {
+	    tftp_count = 0;
+	    tftp_state = TFS_IDLE;
+	    printf ( "TFTP server not listening\n" );
+	    sem_unblock ( tftp_sem );
+	}
+
+	delay = TFTP_TOTAL_WAIT - TFTP_START_WAIT;
+
+	while ( tftp_state != TFS_IDLE && delay-- )
+	    thr_delay ( hz );
+
+	if ( tftp_state != TFS_IDLE ) {
+	    tftp_count = 0;
+	    tftp_state = TFS_IDLE;
+	    printf ( "TFTP transfer did not finish\n" );
+	    sem_unblock ( tftp_sem );
+	}
+}
+
 /* This is the main externally visible entry point */
 int
 tftp_fetch ( char *file, char *buf, int limit )
@@ -95,7 +148,12 @@ tftp_fetch ( char *file, char *buf, int limit )
 	tftp_count = 0;
 	tftp_sem = sem_signal_new ( SEM_FIFO );
 
+	tftp_state = TFS_START;
+	(void) safe_thr_new ( "tftp_wdog", tftp_wdog, (void *) 0, 13, 0 );
+
 	tftp_start ( file );
+
+	/* Wait here for transfer to finish (or timeout) */
 	sem_block ( tftp_sem );
 	return tftp_count;
 }
@@ -158,10 +216,12 @@ tftp_rcv ( struct netbuf *nbp )
 	    printf ( "TFTP error: %s\n", &nbp->dptr[4] );
 	    tftp_count = 0;
 	    sem_unblock ( tftp_sem );
+	    tftp_state = TFS_IDLE;
 	    return;
 	}
 
 	if ( code == TFTP_DATA ) {
+	    tftp_state = TFS_RUN;
 	    memcpy ( &rblock, &nbp->dptr[2], 2 );
 	    block = ntohs ( rblock );
 	    if ( block == 1 ) {
@@ -184,17 +244,20 @@ tftp_rcv ( struct netbuf *nbp )
 	    tftp_ack ( rblock );
 
 	    if ( count < TFTP_BSIZE ) {
+		tftp_state = TFS_IDLE;
 		if ( tftp_verbose )
 		    printf ( "TFTP transfer finished, %d bytes received\n", tftp_count );
 		sem_unblock ( tftp_sem );
 	    }
 
+	    tftp_state = TFS_IDLE;
 	    return;
 	}
 
 	/* XXX - should never happen */
 	printf ("TFTP unexpected opcode: %d\n", code );
 	tftp_count = 0;
+	tftp_state = TFS_IDLE;
 	sem_unblock ( tftp_sem );
 }
 

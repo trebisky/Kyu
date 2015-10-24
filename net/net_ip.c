@@ -125,10 +125,7 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 
 	ipp->ttl = 64;
 
-#ifdef notdef
-	/* Let the udp or tcp layer fill this in for us */
-	ipp->proto = IPPROTO_UDP;
-#endif
+	/* proto is already filled in by caller */
 
 	ipp->src = my_ip;
 	ipp->dst = dest_ip;
