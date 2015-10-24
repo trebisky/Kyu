@@ -151,13 +151,13 @@ tcp_reply_rst ( struct netbuf *xbp )
 	 */
 	tcp->sum = ~sum;
 
-	net_show_packet ( "tcp_reply_rst", nbp );
-
+	/*
 	net_debug_arm ();
+	*/
 	ip_send ( nbp, xipp->src );
 }
 
-#ifdef not_any_more
+#ifdef no_way
 
 /* Here is a TCP packet with a valid checksum.
  * 54 bytes
@@ -220,9 +220,12 @@ tcp_demo ( void )
 	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
 	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
 	sum = ~sum;
-	printf ( "my tcp checksum is %08x\n", htons(sum) );
-}
+	printf ( "my tcp checksum is %04x\n", htons(sum) );
 
+	tcp->sum = sum;
+
+	ip_arp_send ( nbp );
+}
 #endif
 
 #ifdef notdef
