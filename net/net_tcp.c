@@ -5,13 +5,23 @@
 
 #include <kyu.h>
 #include <kyulib.h>
+#include <malloc.h>
 
 #include "net.h"
 #include "netbuf.h"
 #include "cpu.h"
 
+typedef void (*tcp_fptr) ( char *, int );
+
 static void tcp_reply_rst ( struct netbuf * );
-void tcp_demo ( void );
+struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
+
+struct tcp_io {
+	unsigned long remote_ip;
+	int remote_port;
+	int local_port;
+	tcp_fptr rcv_func;
+};
 
 /* XXX - bit fields are little endian only.
  * 20 bytes in all, but options may follow.
@@ -45,11 +55,25 @@ struct tcp_hdr {
 #define TH_URG  0x20
 
 void
-tcp_init ( void )
+tcp_tester ( char *buf, int count )
 {
-	/* stub */
+	/* XXX - should dump packet */
 }
 
+/* XXX - this gets called, but has no purpose yet.
+ * Use for debug and ultimately initialization.
+ */
+void
+tcp_init ( void )
+{
+	unsigned long ip;
+	struct tcp_io *tio;
+
+	(void) net_dots ( "192.168.0.5", &ip );
+	tio = tcp_connect ( ip, 17, tcp_tester );
+}
+
+/* Called with every received TCP packet */
 void
 tcp_rcv ( struct netbuf *nbp )
 {
@@ -157,7 +181,106 @@ tcp_reply_rst ( struct netbuf *xbp )
 	ip_send ( nbp, xipp->src );
 }
 
+/* Just a start, needs work XXX */
+static void
+tcp_send_syn ( struct tcp_io *tp )
+{
+	struct netbuf *nbp;
+	struct tcp_hdr *tcp;
+
+	/*
+	struct tcp_hdr *xtcp;
+	struct ip_hdr *xipp;
+	*/
+	struct tcp_pseudo pseudo;
+	unsigned short sum;
+
+	nbp = netbuf_alloc ();
+	if ( ! nbp )
+	    return;
+
+	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
+
+	nbp->dlen = 0;
+	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
+	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
+	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
+
+	nbp->iptr->proto = IPPROTO_TCP;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+
+	tcp->sport = tp->local_port;
+	tcp->dport = tp->remote_port;
+
+	tcp->flags = TH_SYN;
+
+	tcp->ack = 0;
+
+	// tcp->seq = htonl(seq_start);
+	tcp->seq = 0;
+
+	tcp->hlen = 5;
+
+	tcp->win = 0;
+	tcp->urg = 0;
+
+#ifdef notdef
+	xipp = xbp->iptr;
+
+	/* Setup and checksum the pseudo header */
+	pseudo.src = xipp->dst;
+	pseudo.dst = xipp->src;
+#endif
+
+	pseudo.proto = htons ( IPPROTO_TCP );
+	pseudo.len = htons ( sizeof(struct tcp_hdr) );
+
+	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
+	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
+
+	/* Note - we do NOT byte reorder the checksum.
+	 * if it was done on byte swapped data, it will be correct
+	 * as is !!
+	 */
+	tcp->sum = ~sum;
+
+	/*
+	net_debug_arm ();
+	*/
+	ip_send ( nbp, tp->remote_ip );
+}
+
+struct tcp_io *
+tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
+{
+	struct tcp_io *tp;
+
+	tp = (struct tcp_io *) malloc ( sizeof(struct tcp_io) );
+	if ( ! tp )
+	    return NULL;
+
+	tp->remote_ip = ip;
+	tp->remote_port = port;
+	tp->local_port = get_ephem_port ();
+	tp->rcv_func = rfunc;
+
+	tcp_send_sync ( tp );
+
+	return tp;
+}
+
+/* Call this to send payload data to remote */
+void
+tcp_send ( struct tcp_io *tp, char *buf, int count )
+{
+}
+
 #ifdef no_way
+void tcp_demo ( void );
 
 /* Here is a TCP packet with a valid checksum.
  * 54 bytes
@@ -225,166 +348,6 @@ tcp_demo ( void )
 	tcp->sum = sum;
 
 	ip_arp_send ( nbp );
-}
-#endif
-
-#ifdef notdef
-
-void
-udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
-{
-	struct udp_hdr *udp;
-	struct netbuf *nbp;
-	struct bogus_ip *bip;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct udp_hdr );
-
-	memcpy ( nbp->dptr, buf, size );
-
-	size += sizeof(struct udp_hdr);
-	nbp->plen = size;
-	nbp->ilen = size + sizeof(struct ip_hdr);
-
-	udp = (struct udp_hdr *) nbp->pptr;
-	udp->sport = htons(sport);
-	udp->dport = htons(dport);
-	udp->len = htons(nbp->plen);
-	udp->sum = 0;
-
-	/* Fill out a bogus IP header just to do
-	 * checksum computation.  It will pick up
-	 * the proto field from this however.
-	 */
-	bip = (struct bogus_ip *) nbp->iptr;
-	memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
-	bip->proto = IPPROTO_UDP;
-	bip->len = udp->len;
-	bip->dst = dest_ip;
-	bip->src = my_ip;	/* should be zero for BOOTP */
-
-	udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
-
-	ip_send ( nbp, dest_ip );
-}
-
-extern unsigned long my_ip;
-
-struct bogus_ip {
-    	unsigned long x1;
-    	unsigned long x2;
-	/* */
-	unsigned char x3;
-	unsigned char proto;
-	unsigned short len;
-	/* */
-	unsigned long src;
-	unsigned long dst;
-};
-
-static void
-tcp_reply_rst ( struct netbuf *nbp )
-{
-	struct bogus_ip save;
-	struct tcp_hdr *tcp;
-    	unsigned long tmp;
-	struct bogus_ip *bip;
-	unsigned long seq;
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-
-	/* turn the ports in the packet around */
-	tmp = tcp->sport;
-	tcp->sport = tcp->dport;
-	tcp->dport = tmp;
-
-	tcp->flags = TH_RST | TH_ACK;
-
-	seq = ntohl(tcp->seq) + 1;
-	tcp->ack = htonl(seq);
-	tcp->seq = htonl(seq_start);
-
-	tcp->win = 0;
-	tcp->urg = 0;
-
-	bip = (struct bogus_ip *) nbp->iptr;
-
-	/* Save the entire IP header */
-	save = *bip;
-
-	memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
-
-	bip->proto = IPPROTO_TCP;
-	bip->len = save.len;
-
-	bip->dst = save.dst;
-	bip->src = save.src;
-
-	tcp->sum = 0;
-	tcp->sum = in_cksum ( nbp->iptr, nbp->ilen );
-
-	bip->x1 = save.x1;
-	bip->x2 = save.x2;
-	bip->x3 = save.x3;
-
-	/* This will flip src/dst IP around */
-	ip_reply ( nbp );
-}
-#endif
-
-#ifdef notyet
-/* XXX actually this is the UDP routine waiting for hackery */
-void
-udp_send_hacked ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
-{
-	struct tcp_hdr *udp;
-	struct netbuf *nbp;
-	struct bogus_ip *bip;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	memcpy ( nbp->dptr, buf, size );
-
-	size += sizeof(struct tcp_hdr);
-	nbp->plen = size;
-	nbp->ilen = size + sizeof(struct ip_hdr);
-
-	/* The rest of this junk is just the UDP code.
-	 * waiting to be converted to UDP
-	 */
-	udp = (struct tcp_hdr *) nbp->pptr;
-	udp->sport = htons(sport);
-	udp->dport = htons(dport);
-	/*
-	udp->len = htons(nbp->plen);
-	*/
-	udp->sum = 0;
-
-	/* Fill out a bogus IP header just to do
-	 * checksum computation.  It will pick up
-	 * the proto field from this however.
-	 */
-	bip = (struct bogus_ip *) nbp->iptr;
-	memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
-	bip->proto = IPPROTO_UDP;
-	/*
-	bip->len = udp->len;
-	*/
-	bip->dst = dest_ip;
-	bip->src = my_ip;
-
-	udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
-
-	ip_send ( nbp, dest_ip );
 }
 #endif
 
