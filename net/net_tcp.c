@@ -7,6 +7,7 @@
 #include <kyulib.h>
 #include <malloc.h>
 
+#include "thread.h"
 #include "net.h"
 #include "netbuf.h"
 #include "cpu.h"
@@ -17,13 +18,13 @@ typedef void (*tcp_fptr) ( char *, int );
 
 static void tcp_reply_rst ( struct netbuf * );
 struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
+void tcp_send ( struct tcp_io *, char *, int );
+void tcp_shutdown ( struct tcp_io * );
 
 static void tcp_send_flags ( struct tcp_io *, int );
-static void tcp_send_ack ( struct tcp_io * );
-static void tcp_send_syn ( struct tcp_io * );
 
 /* This structure manages TCP connections */
-enum tcp_state { FREE, CWAIT, CONNECT, FWAIT, INIT };
+enum tcp_state { FREE, BORASCO, CWAIT, CONNECT, FWAIT };
 
 struct tcp_io {
 	struct tcp_io *next;
@@ -34,9 +35,11 @@ struct tcp_io {
 	unsigned long remote_seq;
 	tcp_fptr rcv_func;
 	enum tcp_state state;
+	struct sem *sem;
 };
 
 static struct tcp_io *tcp_io_head;
+static struct tcp_io *tcp_io_free_list;
 
 /* XXX - bit fields are little endian only.
  * 20 bytes in all, but options may follow.
@@ -71,6 +74,33 @@ struct tcp_hdr {
 #define TH_ACK  0x10
 #define TH_URG  0x20
 
+/* ------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------- */
+
+/* XXX - Someday slab allocator will handle this */
+struct tcp_io *
+tcp_io_alloc ( void )
+{
+	struct tcp_io *rv;
+
+	if ( tcp_io_free_list ) {
+	    rv = tcp_io_free_list;   
+	    tcp_io_free_list = rv->next;
+	} else {
+	    rv = (struct tcp_io *) malloc ( sizeof(struct tcp_io) );
+	}
+
+	return rv;
+}
+
+void
+tcp_io_free ( struct tcp_io *tp )
+{
+	tp->next = tcp_io_free_list;
+	tp->state = FREE;
+	tcp_io_free_list = tp;
+}
+
 void
 tcp_tester ( char *buf, int count )
 {
@@ -85,7 +115,42 @@ tcp_tester ( char *buf, int count )
 }
 
 #define	TEST_SERVER	"192.168.0.5"
-#define	TEST_PORT	13	/* daytime */
+#define	ECHO_PORT	7	/* echo */
+#define	DAYTIME_PORT	13	/* daytime */
+#define	TEST_PORT	DAYTIME_PORT
+
+static void
+test_tcp_daytime ( int dummy )
+{
+	unsigned long ip;
+	struct tcp_io *tio;
+
+	(void) net_dots ( TEST_SERVER, &ip );
+	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+}
+
+static void
+test_tcp_echo ( int dummy )
+{
+	unsigned long ip;
+	struct tcp_io *tio;
+	char buf[16];
+
+	(void) net_dots ( TEST_SERVER, &ip );
+	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+
+	strcpy ( buf, "test" );
+	tcp_send ( tio, buf, 4 );
+
+	tcp_shutdown ( tio );
+}
+
+/* This gets called from the test console */
+void
+test_tcp ( int dummy )
+{
+	test_tcp_daytime ( dummy );
+}
 
 /* XXX - this gets called, but has no purpose yet.
  * Use for debug and ultimately initialization.
@@ -94,6 +159,7 @@ void
 tcp_init ( void )
 {
 	tcp_io_head = NULL;
+	tcp_io_free_list = NULL;
 }
 
 static struct tcp_io *
@@ -144,17 +210,31 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	 * check if SYN/ACK for this.
 	 */
 	if ( tcp->flags == (TH_SYN | TH_ACK) ) {
-	    tp->remote_seq = ntohl(tcp->seq) + 1;
-	    tp->local_seq += 1;
-	    tcp_send_flags ( tp, TH_ACK );
-	    printf ( "Connection established\n" );
+	    if ( tp->state == CWAIT ) {
+		tp->remote_seq = ntohl(tcp->seq) + 1;
+		tp->local_seq += 1;
+		tcp_send_flags ( tp, TH_ACK );
+		printf ( "Connection established\n" );
+		tp->state = CONNECT;
+		sem_unblock ( tp->sem );
+	    }
 	    return;
 	}
 
 	if ( tcp->flags == (TH_FIN | TH_ACK) ) {
 	    tp->remote_seq = ntohl(tcp->seq) + 1;
-	    tcp_send_flags ( tp, TH_FIN | TH_ACK );
-	    printf ( "Connection terminated\n" );
+	    if ( tp->state == FWAIT ) {
+		tcp_send_flags ( tp, TH_ACK );
+		printf ( "Connection termination complete\n" );
+		tp->state = BORASCO;
+		tcp_io_free ( tp );
+	    }
+	    if ( tp->state == CONNECT ) {
+		tcp_send_flags ( tp, TH_FIN | TH_ACK );
+		printf ( "Connection terminated by peer\n" );
+		tp->state = BORASCO;
+		tcp_io_free ( tp );
+	    }
 	    return;
 	}
 
@@ -164,14 +244,22 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	}
 }
 
+/* Call this to send payload data to remote */
 void
-test_tcp ( int dummy )
+tcp_send ( struct tcp_io *tp, char *buf, int count )
 {
-	unsigned long ip;
-	struct tcp_io *tio;
+}
 
-	(void) net_dots ( TEST_SERVER, &ip );
-	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+/* Call this when we want to shut down a connection.
+ * Unlike making a connection, we don't sweat any
+ * kind of synchronization.
+ */
+void
+tcp_shutdown ( struct tcp_io *tp )
+{
+	printf ( " Shutdown connection\n" );
+	tcp_send_flags ( tp, TH_FIN | TH_ACK );
+	tp->state = FWAIT;
 }
 
 static void dump_tcp ( struct netbuf *nbp )
@@ -193,6 +281,37 @@ static void dump_tcp ( struct netbuf *nbp )
 	len = ilen - sizeof(struct ip_hdr) - tcp->hlen * 4;
 	printf ( " dlen = %d, ilen = %d, len = %d\n", nbp->dlen, ilen, len );
 }
+
+struct tcp_io *
+tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
+{
+	struct tcp_io *tp;
+
+	tp = tcp_io_alloc ();
+	if ( ! tp )
+	    return NULL;
+
+	tp->remote_ip = ip;
+	tp->remote_port = port;
+	tp->local_port = get_ephem_port ();
+	tp->rcv_func = rfunc;
+	tp->local_seq = 0;	/* XXX */
+	tp->remote_seq = 0;	/* for now */
+	tp->state = CWAIT;
+
+	tp->next = tcp_io_head;
+	tp->state = CWAIT;
+	tp->sem = sem_signal_new ( SEM_FIFO );
+	tcp_io_head = tp;
+
+	tcp_send_flags ( tp, TH_SYN );
+	sem_block ( tp->sem );
+
+	/* XXX - this should block till we have a connection */
+
+	return tp;
+}
+
 
 /* Called with every received TCP packet */
 void
@@ -375,162 +494,6 @@ tcp_send_flags ( struct tcp_io *tp, int flags )
 	net_debug_arm ();
 	*/
 	ip_send ( nbp, tp->remote_ip );
-}
-
-#ifdef notdef
-static void
-tcp_send_ack ( struct tcp_io *tp )
-{
-	struct netbuf *nbp;
-	struct tcp_hdr *tcp;
-	struct tcp_pseudo pseudo;
-	unsigned short sum;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	nbp->dlen = 0;
-	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
-	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
-	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
-
-	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
-
-	nbp->iptr->proto = IPPROTO_TCP;
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-
-	tcp->sport = htons(tp->local_port);
-	tcp->dport = htons(tp->remote_port);
-
-	tcp->flags = TH_ACK;	/* --- */
-
-	tcp->ack = htonl(tp->remote_seq);
-
-	tcp->seq = htonl(tp->local_seq + 1);	/* XXX */
-
-	tcp->hlen = 5;
-
-	tcp->win = DEF_WIN;
-	tcp->urg = 0;
-
-	/* Setup and checksum the pseudo header */
-	pseudo.src = my_ip;
-	pseudo.dst = tp->remote_ip;
-
-	pseudo.proto = htons ( IPPROTO_TCP );
-	pseudo.len = htons ( sizeof(struct tcp_hdr) );
-
-	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
-	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
-
-	/* Note - we do NOT byte reorder the checksum.
-	 * if it was done on byte swapped data, it will be correct
-	 * as is !!
-	 */
-	tcp->sum = ~sum;
-
-	/*
-	net_debug_arm ();
-	*/
-	ip_send ( nbp, tp->remote_ip );
-}
-
-static void
-tcp_send_syn ( struct tcp_io *tp )
-{
-	struct netbuf *nbp;
-	struct tcp_hdr *tcp;
-	struct tcp_pseudo pseudo;
-	unsigned short sum;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	nbp->dlen = 0;
-	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
-	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
-	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
-
-	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
-
-	nbp->iptr->proto = IPPROTO_TCP;
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-
-	tcp->sport = htons(tp->local_port);
-	tcp->dport = htons(tp->remote_port);
-
-	tcp->flags = TH_SYN;	/* --- */
-
-	tcp->ack = htonl(tp->remote_seq);
-
-	tcp->seq = htonl(tp->local_seq);
-
-	tcp->hlen = 5;
-
-	tcp->win = DEF_WIN;
-	tcp->urg = 0;
-
-	/* Setup and checksum the pseudo header */
-	pseudo.src = my_ip;
-	pseudo.dst = tp->remote_ip;
-
-	pseudo.proto = htons ( IPPROTO_TCP );
-	pseudo.len = htons ( sizeof(struct tcp_hdr) );
-
-	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
-	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
-
-	/* Note - we do NOT byte reorder the checksum.
-	 * if it was done on byte swapped data, it will be correct
-	 * as is !!
-	 */
-	tcp->sum = ~sum;
-
-	/*
-	net_debug_arm ();
-	*/
-	ip_send ( nbp, tp->remote_ip );
-}
-#endif
-
-struct tcp_io *
-tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
-{
-	struct tcp_io *tp;
-
-	tp = (struct tcp_io *) malloc ( sizeof(struct tcp_io) );
-	if ( ! tp )
-	    return NULL;
-
-	tp->remote_ip = ip;
-	tp->remote_port = port;
-	tp->local_port = get_ephem_port ();
-	tp->rcv_func = rfunc;
-	tp->local_seq = 0;	/* XXX */
-	tp->remote_seq = 0;	/* for now */
-
-	tp->next = tcp_io_head;
-	tcp_io_head = tp;
-
-	tcp_send_flags ( tp, TH_SYN );
-
-	return tp;
-}
-
-/* Call this to send payload data to remote */
-void
-tcp_send ( struct tcp_io *tp, char *buf, int count )
-{
 }
 
 #ifdef no_way
