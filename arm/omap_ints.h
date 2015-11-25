@@ -23,6 +23,11 @@
 
 #define NUM_INTS	128
 
+#define NINT_CPSW_RX_THR	40
+#define NINT_CPSW_RX		42
+#define NINT_CPSW_TX		43
+#define NINT_CPSW_MISC		44
+
 #define NINT_TIMER0	66
 #define NINT_TIMER1	67
 #define NINT_UART0	72

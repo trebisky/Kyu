@@ -51,6 +51,7 @@ static void show_dmastatus ( void );
 
 #include <kyu.h>
 #include <kyulib.h>
+#include <omap_ints.h>
 
 #include <malloc.h>
 #include <miiphy.h>
@@ -174,6 +175,7 @@ struct cpsw_platform_data {
 #define FULLDUPLEXEN		BIT(0)
 #define MIIEN			BIT(15)
 
+/* Offsets to access CPDMA registers -- this driver doesn't use many */
 /* DMA Registers */
 #define CPDMA_TXCONTROL		0x004
 #define CPDMA_RXCONTROL		0x014
@@ -1691,6 +1693,10 @@ eth_register(struct eth_device *dev)
         return 0;
 }
 
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+
 /* The current set of official Kyu entry points */
 
 #include "netbuf.h"
@@ -1698,6 +1704,7 @@ eth_register(struct eth_device *dev)
 
 static int rx_count = 0;
 static int tx_count = 0;
+static int tx_int_count = 0;
 
 /* As a funky hack til we make interrupt works,
  * we launch this thread to harvest packets.
@@ -1750,11 +1757,20 @@ cpsw_reaper ( int xxx )
 	}
 }
 
+void
+cpsw_tx_isr ( int dummy )
+{
+	tx_int_count++;
+}
+
+/* Kyu entry point. */
 /* Called first to initialize the device */
+/* Then call cpsw_activate() */
 int
 cpsw_init ( void )
 {
 	eth_init ();
+	irq_hookup ( NINT_CPSW_TX, cpsw_tx_isr, 0 );
 	return 1;
 }
 
@@ -1782,6 +1798,7 @@ cpsw_show ( void )
 {
 	printf ( "Receive count: %d\n", rx_count );
 	printf ( "Transmit count: %d\n", tx_count );
+	printf ( "Transmit INT count: %d\n", tx_int_count );
 }
 
 void

@@ -184,7 +184,7 @@ struct fixed_link {
 	int asym_pause;
 };
 
-#ifndef KYU
+#ifndef KYU_DEBUG_PHY
 static inline int phy_read(struct phy_device *phydev, int devad, int regnum)
 {
 	struct mii_dev *bus = phydev->bus;

@@ -174,6 +174,7 @@ show_thread_regs ( struct thread *tp )
 	struct arm_regs *regs;
 
 	regs = (struct arm_regs *) tp->iregs.regs;
+
 	printf ( "\n" );
 	show_regs ( regs );
 	show_stack ( (unsigned long) regs->ARM_sp );

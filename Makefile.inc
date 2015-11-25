@@ -14,8 +14,11 @@
 ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
 
 # IMPORTANT --
-# I have tried several times to use the gcc builting functions
-# and it always leads to misery and heartache.  Be warned.
+# I have tried several times to use the gcc builtin functions
+# and it always leads to misery and heartache.
+# I honestly don't think it will work on an embedded system
+# without the standard glibc
+# Be warned.
 
 # Perhaps I should find a way to cooperate with gcc and printf.
 # It optimizes simple calls to just a puts call, which ought to
@@ -28,7 +31,8 @@ ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
 #  this should be enabled and all necessary prototypes added.
 NOB = -fno-builtin -Wno-implicit-function-declaration
 
-OPT = -Os
+OPT = -fno-omit-frame-pointer
+#OPT = -Os
 #OPT =
 
 CCX = arm-linux-gnu-gcc

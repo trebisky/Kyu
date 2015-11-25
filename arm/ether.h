@@ -1,4 +1,4 @@
-/* XXX - we don't plant to keep this either */
+/* XXX - we don't plan to keep this either */
 
 struct eth_device {
         char name[16];

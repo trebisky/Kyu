@@ -39,7 +39,7 @@ typedef unsigned long u32;
 #endif
 
 
-#ifdef KYU
+#ifdef KYU_DEBUG_PHY
 /* Normally an inline function in phy.h
  * Here to facilitate Kyu debugging.
  */
