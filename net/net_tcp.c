@@ -11,17 +11,32 @@
 #include "netbuf.h"
 #include "cpu.h"
 
+extern unsigned long my_ip;
+
 typedef void (*tcp_fptr) ( char *, int );
 
 static void tcp_reply_rst ( struct netbuf * );
 struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
 
+static void tcp_send_flags ( struct tcp_io *, int );
+static void tcp_send_ack ( struct tcp_io * );
+static void tcp_send_syn ( struct tcp_io * );
+
+/* This structure manages TCP connections */
+enum tcp_state { FREE, CWAIT, CONNECT, FWAIT, INIT };
+
 struct tcp_io {
+	struct tcp_io *next;
 	unsigned long remote_ip;
 	int remote_port;
 	int local_port;
+	unsigned long local_seq;
+	unsigned long remote_seq;
 	tcp_fptr rcv_func;
+	enum tcp_state state;
 };
+
+static struct tcp_io *tcp_io_head;
 
 /* XXX - bit fields are little endian only.
  * 20 bytes in all, but options may follow.
@@ -46,6 +61,8 @@ struct tcp_hdr {
 	unsigned short urg;	/* urgent pointer */
 };
 
+#define DEF_WIN	2000
+
 /* Here's the flags */
 #define TH_FIN  0x01
 #define TH_SYN  0x02
@@ -57,8 +74,18 @@ struct tcp_hdr {
 void
 tcp_tester ( char *buf, int count )
 {
-	/* XXX - should dump packet */
+	char zoot[32];
+
+	printf ( "%d byes of data delivered !!\n", count );
+
+	/* for Daytime */
+	strncpy ( zoot, buf, 24 );
+	zoot[24] = '\0';
+	printf ( "Received: %s\n", zoot );
 }
+
+#define	TEST_SERVER	"192.168.0.5"
+#define	TEST_PORT	13	/* daytime */
 
 /* XXX - this gets called, but has no purpose yet.
  * Use for debug and ultimately initialization.
@@ -66,11 +93,105 @@ tcp_tester ( char *buf, int count )
 void
 tcp_init ( void )
 {
+	tcp_io_head = NULL;
+}
+
+static struct tcp_io *
+tcp_io_lookup ( struct netbuf *nbp )
+{
+	struct tcp_io *tp;
+	struct tcp_hdr *tcp;
+	int sport, dport;
+
+#ifdef notdef
+	if ( ! tcp_io_head )
+	    return NULL;
+#endif
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+	sport = ntohs(tcp->sport);
+	dport = ntohs(tcp->dport);
+
+	for ( tp =  tcp_io_head; tp; tp = tp->next ) {
+	    if ( tp->remote_ip != nbp->iptr->src )
+		continue;
+	    if ( tp->remote_port != sport )
+		continue;
+	    if ( tp->local_port != dport )
+		continue;
+	    return tp;
+	}
+
+	return NULL;
+}
+
+/* We are here when we have identified a receive packet
+ * with a tcp_io object we know about.
+ */
+static void
+tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
+{
+	unsigned long seq;
+	struct tcp_hdr *tcp;
+	int len;
+
+	printf ( "Packet received for connection\n" );
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+	len = ntohs(nbp->iptr->len) - sizeof(struct ip_hdr) - tcp->hlen * 4;
+
+	/* should keep state in tp
+	 * check if SYN/ACK for this.
+	 */
+	if ( tcp->flags == (TH_SYN | TH_ACK) ) {
+	    tp->remote_seq = ntohl(tcp->seq) + 1;
+	    tp->local_seq += 1;
+	    tcp_send_flags ( tp, TH_ACK );
+	    printf ( "Connection established\n" );
+	    return;
+	}
+
+	if ( tcp->flags == (TH_FIN | TH_ACK) ) {
+	    tp->remote_seq = ntohl(tcp->seq) + 1;
+	    tcp_send_flags ( tp, TH_FIN | TH_ACK );
+	    printf ( "Connection terminated\n" );
+	    return;
+	}
+
+	if ( len > 0 ) {
+	    printf ( "Data packet\n" );
+	    tp->rcv_func ( nbp->dptr, len );
+	}
+}
+
+void
+test_tcp ( int dummy )
+{
 	unsigned long ip;
 	struct tcp_io *tio;
 
-	(void) net_dots ( "192.168.0.5", &ip );
-	tio = tcp_connect ( ip, 17, tcp_tester );
+	(void) net_dots ( TEST_SERVER, &ip );
+	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+}
+
+static void dump_tcp ( struct netbuf *nbp )
+{
+	struct tcp_hdr *tcp;
+	int ilen;
+	int len;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+
+	printf ( "TCP from %s: src/dst = %d/%d, size = %d",
+		ip2strl ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
+	printf ( " hlen = %d (%d bytes), seq = %lu (%08x), ack = %lu (%08x)\n",
+		tcp->hlen, tcp->hlen * 4,
+		ntohl(tcp->seq), ntohl(tcp->seq),
+		ntohl(tcp->ack), ntohl(tcp->ack) );
+
+	ilen = ntohs(nbp->iptr->len);
+	len = ilen - sizeof(struct ip_hdr) - tcp->hlen * 4;
+	printf ( " dlen = %d, ilen = %d, len = %d\n", nbp->dlen, ilen, len );
 }
 
 /* Called with every received TCP packet */
@@ -78,27 +199,40 @@ void
 tcp_rcv ( struct netbuf *nbp )
 {
 	struct tcp_hdr *tcp;
-	int sum;
-	char *cptr;
+	struct tcp_io *tp;
+	int tlen;
 
 	tcp = (struct tcp_hdr *) nbp->pptr;
-	nbp->dlen = nbp->plen - sizeof(struct tcp_hdr);
-	nbp->dptr = nbp->pptr + sizeof(struct tcp_hdr);
+	tlen = tcp->hlen * 4;
+	nbp->dlen = nbp->plen - tlen;
+	nbp->dptr = nbp->pptr + tlen;
 
 #ifdef DEBUG_TCP
-	printf ( "TCP from %s: src/dst = %d/%d, size = %d",
-		ip2strl ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
-		printf ( " hlen = %d (%d bytes), seq = %lu (%08x), ack = %lu (%08x)\n",
-		    tcp->hlen, tcp->hlen * 4,
-		    ntohl(tcp->seq), ntohl(tcp->seq),
-		    ntohl(tcp->ack), ntohl(tcp->ack) );
+	dump_tcp ( nbp );
 #endif
+
+	/* At this point, we aren't a gateway, so drop the packet */
+	if ( nbp->iptr->dst != my_ip ) {
+	    printf ("TCP packet is not for us - dropped\n" );
+	    netbuf_free ( nbp );
+	    return;
+	}
+
+	tp = tcp_io_lookup ( nbp );
+	if ( tp ) {
+	    tcp_io_receive ( tp, nbp );
+	    netbuf_free ( nbp );
+	    return;
+	}
 
 	if ( tcp->flags == TH_SYN ) {
 	    printf ( "Sending TCP rst/ack\n");
 	    tcp_reply_rst ( nbp );
+	    netbuf_free ( nbp );
+	    return;
 	}
 
+	/* otherwise, silently drop packet */
 	netbuf_free ( nbp );
 }
 
@@ -154,7 +288,7 @@ tcp_reply_rst ( struct netbuf *xbp )
 
 	tcp->hlen = 5;
 
-	tcp->win = 0;
+	tcp->win = DEF_WIN;
 	tcp->urg = 0;
 
 	xipp = xbp->iptr;
@@ -181,17 +315,11 @@ tcp_reply_rst ( struct netbuf *xbp )
 	ip_send ( nbp, xipp->src );
 }
 
-/* Just a start, needs work XXX */
 static void
-tcp_send_syn ( struct tcp_io *tp )
+tcp_send_flags ( struct tcp_io *tp, int flags )
 {
 	struct netbuf *nbp;
 	struct tcp_hdr *tcp;
-
-	/*
-	struct tcp_hdr *xtcp;
-	struct ip_hdr *xipp;
-	*/
 	struct tcp_pseudo pseudo;
 	unsigned short sum;
 
@@ -213,28 +341,23 @@ tcp_send_syn ( struct tcp_io *tp )
 
 	tcp = (struct tcp_hdr *) nbp->pptr;
 
-	tcp->sport = tp->local_port;
-	tcp->dport = tp->remote_port;
+	tcp->sport = htons(tp->local_port);
+	tcp->dport = htons(tp->remote_port);
 
-	tcp->flags = TH_SYN;
+	tcp->flags = flags;
 
-	tcp->ack = 0;
+	tcp->ack = htonl(tp->remote_seq);
 
-	// tcp->seq = htonl(seq_start);
-	tcp->seq = 0;
+	tcp->seq = htonl(tp->local_seq + 1);
 
 	tcp->hlen = 5;
 
-	tcp->win = 0;
+	tcp->win = DEF_WIN;
 	tcp->urg = 0;
 
-#ifdef notdef
-	xipp = xbp->iptr;
-
 	/* Setup and checksum the pseudo header */
-	pseudo.src = xipp->dst;
-	pseudo.dst = xipp->src;
-#endif
+	pseudo.src = my_ip;
+	pseudo.dst = tp->remote_ip;
 
 	pseudo.proto = htons ( IPPROTO_TCP );
 	pseudo.len = htons ( sizeof(struct tcp_hdr) );
@@ -254,6 +377,132 @@ tcp_send_syn ( struct tcp_io *tp )
 	ip_send ( nbp, tp->remote_ip );
 }
 
+#ifdef notdef
+static void
+tcp_send_ack ( struct tcp_io *tp )
+{
+	struct netbuf *nbp;
+	struct tcp_hdr *tcp;
+	struct tcp_pseudo pseudo;
+	unsigned short sum;
+
+	nbp = netbuf_alloc ();
+	if ( ! nbp )
+	    return;
+
+	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
+
+	nbp->dlen = 0;
+	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
+	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
+	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
+
+	nbp->iptr->proto = IPPROTO_TCP;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+
+	tcp->sport = htons(tp->local_port);
+	tcp->dport = htons(tp->remote_port);
+
+	tcp->flags = TH_ACK;	/* --- */
+
+	tcp->ack = htonl(tp->remote_seq);
+
+	tcp->seq = htonl(tp->local_seq + 1);	/* XXX */
+
+	tcp->hlen = 5;
+
+	tcp->win = DEF_WIN;
+	tcp->urg = 0;
+
+	/* Setup and checksum the pseudo header */
+	pseudo.src = my_ip;
+	pseudo.dst = tp->remote_ip;
+
+	pseudo.proto = htons ( IPPROTO_TCP );
+	pseudo.len = htons ( sizeof(struct tcp_hdr) );
+
+	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
+	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
+
+	/* Note - we do NOT byte reorder the checksum.
+	 * if it was done on byte swapped data, it will be correct
+	 * as is !!
+	 */
+	tcp->sum = ~sum;
+
+	/*
+	net_debug_arm ();
+	*/
+	ip_send ( nbp, tp->remote_ip );
+}
+
+static void
+tcp_send_syn ( struct tcp_io *tp )
+{
+	struct netbuf *nbp;
+	struct tcp_hdr *tcp;
+	struct tcp_pseudo pseudo;
+	unsigned short sum;
+
+	nbp = netbuf_alloc ();
+	if ( ! nbp )
+	    return;
+
+	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
+
+	nbp->dlen = 0;
+	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
+	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
+	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
+
+	nbp->iptr->proto = IPPROTO_TCP;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+
+	tcp->sport = htons(tp->local_port);
+	tcp->dport = htons(tp->remote_port);
+
+	tcp->flags = TH_SYN;	/* --- */
+
+	tcp->ack = htonl(tp->remote_seq);
+
+	tcp->seq = htonl(tp->local_seq);
+
+	tcp->hlen = 5;
+
+	tcp->win = DEF_WIN;
+	tcp->urg = 0;
+
+	/* Setup and checksum the pseudo header */
+	pseudo.src = my_ip;
+	pseudo.dst = tp->remote_ip;
+
+	pseudo.proto = htons ( IPPROTO_TCP );
+	pseudo.len = htons ( sizeof(struct tcp_hdr) );
+
+	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
+	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
+
+	/* Note - we do NOT byte reorder the checksum.
+	 * if it was done on byte swapped data, it will be correct
+	 * as is !!
+	 */
+	tcp->sum = ~sum;
+
+	/*
+	net_debug_arm ();
+	*/
+	ip_send ( nbp, tp->remote_ip );
+}
+#endif
+
 struct tcp_io *
 tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 {
@@ -267,8 +516,13 @@ tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 	tp->remote_port = port;
 	tp->local_port = get_ephem_port ();
 	tp->rcv_func = rfunc;
+	tp->local_seq = 0;	/* XXX */
+	tp->remote_seq = 0;	/* for now */
 
-	tcp_send_sync ( tp );
+	tp->next = tcp_io_head;
+	tcp_io_head = tp;
+
+	tcp_send_flags ( tp, TH_SYN );
 
 	return tp;
 }

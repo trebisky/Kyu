@@ -212,6 +212,9 @@ net_init ( void )
     net_timer_hookup ( fast_net );
 #endif
 
+    /* Here is where we initialize hardware.
+     * no network traffic until after this is done
+     */
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
@@ -228,6 +231,11 @@ net_init ( void )
     arp_announce ();
 
     net_show ();
+
+#ifdef notdef
+    /* XXX - Doing this here interfered with tftp symbol table fetch */
+    tcp_test ();	/* XXX XXX */
+#endif
 
     /*
     show_arp_ping ( mmt_ip );
@@ -277,11 +285,17 @@ fast_net ( void )
 /* Called from interrupt level to place a
  * packet on input queue and awaken handler thread.
  */
+
+/* locking added only for BBB -- must be removed when
+ * this is handled via receive interrupts */
 void
 net_rcv ( struct netbuf *nbp )
 {
+	int x;
+
 	nbp->next = (struct netbuf *) 0;
 
+	x = splhigh();	/* XXX XXX */
     	if ( inq_tail ) {
 	    inq_tail->next = nbp;
 	    inq_tail = nbp;
@@ -289,6 +303,7 @@ net_rcv ( struct netbuf *nbp )
 	    inq_tail = nbp;
 	    inq_head = nbp;
 	}
+	splx ( x );	/* XXX XXX */
 
 	/*
 	cpu_signal ( inq_sem );
@@ -499,9 +514,17 @@ net_send ( struct netbuf *nbp )
     netbuf_free ( nbp );
 }
 
+
+/* We get bugs when we call this too soon before network
+ * is initialized.
+ * So I added the panic.  11-22-2015
+ */
 void
 net_addr_get ( char *buf )
 {
+    if ( net_state != NET_RUN )
+	panic ( "Premature MAC address access" );
+
 #ifdef ARCH_X86
     if ( use_rtl )
 	get_rtl_addr ( buf );
