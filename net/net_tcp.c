@@ -16,16 +16,10 @@ extern unsigned long my_ip;
 
 typedef void (*tcp_fptr) ( char *, int );
 
-static void tcp_reply_rst ( struct netbuf * );
-struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
-void tcp_send ( struct tcp_io *, char *, int );
-void tcp_shutdown ( struct tcp_io * );
-
-static void tcp_send_flags ( struct tcp_io *, int );
-
 /* This structure manages TCP connections */
 enum tcp_state { FREE, BORASCO, CWAIT, CONNECT, FWAIT };
 
+/* One of these for every connection */
 struct tcp_io {
 	struct tcp_io *next;
 	unsigned long remote_ip;
@@ -38,8 +32,31 @@ struct tcp_io {
 	struct sem *sem;
 };
 
+typedef void (*tcp_cptr) ( struct tcp_io * );
+
+static void tcp_reply_rst ( struct netbuf * );
+/*
+static void tcp_send_flags ( struct tcp_io *, int );
+*/
+static void tcp_send_data ( struct tcp_io *, int, char *, int );
+
+/* Public entry points */
+
+struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
+void tcp_send ( struct tcp_io *, char *, int );
+void tcp_shutdown ( struct tcp_io * );
+
+struct tcp_server {
+	struct tcp_server *next;
+	int		port;
+	tcp_cptr	conn_func;
+	tcp_fptr 	rcv_func;
+};
+
 static struct tcp_io *tcp_io_head;
 static struct tcp_io *tcp_io_free_list;
+
+static struct tcp_server *tcp_server_head;
 
 /* XXX - bit fields are little endian only.
  * 20 bytes in all, but options may follow.
@@ -160,6 +177,25 @@ tcp_init ( void )
 {
 	tcp_io_head = NULL;
 	tcp_io_free_list = NULL;
+	tcp_server_head = NULL;
+}
+
+static struct tcp_server *
+tcp_server_lookup ( struct netbuf *nbp )
+{
+	struct tcp_hdr *tcp;
+	struct tcp_server *sp;
+	int dport;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+	dport = ntohs(tcp->dport);
+
+	for ( sp =  tcp_server_head; sp; sp = sp->next ) {
+	    if ( sp->port == dport )
+		return sp;
+	}
+
+	return NULL;
 }
 
 static struct tcp_io *
@@ -191,6 +227,13 @@ tcp_io_lookup ( struct netbuf *nbp )
 	return NULL;
 }
 
+/* Call this to send payload data to remote */
+void
+tcp_send ( struct tcp_io *tp, char *buf, int count )
+{
+	tcp_send_data ( tp, TH_ACK, buf, count );
+}
+
 /* We are here when we have identified a receive packet
  * with a tcp_io object we know about.
  */
@@ -206,14 +249,14 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	tcp = (struct tcp_hdr *) nbp->pptr;
 	len = ntohs(nbp->iptr->len) - sizeof(struct ip_hdr) - tcp->hlen * 4;
 
-	/* should keep state in tp
-	 * check if SYN/ACK for this.
+	/* Get this in response to our sending a SYN to set up
+	 * a client connection.
 	 */
 	if ( tcp->flags == (TH_SYN | TH_ACK) ) {
 	    if ( tp->state == CWAIT ) {
-		tp->remote_seq = ntohl(tcp->seq) + 1;
-		tp->local_seq += 1;
-		tcp_send_flags ( tp, TH_ACK );
+		tp->remote_seq = ntohl(tcp->seq) + 1;	/* bump */
+		tp->local_seq = ntohl(tcp->ack);
+		tcp_send_data ( tp, TH_ACK, NULL, 0 );
 		printf ( "Connection established\n" );
 		tp->state = CONNECT;
 		sem_unblock ( tp->sem );
@@ -221,33 +264,39 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	    return;
 	}
 
+	/* Somebody is shutting down the connection.
+	 */
 	if ( tcp->flags == (TH_FIN | TH_ACK) ) {
-	    tp->remote_seq = ntohl(tcp->seq) + 1;
+	    tp->remote_seq = ntohl(tcp->seq) + 1;	/* bump */
 	    if ( tp->state == FWAIT ) {
-		tcp_send_flags ( tp, TH_ACK );
+		tcp_send_data ( tp, TH_ACK, NULL, 0 );
 		printf ( "Connection termination complete\n" );
 		tp->state = BORASCO;
+		sem_destroy ( tp->sem );
 		tcp_io_free ( tp );
 	    }
 	    if ( tp->state == CONNECT ) {
-		tcp_send_flags ( tp, TH_FIN | TH_ACK );
+		tcp_send_data ( tp, TH_FIN | TH_ACK, NULL, 0 );
 		printf ( "Connection terminated by peer\n" );
 		tp->state = BORASCO;
+		sem_destroy ( tp->sem );
 		tcp_io_free ( tp );
 	    }
 	    return;
 	}
 
-	if ( len > 0 ) {
-	    printf ( "Data packet\n" );
-	    tp->rcv_func ( nbp->dptr, len );
+	/* Some kind of traffic */
+	if ( tcp->flags & TH_ACK ) {
+	    tp->remote_seq = ntohl(tcp->seq);
+	    tp->local_seq = ntohl(tcp->ack);
+	    if ( len > 0 ) {
+		printf ( "Data received ***\n" );
+		tp->rcv_func ( nbp->dptr, len );
+	    }
+	    return;
 	}
-}
 
-/* Call this to send payload data to remote */
-void
-tcp_send ( struct tcp_io *tp, char *buf, int count )
-{
+	printf ( "************** unexpected flags: %08x\n", tcp->flags );
 }
 
 /* Call this when we want to shut down a connection.
@@ -258,7 +307,7 @@ void
 tcp_shutdown ( struct tcp_io *tp )
 {
 	printf ( " Shutdown connection\n" );
-	tcp_send_flags ( tp, TH_FIN | TH_ACK );
+	tcp_send_data ( tp, TH_FIN | TH_ACK, NULL, 0 );
 	tp->state = FWAIT;
 }
 
@@ -282,6 +331,12 @@ static void dump_tcp ( struct netbuf *nbp )
 	printf ( " dlen = %d, ilen = %d, len = %d\n", nbp->dlen, ilen, len );
 }
 
+/* XXX - need a way to timeout a connection attempt.
+ * currently this blocks forever if the server does not
+ * respond.  There may be an ICMP message, such as from a firewall,
+ * but we have nothing setup in our ICMP handler for that.
+ * We may need a new primitive to block with a timeout.
+ */
 struct tcp_io *
 tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 {
@@ -295,7 +350,7 @@ tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 	tp->remote_port = port;
 	tp->local_port = get_ephem_port ();
 	tp->rcv_func = rfunc;
-	tp->local_seq = 0;	/* XXX */
+	tp->local_seq = 0x1234ABCD;	/* XXX */
 	tp->remote_seq = 0;	/* for now */
 	tp->state = CWAIT;
 
@@ -304,7 +359,7 @@ tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 	tp->sem = sem_signal_new ( SEM_FIFO );
 	tcp_io_head = tp;
 
-	tcp_send_flags ( tp, TH_SYN );
+	tcp_send_data ( tp, TH_SYN, NULL, 0 );
 	sem_block ( tp->sem );
 
 	/* XXX - this should block till we have a connection */
@@ -312,6 +367,32 @@ tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 	return tp;
 }
 
+/* declare our intent to be a TCP server on a given port.
+ * This is what some people call a "passive open"
+ * No network traffic is generated.
+ * We just make an entry in internal datastructures
+ *  that indicate how we respond we connections arrive.
+ */
+void
+tcp_server ( int port, tcp_cptr cfunc, tcp_fptr rfunc )
+{
+	struct tcp_server *sp;
+
+	/* We don't worry much about reallocating these
+	 * since servers don't tend to come and go like
+	 * connections do.
+	 */
+	sp = (struct tcp_server *) malloc ( sizeof(struct tcp_server) );
+	if ( ! sp )
+	    return;
+
+	sp->port = port;
+	sp->conn_func = cfunc;
+	sp->rcv_func = rfunc;
+
+	sp->next = tcp_server_head;
+	tcp_server_head = sp;
+}
 
 /* Called with every received TCP packet */
 void
@@ -319,6 +400,7 @@ tcp_rcv ( struct netbuf *nbp )
 {
 	struct tcp_hdr *tcp;
 	struct tcp_io *tp;
+	struct tcp_server *sp;
 	int tlen;
 
 	tcp = (struct tcp_hdr *) nbp->pptr;
@@ -337,16 +419,28 @@ tcp_rcv ( struct netbuf *nbp )
 	    return;
 	}
 
+	/* Somebody thinks we are a server */
+	if ( tcp->flags == TH_SYN ) {
+	    sp = tcp_server_lookup ( nbp );
+	    if ( sp ) {
+		/* XXX - send SYN/ACK.
+		 * Also set up a tcp_io with salient details
+		 * and proper state for the embryonic connection.
+		 */
+	    } else {
+		/* Tell them to go away */
+		/* - could just silently drop packet */
+		printf ( "Sending TCP rst/ack\n");
+		tcp_reply_rst ( nbp );
+		netbuf_free ( nbp );
+		return;
+	    }
+	}
+
+	/* Is this for a connection we know about? */
 	tp = tcp_io_lookup ( nbp );
 	if ( tp ) {
 	    tcp_io_receive ( tp, nbp );
-	    netbuf_free ( nbp );
-	    return;
-	}
-
-	if ( tcp->flags == TH_SYN ) {
-	    printf ( "Sending TCP rst/ack\n");
-	    tcp_reply_rst ( nbp );
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -362,8 +456,7 @@ struct tcp_pseudo {
 	unsigned short len;
 };
 
-static unsigned long seq_start = 99;
-
+#ifdef notdef
 static void
 tcp_reply_rst ( struct netbuf *xbp )
 {
@@ -402,7 +495,6 @@ tcp_reply_rst ( struct netbuf *xbp )
 
 	seq = ntohl(xtcp->seq) + 1;
 	tcp->ack = htonl(seq);
-	// tcp->seq = htonl(seq_start);
 	tcp->seq = 0;
 
 	tcp->hlen = 5;
@@ -433,7 +525,107 @@ tcp_reply_rst ( struct netbuf *xbp )
 	*/
 	ip_send ( nbp, xipp->src );
 }
+#endif
 
+static void
+tcp_reply_rst ( struct netbuf *xbp )
+{
+	struct tcp_io rst_io;
+	struct tcp_hdr *xtcp;
+	struct ip_hdr *xipp;
+
+	xtcp = (struct tcp_hdr *) xbp->pptr;
+	xipp = xbp->iptr;
+
+	rst_io.local_port = ntohs (xtcp->dport); 
+	rst_io.remote_port = ntohs (xtcp->sport);
+
+	rst_io.remote_seq = ntohl(xtcp->seq) + 1;
+	rst_io.local_seq = 0;
+
+	rst_io.remote_ip = xipp->src;
+
+	tcp_send_data ( &rst_io, TH_RST | TH_ACK, NULL, 0 );
+}
+
+static void
+tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
+{
+	struct netbuf *nbp;
+	struct tcp_hdr *tcp;
+	struct tcp_pseudo pseudo;
+	unsigned short sum;
+	int sum_count;
+
+	nbp = netbuf_alloc ();
+	if ( ! nbp )
+	    return;
+
+	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+
+	/* This will need to be changed once we have options */
+	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
+
+	nbp->dlen = count;
+	if ( count > 0 )
+	    memcpy ( nbp->dptr, buf, count );
+
+	/* If payload size is odd, pad for checksum */
+	sum_count = count;
+	if ( count % 2 ) {
+	    nbp->dptr[count] = 0;
+	    sum_count++;
+	}
+
+	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
+	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
+	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
+
+	nbp->iptr->proto = IPPROTO_TCP;
+
+	tcp = (struct tcp_hdr *) nbp->pptr;
+
+	tcp->sport = htons(tp->local_port);
+	tcp->dport = htons(tp->remote_port);
+
+	tcp->flags = flags;
+
+	tcp->ack = htonl(tp->remote_seq);
+	tcp->seq = htonl(tp->local_seq);
+
+	tcp->hlen = 5;
+
+	tcp->win = DEF_WIN;
+	tcp->urg = 0;
+
+	/* Setup and checksum the pseudo header */
+	pseudo.src = my_ip;
+	pseudo.dst = tp->remote_ip;
+
+	pseudo.proto = htons ( IPPROTO_TCP );
+	pseudo.len = htons ( sizeof(struct tcp_hdr) );
+
+	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
+	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
+	if ( sum_count )
+	    sum = in_cksum_i ( nbp->dptr, sum_count, sum );
+
+	/* Note - we do NOT byte reorder the checksum.
+	 * if it was done on byte swapped data, it will be correct
+	 * as is !!
+	 */
+	tcp->sum = ~sum;
+
+	/*
+	net_debug_arm ();
+	*/
+	ip_send ( nbp, tp->remote_ip );
+}
+
+#ifdef notdef
+/* Get rid of this once the above is proven */
 static void
 tcp_send_flags ( struct tcp_io *tp, int flags )
 {
@@ -466,8 +658,7 @@ tcp_send_flags ( struct tcp_io *tp, int flags )
 	tcp->flags = flags;
 
 	tcp->ack = htonl(tp->remote_seq);
-
-	tcp->seq = htonl(tp->local_seq + 1);
+	tcp->seq = htonl(tp->local_seq);
 
 	tcp->hlen = 5;
 
@@ -494,77 +685,6 @@ tcp_send_flags ( struct tcp_io *tp, int flags )
 	net_debug_arm ();
 	*/
 	ip_send ( nbp, tp->remote_ip );
-}
-
-#ifdef no_way
-void tcp_demo ( void );
-
-/* Here is a TCP packet with a valid checksum.
- * 54 bytes
- */
-
-static char tcp_demo_b[] = {
-    0xc8,0x60,0x00,0x36,0xc7,0xdb,
-    0x90,0x2b,0x34,0x37,0x55,0xe2,
-    0x08,0x00,
-    0x45,0x00,0x00,0x28,0xc2,0x6d,0x40,0x00,0x40,0x06,0xf7,0x06,
-    0xc0,0xa8,0x00,0x05,
-    0xc0,0xa8,0x00,0x06,
-    0x00,0x21, 0xc3,0xd7,
-    0x00,0x00,0x00,0x00,
-    0xa8,0xc3,0x02,0x52,
-    0x50,0x14, 0x00,0x00,
-    0xbf,0x66,		/* <--- checksum */
-    0x00,0x00
-};
-
-void
-tcp_demo ( void )
-{
-	struct netbuf *nbp;
-	struct tcp_hdr *tcp;
-	struct tcp_pseudo pseudo;
-	unsigned short sum;
-
-	printf ( "Demo packet is %d bytes\n", sizeof(tcp_demo_b) );
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	memcpy ( nbp->eptr, tcp_demo_b, sizeof(tcp_demo_b) );
-	nbp->elen = sizeof(tcp_demo_b);
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	nbp->ilen = nbp->elen - sizeof(struct eth_hdr);
-	nbp->plen = nbp->ilen - sizeof(struct ip_hdr);
-	nbp->dlen = nbp->plen - sizeof(struct tcp_hdr);
-
-	printf ( "Demo packet has %d bytes of payload\n", nbp->dlen );
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-	printf ( "good tcp checksum is %04x\n", ntohs ( tcp->sum ) );
-
-	/* Setup and checksum the pseudo header */
-	pseudo.src = nbp->iptr->src;
-	pseudo.dst = nbp->iptr->dst;
-
-	/* shorts -- should byte swap */
-	pseudo.proto = htons ( IPPROTO_TCP );
-	pseudo.len = htons ( sizeof(struct tcp_hdr) );
-
-	tcp->sum = 0;
-
-	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
-	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
-	sum = ~sum;
-	printf ( "my tcp checksum is %04x\n", htons(sum) );
-
-	tcp->sum = sum;
-
-	ip_arp_send ( nbp );
 }
 #endif
 
