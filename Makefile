@@ -42,6 +42,9 @@ dump: kyu.dump
 
 sym: kyu.sym
 
+term:
+	picocom -b 115200 /dev/ttyUSB0
+
 .PHONY:	tags
 tags:
 	ctags -R

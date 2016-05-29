@@ -213,7 +213,7 @@ XXuser_init ( int xx )
 #endif
 
 	/*
-	gpio_test ();
+	gpio_test1 ();
 	*/
 	gpio_test2 ();
 }

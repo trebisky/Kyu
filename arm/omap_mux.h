@@ -132,7 +132,9 @@
 #define	MUX_XDMA_EVENT_INTR0	108	/* A15 */
 #define	MUX_XDMA_EVENT_INTR1	109	/* D14 */
 #define	MUX_WARMRSTN		110	/* A10 */
+/* */
 #define	MUX_EXTINTN		112	/* B18 */
+/* */
 #define	MUX_TMS			116	/* C11 */
 #define	MUX_TDI			117	/* B11 */
 #define	MUX_TDO			118	/* A11 */
@@ -140,11 +142,14 @@
 #define	MUX_TRSTN		120	/* B10 */
 #define	MUX_EMU0		121	/* C14 */
 #define	MUX_EMU1		122	/* B14 */
+/* */
 #define	MUX_RTC_PWRONRSTN	126	/* B5 */
 #define	MUX_PMIC_POWER_EN	127	/* C6 */
 #define	MUX_EXT_WAKEUP		128	/* C5 */
 #define	MUX_RTC_KALDO_ENN	129	/* B4 */
+/* */
 #define	MUX_USB0_DRVVBUS	135	/* F16 */
+/* */
 #define	MUX_USB1_DRVVBUS	141	/* F15 */
 
 /* Convenient aliases for GPIO signals */
@@ -172,10 +177,11 @@
 #define MUX_GPIO_0_21	MUX_MII1_TXD1
 #define MUX_GPIO_0_22	MUX_GPMC_AD8
 #define MUX_GPIO_0_23	MUX_GPMC_AD9
+/* */
 #define MUX_GPIO_0_26	MUX_GPMC_AD10
 #define MUX_GPIO_0_27	MUX_GPMC_AD11
 #define MUX_GPIO_0_28	MUX_MII1_TXD0
-#define MUX_GPIO_0_29	MUX_RMII1_REF_CLK
+#define MUX_GPIO_0_29	MUX_RMII1_REFCLK
 #define MUX_GPIO_0_30	MUX_GPMC_WAIT0
 #define MUX_GPIO_0_31	MUX_GPMC_WPN
 #define MUX_GPIO_1_0	MUX_GPMC_AD0
@@ -253,6 +259,7 @@
 #define MUX_GPIO_3_8	MUX_EMU1
 #define MUX_GPIO_3_9	MUX_MII1_TX_CLK
 #define MUX_GPIO_3_10	MUX_MII1_RX_CLK
+/* */
 #define MUX_GPIO_3_13	MUX_USB1_DRVVBUS
 #define MUX_GPIO_3_14	MUX_MCASP0_ACLKX
 #define MUX_GPIO_3_15	MUX_MCASP0_FSX

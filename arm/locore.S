@@ -389,9 +389,72 @@ set_vbar:
 	mcr 	p15, 0, r0, c12, c0, 0
 	bx	lr
 
+/* SCTRL */
 	.globl get_sctrl
 get_sctrl:
 	mrc     p15, 0, r0, c1, c0, 0
+	bx	lr
+
+/* The cycle count register is a 32 bit register
+ * This is for a Cortex A8 arm chip.
+ */
+	.globl get_ccnt
+get_ccnt:
+	mrc     p15, 0, r0, c9, c13, 0
+	bx	lr
+
+	.globl set_ccnt
+set_ccnt:
+	mcr     p15, 0, r0, c9, c13, 0
+	bx	lr
+
+/* The performance monitor control register controls
+ * the behavior of the CCNT register.
+ */
+	.globl get_pmcr
+get_pmcr:
+	mrc     p15, 0, r0, c9, c12, 0
+	bx	lr
+
+	.globl set_pmcr
+set_pmcr:
+	mcr     p15, 0, r0, c9, c12, 0
+	bx	lr
+
+/* Counter enable register.
+ */
+	.globl get_cena
+get_cena:
+	mrc     p15, 0, r0, c9, c12, 1
+	bx	lr
+
+	.globl set_cena
+set_cena:
+	mcr     p15, 0, r0, c9, c12, 1
+	bx	lr
+
+/* Counter disable register.
+ */
+	.globl get_cdis
+get_cdis:
+	mrc     p15, 0, r0, c9, c12, 2
+	bx	lr
+
+	.globl set_cdis
+set_cdis:
+	mcr     p15, 0, r0, c9, c12, 2
+	bx	lr
+
+/* Counter overflow register.
+ */
+	.globl get_covr
+get_covr:
+	mrc     p15, 0, r0, c9, c12, 3
+	bx	lr
+
+	.globl set_covr
+set_covr:
+	mcr     p15, 0, r0, c9, c12, 3
 	bx	lr
 
 /* enable_irq (void); */

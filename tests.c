@@ -517,7 +517,7 @@ static struct thread *bbb_tp;
 static void
 start_bbb_blink ( void )
 {
-	gpio_led_init ();
+	// gpio_led_init ();
 	bbb_tp = thr_new_repeat ( "blinker", bbb_blinker, 0, 10, 0, 1000 );
 }
 
@@ -2045,15 +2045,7 @@ test_fault ( int xxx )
 static void
 test_gpio ( int count )
 {
-	gpio_test3 ();
-#ifdef notdef
-	gpio_test_init ();
-
-	while ( test_running ) {
-	    thr_delay ( 4 );
-	    gpio_test_run ();
-	}
-#endif
+	gpio_test ();
 }
 
 #ifdef ARCH_X86

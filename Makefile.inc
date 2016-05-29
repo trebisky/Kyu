@@ -8,10 +8,15 @@
 # I probably should arange so the compiler looks
 # here by default.
 #  /usr/lib/gcc/arm-linux-gnueabi/4.9.1/include/stdarg.h
-# And this option is the way to do it:
+# And the ABI option is the way to do it:
+
+# This has to be adjusted every time a new compiler version comes along.
+# As of 5-26-2016 ...
+GCCVERSION = 5.3.1
 
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
-ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
+#ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
+ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION)/include
 
 # IMPORTANT --
 # I have tried several times to use the gcc builtin functions
@@ -51,7 +56,8 @@ LD = arm-linux-gnu-ld.bfd
 
 # Should we get this via linux arch/arm/asm/lib ??
 # for LINUX comment this out -----
-LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/5.1.1 -lgcc
+#LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/5.1.1 -lgcc
+LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION) -lgcc
 
 BIN = arm-linux-gnu-objcopy -O binary
 DUMP = arm-linux-gnu-objdump -d

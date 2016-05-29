@@ -112,13 +112,16 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 	struct ip_hdr *ipp;
 
 	ipp = (struct ip_hdr *) nbp->iptr;
+
+	/* XXX - why redo this here ?? */
 	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
+	printf ( "IP SEND: ilen = %d\n", nbp->ilen );
 
 	ipp->hl = sizeof(struct ip_hdr) / sizeof(long);
 	ipp->ver = 4;
 
 	ipp->tos = 0;
-	ipp->len = ntohs(nbp->ilen);
+	ipp->len = htons(nbp->ilen);
 
 	ipp->id = ip_id++;
 	ipp->offset = 0;

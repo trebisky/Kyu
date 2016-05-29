@@ -6,12 +6,52 @@
 
 #define GPIO0_BASE      ( (struct gpio *) 0x44E07000 )
 #define GPIO1_BASE      ( (struct gpio *) 0x4804C000 )
-#define GPIO2_BASE      ( (struct gpio *) 0x48A1C000 )
-#define GPIO3_BASE      ( (struct gpio *) 0x48A1E000 )
+#define GPIO2_BASE      ( (struct gpio *) 0x481AC000 )
+#define GPIO3_BASE      ( (struct gpio *) 0x481AE000 )
 
 #include <kyulib.h>
 #include <omap_gpio.h>
+#include <omap_mux.h>
 
+/* Lookup table to map gpio number to mux index.
+ */
+static int gpio_to_mux[] = {
+	MUX_GPIO_0_0, MUX_GPIO_0_1, MUX_GPIO_0_2, MUX_GPIO_0_3,
+	MUX_GPIO_0_4, MUX_GPIO_0_5, MUX_GPIO_0_6, MUX_GPIO_0_7,
+	MUX_GPIO_0_8, MUX_GPIO_0_9, MUX_GPIO_0_10, MUX_GPIO_0_11,
+	MUX_GPIO_0_12, MUX_GPIO_0_13, MUX_GPIO_0_14, MUX_GPIO_0_15,
+	MUX_GPIO_0_16, MUX_GPIO_0_17, MUX_GPIO_0_18, MUX_GPIO_0_19,
+	MUX_GPIO_0_20, MUX_GPIO_0_21, MUX_GPIO_0_22, MUX_GPIO_0_23,
+	-1, -1, MUX_GPIO_0_26, MUX_GPIO_0_27,
+	MUX_GPIO_0_28, MUX_GPIO_0_29, MUX_GPIO_0_30, MUX_GPIO_0_31,
+	MUX_GPIO_1_0, MUX_GPIO_1_1, MUX_GPIO_1_2, MUX_GPIO_1_3,
+	MUX_GPIO_1_4, MUX_GPIO_1_5, MUX_GPIO_1_6, MUX_GPIO_1_7,
+	MUX_GPIO_1_8, MUX_GPIO_1_9, MUX_GPIO_1_10, MUX_GPIO_1_11,
+	MUX_GPIO_1_12, MUX_GPIO_1_13, MUX_GPIO_1_14, MUX_GPIO_1_15,
+	MUX_GPIO_1_16, MUX_GPIO_1_17, MUX_GPIO_1_18, MUX_GPIO_1_19,
+	MUX_GPIO_1_20, MUX_GPIO_1_21, MUX_GPIO_1_22, MUX_GPIO_1_23,
+	MUX_GPIO_1_24, MUX_GPIO_1_25, MUX_GPIO_1_26, MUX_GPIO_1_27,
+	MUX_GPIO_1_28, MUX_GPIO_1_29, MUX_GPIO_1_30, MUX_GPIO_1_31,
+	MUX_GPIO_2_0, MUX_GPIO_2_1, MUX_GPIO_2_2, MUX_GPIO_2_3,
+	MUX_GPIO_2_4, MUX_GPIO_2_5, MUX_GPIO_2_6, MUX_GPIO_2_7,
+	MUX_GPIO_2_8, MUX_GPIO_2_9, MUX_GPIO_2_10, MUX_GPIO_2_11,
+	MUX_GPIO_2_12, MUX_GPIO_2_13, MUX_GPIO_2_14, MUX_GPIO_2_15,
+	MUX_GPIO_2_16, MUX_GPIO_2_17, MUX_GPIO_2_18, MUX_GPIO_2_19,
+	MUX_GPIO_2_20, MUX_GPIO_2_21, MUX_GPIO_2_22, MUX_GPIO_2_23,
+	MUX_GPIO_2_24, MUX_GPIO_2_25, MUX_GPIO_2_26, MUX_GPIO_2_27,
+	MUX_GPIO_2_28, MUX_GPIO_2_29, MUX_GPIO_2_30, MUX_GPIO_2_31,
+	MUX_GPIO_3_0, MUX_GPIO_3_1, MUX_GPIO_3_2, MUX_GPIO_3_3,
+	MUX_GPIO_3_4, MUX_GPIO_3_5, MUX_GPIO_3_6, MUX_GPIO_3_7,
+	MUX_GPIO_3_8, MUX_GPIO_3_9, MUX_GPIO_3_10, -1,
+	-1, MUX_GPIO_3_13, MUX_GPIO_3_14, MUX_GPIO_3_15,
+	MUX_GPIO_3_16, MUX_GPIO_3_17, MUX_GPIO_3_18, MUX_GPIO_3_19,
+	MUX_GPIO_3_20, MUX_GPIO_3_21, -1, -1,
+	-1, -1, -1, -1,
+	-1, -1, -1, -1
+};
+
+/* Each GPIO has registers like this:
+ */
 struct gpio {
 	volatile unsigned long id;
 	long _pad0[3];
@@ -53,6 +93,10 @@ static struct gpio *gpio_bases[] = {
     GPIO0_BASE, GPIO1_BASE, GPIO2_BASE, GPIO3_BASE
 };
 
+/* once you know that the user LED's are all in GPIO1
+ * these bit definitions are what you want.
+ */
+
 #define LED0	1<<21
 #define LED1	1<<22
 #define LED2	1<<23
@@ -60,7 +104,15 @@ static struct gpio *gpio_bases[] = {
 
 #define ALL_LED (LED0 | LED1 | LED2 | LED3)
 
-void
+static int led_bits[] = { LED0, LED1, LED2, LED3 };
+
+/* If you don't know jack, you can use these definitions
+ * along with my header file and the gpio routines.
+ * This is actually the better way.
+ */
+static int users[] = { USER_LED0, USER_LED1, USER_LED2, USER_LED3 };
+
+static void
 gpio_led_init ( void )
 {
 	struct gpio *p = (struct gpio *) GPIO1_BASE;
@@ -73,6 +125,20 @@ gpio_led_init ( void )
 	printf ( "gpio1 OE = %08x\n", p->oe );
 	*/
 	p->clear_data = ALL_LED;
+}
+
+void
+gpio_dir_out ( int bit )
+{
+	int gpio = bit / 32;
+	gpio_bases[gpio]->oe &= ~(1 << (bit % 32));
+}
+
+void
+gpio_dir_in ( int bit )
+{
+	int gpio = bit / 32;
+	gpio_bases[gpio]->oe |= (1 << (bit % 32));
 }
 
 void
@@ -89,9 +155,15 @@ gpio_clear_bit ( int bit )
 	gpio_bases[gpio]->clear_data = 1 << (bit % 32);
 }
 
-/* --------------------- */
+/* Call this before trying to set or clear a gpio */
+void
+gpio_out_init ( int bit )
+{
+	setup_gpio_out ( gpio_to_mux[bit] );
+	gpio_dir_out ( bit );
+}
 
-int led_bits[] = { LED0, LED1, LED2, LED3 };
+/* --------------------- */
 
 void
 gpio_led_set ( int val )
@@ -108,18 +180,61 @@ gpio_led_set ( int val )
 	}
 }
 
+// Called from hardware.c
 void
 gpio_init ( void )
 {
 	gpio_led_init ();
 }
 
+/* Test 0 --
+ * Cute light show.
+ * Works fine 5-27-2016
+ */
 
-int pork[] = { LED0, LED1, LED2, LED3 };
+static int gpio_test_count = 0;
 
-/* Cute light show */
+static void
+gpio_test_init ( void )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+
+	p->clear_data = ALL_LED;
+
+	p->set_data = led_bits[0];
+}
+
 void
-gpio_test ( void )
+gpio_test_run ( void )
+{
+	struct gpio *p = (struct gpio *) GPIO1_BASE;
+
+	p->clear_data = led_bits[gpio_test_count];
+	gpio_test_count = (gpio_test_count+1) % 4;
+	p->set_data = led_bits[gpio_test_count];
+}
+
+#define DELAY0	40
+
+// XXX - runs forever
+void
+gpio_test0 ( void )
+{
+	gpio_test_init ();
+
+	for ( ;; ) {
+	    thr_delay ( DELAY0 );
+	    gpio_test_run ();
+	}
+}
+
+/* Test 1
+ * Cute light show
+ * works, slower and less cool than the above.
+ * uses uncalibrated delay loop.
+ */
+void
+gpio_test1 ( void )
 {
 	struct gpio *p = (struct gpio *) GPIO1_BASE;
 	int i;
@@ -134,22 +249,27 @@ gpio_test ( void )
 
 	p->clear_data = ALL_LED;
 	i=0;
-	p->set_data = pork[i];
+	p->set_data = led_bits[i];
 	n = 1;
 
 	for ( ;; ) {
-	    if ( i == 0 )
-		printf ( "GPIO test, pass %d\n", n++ );
-	    p->clear_data = pork[i];
+	    //if ( i == 0 )
+		//printf ( "GPIO test, pass %d\n", n++ );
+	    p->clear_data = led_bits[i];
 	    i = (i+1) % 4;
-	    p->set_data = pork[i];
+	    p->set_data = led_bits[i];
 	    delay10 ();
 	}
 }
 
-/* Cute light show.
+/* Test 2 --
+ * Cute light show.
  *  use timer interrupts
+ *  works 5-27-2016
  */
+
+#define DELAY2	40
+
 void
 gpio_test2 ( void )
 {
@@ -166,64 +286,113 @@ gpio_test2 ( void )
 
 	p->clear_data = ALL_LED;
 	i=0;
-	p->set_data = pork[i];
+	p->set_data = led_bits[i];
 	n = 1;
 
 	for ( ;; ) {
-	    if ( i == 0 )
-		printf ( "GPIO test, pass %d\n", n++ );
-	    p->clear_data = pork[i];
+	    // if ( i == 0 )
+		// printf ( "GPIO test, pass %d\n", n++ );
+	    p->clear_data = led_bits[i];
 	    i = (i+1) % 4;
-	    p->set_data = pork[i];
-	    thr_delay ( 5 );
+	    p->set_data = led_bits[i];
+	    thr_delay ( DELAY2 );
 	}
 }
 
-int users[] = { USER_LED0, USER_LED1, USER_LED2, USER_LED3 };
-
-/* Simple light blinking
- *  use timer interrupts
+/* Test 3 - 
+ * Cute light blinking
+ *  use gpio routines and timer interrupts
  */
 void
 gpio_test3 ( void )
 {
 	int who = 0;
 
-	gpio_clear_bit ( GPIO_0_2 );
-
 	for ( ;; ) {
 	    gpio_clear_bit ( users[who] );
 	    who = (who+1) % 4;
 	    gpio_set_bit ( users[who] );
-	    thr_delay ( 3 );
+	    thr_delay ( 37 );
 	}
 }
 
-/* Cute light show.
- *  hooks for test menu
+/* Test 4 -
+ *  first time turn all off.
+ *  next time turn all on.
+ *  toggle state like this on each call.
+ * OK - 5-27-2016
  */
-
-static int gpio_test_count;
+static int flip = 1;
 
 void
-gpio_test_init ( void )
+gpio_test4 ( void )
 {
 	struct gpio *p = (struct gpio *) GPIO1_BASE;
 
-	p->clear_data = ALL_LED;
-
-	p->set_data = pork[0];
-	gpio_test_count = 0;
+	if ( flip ) {
+	    p->clear_data = ALL_LED;
+	    flip = 0;
+	} else {
+	    p->set_data = ALL_LED;
+	    flip = 1;
+	}
 }
 
-void
-gpio_test_run ( void )
-{
-	struct gpio *p = (struct gpio *) GPIO1_BASE;
+/* For this to work, you must wire up an LED to
+ * P8 pin 7.  I use a 470 ohm series resistor
+ * and connect to ground on P9 pin 1
+ */
 
-	p->clear_data = pork[gpio_test_count];
-	gpio_test_count = (gpio_test_count+1) % 4;
-	p->set_data = pork[gpio_test_count];
+#define HALF_SEC	500000000
+
+#define TEST5_BIT	GPIO_2_2
+
+void
+gpio_test5 ( void )
+{
+	gpio_out_init ( TEST5_BIT );
+
+	// printf ( "Ticking\n" );
+
+	for ( ;; ) {
+	    delay_ns ( HALF_SEC );
+	    gpio_clear_bit ( TEST5_BIT );
+	    delay_ns ( HALF_SEC );
+	    gpio_set_bit ( TEST5_BIT );
+	    // printf ( "Tick\n" );
+	}
+}
+
+/* Called from test menu in tests.c */
+void
+gpio_test ( void )
+{
+	unsigned long val;
+	int i;
+
+	// gpio_test3 ();
+
+	/*
+	unsigned long val2;
+	val = get_pmcr ();
+	printf ( "PMCR = %d %08x\n", val, val );
+
+	reset_ccnt ();
+	val = get_ccnt ();
+	printf ( "CCNT = %d %08x\n", val, val );
+	thr_delay ( 2 );
+	val2 = get_ccnt ();
+	printf ( "CCNT = %d %08x\n", val2, val2 );
+	printf ( " elapsed = %d\n", val2 - val );
+	*/
+
+	for ( i=0; i < 5; i++ ) {
+	    delay_ns ( 2000000 - 50 );
+	    val = get_ccnt ();
+	    printf ( "CCNT = %d %08x\n", val, val );
+	}
+
+	gpio_test5 ();
 }
 
 /* THE END */

@@ -12,9 +12,15 @@
 #include "netbuf.h"
 #include "cpu.h"
 
-extern unsigned long my_ip;
+/* Priority at which connection threads are launched */
+/* XXX - at this time the test thread does NOT use
+ * interrupt serial IO, so it is a hog running at
+ * priority 30, so we must launch these threads at
+ * a lower priority or they are starved
+ */
+#define CONN_PRI	29
 
-typedef void (*tcp_fptr) ( char *, int );
+extern unsigned long my_ip;
 
 /* This structure manages TCP connections */
 enum tcp_state { FREE, BORASCO, CWAIT, CONNECT, FWAIT };
@@ -27,24 +33,14 @@ struct tcp_io {
 	int local_port;
 	unsigned long local_seq;
 	unsigned long remote_seq;
-	tcp_fptr rcv_func;
+	void (*rcv_func) ( struct tcp_io *, char *, int);
 	enum tcp_state state;
 	struct sem *sem;
+	struct tcp_server *server;
 };
 
+typedef void (*tcp_fptr) ( struct tcp_io *, char *, int );
 typedef void (*tcp_cptr) ( struct tcp_io * );
-
-static void tcp_reply_rst ( struct netbuf * );
-/*
-static void tcp_send_flags ( struct tcp_io *, int );
-*/
-static void tcp_send_data ( struct tcp_io *, int, char *, int );
-
-/* Public entry points */
-
-struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
-void tcp_send ( struct tcp_io *, char *, int );
-void tcp_shutdown ( struct tcp_io * );
 
 struct tcp_server {
 	struct tcp_server *next;
@@ -52,6 +48,16 @@ struct tcp_server {
 	tcp_cptr	conn_func;
 	tcp_fptr 	rcv_func;
 };
+
+static void tcp_reply_rst ( struct netbuf * );
+static void tcp_send_data ( struct tcp_io *, int, char *, int );
+
+/* Public entry points */
+
+void tcp_server ( int, tcp_cptr, tcp_fptr );
+struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
+void tcp_send ( struct tcp_io *, char *, int );
+void tcp_shutdown ( struct tcp_io * );
 
 static struct tcp_io *tcp_io_head;
 static struct tcp_io *tcp_io_free_list;
@@ -118,8 +124,8 @@ tcp_io_free ( struct tcp_io *tp )
 	tcp_io_free_list = tp;
 }
 
-void
-tcp_tester ( char *buf, int count )
+static void
+tcp_tester ( struct tcp_io *tp, char *buf, int count )
 {
 	char zoot[32];
 
@@ -162,11 +168,33 @@ test_tcp_echo ( int dummy )
 	tcp_shutdown ( tio );
 }
 
+/* This gets called when a new connection arrives on
+ * whatever server we are testing.
+ */
+static void
+test_connect ( struct tcp_io *tp )
+{
+	printf ( "Got a connection on port %d\n", tp->local_port );
+}
+
 /* This gets called from the test console */
 void
 test_tcp ( int dummy )
 {
 	test_tcp_daytime ( dummy );
+}
+
+/* For echo server */
+static void
+tcp_echo_rcv ( struct tcp_io *tp, char *buf, int count )
+{
+	char lbuf[64];
+
+	strcpy ( lbuf, buf, count );
+	lbuf[count] = '\0';
+	printf ( "%d byes of data received by echo server: !!\n", count );
+	printf ( "Here she is: %s\n", lbuf );
+	tcp_send ( tp, "ECHO\n\r", 6 );
 }
 
 /* XXX - this gets called, but has no purpose yet.
@@ -178,6 +206,8 @@ tcp_init ( void )
 	tcp_io_head = NULL;
 	tcp_io_free_list = NULL;
 	tcp_server_head = NULL;
+
+	tcp_server ( ECHO_PORT, test_connect, tcp_echo_rcv );
 }
 
 static struct tcp_server *
@@ -189,8 +219,9 @@ tcp_server_lookup ( struct netbuf *nbp )
 
 	tcp = (struct tcp_hdr *) nbp->pptr;
 	dport = ntohs(tcp->dport);
+	printf ( "Doing server lookup on port %d\n", dport );
 
-	for ( sp =  tcp_server_head; sp; sp = sp->next ) {
+	for ( sp = tcp_server_head; sp; sp = sp->next ) {
 	    if ( sp->port == dport )
 		return sp;
 	}
@@ -231,7 +262,8 @@ tcp_io_lookup ( struct netbuf *nbp )
 void
 tcp_send ( struct tcp_io *tp, char *buf, int count )
 {
-	tcp_send_data ( tp, TH_ACK, buf, count );
+	tcp_send_data ( tp, TH_PUSH | TH_ACK, buf, count );
+	tp->local_seq += count;
 }
 
 /* We are here when we have identified a receive packet
@@ -254,7 +286,7 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	 */
 	if ( tcp->flags == (TH_SYN | TH_ACK) ) {
 	    if ( tp->state == CWAIT ) {
-		tp->remote_seq = ntohl(tcp->seq) + 1;	/* bump */
+		tp->remote_seq = ntohl(tcp->seq);
 		tp->local_seq = ntohl(tcp->ack);
 		tcp_send_data ( tp, TH_ACK, NULL, 0 );
 		printf ( "Connection established\n" );
@@ -267,17 +299,30 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	/* Somebody is shutting down the connection.
 	 */
 	if ( tcp->flags == (TH_FIN | TH_ACK) ) {
-	    tp->remote_seq = ntohl(tcp->seq) + 1;	/* bump */
+	    tp->remote_seq = ntohl(tcp->seq);
 	    if ( tp->state == FWAIT ) {
 		tcp_send_data ( tp, TH_ACK, NULL, 0 );
 		printf ( "Connection termination complete\n" );
 		tp->state = BORASCO;
 		sem_destroy ( tp->sem );
+		/* XXX - remove from list */
 		tcp_io_free ( tp );
 	    }
 	    if ( tp->state == CONNECT ) {
 		tcp_send_data ( tp, TH_FIN | TH_ACK, NULL, 0 );
 		printf ( "Connection terminated by peer\n" );
+		tp->state = BORASCO;
+		sem_destroy ( tp->sem );
+		/* XXX - remove from list */
+		tcp_io_free ( tp );
+	    }
+	    return;
+	}
+
+	/* Somebody is shutting things down another way */
+	if ( tcp->flags == TH_RST ) {
+	    if ( tp->state == FWAIT ) {
+		printf ( "Connection terminated by RST\n" );
 		tp->state = BORASCO;
 		sem_destroy ( tp->sem );
 		tcp_io_free ( tp );
@@ -289,9 +334,16 @@ tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 	if ( tcp->flags & TH_ACK ) {
 	    tp->remote_seq = ntohl(tcp->seq);
 	    tp->local_seq = ntohl(tcp->ack);
+	    if ( tp->state == CWAIT ) {
+		printf ( "Connection established\n" );
+		tp->state = CONNECT;
+		sem_unblock ( tp->sem );
+	    }
 	    if ( len > 0 ) {
+		tp->remote_seq += len - 1;
 		printf ( "Data received ***\n" );
-		tp->rcv_func ( nbp->dptr, len );
+		tcp_send_data ( tp, TH_ACK, NULL, 0 );
+		tp->rcv_func ( tp, nbp->dptr, len );
 	    }
 	    return;
 	}
@@ -353,16 +405,75 @@ tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
 	tp->local_seq = 0x1234ABCD;	/* XXX */
 	tp->remote_seq = 0;	/* for now */
 	tp->state = CWAIT;
+	tp->sem = sem_signal_new ( SEM_FIFO );
 
 	tp->next = tcp_io_head;
-	tp->state = CWAIT;
-	tp->sem = sem_signal_new ( SEM_FIFO );
 	tcp_io_head = tp;
 
 	tcp_send_data ( tp, TH_SYN, NULL, 0 );
 	sem_block ( tp->sem );
 
-	/* XXX - this should block till we have a connection */
+	return tp;
+}
+
+void
+tcp_connect_thread ( int arg )
+{
+	struct tcp_io *tp = (struct tcp_io *) arg;
+
+	printf ( "Connect thread launched\n" );
+
+	tcp_send_data ( tp, TH_SYN | TH_ACK, NULL, 0 );
+	printf ( "Connect thread blocking\n" );
+
+	sem_block ( tp->sem );
+
+	printf ( "Connect thread running\n" );
+
+	/*
+	tcp_send ( tp, "fish", 4 );
+	tcp_shutdown ( tp );
+	*/
+	printf ( "Connect thread done\n" );
+}
+
+/* This gets called when someone tries to establish a
+ * connection to one of our servers.
+ * Note that this SHOULD NOT block, as it is running
+ * as part of the network thread.
+ */
+struct tcp_io *
+tcp_server_connect ( struct tcp_server *sp, struct netbuf *nbp )
+{
+	struct tcp_io *tp;
+	struct tcp_hdr *xtcp;
+	struct ip_hdr *xipp;
+
+	tp = tcp_io_alloc ();
+	if ( ! tp )
+	    return NULL;
+
+	xtcp = (struct tcp_hdr *) nbp->pptr;
+	xipp = nbp->iptr;
+
+	tp->remote_ip = xipp->src;
+	tp->local_port = ntohs (xtcp->dport); 
+	tp->remote_port = ntohs (xtcp->sport);
+
+	printf ( "Server connect on port %d\n", tp->local_port );
+
+	tp->rcv_func = sp->rcv_func;
+
+	tp->remote_seq = ntohl(xtcp->seq);
+	tp->local_seq = 0x1234ABCD;	/* XXX */
+	tp->state = CWAIT;
+	tp->sem = sem_signal_new ( SEM_FIFO );
+
+	tp->next = tcp_io_head;
+	tcp_io_head = tp;
+
+	printf ( "Launching connect thread\n" );
+	(void) thr_new ( "conn", tcp_connect_thread, (void *) tp, CONN_PRI, 0 );
 
 	return tp;
 }
@@ -423,10 +534,9 @@ tcp_rcv ( struct netbuf *nbp )
 	if ( tcp->flags == TH_SYN ) {
 	    sp = tcp_server_lookup ( nbp );
 	    if ( sp ) {
-		/* XXX - send SYN/ACK.
-		 * Also set up a tcp_io with salient details
-		 * and proper state for the embryonic connection.
-		 */
+		tcp_server_connect ( sp, nbp );
+		netbuf_free ( nbp );
+		return;
 	    } else {
 		/* Tell them to go away */
 		/* - could just silently drop packet */
@@ -449,84 +559,7 @@ tcp_rcv ( struct netbuf *nbp )
 	netbuf_free ( nbp );
 }
 
-struct tcp_pseudo {
-	unsigned long src;
-	unsigned long dst;
-	unsigned short proto;
-	unsigned short len;
-};
-
-#ifdef notdef
-static void
-tcp_reply_rst ( struct netbuf *xbp )
-{
-	struct netbuf *nbp;
-	struct tcp_hdr *tcp;
-	struct tcp_hdr *xtcp;
-	struct ip_hdr *xipp;
-	unsigned long seq;
-	struct tcp_pseudo pseudo;
-	unsigned short sum;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	nbp->dlen = 0;
-	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
-	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
-	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
-
-	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
-
-	nbp->iptr->proto = IPPROTO_TCP;
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-
-	/* flip the ports in the reply packet */
-	xtcp = (struct tcp_hdr *) xbp->pptr;
-	tcp->sport = xtcp->dport;
-	tcp->dport = xtcp->sport;
-
-	tcp->flags = TH_RST | TH_ACK;
-
-	seq = ntohl(xtcp->seq) + 1;
-	tcp->ack = htonl(seq);
-	tcp->seq = 0;
-
-	tcp->hlen = 5;
-
-	tcp->win = DEF_WIN;
-	tcp->urg = 0;
-
-	xipp = xbp->iptr;
-
-	/* Setup and checksum the pseudo header */
-	pseudo.src = xipp->dst;
-	pseudo.dst = xipp->src;
-
-	pseudo.proto = htons ( IPPROTO_TCP );
-	pseudo.len = htons ( sizeof(struct tcp_hdr) );
-
-	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
-	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
-
-	/* Note - we do NOT byte reorder the checksum.
-	 * if it was done on byte swapped data, it will be correct
-	 * as is !!
-	 */
-	tcp->sum = ~sum;
-
-	/*
-	net_debug_arm ();
-	*/
-	ip_send ( nbp, xipp->src );
-}
-#endif
-
+/* Send a RST/ACK packet to make somebody go away */
 static void
 tcp_reply_rst ( struct netbuf *xbp )
 {
@@ -540,13 +573,20 @@ tcp_reply_rst ( struct netbuf *xbp )
 	rst_io.local_port = ntohs (xtcp->dport); 
 	rst_io.remote_port = ntohs (xtcp->sport);
 
-	rst_io.remote_seq = ntohl(xtcp->seq) + 1;
+	rst_io.remote_seq = ntohl(xtcp->seq);
 	rst_io.local_seq = 0;
 
 	rst_io.remote_ip = xipp->src;
 
 	tcp_send_data ( &rst_io, TH_RST | TH_ACK, NULL, 0 );
 }
+
+struct tcp_pseudo {
+	unsigned long src;
+	unsigned long dst;
+	unsigned short proto;
+	unsigned short len;
+};
 
 static void
 tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
@@ -581,6 +621,8 @@ tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
 	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
 	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
 
+	printf ( "SEND DATA: ilen = %d\n", nbp->ilen );
+
 	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
 
 	nbp->iptr->proto = IPPROTO_TCP;
@@ -592,8 +634,8 @@ tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
 
 	tcp->flags = flags;
 
-	tcp->ack = htonl(tp->remote_seq);
-	tcp->seq = htonl(tp->local_seq);
+	tcp->ack = htonl(tp->remote_seq + 1);	/* next byte expected */
+	tcp->seq = htonl(tp->local_seq);	/* start of our data */
 
 	tcp->hlen = 5;
 
@@ -623,69 +665,5 @@ tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
 	*/
 	ip_send ( nbp, tp->remote_ip );
 }
-
-#ifdef notdef
-/* Get rid of this once the above is proven */
-static void
-tcp_send_flags ( struct tcp_io *tp, int flags )
-{
-	struct netbuf *nbp;
-	struct tcp_hdr *tcp;
-	struct tcp_pseudo pseudo;
-	unsigned short sum;
-
-	nbp = netbuf_alloc ();
-	if ( ! nbp )
-	    return;
-
-	nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-	nbp->dptr = nbp->pptr + sizeof ( struct tcp_hdr );
-
-	nbp->dlen = 0;
-	nbp->plen = nbp->dlen + sizeof(struct tcp_hdr);
-	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
-	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
-
-	memset ( nbp->pptr, 0, sizeof(struct tcp_hdr) );
-
-	nbp->iptr->proto = IPPROTO_TCP;
-
-	tcp = (struct tcp_hdr *) nbp->pptr;
-
-	tcp->sport = htons(tp->local_port);
-	tcp->dport = htons(tp->remote_port);
-
-	tcp->flags = flags;
-
-	tcp->ack = htonl(tp->remote_seq);
-	tcp->seq = htonl(tp->local_seq);
-
-	tcp->hlen = 5;
-
-	tcp->win = DEF_WIN;
-	tcp->urg = 0;
-
-	/* Setup and checksum the pseudo header */
-	pseudo.src = my_ip;
-	pseudo.dst = tp->remote_ip;
-
-	pseudo.proto = htons ( IPPROTO_TCP );
-	pseudo.len = htons ( sizeof(struct tcp_hdr) );
-
-	sum = in_cksum_i ( &pseudo, sizeof(struct tcp_pseudo), 0 );
-	sum = in_cksum_i ( tcp, sizeof(struct tcp_hdr), sum );
-
-	/* Note - we do NOT byte reorder the checksum.
-	 * if it was done on byte swapped data, it will be correct
-	 * as is !!
-	 */
-	tcp->sum = ~sum;
-
-	/*
-	net_debug_arm ();
-	*/
-	ip_send ( nbp, tp->remote_ip );
-}
-#endif
 
 /* THE END */

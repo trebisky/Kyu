@@ -99,4 +99,12 @@ setup_led_mux ( void )
     psp[MUX_GPMC_A8] = MODE(7) | PULLUDDIS;
 }
 
+void
+setup_gpio_out ( int pin )
+{
+    int *psp = (int *) MUX_BASE;
+
+    psp[pin] = MODE(7) | PULLUDDIS;
+}
+
 /* THE END */
