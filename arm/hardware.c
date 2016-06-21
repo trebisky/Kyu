@@ -107,6 +107,7 @@ hardware_init ( void )
 	enable_ccnt ( 0 );
 
 	gpio_init ();
+	i2c_init ();
 #endif
 
 #ifdef ARCH_X86

@@ -1,21 +1,30 @@
 /* Tom Trebisky
- * 5-11-2016
+ * 5-11-2016 - begun for ESP8266
+ * 5-29-2016 - begin port for ARM/BBB/Kyu
  *
  *  iic.c
  *
- *  Bit banging i2c library for the ESP8266
+ *  Bit banging i2c library
+ *    for the ESP8266 and for Kyu/BBB
  *
  * A key idea is that the sda and scl pins can be
  * specified as arguments to the initializer function.
  *
  * A fairly high level interface is presented as an API.
- * patterned after i2c_master.c
+ *  low level code derived from i2c_master.c
  */
+#include <kyu.h>
 
 #ifdef ARCH_ESP8266
 #include "ets_sys.h"
 #include "osapi.h"
 #include "gpio.h"
+
+#define printf	os_printf
+#endif
+
+#ifdef ARCH_ARM
+#include "omap_gpio.h"
 #endif
 
 static void iic_setdc ( int, int );
@@ -40,7 +49,6 @@ int iic_send_byte ( int );
 typedef unsigned char uint8;
 
 #define os_delay_us(x)	delay_ns ( 1000 * (x) )
-#define os_printf	printf
 #endif
 
 /* -------------------------------------------------- */
@@ -93,6 +101,17 @@ gpio_iic_setup ( int gpio )
 
 /* -------------------------------------------------- */
 
+/* Some notes on the i2c protocol
+ * both signals are open drain.
+ *  a device can pull a line low, but can never drive it high.
+ * an idle bus has both sda and scl high
+ * a start sequence pulls SDA low, with SCL left high
+ * a stop sequence first raises SCL, then raises SDA
+ *  (avoid changing SDS with SCL high to avoid false stops)
+ * data is asserted after SCL falls, is sampled when SCL rises.
+ */
+/* -------------------------------------------------- */
+
 static uint8 sda_pin;
 static uint8 scl_pin;	/* never used */
 
@@ -133,14 +152,20 @@ iic_gpio_init ( int sda, int scl )
     scl_mask = 1 << scl;
     all_mask = sda_mask | scl_mask;
 
+#ifdef ARCH_ESP8266
     ETS_GPIO_INTR_DISABLE() ;
-
     gpio_iic_setup ( sda );
     gpio_iic_setup ( scl );
 
-    iic_setdc ( 1, 1 );
-
     ETS_GPIO_INTR_ENABLE() ;
+#endif
+
+#ifdef ARCH_ARM
+    gpio_iic_init ( sda );
+    gpio_iic_init ( scl );
+#endif
+
+    iic_setdc ( 1, 1 );
 }
 
 /* Arguments are gpio numbers, 0-15 */
@@ -153,9 +178,10 @@ iic_init ( int sda_pin, int scl_pin )
 
 /* -------------------------------------------------- */
 
+#ifdef ARCH_ESP8266
 /* Could be a macro */
 static int ICACHE_FLASH_ATTR
-iic_getbit ( void )
+iic_get_bit ( void )
 {
     // return GPIO_INPUT_GET ( SDA_GPIO );
     return ( gpio_input_get() >> sda_pin) & 1;
@@ -185,6 +211,54 @@ iic_setdc ( int sda, int scl )
 
     gpio_output_set( high_mask, low_mask, all_mask, 0);
 }
+#endif
+
+#ifdef ARCH_ARM
+static int
+iic_raw_bit ( void )
+{
+    return gpio_read_bit ( sda_pin ) ? 1 : 0;
+}
+
+static int
+iic_get_bit ( void )
+{
+    int rv;
+
+    gpio_dir_in ( sda_pin );
+    rv = gpio_read_bit ( sda_pin );
+    gpio_dir_out ( sda_pin );
+    return rv ? 1 : 0;
+}
+
+static void
+iic_setdc ( int sda, int scl )
+{
+    cur_sda = sda;
+    if ( sda ) {
+	gpio_set_bit ( sda_pin );
+    } else {
+	gpio_clear_bit ( sda_pin );
+    }
+
+    cur_scl = scl;
+    if ( scl ) {
+	gpio_set_bit ( scl_pin );
+    } else {
+	gpio_clear_bit ( scl_pin );
+    }
+}
+
+static void
+iic_setclk ( int scl )
+{
+    if ( scl ) {
+	gpio_set_bit ( scl_pin );
+    } else {
+	gpio_clear_bit ( scl_pin );
+    }
+}
+#endif
 
 static void ICACHE_FLASH_ATTR
 iic_dc ( int data, int clock )
@@ -237,7 +311,7 @@ iic_getAck ( void )
     iic_dc ( 1, 0 );
     iic_dc ( 1, 1 );
 
-    rv = iic_getbit ();
+    rv = iic_get_bit ();
     os_delay_us (5);
 
     iic_dc ( 1, 0 );
@@ -245,6 +319,98 @@ iic_getAck ( void )
     return rv;
 }
 
+#ifdef ARCH_ARM
+/* XXX - why even manipulate the sda pin when reading ?? */
+/* We send the Ack outside of this routine */
+static int
+iic_readb ( void )
+{
+    int rv = 0;
+    int i;
+
+    gpio_dir_in ( sda_pin );
+
+    os_delay_us (5);
+
+    iic_dc ( cur_sda, 0 );
+
+    for (i = 0; i < 8; i++) {
+        os_delay_us (5);
+	iic_dc ( 1, 0 );
+	iic_dc ( 1, 1 );
+
+        rv |= iic_get_bit() << (7-i);
+
+	iic_dc_wait ( 1, 1, i == 7 ? 8 : 5 );
+    }
+
+    gpio_dir_out ( sda_pin );
+
+    iic_dc ( 1, 0 );
+
+    return rv;
+}
+
+static void
+iic_watch ( int delay )
+{
+    int i;
+    int val;
+
+    for ( i=0; i<delay; i++ ) {
+        val = iic_raw_bit();
+	printf ( "SDA = %d\n", val );
+	os_delay_us ( 1 );
+    }
+}
+
+static void
+iic_clk_d ( int clk, int delay )
+{
+    iic_setclk ( clk );
+    iic_watch ( delay );
+}
+
+static int
+iic_readbx ( void )
+{
+    int rv = 0;
+    int i;
+    int val;
+
+    gpio_dir_in ( sda_pin );
+
+    os_delay_us (5);
+
+    // iic_dc ( cur_sda, 0 );
+    iic_clk_d ( 0, 5 );
+
+    for (i = 0; i < 8; i++) {
+        // os_delay_us (5);
+	iic_watch ( 5 );
+	// iic_dc ( 1, 0 );
+	iic_clk_d ( 0, 5 );
+	// iic_dc ( 1, 1 );
+	iic_clk_d ( 1, 5 );
+
+        // rv |= gpio_read_bit( sda_pin ) << (7-i);
+        val = iic_raw_bit();
+	rv |= val << (7-i);
+	printf ( "*SDA = %d\n", val );
+
+	// iic_dc_wait ( 1, 1, i == 7 ? 8 : 5 );
+	iic_clk_d ( 1, i == 7 ? 8 : 5 );
+    }
+
+    gpio_dir_out ( sda_pin );
+
+    iic_dc ( 1, 0 );
+
+    return rv;
+}
+#endif
+
+#ifdef ARCH_ESP8266
 static int ICACHE_FLASH_ATTR
 iic_readb ( void )
 {
@@ -260,7 +426,7 @@ iic_readb ( void )
 	iic_dc ( 1, 0 );
 	iic_dc ( 1, 1 );
 
-        rv |= iic_getbit () << (7-i);
+        rv |= iic_get_bit () << (7-i);
 
 	iic_dc_wait ( 1, 1, i == 7 ? 8 : 5 );
     }
@@ -269,6 +435,7 @@ iic_readb ( void )
 
     return rv;
 }
+#endif
 
 static void ICACHE_FLASH_ATTR
 iic_writeb ( int data )
@@ -314,7 +481,7 @@ iic_send_byte_m ( int byte, char *msg )
 	iic_writeb ( byte );
 	ack = iic_getAck();
 	if ( ack ) {
-	    os_printf("I2C: No ack after sending %s\n", msg);
+	    printf("IIC: No ack after sending %s\n", msg);
 	    iic_stop();
 	    return 1;
 	}
@@ -398,6 +565,26 @@ iic_read_16raw ( int addr, unsigned short *buf, int n )
 	return 0;
 }
 
+/* 8 bit read.
+ * Send the address and see if we get an ACK.
+ * ripped out of iic_read();
+ */
+void
+iic_diag ( int addr, int reg )
+{
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) {
+	    printf ( " Oops (addr) !!\n" );
+	    return;
+	}
+	if ( iic_send_byte_m ( reg, "reg" ) ) {
+	    printf ( " Oops (reg) !!\n" );
+	    return;
+	}
+	iic_stop();
+	printf ( " OK !!\n" );
+}
+
 /* 8 bit read */
 int ICACHE_FLASH_ATTR
 iic_read ( int addr, int reg )
@@ -412,6 +599,29 @@ iic_read ( int addr, int reg )
 	iic_start();
 	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return -1;
 	rv = iic_recv_byte ( 1 );
+	iic_stop();
+
+	return rv;
+}
+
+/* 8 bit read */
+int ICACHE_FLASH_ATTR
+iic_readx ( int addr, int reg )
+{
+	int rv;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return -1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return -1;
+	iic_stop();
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return -1;
+
+	// rv = iic_recv_byte ( 1 );
+	rv = iic_readbx();
+	iic_setAck ( 1 );
+
 	iic_stop();
 
 	return rv;
@@ -556,5 +766,16 @@ iic_write_nada ( int addr, int reg )
 	return 0;
 }
 
+/* --------------- */
+/* --------------- */
+/* --------------- */
+
+int iic_pulses ( void )
+{
+	for ( ;; ) {
+	    iic_dc ( 0, 0 );
+	    iic_dc ( 1, 1 );
+	}
+}
 
 /* THE END */

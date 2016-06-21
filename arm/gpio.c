@@ -155,11 +155,36 @@ gpio_clear_bit ( int bit )
 	gpio_bases[gpio]->clear_data = 1 << (bit % 32);
 }
 
+int
+gpio_read_bit ( int bit )
+{
+	int gpio = bit / 32;
+	// return gpio_bases[gpio]->datain;
+	return gpio_bases[gpio]->datain & (1 << (bit % 32));
+}
+
 /* Call this before trying to set or clear a gpio */
 void
 gpio_out_init ( int bit )
 {
 	setup_gpio_out ( gpio_to_mux[bit] );
+	gpio_dir_out ( bit );
+}
+
+/* Call this before trying to read from a bit */
+void
+gpio_in_init ( int bit )
+{
+	setup_gpio_in ( gpio_to_mux[bit] );
+	// setup_gpio_in_up ( gpio_to_mux[bit] );
+	// setup_gpio_in_down ( gpio_to_mux[bit] );
+	gpio_dir_in ( bit );
+}
+
+void
+gpio_iic_init ( int bit )
+{
+	setup_iic_mux ( gpio_to_mux[bit] );
 	gpio_dir_out ( bit );
 }
 
@@ -363,9 +388,64 @@ gpio_test5 ( void )
 	}
 }
 
-/* Called from test menu in tests.c */
+#define TEST6_BIT	GPIO_2_2
+
+/* Used to test a single "pushbutton" input.
+ */
 void
-gpio_test ( void )
+gpio_test6 ( void )
+{
+	int val;
+
+	gpio_in_init ( TEST6_BIT );
+	printf ( "bit: %d\n", TEST6_BIT );
+
+	for ( ;; ) {
+	    delay_ns ( HALF_SEC );
+	    val = gpio_read_bit ( TEST6_BIT );
+	    printf ( "Read: %08x\n", val );
+	}
+}
+
+/* Used with a 555 sending a square wave input
+ * With a particular set of components, I get:
+ * 5-29-2016
+High: 727
+Low : 463
+High: 726
+Low : 463
+*/
+#define TEST7_BIT	GPIO_2_2
+
+#define MILLI_SEC	1000000
+void
+gpio_test7 ( void )
+{
+	int val;
+	int nval;
+	int count;
+
+	gpio_in_init ( TEST7_BIT );
+	val = gpio_read_bit ( TEST7_BIT );
+	count = 0;
+
+	for ( ;; ) {
+	    count++;
+	    delay_ns ( MILLI_SEC );
+	    nval = gpio_read_bit ( TEST7_BIT );
+	    if ( val != nval ) {
+		if ( val )
+		    printf ( "High: %d\n", count );
+		else
+		    printf ( "Low : %d\n", count );
+		count = 0;
+		val = nval;
+	    }
+	}
+}
+
+void
+gpio_test_ccnt ( void )
 {
 	unsigned long val;
 	int i;
@@ -391,8 +471,15 @@ gpio_test ( void )
 	    val = get_ccnt ();
 	    printf ( "CCNT = %d %08x\n", val, val );
 	}
+}
 
-	gpio_test5 ();
+/* Called from test menu in tests.c */
+void
+gpio_test ( void )
+{
+	// gpio_test7 ();
+	// iic_test ();
+	i2c_test ();
 }
 
 /* THE END */
