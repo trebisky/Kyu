@@ -26,6 +26,8 @@ all: ../machine.o
 ../machine.o: $(OBJS)
 	$(LD) -r -o ../machine.o $(OBJS)
 
+i2c.o:	omap_ints.h
+
 if_cpsw.e:	if_cpsw.c
 	$(CC) -E if_cpsw.c >if_cpsw.e
 

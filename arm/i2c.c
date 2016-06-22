@@ -1,6 +1,6 @@
 /* i2c.c
  *
- * Tom Trebisky  Kyu project  5-25-2015
+ * Tom Trebisky  Kyu project  6-21-2016
  *
  * The am3359 has 3 i2c interfaces.
  *  i2c-0, i2c-1, and i2c-2
@@ -20,7 +20,7 @@
  * 2) 0x34 - TDA19988 CEC core
  * 3) 0x50 - 24LC32A board ID EEPROM (32Kbit) U7 (U8?)
  *
- * See Chapter 21 in the AM3359 TRM
+ * See Chapter 21 in the AM3359 TRM, pages 4236-4305
  *
  * A lot can be learned from the linux driver for this thing.
  *  see:  drivers/i2c/busses/i2c-omap.c
@@ -36,11 +36,19 @@
  *
  * This driver reported "bus busy" without anything connected until I
  *   added a pair of external 4.7K pullup resistors.
+ *
+ * I wasted a lot of time trying to write this driver using polling
+ *  and avoiding interrupts.  It is actually far easier and simpler
+ *  to just dive in and use interrupts.
  */
+#include "kyu.h"
+#include "thread.h"
+#include "omap_ints.h"
 
 #define I2C0_BASE      0x44E0B000
 #define I2C1_BASE      0x4802A000
 #define I2C2_BASE      0x4819C000
+
 
 struct i2c_dev {
 	volatile unsigned long revlo;		/* 00 */
@@ -91,11 +99,11 @@ struct i2c_dev {
 #define IRQ_AERR	0x0080		/* access error */
 #define IRQ_STC		0x0040
 #define IRQ_GC		0x0020
-#define IRQ_XRDY	0x0010		/* xmitter ready for data*/
+#define IRQ_XRDY	0x0010		/* xmitter ready for data */
 #define IRQ_RRDY	0x0008		/* rcv data ready */
 #define IRQ_ARDY	0x0004
 #define IRQ_NACK	0x0002
-#define IRQ_AL		0x0008
+#define IRQ_AL		0x0001		/* Arbitration lost */
 
 /* Bits in the CON register */
 #define CON_ENABLE	0x8000
@@ -119,14 +127,73 @@ struct i2c_dev {
 #define BUF_TX_CLR	0x0040
 
 /* --------------------------------------------------------- */
+
+#define NUM_I2C	3
+
+static struct i2c_softc {
+	struct i2c_dev *base;
+	int irq;
+	char *tbufp;
+	char *rbufp;
+	int tcount;
+	int rcount;
+	struct sem *sem;
+} i2c_soft[NUM_I2C];
+
+#define DEFAULT_DEV	1
+
+#define IRQ_ENABLES	(IRQ_XRDY | IRQ_RRDY | IRQ_ARDY)
+
+/* --------------------------------------------------------- */
 /* --------------------------------------------------------- */
 
+/* XXX */
 static int i2c_slave_addr;
 
 void
 i2c_set_slave ( int addr )
 {
 	i2c_slave_addr = addr;
+}
+
+static int isr_count = 0;
+
+/* Despite contradictory statements in the TRM, you ack (and clear)
+ * interrupts by writing a one to the relevant bit in the irqstatus register,
+ * NOT the irqstatus_raw register.
+ */
+static void
+i2c_isr ( int arg )
+{
+	struct i2c_softc *sc = (struct i2c_softc *) arg;
+	struct i2c_dev *base = sc->base;
+	int stat;
+	int ch;
+
+	stat = base->irqstatus;
+	// printf ( "i2c_isr (raw, stat): %08x %08x\n", base->irqstatus_raw, stat );
+
+	if ( stat & IRQ_XRDY ) {
+	    base->data = sc->tbufp ? *sc->tbufp++ : 0xff;
+	    base->irqstatus = IRQ_XRDY;
+	}
+
+	if ( stat & IRQ_RRDY ) {
+	    ch = base->data;
+	    if ( sc->rbufp ) {
+		*sc->rbufp++ = ch;
+		sc->rcount++;
+	    }
+	    base->irqstatus = IRQ_RRDY;
+	}
+
+	/* Near as I can tell, this indicates the transfer is done */
+	if ( stat & IRQ_ARDY ) {
+	    sem_unblock ( sc->sem );
+	    base->irqstatus = IRQ_ARDY;
+	}
+
+	// if ( isr_count++ > 20 ) base->irqenable_clr = IRQ_ENABLES;
 }
 
 static void
@@ -154,14 +221,26 @@ i2c_reset_i ( struct i2c_dev *base )
  * To get 100 kHz, 120 ticks hi and 120 ticks lo.
  */
 static void
-i2c_devinit ( struct i2c_dev *base )
+i2c_devinit ( int devnum, struct i2c_dev *base, int irq )
 {
+	struct i2c_softc *sc = &i2c_soft[devnum];
+
+	sc->base = base;
+	sc->irq = irq;
+	sc->rbufp = 0;
+	sc->tbufp = 0;
+	sc->sem = sem_signal_new ( SEM_PRIO );
+
 	i2c_reset_i ( base );
 
 	base->psc = PSC_2;
 	base->scll = 120;
 	base->sclh = 120;
 	base->buf = BUF_RX_CLR | BUF_TX_CLR;
+
+	base->irqenable_set = IRQ_ENABLES;
+
+	irq_hookup ( irq, i2c_isr, sc );
 
 	base->con = CON_ENABLE;
 }
@@ -170,7 +249,7 @@ i2c_devinit ( struct i2c_dev *base )
 void
 i2c_reset ( void )
 {
-	i2c_devinit ( (struct i2c_dev *) I2C1_BASE );
+	i2c_devinit ( 1, (struct i2c_dev *) I2C1_BASE, IRQ_I2C1 );
 }
 
 static int
@@ -295,7 +374,7 @@ i2c_con_waitclr ( int flag )
 
 
 int
-i2c_send ( char *buf, int count )
+i2c_send_poll ( char *buf, int count )
 {
 	struct i2c_dev *base = (struct i2c_dev *) I2C1_BASE;
 
@@ -316,7 +395,9 @@ i2c_send ( char *buf, int count )
 	while ( count-- ) {
 	    if ( i2c_irq_waitset( IRQ_XRDY ) )
 		return 1;
+	    base->irqstatus_raw = IRQ_XRDY;
 	    base->data = *buf++;
+
 	}
 
 	/* XXX - We may be able to just tack this on at the start */
@@ -327,7 +408,7 @@ i2c_send ( char *buf, int count )
 }
 
 int
-i2c_recv ( char *buf, int count )
+i2c_recv_poll ( char *buf, int count )
 {
 	struct i2c_dev *base = (struct i2c_dev *) I2C1_BASE;
 
@@ -346,9 +427,66 @@ i2c_recv ( char *buf, int count )
 	while ( count-- ) {
 	    if ( i2c_irq_waitset( IRQ_RRDY ) )
 		return 1;
+	    base->irqstatus_raw = IRQ_RRDY;
 	    *buf++ = base->data;
 	}
 	i2c_con_waitclr ( CON_STOP );
+
+	return 0;
+}
+
+int
+i2c_send ( char *buf, int count )
+{
+	struct i2c_softc *sc = &i2c_soft[DEFAULT_DEV];
+	struct i2c_dev *base = (struct i2c_dev *) I2C1_BASE;
+
+	i2c_irq_waitclr ( IRQ_BB );
+
+	if ( base->irqstatus_raw & IRQ_BB ) {
+	    printf ( "i2c_send - sorry, bus busy: %08x\n", base->irqstatus_raw );
+	    return 1;
+	}
+
+	base->sa = i2c_slave_addr;
+	base->count = count;
+	base->buf = BUF_RX_CLR | BUF_TX_CLR;
+	sc->tbufp = buf;
+	sc->tcount = count;
+
+	base->con = CON_ENABLE | CON_MASTER | CON_TRX | CON_START | CON_STOP;
+
+	// printf ( "Block in send\n" );
+	sem_block ( sc->sem );
+	// printf ( "Done in send\n" );
+
+	return 0;
+}
+
+int
+i2c_recv ( char *buf, int count )
+{
+	struct i2c_softc *sc = &i2c_soft[DEFAULT_DEV];
+	struct i2c_dev *base = (struct i2c_dev *) I2C1_BASE;
+
+	i2c_irq_waitclr ( IRQ_BB );
+	if ( base->irqstatus_raw & IRQ_BB ) {
+	    printf ( "i2c_send - sorry, bus busy: %08x\n", base->irqstatus_raw );
+	    return 1;
+	}
+
+	base->sa = i2c_slave_addr;
+	base->count = count;
+	base->buf = BUF_RX_CLR | BUF_TX_CLR;
+
+	sc->rbufp = buf;
+	sc->rcount = 0;
+
+	base->con = CON_ENABLE | CON_MASTER | CON_START | CON_STOP;
+
+	// printf ( "Block in recv\n" );
+	sem_block ( sc->sem );
+	// printf ( "Done in recv\n" );
 
 	return 0;
 }
@@ -358,7 +496,7 @@ void
 i2c_i2c0_setup ( void )
 {
 	setup_i2c0_mux ();
-	// i2c_devinit ( (struct i2c_dev *) I2C0_BASE );
+	// i2c_devinit ( 0, (struct i2c_dev *) I2C0_BASE, IRQ_I2C0 );
 }
 
 /* Uses mode 2 to put these on P9-17 and P9-18
@@ -369,7 +507,7 @@ void
 i2c_i2c1_setup ( void )
 {
 	setup_i2c1_mux ();
-	i2c_devinit ( (struct i2c_dev *) I2C1_BASE );
+	i2c_devinit ( 1, (struct i2c_dev *) I2C1_BASE, IRQ_I2C1 );
 }
 
 /* Uses mode 2 to put these on P9-21 and P9-22
@@ -380,7 +518,7 @@ void
 i2c_i2c2_setup ( void )
 {
 	setup_i2c2_mux ();
-	i2c_devinit ( (struct i2c_dev *) I2C2_BASE );
+	i2c_devinit ( 2, (struct i2c_dev *) I2C2_BASE, IRQ_I2C2 );
 }
 
 /* Called during system startup.
@@ -553,8 +691,8 @@ i2c_write ( int reg, int val )
 	if ( i2c_send ( buf, 2 ) )
 	    printf ( "send Trouble\n" );
 
-	if ( i2c_irq_waitset( IRQ_ARDY ) )
-	    printf ( "send-ardy Trouble\n" );
+	//if ( i2c_irq_waitset( IRQ_ARDY ) )
+	 //   printf ( "send-ardy Trouble\n" );
 }
 
 static void
@@ -565,14 +703,14 @@ i2c_read_reg_n ( int reg, unsigned char *buf, int n )
 	if ( i2c_send ( buf, 1 ) )
 	    printf ( "send Trouble\n" );
 
-	if ( i2c_irq_waitset( IRQ_ARDY ) )
-	    printf ( "send-ardy Trouble\n" );
+	//if ( i2c_irq_waitset( IRQ_ARDY ) )
+	 //   printf ( "send-ardy Trouble\n" );
 
 	if ( i2c_recv ( buf, n ) )
 	    printf ( "recv Trouble\n" );
 
-	if ( i2c_irq_waitset( IRQ_ARDY ) )
-	    printf ( "recv-ardy Trouble\n" );
+	//if ( i2c_irq_waitset( IRQ_ARDY ) )
+	 //   printf ( "recv-ardy Trouble\n" );
 }
 
 void
@@ -640,7 +778,7 @@ i2c_read_24 ( int reg )
 #define NTEST	5000
 
 void
-i2c_try ( void )
+i2c_try5 ( void )
 {
 	struct i2c_dev *base = (struct i2c_dev *) I2C1_BASE;
 	int i;
@@ -659,6 +797,28 @@ i2c_try ( void )
 	}
 
 	printf ( "Done\n" );
+}
+
+void
+i2c_try ( void )
+{
+	struct i2c_softc *sc = &i2c_soft[DEFAULT_DEV];
+	char buf[2];
+
+	i2c_set_slave ( BMP_ADDR );
+
+	buf[0] = REG_ID;
+
+	if ( i2c_send ( buf, 1 ) )
+	    printf ( "try-send Trouble\n" );
+
+	buf[0] = 0xff;
+	if ( i2c_recv ( buf, 1 ) )
+	    printf ( "try-recv Trouble\n" );
+
+	printf ( "Done\n" );
+	printf ( "RCV count = %d\n", sc->rcount );
+	printf ( "val = %02x\n", buf[0] );
 }
 
 /* Currently wired to "t 19" */

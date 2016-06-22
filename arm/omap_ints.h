@@ -17,8 +17,8 @@
 #define F_PANIC	9	/* pseudo for Kyu, user panic */
 
 /* List of interrupt numbers for the 3359 omap
- * There are 128 of these, we will fill out
- *  the list as needed.
+ * There are 128 of these, we will fill out the list as needed.
+ * Interrupts are chapter 6 in the TRM, table on pages 212-215
  */
 
 #define NUM_INTS	128
@@ -27,6 +27,11 @@
 #define NINT_CPSW_RX		42
 #define NINT_CPSW_TX		43
 #define NINT_CPSW_MISC		44
+
+/* XXX - unify - NINT or IRQ */
+#define IRQ_I2C0		70
+#define IRQ_I2C1		71
+#define IRQ_I2C2		30
 
 #define NINT_TIMER0	66
 #define NINT_TIMER1	67

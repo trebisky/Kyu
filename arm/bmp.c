@@ -808,13 +808,11 @@ bmp_test ( void )
 	    printf ( "BMP temp = %d\n", tt );
 	}
 
-	/*
 	pp = bmp_pressure ();
 	printf ( "BMP pressure = %d\n", pp );
 
 	bmp_cals ( (unsigned short *) &bmp_cal );
 	show_cals ( (void *) &bmp_cal );
-	*/
 }
 
 /* THE END */
