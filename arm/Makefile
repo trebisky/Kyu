@@ -14,7 +14,7 @@ include ../Makefile.inc
 # locore must be first
 OBJS =  locore.o hardware.o \
 	wdt.o timer.o serial.o mux.o prm.o gpio.o cm.o \
-	i2c.o iic.o bmp.o \
+	i2c.o i2c_hw.o iic.o bmp.o \
 	if_cpsw.o phy.o smsc.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
@@ -26,7 +26,9 @@ all: ../machine.o
 ../machine.o: $(OBJS)
 	$(LD) -r -o ../machine.o $(OBJS)
 
-i2c.o:	omap_ints.h
+i2c_hw.o:	omap_ints.h
+i2c.o:	i2c.h
+iic.o:	i2c.h
 
 if_cpsw.e:	if_cpsw.c
 	$(CC) -E if_cpsw.c >if_cpsw.e

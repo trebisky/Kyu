@@ -17,18 +17,6 @@
  * GNU General Public License for more details.
  */
 
-/* Kyu project
- * Tom Trebisky 5-26-2015
- * Copied from the U-boot (2015.01) sources (from cpsw.c)
- *  many other files merged in to make it stand alone
- *
- * The cpsw is a 3 port ethernet switch capable of gigabit
- *  two ports are ethernet, one is CPPI
- *  on the BBB only one port is used and has
- *   only a 10/100 media interface.
- * The media interface is a SMSC "LAN8710" chip.
- */
-
 #ifndef KYU
 #include <common.h>
 #include <command.h>
@@ -43,19 +31,167 @@
 #include <asm/arch/cpu.h>
 #endif
 
+/* Kyu project
+ * Tom Trebisky 5-26-2015
+ * Copied from the U-boot (2015.01) sources (from cpsw.c)
+ *  many other files merged in to make it stand alone
+ *
+ * The cpsw is a 3 port ethernet switch capable of gigabit
+ *  two ports are ethernet, one is CPPI
+ *  on the BBB only one port is used and has
+ *   only a 10/100 media interface.
+ * The media interface is a SMSC "LAN8710" chip.
+ */
+
+/* This next section is code I have added for Kyu, with every intention
+ * of working up my own BBB specific driver for this chip.
+ * As of 6-23-2016 this stuff up front is just "parked" here and
+ * pretty much independent of the rest and untested.
+ */
+#include <kyu.h>
+#include <kyulib.h>
+#include <thread.h>
+#include <malloc.h>
+#include <omap_ints.h>
+
+#include <miiphy.h>
+#include <phy.h>
+
+/* from the TRM, chapter 2, pages 175-176 */
+
+#define CPSW_SS		0x4a100000	/* Ethernet Switch Subsystem */
+#define CPSW_PORT	0x4a100100	/* Ethernet Port control */
+#define CPSW_CPDMA	0x4a100800	/* Ethernet DMA */
+#define CPSW_STATS	0x4a100900	/* Ethernet Statistics */
+#define CPSW_STATERAM	0x4a100A00	/* Ethernet State RAM */
+#define CPSW_CPTS	0x4a100C00	/* Ethernet Time sync */
+#define CPSW_ALE	0x4a100D00	/* Ethernet Address Lookup Engine */
+#define CPSW_SL1	0x4a100D80	/* Ethernet "sliver" for Port 1 */
+#define CPSW_SL2	0x4a100DC0	/* Ethernet "sliver" for Port 2 */
+#define CPSW_MDIO	0x4a101000	/* Ethernet MDIO */
+#define CPSW_WR		0x4a101200	/* Ethernet RMII/RGMII wrapper */
+
+struct mdio_regs {
+	volatile unsigned long version;		/* 0 */
+	volatile unsigned long control;
+	volatile unsigned long phy_alive;
+	volatile unsigned long phy_link;
+	volatile unsigned long link_stat_raw;	/* 0x10 */
+	volatile unsigned long link_stat;
+	long _pad1[2];
+	volatile unsigned long cmd_raw;		/* 0x20 */
+	volatile unsigned long cmd;
+	volatile unsigned long maskset;
+	volatile unsigned long maskclr;
+	long _pad2[20];
+	volatile unsigned long access0;		/* 0x80 */
+	volatile unsigned long physel0;
+	/* -- */
+	volatile unsigned long access1;
+	volatile unsigned long physel1;
+};
+
+#define ACCESS_GO	0x80000000
+#define ACCESS_WRITE	0x40000000
+#define ACCESS_ACK	0x20000000
+#define ACCESS_DATA	0xFFFF
+// #define USERACCESS_READ		(0)
+
+#define CTL_IDLE	0x80000000
+#define CTL_ENABLE	0x40000000
+
+#define MDIO_MAX        100 /* timeout */
+
+static int mdio_div = 1;	/* XXX */
+static int xx_phy_id = 0;	/* XXX */
+
+static void 
+mdio_init ( void )
+{
+	struct mdio_regs *mp = (struct mdio_regs *) CPSW_MDIO;
+
+	mp->control = CTL_ENABLE | mdio_div;
+	udelay(1000);
+}
+
+/* Neither of these spin wait routines does anything clever
+ * if they timeout (but at least they don't spin forever)
+ */
+static int
+mdio_access_wait ( void )
+{
+	int tmo = MDIO_MAX;
+	int rv;
+	struct mdio_regs *mp = (struct mdio_regs *) CPSW_MDIO;
+
+	while ( tmo-- ) {
+	    rv = mp->access0;
+	    if ( ! (rv & ACCESS_GO) )
+		break;
+	    udelay ( 10 );
+	}
+	return rv;	/* XXX */
+}
+
+static void
+mdio_idle_wait ( void )
+{
+	int tmo = MDIO_MAX;
+	struct mdio_regs *mp = (struct mdio_regs *) CPSW_MDIO;
+
+	while ( tmo-- ) {
+	    if ( mp->control & CTL_IDLE )
+		return;
+	    udelay ( 10 );
+	}
+}
+
+static int
+mdio_read ( int reg )
+{
+	struct mdio_regs *mp = (struct mdio_regs *) CPSW_MDIO;
+	unsigned int val;
+
+	mdio_access_wait ();
+
+	mp->access0 = 
+	    ACCESS_GO | (reg << 21) | (xx_phy_id << 16);
+
+	val = mdio_access_wait ();
+
+	/* XXX only valid if ACK bit is set.
+	 * We don't check (and what if the access timed out?)
+	 */
+	return val & ACCESS_DATA;
+}
+
+static void
+mdio_write ( int reg, int val )
+{
+	struct mdio_regs *mp = (struct mdio_regs *) CPSW_MDIO;
+
+	mdio_access_wait ();
+	mp->access0 = 
+	    ACCESS_GO | ACCESS_WRITE | (reg << 21) | (xx_phy_id << 16) | (val & ACCESS_DATA);
+	mdio_access_wait ();
+}
+
+/* ------------------------------------------------*/
+/* ------------------------------------------------*/
+/* ------------------------------------------------*/
+/* Below here is the working driver */
+/* ------------------------------------------------*/
+/* ------------------------------------------------*/
+/* ------------------------------------------------*/
+
+/* XXX - just to provide some debug */
+extern struct thread *cur_thread;
+
 #ifdef KYU
 
 static struct eth_device *eth_device = 0;
 
 static void show_dmastatus ( void );
-
-#include <kyu.h>
-#include <kyulib.h>
-#include <omap_ints.h>
-
-#include <malloc.h>
-#include <miiphy.h>
-#include <phy.h>
 
 #define CPSW_BASE                       0x4A100000
 #define CPSW_MDIO_BASE                  0x4A101000
@@ -76,8 +212,9 @@ static void show_dmastatus ( void );
 #define ETIMEDOUT       110     /* Connection timed out */
 
 #ifdef notdef
-/* XXX - we don't plant to keep this either */
-/* Now pulled in via phy.h */
+/* XXX - we don't plan to keep this here */
+/* The real thing is pulled in via phy.h */
+/* Handy to look at though */
 
 struct eth_device {
         char name[16];
@@ -175,8 +312,9 @@ struct cpsw_platform_data {
 #define FULLDUPLEXEN		BIT(0)
 #define MIIEN			BIT(15)
 
-/* Offsets to access CPDMA registers -- this driver doesn't use many */
-/* DMA Registers */
+/* Offsets to access CPDMA registers --
+ * this driver doesn't use many DMA Registers
+ */
 #define CPDMA_TXCONTROL		0x004
 #define CPDMA_RXCONTROL		0x014
 #define CPDMA_SOFTRESET		0x01c
@@ -660,7 +798,7 @@ cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 	reg = wait_for_user_access();
 
 	data = (reg & USERACCESS_ACK) ? (reg & USERACCESS_DATA) : -1;
-	printf ( "CPSW_mdio_read - exit\n" );
+	printf ( "CPSW_mdio_read - exit (%s)\n", cur_thread->name );
 	return data;
 }
 
@@ -686,7 +824,7 @@ cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
 static void 
 cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 {
-	mdio_regs = (struct cpsw_mdio_regs *)mdio_base;
+	mdio_regs = (struct cpsw_mdio_regs *) mdio_base;
 
 	/* set enable and clock divider */
 	__raw_writel(div | CONTROL_ENABLE, &mdio_regs->control);
@@ -707,7 +845,7 @@ cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 {
 	struct mii_dev *bus = mdio_alloc();
 
-	mdio_regs = (struct cpsw_mdio_regs *)mdio_base;
+	mdio_regs = (struct cpsw_mdio_regs *) mdio_base;
 
 	/* set enable and clock divider */
 	__raw_writel(div | CONTROL_ENABLE, &mdio_regs->control);
@@ -1706,7 +1844,7 @@ static int rx_count = 0;
 static int tx_count = 0;
 static int tx_int_count = 0;
 
-/* As a funky hack til we make interrupt works,
+/* As a funky hack til we start using interrupts.
  * we launch this thread to harvest packets.
  * Mostly copied from cpsw_recv() above.
  */
@@ -1757,9 +1895,11 @@ cpsw_reaper ( int xxx )
 	}
 }
 
+/* I ain't never seen none of these */
 void
 cpsw_tx_isr ( int dummy )
 {
+	printf ( "Interrupt (tx)\n" );
 	tx_int_count++;
 }
 
@@ -1769,8 +1909,10 @@ cpsw_tx_isr ( int dummy )
 int
 cpsw_init ( void )
 {
+	printf ( "Starting cpsw_init\n" );
 	eth_init ();
 	irq_hookup ( NINT_CPSW_TX, cpsw_tx_isr, 0 );
+	printf ( "Finished cpsw_init\n" );
 	return 1;
 }
 
@@ -1779,12 +1921,14 @@ cpsw_init ( void )
  */
 #define PRI_REAPER	25
 
-int
+void
 cpsw_activate ( void )
 {
+	printf ( "Starting cpsw_activate\n" );
 	eth_start ();
 
 	(void) thr_new ( "cpsw_reaper", cpsw_reaper, (void *) 0, PRI_REAPER, 0 );
+	printf ( "Finished cpsw_activate\n" );
 }
 
 void

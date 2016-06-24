@@ -1,6 +1,7 @@
 /* Tom Trebisky
  * 5-11-2016 - begun for ESP8266
  * 5-29-2016 - begin port for ARM/BBB/Kyu
+ * 6-22-2016 - integrated under new i2c.c
  *
  *  iic.c
  *
@@ -35,14 +36,17 @@ static int iic_readb ( void );
 static void iic_setAck ( int );
 static int iic_getAck ( void );
 
+static void iic_start ( void );
+static void iic_stop ( void );
+static int iic_recv_byte ( int );
+static int iic_send_byte ( int );
+
 /* The following functions are all that a person
  * should ever need to use.
  */
 void iic_init ( int, int );
-void iic_start ( void );
-void iic_stop ( void );
-int iic_recv_byte ( int );
-int iic_send_byte ( int );
+int iic_send ( int, unsigned char *, int );
+int iic_recv ( int, unsigned char *, int );
 
 #ifndef ARCH_ESP8266
 #define ICACHE_FLASH_ATTR
@@ -274,7 +278,7 @@ iic_dc_wait ( int data, int clock, int wait )
     os_delay_us ( wait );
 }
 
-void ICACHE_FLASH_ATTR
+static void ICACHE_FLASH_ATTR
 iic_start(void)
 {
     iic_dc ( 1, cur_scl );
@@ -282,7 +286,7 @@ iic_start(void)
     iic_dc ( 0, 1 );
 }
 
-void ICACHE_FLASH_ATTR
+static void ICACHE_FLASH_ATTR
 iic_stop(void)
 {
     os_delay_us (5);
@@ -456,7 +460,7 @@ iic_writeb ( int data )
     }
 }
 
-int ICACHE_FLASH_ATTR
+static int ICACHE_FLASH_ATTR
 iic_send_byte ( int byte )
 {
 	int ack;
@@ -473,7 +477,7 @@ iic_send_byte ( int byte )
 /* XXX - useful when debugging
  *  but not what I would want when in production.
  */
-int ICACHE_FLASH_ATTR
+static int ICACHE_FLASH_ATTR
 iic_send_byte_m ( int byte, char *msg )
 {
 	int ack;
@@ -488,7 +492,7 @@ iic_send_byte_m ( int byte, char *msg )
 	return 0;
 }
 
-int ICACHE_FLASH_ATTR
+static int ICACHE_FLASH_ATTR
 iic_recv_byte ( int ack )
 {
 	int rv;
@@ -509,7 +513,7 @@ iic_recv_byte ( int ack )
  * for a device without registers (like the MCP4725)
  */
 int ICACHE_FLASH_ATTR
-iic_write_raw ( int addr, unsigned char *buf, int n )
+iic_send ( int addr, unsigned char *buf, int n )
 {
 	int i;
 
@@ -527,7 +531,7 @@ iic_write_raw ( int addr, unsigned char *buf, int n )
  * for a device without registers (like the MCP4725)
  */
 int ICACHE_FLASH_ATTR
-iic_read_raw ( int addr, unsigned char *buf, int n )
+iic_recv ( int addr, unsigned char *buf, int n )
 {
 	int i;
 
@@ -543,6 +547,7 @@ iic_read_raw ( int addr, unsigned char *buf, int n )
 	return 0;
 }
 
+#ifdef OLD_HIGH_LEVEL
 /* raw read an array of shorts (16 bit objects)
  */
 int ICACHE_FLASH_ATTR
@@ -765,11 +770,13 @@ iic_write_nada ( int addr, int reg )
 
 	return 0;
 }
+#endif /* OLD_HIGH_LEVEL */
 
 /* --------------- */
 /* --------------- */
 /* --------------- */
 
+#ifdef notdef
 int iic_pulses ( void )
 {
 	for ( ;; ) {
@@ -777,5 +784,6 @@ int iic_pulses ( void )
 	    iic_dc ( 1, 1 );
 	}
 }
+#endif
 
 /* THE END */

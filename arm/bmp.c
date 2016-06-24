@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 #include <kyu.h>
+#include "i2c.h"
 
 #ifdef ARCH_ESP8266
 #include <ets_sys.h>
@@ -112,6 +113,7 @@ struct bmp_cals {
 /* ---------------------------------------------- */
 /* BMP180 specific routines --- */
 
+#ifdef OLD_BMP
 /* ID register -- should always yield 0x55
  */
 static int ICACHE_FLASH_ATTR
@@ -178,6 +180,7 @@ read_cals ( unsigned short *buf )
 	// iic_read_n ( BMP_ADDR, REG_CALS, (unsigned char *) buf, 2*NCALS );
 	iic_read_16n ( BMP_ADDR, REG_CALS, buf, NCALS );
 }
+#endif /* OLD_BMP */
 
 /* ---------------------------------------------- */
 /* ---------------------------------------------- */
@@ -364,13 +367,9 @@ show_cals ( void *cals )
 #define MCP_OLAT	0x0a
 
 static int ICACHE_FLASH_ATTR
-read_gpio ( void )
+read_mcp ( struct i2c *ip )
 {
-	int val;
-
-	val = iic_read ( MCP_ADDR, MCP_GPIO );
-
-	return val;
+	return i2c_read_8 ( ip, MCP_ADDR, MCP_GPIO );
 }
 
 /* ---------------------------------------------- */
@@ -384,17 +383,17 @@ read_gpio ( void )
 #define DAC_ADDR	0x60
 
 static void ICACHE_FLASH_ATTR
-dac_write ( unsigned int val )
+dac_write ( struct i2c *ip, unsigned int val )
 {
 	unsigned char iobuf[2];
 
 	iobuf[0] = (val >> 8) & 0xf;
 	iobuf[1] = val & 0xff;
-	iic_write_raw ( DAC_ADDR, iobuf, 2 );
+	i2c_send ( ip, DAC_ADDR, iobuf, 2 );
 }
 
 static void ICACHE_FLASH_ATTR
-dac_write_ee ( unsigned int val )
+dac_write_ee ( struct i2c *ip, unsigned int val )
 {
 	unsigned char iobuf[3];
 
@@ -402,7 +401,7 @@ dac_write_ee ( unsigned int val )
 	iobuf[1] = val >> 4;
 	// iobuf[2] = (val & 0xf) << 4;
 	iobuf[2] = val << 4;
-	iic_write_raw ( DAC_ADDR, iobuf, 3 );
+	i2c_send ( ip, DAC_ADDR, iobuf, 3 );
 }
 
 /* returns up to 5 bytes.
@@ -411,17 +410,17 @@ dac_write_ee ( unsigned int val )
  * EEPROM value (2 bytes)
  */
 static void ICACHE_FLASH_ATTR
-dac_read ( unsigned char *buf, int n )
+dac_read ( struct i2c *ip, unsigned char *buf, int n )
 {
-	iic_read_raw ( DAC_ADDR, buf, n );
+	iic_recv ( ip, DAC_ADDR, buf, n );
 }
 
 static unsigned int ICACHE_FLASH_ATTR
-dac_read_val ( void )
+dac_read_val ( struct i2c *ip )
 {
 	unsigned char iobuf[3];
 
-	iic_read_raw ( DAC_ADDR, iobuf, 3 );
+	iic_recv ( ip, DAC_ADDR, iobuf, 3 );
 	return (iobuf[1] << 4) | (iobuf[2] >> 4);
 }
 /* ---------------------------------------------- */
@@ -459,30 +458,49 @@ dac_read_val ( void )
 
 /* Read gets both T then H */
 static void ICACHE_FLASH_ATTR
-hdc_con_both ( void )
+hdc_con_both ( struct i2c *ip )
 {
-	(void) iic_write16 ( HDC_ADDR, HDC_CON, HDC_BOTH );
+	unsigned char buf[3];
+
+	//(void) iic_write16 ( HDC_ADDR, HDC_CON, HDC_BOTH );
+	buf[0] = HDC_CON;
+	buf[1] = HDC_BOTH >> 8;
+	buf[2] = HDC_BOTH & 0xff;
+	i2c_send ( ip, HDC_ADDR, buf, 3 );
 }
 
 /* Read gets either T or H */
 static void ICACHE_FLASH_ATTR
-hdc_con_single ( void )
+hdc_con_single ( struct i2c *ip )
 {
-	(void) iic_write16 ( HDC_ADDR, HDC_CON, 0 );
+	unsigned char buf[3];
+
+	// (void) iic_write16 ( HDC_ADDR, HDC_CON, 0 );
+	buf[0] = HDC_CON;
+	buf[1] = 0;
+	buf[2] = 0;
+	i2c_send ( ip, HDC_ADDR, buf, 3 );
 }
 
 static void ICACHE_FLASH_ATTR
-hdc_read_both ( unsigned short *buf )
+hdc_read_both ( struct i2c *ip, unsigned short *buf )
 {
-	iic_write_nada ( HDC_ADDR, HDC_TEMP );
+	unsigned char bbuf[4];
+
+	bbuf[0] = HDC_TEMP;
+	i2c_send ( ip, HDC_ADDR, bbuf, 1 );
+
 	os_delay_us ( CONV_BOTH );
 
-	iic_read_16raw ( HDC_ADDR, buf, 2 );
+	i2c_recv ( ip, HDC_ADDR, bbuf, 4 );
+	buf[0] = bbuf[0] << 8 | bbuf[1];
+	buf[1] = bbuf[2] << 8 | bbuf[3];
 }
 
 /* ---------------------------------------------- */
 /* ---------------------------------------------- */
 
+#ifdef OLD_TESTS
 static void ICACHE_FLASH_ATTR
 upd_mcp ( void )
 {
@@ -562,34 +580,6 @@ hdc_test ( void )
 	hdc_con_both ();
 }
 
-static void ICACHE_FLASH_ATTR
-hdc_read ( void )
-{
-	unsigned short iobuf[2];
-	int t, h;
-	int tf;
-
-	hdc_read_both ( iobuf );
-
-	/*
-	t = 99;
-	h = 23;
-	tf = 0;
-	os_printf ( " Bogus t, tf, h = %d  %d %d\n", t, tf, h );
-	*/
-	// os_printf ( " HDC raw t,h = %04x  %04x\n", iobuf[0], iobuf[1] );
-
-	t = ((iobuf[0] * 165) / 65536)- 40;
-	tf = t * 18 / 10 + 32;
-	os_printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
-
-	//h = ((iobuf[1] * 100) / 65536);
-	//os_printf ( "HDC t, tf, h = %d  %d %d\n", t, tf, h );
-
-	h = ((iobuf[1] * 100) / 65536);
-	os_printf ( " -- hraw, h = %04x %d    %d\n", iobuf[1], iobuf[1], h );
-}
-
 /* ---------------------------------------- */
 
 static void
@@ -639,41 +629,6 @@ iic_tester ( void )
 	*/
 }
 
-#ifdef ARCH_ESP8266
-static os_timer_t timer;
-
-static void ICACHE_FLASH_ATTR
-ticker ( void *arg )
-{
-	iic_tester ();
-}
-
-#define IIC_SDA		4
-#define IIC_SCL		5
-
-/* Reading the BMP180 sensor takes 4.5 + 7.5 milliseconds */
-#define DELAY 1000 /* milliseconds */
-// #define DELAY 2 /* 2 milliseconds - for DAC test */
-
-void user_init(void)
-{
-	// Configure the UART
-	// uart_init(BIT_RATE_9600,0);
-	uart_div_modify(0, UART_CLK_FREQ / 115200);
-	os_printf ( "\n" );
-
-	iic_init ( IIC_SDA, IIC_SCL );
-
-	// os_printf ( "BMP180 address: %02x\n", BMP_ADDR );
-	// os_printf ( "OSS = %d\n", OSS );
-
-	// Set up a timer to tick continually
-	os_timer_disarm(&timer);
-	os_timer_setfn(&timer, ticker, (void *)0);
-	os_timer_arm(&timer, DELAY, 1);
-}
-#endif
-
 void
 iic_tester2 ( void )
 {
@@ -713,6 +668,43 @@ void iic_test ( void )
 	// iic_pulses ();
 }
 
+#endif /* OLD_TESTS */
+
+#ifdef ARCH_ESP8266
+static os_timer_t timer;
+
+static void ICACHE_FLASH_ATTR
+ticker ( void *arg )
+{
+	iic_tester ();
+}
+
+#define IIC_SDA		4
+#define IIC_SCL		5
+
+/* Reading the BMP180 sensor takes 4.5 + 7.5 milliseconds */
+#define DELAY 1000 /* milliseconds */
+// #define DELAY 2 /* 2 milliseconds - for DAC test */
+
+void user_init(void)
+{
+	// Configure the UART
+	// uart_init(BIT_RATE_9600,0);
+	uart_div_modify(0, UART_CLK_FREQ / 115200);
+	os_printf ( "\n" );
+
+	iic_init ( IIC_SDA, IIC_SCL );
+
+	// os_printf ( "BMP180 address: %02x\n", BMP_ADDR );
+	// os_printf ( "OSS = %d\n", OSS );
+
+	// Set up a timer to tick continually
+	os_timer_disarm(&timer);
+	os_timer_setfn(&timer, ticker, (void *)0);
+	os_timer_arm(&timer, DELAY, 1);
+}
+#endif /* ARCH_ESP8266 */
+
 /* -------------------------------------------------------------------- */
 /* -------------------------------------------------------------------- */
 /* -------------------------------------------------------------------- */
@@ -722,28 +714,23 @@ void iic_test ( void )
 /* ID register -- should always yield 0x55
  */
 static int ICACHE_FLASH_ATTR
-bmp_id ( void )
+bmp_id ( struct i2c *ip )
 {
-	int id;
-
-	// id = iic_read ( BMP_ADDR, REG_ID );
-	id = i2c_read_8 ( REG_ID );
-
-	return id;
+	return i2c_read_8 ( ip, BMP_ADDR, REG_ID );
 }
 
 static int ICACHE_FLASH_ATTR
-bmp_temp ( void )
+bmp_temp ( struct i2c *ip )
 {
 	int rv;
 
 	// (void) iic_write ( BMP_ADDR, REG_CONTROL, CMD_TEMP );
-	i2c_write ( REG_CONTROL, CMD_TEMP );
+	i2c_write_8 ( ip, BMP_ADDR, REG_CONTROL, CMD_TEMP );
 
 	os_delay_us ( TDELAY );
 
 	// rv = iic_read_16 ( BMP_ADDR, REG_RESULT );
-	rv = i2c_read_16 ( REG_RESULT );
+	rv = i2c_read_16 ( ip, BMP_ADDR, REG_RESULT );
 
 	return rv;
 }
@@ -752,67 +739,146 @@ bmp_temp ( void )
  */
 
 static int ICACHE_FLASH_ATTR
-bmp_pressure ( void )
+bmp_pressure ( struct i2c *ip )
 {
 	int rv;
 
 	// (void) iic_write ( BMP_ADDR, REG_CONTROL, CMD_PRESS );
-	i2c_write ( REG_CONTROL, CMD_PRESS );
+	i2c_write_8 ( ip, BMP_ADDR, REG_CONTROL, CMD_PRESS );
 
 	os_delay_us ( PDELAY );
 
 	// rv = iic_read_24 ( BMP_ADDR, REG_RESULT );
-	rv = i2c_read_24 ( REG_RESULT );
+	rv = i2c_read_24 ( ip, BMP_ADDR, REG_RESULT );
 
 	return rv >> PSHIFT;
 }
 
 static void ICACHE_FLASH_ATTR
-bmp_cals ( unsigned short *buf )
+bmp_cals ( struct i2c *ip, unsigned short *buf )
 {
-	/* Note that on the ESP8266 just placing the bytes into
-	 * memory in the order read out does not yield an array of shorts.
+	char bbuf[2*NCALS];
+	int i, j;
+
+	/* Note that on the ESP8266 (or any little endian machine)
+	 * just placing the bytes into memory in the order read out
+	 * does not yield an array of shorts.
 	 * This is because the BMP180 gives the MSB first, but the
-	 * ESP8266 is little endian.  So we use our routine that gives
-	 * us an array of shorts and we are happy.
+	 * ESP8266 is little endian.
 	 */
-	// iic_read_n ( BMP_ADDR, REG_CALS, (unsigned char *) buf, 2*NCALS );
-	// iic_read_16n ( BMP_ADDR, REG_CALS, buf, NCALS );
-	i2c_read_16n ( REG_CALS, buf, NCALS );
+
+	i2c_read_reg_n ( ip, BMP_ADDR, REG_CALS, bbuf, 2*NCALS );
+
+	for ( i=0; i<NCALS; i++ ) {
+	    j = i + i;
+	    buf[i] = bbuf[j]<<8 | bbuf[j+1];
+	}
 }
 
 void
-bmp_test ( void )
+bmp_once ( struct i2c *ip )
+{
+	int t, p;
+
+	t = bmp_temp ( ip );
+	p = bmp_pressure ( ip );
+	//os_printf ( "temp = %d\n", val );
+	//os_printf ( "pressure = %d\n", val );
+	//os_printf ( "raw T, P = %d  %d\n", t, p );
+
+	convert ( t, p );
+}
+
+void
+bmp_diag1 ( struct i2c *ip )
 {
 	int id;
 	int tt, pp;
 	unsigned short cals[11];
 	int i;
 
-	i2c_set_slave ( BMP_ADDR );
-
 	for ( i=0; i<8; i++ ) {
-	    id = bmp_id ();
+	    id = bmp_id ( ip );
 	    printf ( "BMP ID = %02x\n", id );
 	}
 
 	for ( i=0; i<8; i++ ) {
-	    tt = bmp_temp ();
+	    tt = bmp_temp ( ip );
 	    printf ( "BMP temp = %d\n", tt );
 	}
 
 	for ( i=0; i<8; i++ ) {
-	    id = bmp_id ();
+	    id = bmp_id ( ip );
 	    printf ( "BMP ID = %02x\n", id );
-	    tt = bmp_temp ();
+	    tt = bmp_temp ( ip );
 	    printf ( "BMP temp = %d\n", tt );
 	}
 
-	pp = bmp_pressure ();
+	pp = bmp_pressure ( ip );
 	printf ( "BMP pressure = %d\n", pp );
 
-	bmp_cals ( (unsigned short *) &bmp_cal );
+	bmp_cals ( ip, (unsigned short *) &bmp_cal );
 	show_cals ( (void *) &bmp_cal );
 }
+
+void
+bmp_test ( void )
+{
+	struct i2c *ip;
+
+	ip = i2c_hw_new ( 1 );
+
+	bmp_diag1 ( ip );
+
+	bmp_cals ( ip, (unsigned short *) &bmp_cal );
+
+	// 		 label  func      arg pri flags interval
+	thr_new_repeat ( "bmp", bmp_once, ip, 13, 0, 1000 );
+}
+
+static void
+hdc_once ( struct i2c *ip )
+{
+	unsigned short iobuf[2];
+	int t, h;
+	int tf;
+
+	hdc_read_both ( ip, iobuf );
+
+	/*
+	t = 99;
+	h = 23;
+	tf = 0;
+	os_printf ( " Bogus t, tf, h = %d  %d %d\n", t, tf, h );
+	*/
+	// os_printf ( " HDC raw t,h = %04x  %04x\n", iobuf[0], iobuf[1] );
+
+	t = ((iobuf[0] * 165) / 65536)- 40;
+	tf = t * 18 / 10 + 32;
+	// os_printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
+
+	//h = ((iobuf[1] * 100) / 65536);
+	//os_printf ( "HDC t, tf, h = %d  %d %d\n", t, tf, h );
+
+	h = ((iobuf[1] * 100) / 65536);
+	// os_printf ( " -- hraw, h = %04x %d    %d\n", iobuf[1], iobuf[1], h );
+	printf ( "HDC t,f = %d %d\n", tf, h );
+}
+
+void
+hdc_test ( void )
+{
+	struct i2c *ip;
+
+	ip = i2c_hw_new ( 1 );
+
+	thr_new_repeat ( "hdc", hdc_once, ip, 13, 0, 1000 );
+}
+
+/* The tests are run via the shell "x" command, i.e.
+ *
+ * x bmp_test
+ * x hdc_test
+ */
 
 /* THE END */

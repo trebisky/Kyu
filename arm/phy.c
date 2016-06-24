@@ -240,6 +240,11 @@ genphy_config_aneg(struct phy_device *phydev)
 	return result;
 }
 
+/* XXX */
+#include <kyu.h>
+#include <thread.h>
+extern struct thread *cur_thread;
+
 /**
  * genphy_update_link - update link status in @phydev
  * @phydev: target phy_device struct
@@ -267,10 +272,13 @@ genphy_update_link(struct phy_device *phydev)
 		return 0;
 
 	if ((mii_reg & BMSR_ANEGCAPABLE) && !(mii_reg & BMSR_ANEGCOMPLETE)) {
+
 		int i = 0;
 
-		printf("%s Waiting for PHY auto negotiation to complete",
-			phydev->dev->name);
+		// printf("%s Waiting for PHY auto negotiation to complete", phydev->dev->name );
+
+		printf("%s (%s) Waiting for PHY auto negotiation to complete\n",
+			phydev->dev->name, cur_thread->name );
 
 		while (!(mii_reg & BMSR_ANEGCOMPLETE)) {
 			/*
@@ -302,8 +310,10 @@ genphy_update_link(struct phy_device *phydev)
 			udelay(1000);	/* 1 ms */
 #endif
 			mii_reg = phy_read(phydev, MDIO_DEVAD_NONE, MII_BMSR);
-		}
-		printf(" done\n");
+		} /* END of wait loop */
+
+		// printf(" done\n");
+		printf("PHY auto negotiation done\n");
 		phydev->link = 1;
 	} else {
 		/* Read the link a second time to clear the latched state */
@@ -500,9 +510,8 @@ static struct phy_driver genphy_driver = {
 
 static LIST_HEAD(phy_drivers);
 
-/* KYU - trimmed to just the smsc driver
- * we need for the BBB, this ordinarily could
- * be initializaing a longer list of drivers.
+/* KYU - trimmed to just the smsc driver we need for the BBB,
+ * this ordinarily could be initializaing a longer list of drivers.
  */
 int
 phy_init(void)

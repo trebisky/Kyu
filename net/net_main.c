@@ -218,8 +218,11 @@ net_init ( void )
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
-    while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT )
+    count = 0;
+    while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
+	printf ( "Net wait %d\n", count );
 	thr_delay ( system_clock_rate );
+    }
 
     if ( num_eth == 0 ) {
 	net_state = NET_IDLE;
