@@ -55,30 +55,10 @@
 #include <malloc.h>
 #include <omap_ints.h>
 
-/* XXX - we don't plan to keep this forever (from old ether.h) */
-/* A couple of global variables and we could kiss this goodbye */
-
-struct eth_device {
-        char name[16];
-        unsigned char enetaddr[6];
-        void *priv;
-
-        // int  (*init) (struct eth_device * );
-        // void (*halt) (struct eth_device *);
-
-        // int  (*send) (struct eth_device *, void *packet, int length);
-        // int  (*recv) (struct eth_device *);
-};
-
-/* This would be list header, but simply points to our
- * one instance of this structure.
- */
-static struct eth_device *eth_device = 0;
-
 /* Hardware base addresses */
 /* from the TRM, chapter 2, pages 175-176 */
 
-#define CPSW_SS		0x4a100000	/* Ethernet Switch Subsystem */
+#define CPSW_BASE	0x4a100000	/* Ethernet Switch Subsystem */
 #define CPSW_PORT	0x4a100100	/* Ethernet Port control */
 #define CPSW_CPDMA	0x4a100800	/* Ethernet DMA */
 #define CPSW_STATS	0x4a100900	/* Ethernet Statistics */
@@ -90,6 +70,105 @@ static struct eth_device *eth_device = 0;
 #define CPSW_MDIO	0x4a101000	/* Ethernet MDIO */
 #define CPSW_WR		0x4a101200	/* Ethernet RMII/RGMII wrapper */
 
+/* KYU */
+#define CPSW_DMA_BASE                   0x4A100800
+
+struct cpsw_slave_data {
+	u32		slave_reg_ofs;
+	u32		sliver_reg_ofs;
+};
+
+struct cpsw_platform_data {
+	u32	cpsw_base;
+	int	mdio_div;
+	int	channels;	/* number of cpdma channels (symmetric)	*/
+	u32	cpdma_reg_ofs;	/* cpdma register offset		*/
+	int	slaves;		/* number of slave cpgmac ports		*/
+	u32	ale_reg_ofs;	/* address lookup engine reg offset	*/
+	int	ale_entries;	/* ale table size			*/
+	u32	host_port_reg_ofs;	/* cpdma host port registers	*/
+	u32	hw_stats_reg_ofs;	/* cpsw hw stats counters	*/
+	u32	bd_ram_ofs;		/* Buffer Descriptor RAM offset */
+	u32	mac_control;
+	struct cpsw_slave_data	*slave_data;
+	void	(*control)(int enabled);
+	u32	host_port_num;
+	u32	active_slave;
+	u8	version;
+};
+
+static struct cpsw_slave_data cpsw_slaves[] = {
+	{
+		.slave_reg_ofs	= 0x208,
+		.sliver_reg_ofs	= 0xd80,
+	},
+	{
+		.slave_reg_ofs	= 0x308,
+		.sliver_reg_ofs	= 0xdc0,
+	},
+};
+
+enum {
+	CPSW_CTRL_VERSION_1 = 0,
+	CPSW_CTRL_VERSION_2	/* am33xx like devices */
+};
+
+struct cpdma_desc {
+	/* hardware fields */
+	u32			hw_next;
+	u32			hw_buffer;
+	u32			hw_len;
+	u32			hw_mode;
+	/* software fields */
+	u32			sw_buffer;
+	u32			sw_len;
+};
+
+struct cpdma_chan {
+	struct cpdma_desc	*head, *tail;
+	void			*hdp, *cp, *rxfree;
+};
+
+static struct cpsw_platform_data cpsw_data = {
+	.cpsw_base		= CPSW_BASE,
+	.mdio_div		= 0xff,
+	.channels		= 8,
+	.cpdma_reg_ofs		= 0x800,
+	.slaves			= 1,
+	.slave_data		= cpsw_slaves,
+	.ale_reg_ofs		= 0xd00,
+	.ale_entries		= 1024,
+	.host_port_reg_ofs	= 0x108,
+	.hw_stats_reg_ofs	= 0x900,
+	.bd_ram_ofs		= 0x2000,
+	.mac_control		= (1 << 5),
+	.host_port_num		= 0,
+	.version		= CPSW_CTRL_VERSION_2,
+};
+
+
+struct cpsw_priv {
+	struct cpsw_platform_data	data;
+	int				host_port;
+        unsigned char			enetaddr[6];
+
+	struct cpsw_regs		*regs;
+	void				*dma_regs;
+	struct cpsw_host_regs		*host_port_regs;
+	void				*ale_regs;
+
+	struct cpdma_desc		*descs;
+	struct cpdma_desc		*desc_free;
+	struct cpdma_chan		rx_chan, tx_chan;
+
+	struct cpsw_slave		*slaves;
+};
+
+static struct cpsw_priv cpsw_private;
+
+/* This would be list header, but simply points to our
+ * one instance of this structure.
+ */
 struct mdio_regs {
 	volatile unsigned long version;		/* 0 */
 	volatile unsigned long control;
@@ -346,7 +425,6 @@ cpsw_phy_init ( void )
 	cpsw_phy_verify ();
 
 	cpsw_phy_aneg ();
-
 }
 
 /* ------------------------------------------------*/
@@ -363,12 +441,6 @@ extern struct thread *cur_thread;
 #ifdef KYU
 
 static void show_dmastatus ( void );
-
-#define CPSW_BASE                       0x4A100000
-#define CPSW_MDIO_BASE                  0x4A101000
-
-/* KYU */
-#define CPSW_DMA_BASE                   0x4A100800
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
@@ -412,43 +484,13 @@ void NetReceive ( char *, int );
 
 #endif	/* KYU */
 
-struct cpsw_slave_data {
-	u32		slave_reg_ofs;
-	u32		sliver_reg_ofs;
-	int		phy_if;
-};
-
-enum {
-	CPSW_CTRL_VERSION_1 = 0,
-	CPSW_CTRL_VERSION_2	/* am33xx like devices */
-};
-
-struct cpsw_platform_data {
-	u32	mdio_base;
-	u32	cpsw_base;
-	int	mdio_div;
-	int	channels;	/* number of cpdma channels (symmetric)	*/
-	u32	cpdma_reg_ofs;	/* cpdma register offset		*/
-	int	slaves;		/* number of slave cpgmac ports		*/
-	u32	ale_reg_ofs;	/* address lookup engine reg offset	*/
-	int	ale_entries;	/* ale table size			*/
-	u32	host_port_reg_ofs;	/* cpdma host port registers	*/
-	u32	hw_stats_reg_ofs;	/* cpsw hw stats counters	*/
-	u32	bd_ram_ofs;		/* Buffer Descriptor RAM offset */
-	u32	mac_control;
-	struct cpsw_slave_data	*slave_data;
-	void	(*control)(int enabled);
-	u32	host_port_num;
-	u32	active_slave;
-	u8	version;
-};
-
 #define BITMASK(bits)		(BIT(bits) - 1)
 #define PHY_REG_MASK		0x1f
 #define PHY_ID_MASK		0x1f
 #define NUM_DESCS		(PKTBUFSRX * 2)
 #define PKT_MIN			60
 #define PKT_MAX			(1500 + 14 + 4 + 4)
+
 #define CLEAR_BIT		1
 #define GIGABITEN		BIT(7)
 #define FULLDUPLEXEN		BIT(0)
@@ -485,6 +527,7 @@ struct cpsw_platform_data {
 #define MDIO_TIMEOUT            100 /* msecs */
 #define CPDMA_TIMEOUT		100 /* msecs */
 
+#ifdef KYU_OLD
 struct cpsw_mdio_regs {
 	u32	version;
 	u32	control;
@@ -517,6 +560,7 @@ struct cpsw_mdio_regs {
 #define USERACCESS_DATA		(0xffff)
 	} user[0];
 };
+#endif
 
 struct cpsw_regs {
 	vu32	id_ver;
@@ -612,22 +656,6 @@ struct cpsw_slave {
 	struct cpsw_slave_data		*data;
 };
 
-struct cpdma_desc {
-	/* hardware fields */
-	u32			hw_next;
-	u32			hw_buffer;
-	u32			hw_len;
-	u32			hw_mode;
-	/* software fields */
-	u32			sw_buffer;
-	u32			sw_len;
-};
-
-struct cpdma_chan {
-	struct cpdma_desc	*head, *tail;
-	void			*hdp, *cp, *rxfree;
-};
-
 #ifdef KYU
 #define __raw_writel(v,a)	(*((volatile unsigned long *)(a)) = (v))
 #define __raw_readl(a)		(*((volatile unsigned long *)(a)))
@@ -647,25 +675,6 @@ struct cpdma_chan {
 #define for_each_slave(slave, priv) \
 	for (slave = (priv)->slaves; slave != (priv)->slaves + \
 				(priv)->data.slaves; slave++)
-
-struct cpsw_priv {
-	struct eth_device		*dev;
-	struct cpsw_platform_data	data;
-	int				host_port;
-
-	struct cpsw_regs		*regs;
-	void				*dma_regs;
-	struct cpsw_host_regs		*host_port_regs;
-	void				*ale_regs;
-
-	struct cpdma_desc		*descs;
-	struct cpdma_desc		*desc_free;
-	struct cpdma_chan		rx_chan, tx_chan;
-
-	struct cpsw_slave		*slaves;
-	// struct phy_device		*phydev;
-	struct mii_dev			*bus;
-};
 
 static inline int cpsw_ale_get_field(u32 *ale_entry, u32 start, u32 bits)
 {
@@ -885,141 +894,6 @@ static inline void cpsw_ale_port_state(struct cpsw_priv *priv, int port,
 	__raw_writel(tmp, priv->ale_regs + offset);
 }
 
-#ifdef KYU_OLDPHY
-static struct cpsw_mdio_regs *mdio_regs;
-
-/* wait until hardware is ready for another user access */
-static inline u32
-wait_for_user_access(void)
-{
-	u32 reg = 0;
-	int timeout = MDIO_TIMEOUT;
-
-	while (timeout-- &&
-	((reg = __raw_readl(&mdio_regs->user[0].access)) & USERACCESS_GO))
-		udelay(10);
-
-	if (timeout == -1) {
-		printf("wait_for_user_access Timeout\n");
-		return -ETIMEDOUT;
-	}
-
-	return reg;
-}
-
-/* wait until hardware state machine is idle */
-static inline void
-wait_for_idle(void)
-{
-	int timeout = MDIO_TIMEOUT;
-
-	while (timeout-- &&
-		((__raw_readl(&mdio_regs->control) & CONTROL_IDLE) == 0))
-		udelay(10);
-
-	if (timeout == -1)
-		printf("wait_for_idle Timeout\n");
-}
-
-/* note that dev_addr is ignored */
-
-static int
-cpsw_mdio_read(struct mii_dev *bus, int phy_id, int dev_addr, int phy_reg)
-{
-	int data;
-	u32 reg;
-
-	// printf ( "CPSW_mdio_read - enter\n" );
-
-	if (phy_reg & ~PHY_REG_MASK || phy_id & ~PHY_ID_MASK)
-		return -EINVAL;
-
-	wait_for_user_access();
-	reg = (USERACCESS_GO | USERACCESS_READ | (phy_reg << 21) |
-	       (phy_id << 16));
-	__raw_writel(reg, &mdio_regs->user[0].access);
-	reg = wait_for_user_access();
-
-	data = (reg & USERACCESS_ACK) ? (reg & USERACCESS_DATA) : -1;
-	if ( phy_reg != MII_BMSR )
-	    printf ( "PHY --- mdio read: id, phy_reg, data = %d, %d %04x\n", phy_id, phy_reg, data );
-	// printf ( "CPSW_mdio_read - exit (%s)\n", cur_thread->name );
-	return data;
-}
-
-static int
-cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
-				int phy_reg, u16 data)
-{
-	u32 reg;
-
-	printf ( "PHY --- mdio write: id, reg, data = %d, %d %04x\n", phy_id, phy_reg, data );
-	if (phy_reg & ~PHY_REG_MASK || phy_id & ~PHY_ID_MASK)
-		return -EINVAL;
-
-	wait_for_user_access();
-	reg = (USERACCESS_GO | USERACCESS_WRITE | (phy_reg << 21) |
-		   (phy_id << 16) | (data & USERACCESS_DATA));
-	__raw_writel(reg, &mdio_regs->user[0].access);
-	wait_for_user_access();
-
-	return 0;
-}
-
-#ifdef KYU
-static void 
-cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
-{
-	mdio_regs = (struct cpsw_mdio_regs *) mdio_base;
-
-	printf ( "PHY --- init: div = %d\n", div );
-
-	/* set enable and clock divider */
-	__raw_writel(div | CONTROL_ENABLE, &mdio_regs->control);
-
-	/*
-	 * wait for scan logic to settle:
-	 * the scan time consists of (a) a large fixed component, and (b) a
-	 * small component that varies with the mii bus frequency.  These
-	 * were estimated using measurements at 1.1 and 2.2 MHz on tnetv107x
-	 * silicon.  Since the effect of (b) was found to be largely
-	 * negligible, we keep things simple here.
-	 */
-	udelay(1000);
-}
-#else
-static void 
-cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
-{
-	struct mii_dev *bus = mdio_alloc();
-
-	mdio_regs = (struct cpsw_mdio_regs *) mdio_base;
-
-	/* set enable and clock divider */
-	__raw_writel(div | CONTROL_ENABLE, &mdio_regs->control);
-
-	/*
-	 * wait for scan logic to settle:
-	 * the scan time consists of (a) a large fixed component, and (b) a
-	 * small component that varies with the mii bus frequency.  These
-	 * were estimated using measurements at 1.1 and 2.2 MHz on tnetv107x
-	 * silicon.  Since the effect of (b) was found to be largely
-	 * negligible, we keep things simple here.
-	 */
-	udelay(1000);
-
-	bus->read = cpsw_mdio_read;
-	bus->write = cpsw_mdio_write;
-	sprintf(bus->name, name);
-
-	mdio_register(bus);
-	/*
-	printf ( "Register %s\n", name );
-	*/
-}
-#endif
-#endif /* KYU_OLDPHY */
-
 #ifdef KYU_SPIN
 /* The following function was compiling
  *   in some evil way until I added the printf
@@ -1063,16 +937,15 @@ setbit_and_wait_for_clear32(volatile void *addr)
 #define mac_lo(mac)	(((mac)[4] << 0) | ((mac)[5] << 8))
 
 static void
-cpsw_set_slave_mac(struct cpsw_slave *slave,
-			       struct cpsw_priv *priv)
+cpsw_set_slave_mac(struct cpsw_slave *slave, struct cpsw_priv *priv)
 {
 	/*
 	printf ( "Setting MAC address: %08x %08x\n", 
-	    mac_hi(priv->dev->enetaddr), mac_lo(priv->dev->enetaddr) );
+	    mac_hi(priv->enetaddr), mac_lo(priv->enetaddr) );
 	*/
 
-	__raw_writel(mac_hi(priv->dev->enetaddr), &slave->regs->sa_hi);
-	__raw_writel(mac_lo(priv->dev->enetaddr), &slave->regs->sa_lo);
+	__raw_writel(mac_hi(priv->enetaddr), &slave->regs->sa_hi);
+	__raw_writel(mac_lo(priv->enetaddr), &slave->regs->sa_lo);
 }
 
 static void
@@ -1109,57 +982,6 @@ cpsw_slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
 	slave->mac_control = mac_control;
 }
 
-#ifdef KYU_PHYOLD
-static void
-cpsw_slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
-{
-	struct phy_device *phy;
-	u32 mac_control = 0;
-
-	printf ( "Entering cpsw_slave_update_link for slave %d\n", slave->slave_num );
-
-	phy = priv->phydev;
-
-	if (!phy)
-		return;
-
-	printf ( "Running cpsw_slave_update_link for slave %d\n", slave->slave_num );
-
-#ifdef KYU
-	phy->link = phy_link;
-	phy->speed = phy_speed;
-	phy->duplex = phy_duplex;
-#else
-	phy_startup(phy);
-#endif
-
-	if (phy->link) { /* link up */
-		mac_control = priv->data.mac_control;
-		if (phy->speed == 1000)
-			mac_control |= GIGABITEN;
-		if (phy->duplex == DUPLEX_FULL)
-			mac_control |= FULLDUPLEXEN;
-		if (phy->speed == 100)
-			mac_control |= MIIEN;
-	}
-
-	if (mac_control == slave->mac_control)
-		return;
-
-	if (mac_control) {
-		printf("link up on port %d, speed %d, %s duplex\n",
-				slave->slave_num, phy->speed,
-				(phy->duplex == DUPLEX_FULL) ? "full" : "half");
-	} else {
-		printf("link down on port %d\n", slave->slave_num);
-	}
-
-	__raw_writel(mac_control, &slave->sliver->mac_control);
-
-	slave->mac_control = mac_control;
-}
-#endif
-
 static void
 cpsw_update_link(struct cpsw_priv *priv)
 {
@@ -1170,7 +992,8 @@ cpsw_update_link(struct cpsw_priv *priv)
 		cpsw_slave_update_link(slave, priv);
 }
 
-static inline u32  cpsw_get_slave_port(struct cpsw_priv *priv, u32 slave_num)
+static inline u32
+cpsw_get_slave_port(struct cpsw_priv *priv, u32 slave_num)
 {
 	if (priv->host_port == 0)
 		return slave_num + 1;
@@ -1331,15 +1154,13 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan,
 /* for ETH structure (init) */
 /* Was cpsw_init */
 static int
-cpsw_setup(struct eth_device *dev)
+// cpsw_setup(struct eth_device *dev)
+cpsw_setup( void )
 {
-	struct cpsw_priv	*priv = dev->priv;
+	struct cpsw_priv	*priv = &cpsw_private;
 	struct cpsw_slave	*slave;
 	int i, ret;
 
-	// printf ( "cpsw_setup: dev = %08x\n", dev );
-	// printf ( "cpsw_setup: priv = %08x\n", dev->priv );
-	// priv = dev->priv;
 	// printf ( "Resetting controller using %08x\n", &priv->regs->soft_reset );
 
 	/* soft reset the controller and initialize priv */
@@ -1365,8 +1186,9 @@ cpsw_setup(struct eth_device *dev)
 
 	cpsw_ale_port_state(priv, priv->host_port, ALE_PORT_STATE_FORWARD);
 
-	cpsw_ale_add_ucast(priv, priv->dev->enetaddr, priv->host_port,
+	cpsw_ale_add_ucast(priv, priv->enetaddr, priv->host_port,
 			   ALE_SECURE);
+
 	cpsw_ale_add_mcast(priv, NetBcastAddr, 1 << priv->host_port);
 
 	for_active_slave(slave, priv)
@@ -1453,9 +1275,11 @@ cpsw_setup(struct eth_device *dev)
 
 /* was for ETH structure - never called at present */
 static void
-cpsw_halt(struct eth_device *dev)
+// cpsw_halt(struct eth_device *dev)
+cpsw_halt( void )
 {
-	struct cpsw_priv	*priv = dev->priv;
+	// struct cpsw_priv	*priv = dev->priv;
+	struct cpsw_priv	*priv = &cpsw_private;
 
 	__raw_writel(0, priv->dma_regs + CPDMA_TXCONTROL);
 	__raw_writel(0, priv->dma_regs + CPDMA_RXCONTROL);
@@ -1471,9 +1295,10 @@ cpsw_halt(struct eth_device *dev)
 
 /* was for ETH structure - never called at present */
 static int
-cpsw_sendpk(struct eth_device *dev, void *packet, int length)
+// cpsw_sendpk(struct eth_device *dev, void *packet, int length)
+cpsw_sendpk( void *packet, int length )
 {
-	struct cpsw_priv	*priv = dev->priv;
+	struct cpsw_priv	*priv = &cpsw_private;
 	void *buffer;
 	int len;
 	int timeout = CPDMA_TIMEOUT;
@@ -1495,9 +1320,10 @@ cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 
 /* was for ETH structure - never called at present */
 static int
-cpsw_recv(struct eth_device *dev)
+// cpsw_recv(struct eth_device *dev)
+cpsw_recv( void )
 {
-	struct cpsw_priv	*priv = dev->priv;
+	struct cpsw_priv	*priv = &cpsw_private;
 	void *buffer;
 	int len;
 
@@ -1515,11 +1341,12 @@ cpsw_recv(struct eth_device *dev)
 }
 
 static void
-cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
-			    struct cpsw_priv *priv)
+cpsw_slave_setup(struct cpsw_slave *slave, int slave_num, struct cpsw_priv *priv)
 {
 	void			*regs = priv->regs;
-	struct cpsw_slave_data	*data = priv->data.slave_data + slave_num;
+	// struct cpsw_slave_data	*data = priv->data.slave_data + slave_num;
+	struct cpsw_slave_data	*data = &priv->data.slave_data[slave_num];
+
 	slave->slave_num = slave_num;
 	slave->data	= data;
 	slave->regs	= regs + data->slave_reg_ofs;
@@ -1532,8 +1359,8 @@ cpsw_register(struct cpsw_platform_data *data)
 	struct cpsw_priv	*priv;
 	struct cpsw_slave	*slave;
 	void			*regs = (void *)data->cpsw_base;
-	struct eth_device	*dev;
 
+	/*
 	dev = calloc(sizeof(*dev), 1);
 	if (!dev)
 		return -ENOMEM;
@@ -1543,14 +1370,13 @@ cpsw_register(struct cpsw_platform_data *data)
 		free(dev);
 		return -ENOMEM;
 	}
+	*/
+	priv = &cpsw_private;
 
 	priv->data = *data;
-	priv->dev = dev;
 
 	priv->slaves = malloc(sizeof(struct cpsw_slave) * data->slaves);
 	if (!priv->slaves) {
-		free(dev);
-		free(priv);
 		return -ENOMEM;
 	}
 
@@ -1571,61 +1397,13 @@ cpsw_register(struct cpsw_platform_data *data)
 		idx = idx + 1;
 	}
 
-	strcpy(dev->name, "cpsw");
-	dev->priv	= priv;
-
-	// dev->init	= cpsw_setup;
-	// dev->halt	= cpsw_halt;
-	// dev->send	= cpsw_sendpk;
-	// dev->recv	= cpsw_recv;
-
-	cm_get_mac0 ( dev->enetaddr );
+	cm_get_mac0 ( priv->enetaddr );
 
 	/* One instance of a eth_device structure */
-	eth_device = dev;
+	// eth_device = dev;
 
 	return 1;
 }
-
-/* The following from U-boot sources
- *  board/ti/am335x/board.c
- */
-
-static void cpsw_control(int enabled)
-{
-	/* VTP can be added here */
-	return;
-}
-
-static struct cpsw_slave_data cpsw_slaves[] = {
-	{
-		.slave_reg_ofs	= 0x208,
-		.sliver_reg_ofs	= 0xd80,
-	},
-	{
-		.slave_reg_ofs	= 0x308,
-		.sliver_reg_ofs	= 0xdc0,
-	},
-};
-
-static struct cpsw_platform_data cpsw_data = {
-	.mdio_base		= CPSW_MDIO_BASE,
-	.cpsw_base		= CPSW_BASE,
-	.mdio_div		= 0xff,
-	.channels		= 8,
-	.cpdma_reg_ofs		= 0x800,
-	.slaves			= 1,
-	.slave_data		= cpsw_slaves,
-	.ale_reg_ofs		= 0xd00,
-	.ale_entries		= 1024,
-	.host_port_reg_ofs	= 0x108,
-	.hw_stats_reg_ofs	= 0x900,
-	.bd_ram_ofs		= 0x2000,
-	.mac_control		= (1 << 5),
-	.control		= cpsw_control,
-	.host_port_num		= 0,
-	.version		= CPSW_CTRL_VERSION_2,
-};
 
 /*
  * TI AM335x parts define a system EEPROM that defines certain sub-fields.
@@ -1651,7 +1429,12 @@ board_is_bone(struct am335x_baseboard_id *header)
 	return !strncmp(header->name, "A335BONE", HDR_NAME_LEN);
 }
 
+
 /*
+ * eth_init (previously board_eth_init())
+ *
+ * This is what we are using (for now) to kick off this driver.
+ *
  * This function will:
  * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
  * in the environment
@@ -1663,7 +1446,7 @@ board_is_bone(struct am335x_baseboard_id *header)
  * when we build an SPL that has neither option but full U-Boot will.
  */
 int
-board_eth_init ( void )
+eth_init ( void )
 {
 	int rv, n = 0;
 
@@ -1718,25 +1501,6 @@ board_eth_init ( void )
 	/* Kyu only supports the BBB */
 	cm_mii_enable ();
 
-#ifdef KYU_OLDPHY
-	/* This looks like just BS to me */
-	cpsw_slaves[0].phy_if = PHY_INTERFACE_MODE_MII;
-	cpsw_slaves[1].phy_if = PHY_INTERFACE_MODE_MII;
-#endif
-
-#ifdef KYU_OLD
-	if (board_is_bone(&header) || board_is_bone_lt(&header) ||
-	    board_is_idk(&header)) {
-		writel(MII_MODE_ENABLE, &cdev->miisel);
-		cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if =
-				PHY_INTERFACE_MODE_MII;
-	} else {
-		writel((RGMII_MODE_ENABLE | RGMII_INT_DELAY), &cdev->miisel);
-		cpsw_slaves[0].phy_if = cpsw_slaves[1].phy_if =
-				PHY_INTERFACE_MODE_RGMII;
-	}
-#endif
-
 	rv = cpsw_register(&cpsw_data);
 	if (rv < 0)
 		printf("Error %d registering CPSW switch\n", rv);
@@ -1771,21 +1535,6 @@ board_eth_init ( void )
 	return n;
 }
 
-/* This is what we are using (for now) to kick off this driver */
-static int
-eth_init ( void )
-{
-	// phy_init ();
-	board_eth_init ();
-
-	if ( ! eth_device ) {
-	    printf ( "No ethernet\n" );
-	    return 0;
-	}
-
-	return 1;
-}
-
 static void
 eth_start ( void )
 {
@@ -1806,7 +1555,7 @@ eth_start ( void )
 	cpsw_setup ( eth_device );
 	printf ("Done with cpsw_setup\n" );
 	*/
-	cpsw_setup ( eth_device );
+	cpsw_setup ();
 
 #ifdef notdef
 	printf ("Waiting for packets\n" );
@@ -1817,21 +1566,21 @@ eth_start ( void )
 	 * it will trigger a call to NetReceive()
 	 */
 	for ( ;; ) {
-	    cpsw_recv ( eth_device );
+	    cpsw_recv ();
 	}
 #endif
 }
 
 static unsigned long
-get_dmastat ( struct eth_device *dev )
+get_dmastat ( void )
 {
-	struct cpsw_priv	*priv = dev->priv;
-	unsigned long *lp = (unsigned long *) (priv->dma_regs + CPDMA_STATUS);
-
+	struct cpsw_priv	*priv = &cpsw_private;
+	// unsigned long *lp = (unsigned long *) (priv->dma_regs + CPDMA_STATUS);
 	/*
 	printf ("Get dma status from %08x (%08x)\n", lp, *lp );
 	*/
-	return *lp;
+	//return *lp;
+	return * (unsigned long *) (priv->dma_regs + CPDMA_STATUS);
 }
 
 struct cpsw_dma {
@@ -1884,7 +1633,7 @@ eth_test ( int arg )
 	for ( i=0; i<128; i++ )
 	    buf[i] = 0xdeadbeef;
 
-	printf ( "Begin test on ethernet device: %s\n", eth_device->name );
+	printf ( "Begin test on cpsw device\n" );
 
 	eth_start ();
 
@@ -1895,15 +1644,15 @@ eth_test ( int arg )
 	*/
 
 	for ( i=0; i<TLIMIT ; i++ ) {
-	    cpsw_recv ( eth_device );
-	    dmastat = get_dmastat ( eth_device );
+	    cpsw_recv ();
+	    dmastat = get_dmastat ();
 	    printf ( "Sending %d (dma status: %08x\n", i, dmastat );
-	    cpsw_sendpk ( eth_device, buf, 128*sizeof(unsigned long) );
+	    cpsw_sendpk ( buf, 128*sizeof(unsigned long) );
 	    thr_delay ( 100 );
 	}
 
 	for ( i=0; i<RLIMIT ; i++ ) {
-	    cpsw_recv ( eth_device );
+	    cpsw_recv ();
 	    thr_delay ( 50 );
 	}
 
@@ -1914,7 +1663,6 @@ eth_test ( int arg )
 	*/
 
 	printf ( "ALL DONE\n" );
-
 }
 
 static int pk_count = 0;
@@ -1947,8 +1695,7 @@ static int tx_int_count = 0;
 static void
 cpsw_reaper ( int xxx )
 {
-	struct eth_device *dev = eth_device;
-	struct cpsw_priv *priv = dev->priv;
+	struct cpsw_priv *priv = &cpsw_private;
 	struct cpdma_chan *rx_chan = &priv->rx_chan;
 	void *buffer;
 	int len;
@@ -2033,7 +1780,7 @@ cpsw_activate ( void )
 void
 get_cpsw_addr ( char *buf )
 {
-	memcpy ( buf, eth_device->enetaddr, ETH_ADDR_SIZE );
+	memcpy ( buf, cpsw_private.enetaddr, ETH_ADDR_SIZE );
 }
 
 void
@@ -2050,7 +1797,7 @@ cpsw_send ( struct netbuf *nbp )
 	int len;
 
 	/* Put our ethernet address in the packet */
-	memcpy ( nbp->eptr->src, eth_device->enetaddr, ETH_ADDR_SIZE );
+	memcpy ( nbp->eptr->src, cpsw_private.enetaddr, ETH_ADDR_SIZE );
 
 	len = nbp->ilen + sizeof(struct eth_hdr);
 
@@ -2060,7 +1807,7 @@ cpsw_send ( struct netbuf *nbp )
 
 	++tx_count;
 
-	cpsw_sendpk ( eth_device, nbp->eptr, len );
+	cpsw_sendpk ( nbp->eptr, len );
 }
 
 /* THE END */
