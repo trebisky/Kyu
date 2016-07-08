@@ -33,8 +33,9 @@
 
 /* Kyu project
  * Tom Trebisky 5-26-2015
- * Copied from the U-boot (2015.01) sources (from cpsw.c)
+ * Derived from the U-boot (2015.01) sources (from cpsw.c)
  *  many other files merged in to make it stand alone
+ *  then the whole mess reworked heavily.
  *
  * The cpsw is a 3 port ethernet switch capable of gigabit
  *  two ports are ethernet, one is CPPI
@@ -54,9 +55,27 @@
 #include <malloc.h>
 #include <omap_ints.h>
 
-#include <miiphy.h>
-#include <phy.h>
+/* XXX - we don't plan to keep this forever (from old ether.h) */
+/* A couple of global variables and we could kiss this goodbye */
 
+struct eth_device {
+        char name[16];
+        unsigned char enetaddr[6];
+        void *priv;
+
+        // int  (*init) (struct eth_device * );
+        // void (*halt) (struct eth_device *);
+
+        // int  (*send) (struct eth_device *, void *packet, int length);
+        // int  (*recv) (struct eth_device *);
+};
+
+/* This would be list header, but simply points to our
+ * one instance of this structure.
+ */
+static struct eth_device *eth_device = 0;
+
+/* Hardware base addresses */
 /* from the TRM, chapter 2, pages 175-176 */
 
 #define CPSW_SS		0x4a100000	/* Ethernet Switch Subsystem */
@@ -102,8 +121,9 @@ struct mdio_regs {
 
 #define MDIO_MAX        100 /* timeout */
 
-static int mdio_div = 1;	/* XXX */
-static int xx_phy_id = 0;	/* XXX */
+/* Values obtained by print statements in working code */
+static int mdio_div = 255;
+static int xx_phy_id = 0;
 
 static void 
 mdio_init ( void )
@@ -154,8 +174,7 @@ mdio_read ( int reg )
 
 	mdio_access_wait ();
 
-	mp->access0 = 
-	    ACCESS_GO | (reg << 21) | (xx_phy_id << 16);
+	mp->access0 = ACCESS_GO | (reg << 21) | (xx_phy_id << 16);
 
 	val = mdio_access_wait ();
 
@@ -176,6 +195,160 @@ mdio_write ( int reg, int val )
 	mdio_access_wait ();
 }
 
+/* Here are the PHY registers we use */
+#define PHY_BMCR	0
+#define PHY_BMSR	1
+#define PHY_ID1		2
+#define PHY_ID2		3
+#define PHY_ADVERT	4
+#define PHY_PEER	5
+
+#define PHY_SMSC_8710_UID	0x7c0f0
+#define PHY_SMSC_8710_MASK	0xffff0
+
+/* Bits in the basic mode control register. */
+#define BMCR_RESET		0x8000
+
+/* Bits in the basic mode status register. */
+#define BMSR_ANEGCAPABLE	0x0008
+#define BMSR_ANEGCOMPLETE	0x0020
+#define BMSR_10HALF		0x0800
+#define BMSR_10FULL		0x1000
+#define BMSR_100HALF		0x2000
+#define BMSR_100FULL		0x4000
+
+/* Bits in the link partner ability register. */
+#define LPA_10HALF		0x0020
+#define LPA_10FULL		0x0040
+#define LPA_100HALF		0x0080
+#define LPA_100FULL		0x0100
+
+void
+cpsw_phy_verify ( void )
+{
+	unsigned int id;
+
+	id = mdio_read ( PHY_ID1 ) << 16;
+	id |= mdio_read ( PHY_ID2 );
+
+	if ( (id & PHY_SMSC_8710_MASK) == PHY_SMSC_8710_UID )
+	    printf ( "Verified smsc 8710 PHY chip\n" );
+	else
+	    printf ( "Unknown PHY chip, id = %08x\n", id );
+}
+
+/* Reset the PHY, this seems to trigger autonegotiation.
+ * When we start, BMCR is 0x3100
+ * After we trigger reset, it is 0x3000
+ * Oddly, it is the duplex mode bit that is resetting here.
+ * Also note that there is a bit to restart autonegotiation,
+ * which it seems we could use instead of a full reset, but no
+ * harm seems to be done by a full reset like this.
+ */
+void
+cpsw_phy_reset ( void )
+{
+	int reg;
+	int tmo = 500;
+
+	reg = mdio_read ( PHY_BMCR );
+	mdio_write ( PHY_BMCR, reg | BMCR_RESET );
+
+	/* Should autoclear in under 0.5 seconds */
+	/* (I am seeing 2 milliseconds) */
+	while ( tmo-- && (mdio_read(PHY_BMCR) & BMCR_RESET ) )
+	    thr_delay ( 1 );
+
+	printf ( "Reset cleared in %d milliseconds\n", (500-tmo) );
+	printf ( "Reset status CR: %04x\n", mdio_read ( PHY_BMCR ) );
+}
+
+/* we keep track with this */
+#define DUPLEX_HALF		0x00
+#define DUPLEX_FULL		0x01
+
+int phy_link;
+int phy_speed;
+int phy_duplex;
+
+/* Give this 5 seconds.
+ * I am seeting this complete in about 1.6 seconds.
+ *
+ * In the case of Kyu, which at present always boots over the network,
+ *  we never expect to see the link fail to be present on startup.
+ *  (unless somebody is really working fast to pull the cable).
+ * But if we get Kyu to boot from flash someday, we may need to
+ *  rethink this, even then if the autonegotiation times out, we
+ *  can check the link status and set it properly.
+ */
+void
+cpsw_phy_wait_aneg ( void )
+{
+	int tmo = 2500;
+
+	printf ( "Aneg wait starts: %04x\n", mdio_read ( PHY_BMSR ) );
+
+	while ( tmo-- ) {
+	    if ( mdio_read ( PHY_BMSR ) & BMSR_ANEGCOMPLETE ) {
+		printf ( "Aneg done in %d milliseconds\n", (2500-tmo)*2 );
+		phy_link = 1;
+		return;
+	    }
+	    thr_delay ( 2 );
+	}
+
+	phy_link = 0;
+	printf ( "Autonegotiation timeout\n" );
+}
+
+/* And together our capabilities and the peer's capabilities */
+void
+cpsw_phy_link_status ( void )
+{
+	int s;
+
+	phy_speed = 10;
+	phy_duplex = DUPLEX_HALF;
+
+	s = mdio_read ( PHY_ADVERT );
+	s &= mdio_read ( PHY_PEER );
+
+	if ( s & (LPA_100FULL | LPA_100HALF) )
+	    phy_speed = 100;
+
+	if ( s & (LPA_100FULL | LPA_10FULL) )
+	    phy_duplex = DUPLEX_FULL;
+}
+
+/* Can be called at any time - good for testing */
+void
+cpsw_phy_aneg ( void )
+{
+	cpsw_phy_reset ();
+	cpsw_phy_wait_aneg ();
+
+	printf ( "Aneg wait finished: %04x\n", mdio_read ( PHY_BMSR ) );
+	printf ( "Final status CR: %04x\n", mdio_read ( PHY_BMCR ) );
+
+	if ( phy_link ) {
+	    cpsw_phy_link_status ();
+	    printf ( "link up (cpsw), speed %d, %s duplex\n",
+		phy_speed, (phy_duplex == DUPLEX_FULL) ? "full" : "half" );
+	} else
+	    printf("link down (cpsw)\n");
+}
+
+/* Called at startup */
+void
+cpsw_phy_init ( void )
+{
+	mdio_init ();
+	cpsw_phy_verify ();
+
+	cpsw_phy_aneg ();
+
+}
+
 /* ------------------------------------------------*/
 /* ------------------------------------------------*/
 /* ------------------------------------------------*/
@@ -188,8 +361,6 @@ mdio_write ( int reg, int val )
 extern struct thread *cur_thread;
 
 #ifdef KYU
-
-static struct eth_device *eth_device = 0;
 
 static void show_dmastatus ( void );
 
@@ -210,34 +381,6 @@ static void show_dmastatus ( void );
 #define EBUSY           16      /* Device or resource busy */
 #define EINVAL          22      /* Invalid argument */
 #define ETIMEDOUT       110     /* Connection timed out */
-
-#ifdef notdef
-/* XXX - we don't plan to keep this here */
-/* The real thing is pulled in via phy.h */
-/* Handy to look at though */
-
-struct eth_device {
-        char name[16];
-        unsigned char enetaddr[6];
-        int iobase;
-        int state;
-
-        int  (*init) (struct eth_device * );
-	/*
-        int  (*init) (struct eth_device *, bd_t *);
-	*/
-        int  (*send) (struct eth_device *, void *packet, int length);
-        int  (*recv) (struct eth_device *);
-        void (*halt) (struct eth_device *);
-#ifdef CONFIG_MCAST_TFTP
-        int (*mcast) (struct eth_device *, const u8 *enetaddr, u8 set);
-#endif
-        int  (*write_hwaddr) (struct eth_device *);
-        struct eth_device *next;
-        int index;
-        void *priv;
-};
-#endif
 
 /*
  * Maximum packet size; used to allocate packet storage.
@@ -272,7 +415,6 @@ void NetReceive ( char *, int );
 struct cpsw_slave_data {
 	u32		slave_reg_ofs;
 	u32		sliver_reg_ofs;
-	int		phy_addr;
 	int		phy_if;
 };
 
@@ -521,10 +663,8 @@ struct cpsw_priv {
 	struct cpdma_chan		rx_chan, tx_chan;
 
 	struct cpsw_slave		*slaves;
-	struct phy_device		*phydev;
+	// struct phy_device		*phydev;
 	struct mii_dev			*bus;
-
-	u32				phy_mask;
 };
 
 static inline int cpsw_ale_get_field(u32 *ale_entry, u32 start, u32 bits)
@@ -745,6 +885,7 @@ static inline void cpsw_ale_port_state(struct cpsw_priv *priv, int port,
 	__raw_writel(tmp, priv->ale_regs + offset);
 }
 
+#ifdef KYU_OLDPHY
 static struct cpsw_mdio_regs *mdio_regs;
 
 /* wait until hardware is ready for another user access */
@@ -780,14 +921,16 @@ wait_for_idle(void)
 		printf("wait_for_idle Timeout\n");
 }
 
+/* note that dev_addr is ignored */
+
 static int
-cpsw_mdio_read(struct mii_dev *bus, int phy_id,
-				int dev_addr, int phy_reg)
+cpsw_mdio_read(struct mii_dev *bus, int phy_id, int dev_addr, int phy_reg)
 {
 	int data;
 	u32 reg;
 
-	printf ( "CPSW_mdio_read - enter\n" );
+	// printf ( "CPSW_mdio_read - enter\n" );
+
 	if (phy_reg & ~PHY_REG_MASK || phy_id & ~PHY_ID_MASK)
 		return -EINVAL;
 
@@ -798,7 +941,9 @@ cpsw_mdio_read(struct mii_dev *bus, int phy_id,
 	reg = wait_for_user_access();
 
 	data = (reg & USERACCESS_ACK) ? (reg & USERACCESS_DATA) : -1;
-	printf ( "CPSW_mdio_read - exit (%s)\n", cur_thread->name );
+	if ( phy_reg != MII_BMSR )
+	    printf ( "PHY --- mdio read: id, phy_reg, data = %d, %d %04x\n", phy_id, phy_reg, data );
+	// printf ( "CPSW_mdio_read - exit (%s)\n", cur_thread->name );
 	return data;
 }
 
@@ -808,6 +953,7 @@ cpsw_mdio_write(struct mii_dev *bus, int phy_id, int dev_addr,
 {
 	u32 reg;
 
+	printf ( "PHY --- mdio write: id, reg, data = %d, %d %04x\n", phy_id, phy_reg, data );
 	if (phy_reg & ~PHY_REG_MASK || phy_id & ~PHY_ID_MASK)
 		return -EINVAL;
 
@@ -825,6 +971,8 @@ static void
 cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 {
 	mdio_regs = (struct cpsw_mdio_regs *) mdio_base;
+
+	printf ( "PHY --- init: div = %d\n", div );
 
 	/* set enable and clock divider */
 	__raw_writel(div | CONTROL_ENABLE, &mdio_regs->control);
@@ -870,6 +1018,7 @@ cpsw_mdio_init(char *name, u32 mdio_base, u32 div)
 	*/
 }
 #endif
+#endif /* KYU_OLDPHY */
 
 #ifdef KYU_SPIN
 /* The following function was compiling
@@ -927,21 +1076,64 @@ cpsw_set_slave_mac(struct cpsw_slave *slave,
 }
 
 static void
-cpsw_slave_update_link(struct cpsw_slave *slave,
-				   struct cpsw_priv *priv, int *link)
+cpsw_slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
+{
+	u32 mac_control;
+
+	printf ( "Entering cpsw_slave_update_link for slave %d\n", slave->slave_num );
+
+	if (phy_link) { /* link up */
+		mac_control = priv->data.mac_control;
+		if (phy_speed == 1000)
+			mac_control |= GIGABITEN;
+		if (phy_duplex == DUPLEX_FULL)
+			mac_control |= FULLDUPLEXEN;
+		if (phy_speed == 100)
+			mac_control |= MIIEN;
+	} else
+		mac_control = 0;
+
+	if (mac_control == slave->mac_control)
+		return;
+
+	if (mac_control) {
+		printf("link up on port %d, speed %d, %s duplex\n",
+				slave->slave_num, phy_speed,
+				(phy_duplex == DUPLEX_FULL) ? "full" : "half");
+	} else {
+		printf("link down on port %d\n", slave->slave_num);
+	}
+
+	__raw_writel(mac_control, &slave->sliver->mac_control);
+
+	slave->mac_control = mac_control;
+}
+
+#ifdef KYU_PHYOLD
+static void
+cpsw_slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
 {
 	struct phy_device *phy;
 	u32 mac_control = 0;
+
+	printf ( "Entering cpsw_slave_update_link for slave %d\n", slave->slave_num );
 
 	phy = priv->phydev;
 
 	if (!phy)
 		return;
 
-	phy_startup(phy);
-	*link = phy->link;
+	printf ( "Running cpsw_slave_update_link for slave %d\n", slave->slave_num );
 
-	if (*link) { /* link up */
+#ifdef KYU
+	phy->link = phy_link;
+	phy->speed = phy_speed;
+	phy->duplex = phy_duplex;
+#else
+	phy_startup(phy);
+#endif
+
+	if (phy->link) { /* link up */
 		mac_control = priv->data.mac_control;
 		if (phy->speed == 1000)
 			mac_control |= GIGABITEN;
@@ -963,19 +1155,19 @@ cpsw_slave_update_link(struct cpsw_slave *slave,
 	}
 
 	__raw_writel(mac_control, &slave->sliver->mac_control);
+
 	slave->mac_control = mac_control;
 }
+#endif
 
-static int
+static void
 cpsw_update_link(struct cpsw_priv *priv)
 {
-	int link = 0;
 	struct cpsw_slave *slave;
 
+	/* Only calls one slave for BBB */
 	for_active_slave(slave, priv)
-		cpsw_slave_update_link(slave, priv, &link);
-
-	return link;
+		cpsw_slave_update_link(slave, priv);
 }
 
 static inline u32  cpsw_get_slave_port(struct cpsw_priv *priv, u32 slave_num)
@@ -1015,8 +1207,6 @@ cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv)
 	cpsw_ale_port_state(priv, slave_port, ALE_PORT_STATE_FORWARD);
 
 	cpsw_ale_add_mcast(priv, NetBcastAddr, 1 << slave_port);
-
-	priv->phy_mask |= 1 << slave->data->phy_addr;
 }
 
 static struct
@@ -1138,6 +1328,7 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan,
 	return 0;
 }
 
+/* for ETH structure (init) */
 /* Was cpsw_init */
 static int
 cpsw_setup(struct eth_device *dev)
@@ -1146,14 +1337,15 @@ cpsw_setup(struct eth_device *dev)
 	struct cpsw_slave	*slave;
 	int i, ret;
 
-	/*
-	printf ( "Resetting controller using %08x\n", &priv->regs->soft_reset );
-	*/
+	// printf ( "cpsw_setup: dev = %08x\n", dev );
+	// printf ( "cpsw_setup: priv = %08x\n", dev->priv );
+	// priv = dev->priv;
+	// printf ( "Resetting controller using %08x\n", &priv->regs->soft_reset );
+
 	/* soft reset the controller and initialize priv */
 	setbit_and_wait_for_clear32(&priv->regs->soft_reset);
-	/*
-	printf ( "Reset done\n" );
-	/*
+
+	// printf ( "Reset done\n" );
 
 	/* initialize and reset the address lookup engine */
 	cpsw_ale_enable(priv, 1);
@@ -1259,6 +1451,7 @@ cpsw_setup(struct eth_device *dev)
 	return 0;
 }
 
+/* was for ETH structure - never called at present */
 static void
 cpsw_halt(struct eth_device *dev)
 {
@@ -1276,6 +1469,7 @@ cpsw_halt(struct eth_device *dev)
 	priv->data.control(0);
 }
 
+/* was for ETH structure - never called at present */
 static int
 cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 {
@@ -1299,6 +1493,7 @@ cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 	return cpdma_submit(priv, &priv->tx_chan, packet, length);
 }
 
+/* was for ETH structure - never called at present */
 static int
 cpsw_recv(struct eth_device *dev)
 {
@@ -1330,36 +1525,6 @@ cpsw_slave_setup(struct cpsw_slave *slave, int slave_num,
 	slave->regs	= regs + data->slave_reg_ofs;
 	slave->sliver	= regs + data->sliver_reg_ofs;
 }
-
-static int
-cpsw_phy_init(struct eth_device *dev, struct cpsw_slave *slave)
-{
-	struct cpsw_priv *priv = (struct cpsw_priv *)dev->priv;
-	struct phy_device *phydev;
-	u32 supported = PHY_GBIT_FEATURES;
-
-	phydev = phy_connect(priv->bus,
-			slave->data->phy_addr,
-			dev,
-			slave->data->phy_if);
-
-	if (!phydev)
-		return -1;
-
-	phydev->supported &= supported;
-	phydev->advertising = phydev->supported;
-
-	priv->phydev = phydev;
-	phy_config(phydev);
-
-	return 1;
-}
-
-/* Added in KYU when we realized we could do
- * away with miiphyutil.c entirely
- * by just having this static structure here.
- */
-static struct mii_dev cpsw_mii;
 
 int
 cpsw_register(struct cpsw_platform_data *data)
@@ -1407,43 +1572,17 @@ cpsw_register(struct cpsw_platform_data *data)
 	}
 
 	strcpy(dev->name, "cpsw");
-	dev->iobase	= 0;
-	dev->init	= cpsw_setup;
-	dev->halt	= cpsw_halt;
-	dev->send	= cpsw_sendpk;
-	dev->recv	= cpsw_recv;
 	dev->priv	= priv;
+
+	// dev->init	= cpsw_setup;
+	// dev->halt	= cpsw_halt;
+	// dev->send	= cpsw_sendpk;
+	// dev->recv	= cpsw_recv;
 
 	cm_get_mac0 ( dev->enetaddr );
 
-/* In U-boot, this would get called,
- *  it sets up the eth_device structure which
- *  is used for all subsequent calls.
- */
-	eth_register(dev);
-
-	/*
-	printf ( "cpsw mdio init\n" );
-	*/
-	cpsw_mdio_init(dev->name, data->mdio_base, data->mdio_div);
-
-#ifdef KYU
-	memset ( &cpsw_mii, 0, sizeof(cpsw_mii) );
-	cpsw_mii.read = cpsw_mdio_read;
-	cpsw_mii.write = cpsw_mdio_write;
-	sprintf(cpsw_mii.name, dev->name);
-	priv->bus = &cpsw_mii;
-#else
-	priv->bus = miiphy_get_dev_by_name(dev->name);
-#endif
-
-	/* Does this for one slave, if active */
-	for_active_slave(slave, priv) {
-	    /*
-	    printf ( "Initialize slave %d\n", slave->slave_num );
-	    */
-	    cpsw_phy_init(dev, slave);
-	}
+	/* One instance of a eth_device structure */
+	eth_device = dev;
 
 	return 1;
 }
@@ -1462,12 +1601,10 @@ static struct cpsw_slave_data cpsw_slaves[] = {
 	{
 		.slave_reg_ofs	= 0x208,
 		.sliver_reg_ofs	= 0xd80,
-		.phy_addr	= 0,
 	},
 	{
 		.slave_reg_ofs	= 0x308,
 		.sliver_reg_ofs	= 0xdc0,
-		.phy_addr	= 1,
 	},
 };
 
@@ -1581,8 +1718,11 @@ board_eth_init ( void )
 	/* Kyu only supports the BBB */
 	cm_mii_enable ();
 
+#ifdef KYU_OLDPHY
+	/* This looks like just BS to me */
 	cpsw_slaves[0].phy_if = PHY_INTERFACE_MODE_MII;
 	cpsw_slaves[1].phy_if = PHY_INTERFACE_MODE_MII;
+#endif
 
 #ifdef KYU_OLD
 	if (board_is_bone(&header) || board_is_bone_lt(&header) ||
@@ -1635,7 +1775,7 @@ board_eth_init ( void )
 static int
 eth_init ( void )
 {
-	phy_init ();
+	// phy_init ();
 	board_eth_init ();
 
 	if ( ! eth_device ) {
@@ -1787,50 +1927,6 @@ NetReceive ( char *buffer, int len)
 	pk_count++;
 }
 
-/* From include/net.h */
-
-enum eth_state_t {
-        ETH_STATE_INIT,
-        ETH_STATE_PASSIVE,
-        ETH_STATE_ACTIVE
-};
-
-/* From net/eth.c */
-
-int
-eth_register(struct eth_device *dev)
-{
-        static int index;
-
-#ifdef KYU
-	if ( eth_device ) {
-	    printf ( "Ignoring extra ethernet device: %s\n", dev->name );
-	    return -1;
-	} else {
-	    eth_device = dev;
-	}
-        dev->next  = NULL;
-#else
-        assert(strlen(dev->name) < sizeof(dev->name));
-
-        if (!eth_devices) {
-                eth_current = eth_devices = dev;
-                eth_current_changed();
-        } else {
-		struct eth_device *d;
-                for (d = eth_devices; d->next != eth_devices; d = d->next)
-                        ;
-                d->next = dev;
-        }
-        dev->next  = eth_devices;
-#endif
-
-        dev->state = ETH_STATE_INIT;
-        dev->index = index++;
-
-        return 0;
-}
-
 /* ----------------------------------------------------------------------- */
 /* ----------------------------------------------------------------------- */
 /* ----------------------------------------------------------------------- */
@@ -1910,7 +2006,10 @@ int
 cpsw_init ( void )
 {
 	printf ( "Starting cpsw_init\n" );
+	cpsw_phy_init ();
+
 	eth_init ();
+
 	irq_hookup ( NINT_CPSW_TX, cpsw_tx_isr, 0 );
 	printf ( "Finished cpsw_init\n" );
 	return 1;

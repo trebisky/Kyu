@@ -229,6 +229,7 @@ net_init ( void )
 	return;
     }
 
+    /* This will panic unless we are in NET_RUN */
     net_addr_get ( our_mac );
 
     arp_announce ();

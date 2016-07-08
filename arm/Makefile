@@ -7,15 +7,13 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
-#	if_cpsw.o miiphyutil.o phy.o smsc.o \
-#	if_cpsw.o phy.o smsc.o \
-#	eabi_stubs.o
+#	phy.o smsc.o \
 
 # locore must be first
 OBJS =  locore.o hardware.o \
 	wdt.o timer.o serial.o mux.o prm.o gpio.o cm.o \
 	i2c.o i2c_hw.o iic.o bmp.o \
-	if_cpsw.o phy.o smsc.o \
+	if_cpsw.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
 	show_regs.o \
