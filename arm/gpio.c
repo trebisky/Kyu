@@ -444,6 +444,23 @@ gpio_test7 ( void )
 	}
 }
 
+#define TEST8_BIT	GPIO_2_2
+void
+gpio_test8 ( void )
+{
+	int n;
+
+	gpio_out_init ( TEST8_BIT );
+
+	for ( ;; ) {
+	    for ( n=0; n<10; n++ ) {
+		gpio_clear_bit ( TEST8_BIT );
+		gpio_set_bit ( TEST8_BIT );
+	    }
+	    thr_delay ( 1 );
+	}
+}
+
 void
 gpio_test_ccnt ( void )
 {
@@ -479,7 +496,8 @@ gpio_test ( void )
 {
 	// gpio_test7 ();
 	// iic_test ();
-	i2c_test ();
+	// i2c_test ();
+	gpio_test8 ();
 }
 
 /* THE END */
