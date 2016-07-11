@@ -18,24 +18,24 @@
  */
 
 /* Kyu project
+ *
+ * Driver for the cpsw ethernet interface in the BBB
+ *
  * Tom Trebisky 5-26-2015
  * Derived from the U-boot (2015.01) sources (from cpsw.c)
- *  many other files merged in to make it stand alone
- *  then the whole mess reworked heavily.
+ *  many other files merged in to make it stand alone, then
+ *   reworked heavily and lots of cruft removed.
  *
  * The cpsw is a 3 port ethernet switch capable of gigabit
- *  port 0 is CPPI -- bobody on earth knows what CPPI is, or uses it.
+ *  port 0 is CPPI -- (Communications Port Programming Interface)
  *  port 1 is ethernet (we use this one)
  *  port 2 is ethernet (not connected to anything on the BBB)
  *  on the BBB the port 1 PHY supports only a 10/100 media interface.
  * The media interface is a SMSC "LAN8710" chip.
+ *
+ * Port 0 is not entirely ignored, so be on your toes.
  */
 
-/* This next section is code I have added for Kyu, with every intention
- * of working up my own BBB specific driver for this chip.
- * As of 6-23-2016 this stuff up front is just "parked" here and
- * pretty much independent of the rest and untested.
- */
 #include <kyu.h>
 #include <kyulib.h>
 #include <thread.h>
@@ -51,14 +51,22 @@
 #define PORT2_BASE	0x4a100300	/* Port 2 control */
 #define CPDMA_BASE	0x4a100800	/* DMA */
 #define STATS_BASE	0x4a100900	/* Statistics - never used */
-#define STATERAM_BASE	0x4a100A00	/* State RAM - never used */
+#define STATERAM_BASE	0x4a100A00	/* State RAM */
 #define CPTS_BASE	0x4a100C00	/* Time sync - never used*/
 #define ALE_BASE	0x4a100D00	/* Address Lookup Engine */
 #define SLIVER1_BASE	0x4a100D80	/* "sliver" for Port 1 */
 #define SLIVER2_BASE	0x4a100DC0	/* "sliver" for Port 2 */
 #define MDIO_BASE	0x4a101000	/* MDIO */
 #define WR_BASE		0x4a101200	/* RMII/RGMII wrapper - never used */
-#define BDRAM_BASE	0x4a102000
+
+#define BDRAM_BASE	0x4a102000	/* Communications Port Programming Interface RAM */
+
+#define NUM_CPDMA_CHANNELS	8
+
+/* XXX TRM says 1152 entries */
+#define NUM_ALE_ENTRIES		1024
+
+#define HOST_PORT		0
 
 struct cpdma_desc {
 	/* hardware fields */
@@ -72,22 +80,95 @@ struct cpdma_desc {
 };
 
 struct cpdma_chan {
-	struct cpdma_desc	*head, *tail;
-	void			*hdp, *cp, *rxfree;
+	struct cpdma_desc	*head;
+	struct cpdma_desc	*tail;
+	volatile void	*hdp;
+	volatile void    *cp;
+	volatile void    *rxfree;
 };
 
-struct cpsw_dma {
-	volatile unsigned long tx_ver;
+/* Offsets to access CPDMA registers --
+ * this driver doesn't use many DMA Registers
+ */
+//#define CPDMA_TXCONTROL		0x004
+//#define CPDMA_RXCONTROL		0x014
+// #define CPDMA_SOFTRESET		0x01c
+// #define CPDMA_STATUS		0x024	/* KYU */
+// #define CPDMA_RXFREE		0x0e0
+
+struct dma_regs {
+	volatile unsigned long tx_ver;				/* 00 */
 	volatile unsigned long tx_control;
 	volatile unsigned long tx_teardown;
 	long	_pad;
-	volatile unsigned long rx_ver;
+
+	volatile unsigned long rx_ver;				/* 10 */
 	volatile unsigned long rx_control;
 	volatile unsigned long rx_teardown;
 
 	volatile unsigned long soft_reset;
 	volatile unsigned long control;
-	volatile unsigned long status;
+	volatile unsigned long status;				/* 24 */
+
+	long _pad2[46];
+	volatile unsigned long rxfree[NUM_CPDMA_CHANNELS];	/* e0 */
+};
+
+/* Descriptor mode bits */
+#define CPDMA_DESC_SOP		BIT(31)
+#define CPDMA_DESC_EOP		BIT(30)
+#define CPDMA_DESC_OWNER	BIT(29)
+#define CPDMA_DESC_EOQ		BIT(28)
+
+#ifdef notdef
+/* Not for us - these are offsets in some older version of the chip */
+#define CPDMA_TXHDP_VER1	0x100
+#define CPDMA_RXHDP_VER1	0x120
+#define CPDMA_TXCP_VER1		0x140
+#define CPDMA_RXCP_VER1		0x160
+
+/* These are the offsets we want.
+ * These offsets are from the cpdma base, but ...
+ * They are actually in the State RAM
+ */
+#define CPDMA_TXHDP_VER2	0x200
+#define CPDMA_RXHDP_VER2	0x220
+#define CPDMA_TXCP_VER2		0x240
+#define CPDMA_RXCP_VER2		0x260
+#endif
+
+/* ALE Registers */
+#define ALE_CONTROL		0x08
+#define ALE_UNKNOWNVLAN		0x18
+#define ALE_TABLE_CONTROL	0x20
+#define ALE_TABLE		0x34
+#define ALE_PORTCTL		0x40
+
+#define NUM_ALE_PORTS		6
+
+struct ale_regs {
+	vu32	version;
+	u32	  __pad0;
+	vu32	control;
+	u32	  __pad1;
+	vu32	prescale;	/* 0x10 */
+	u32	  __pad2;
+	vu32	unk_vlan;
+	u32	  __pad3;
+	vu32	tbl_ctl;	/* 0x20 */
+	u32	  __pad4[4];
+	vu32	tbl_w2;		/* 0x34 */
+	vu32	tbl_w1;
+	vu32	tbl_w0;
+	vu32	port_control[NUM_ALE_PORTS];	/* 0x40 */
+};
+
+
+struct stateram_regs {
+	volatile unsigned long txhdp[NUM_CPDMA_CHANNELS];
+	volatile unsigned long rxhdp[NUM_CPDMA_CHANNELS];
+	volatile unsigned long txcp[NUM_CPDMA_CHANNELS];
+	volatile unsigned long rxcp[NUM_CPDMA_CHANNELS];
 };
 
 struct mdio_regs {
@@ -118,28 +199,8 @@ struct cpsw_regs {
 	vu32	ptype;
 };
 
-/* Port 1 and 2 (ethernet) */
-struct cpsw_slave_regs {
-	u32	control;
-	u32	_pad;
-	u32	max_blks;
-	u32	blk_cnt;
-	u32	flow_thresh;
-	u32	port_vlan;
-	u32	tx_pri_map;
-#ifdef CONFIG_AM33XX
-	u32	gap_thresh;
-#elif defined(CONFIG_TI814X)
-	u32	ts_ctl;
-	u32	ts_seq_ltype;
-	u32	ts_vlan;
-#endif
-	u32	sa_lo;
-	u32	sa_hi;
-};
-
 /* Port 0 */
-struct cpsw_host_regs {
+struct host_regs {
 	vu32	control;
 	u32	_pad;
 	vu32	max_blks;
@@ -147,11 +208,27 @@ struct cpsw_host_regs {
 	vu32	flow_thresh;
 	vu32	port_vlan;
 	vu32	tx_pri_map;
+
 	vu32	cpdma_tx_pri_map;
 	vu32	cpdma_rx_chan_map;
 };
 
-struct cpsw_sliver_regs {
+/* Port 1 and 2 (ethernet) */
+struct port_regs {
+	u32	control;
+	u32	_pad;
+	u32	max_blks;
+	u32	blk_cnt;
+	u32	flow_thresh;
+	u32	port_vlan;
+	u32	tx_pri_map;
+
+	u32	ts_seq_mtype;
+	u32	sa_lo;
+	u32	sa_hi;
+};
+
+struct sliver_regs {
 	vu32	id_ver;
 	vu32	mac_control;
 	vu32	mac_status;
@@ -175,45 +252,35 @@ struct cpsw_sliver_regs {
 
 #define MDIO_DIV	255
 
-#define NUM_CPDMA_CHANNELS	8
-#define NUM_ALE_ENTRIES		1024
-
-#define HOST_PORT_NUM		0
-
 /* ------------------------------------------------------------------------- */
 /* Everything above here is defined by the hardware */
 /* ------------------------------------------------------------------------- */
 
+/* Only have one port on the BBB, but ...
+ *  the general driver should support two ethernet ports
+ *  These get called various things: channels, slaves, ports, ...
+ *  I prefer to call them "ports"
+ */
+
 struct cpsw_slave {
-	struct cpsw_slave_regs		*regs;
-	struct cpsw_sliver_regs		*sliver;
+	struct port_regs		*regs;
+	struct sliver_regs		*sliver;
 	int				slave_num;
 	u32				mac_control;
 };
 
 struct cpsw_priv {
         unsigned char			enetaddr[6];	/* XXX should be per slave */
-	int				host_port;
 
-	struct cpsw_regs		*regs;
-	void				*dma_regs;
-	void				*ale_regs;
+	void				*ale_base;
 
-	struct cpdma_desc		*descs;
 	struct cpdma_desc		*desc_free;
 
 	struct cpdma_chan		rx_chan;
 	struct cpdma_chan		tx_chan;
 
-	struct cpsw_slave		*slaves;
+	struct cpsw_slave		slaves[2];
 };
-
-/* Only need one for BBB, but ...
- *  the general driver should support two ethernet channels.
- *  These get called various things: channels, slaves, ports, ...
- *  I prefer to call them "ports"
- */
-static struct cpsw_slave cpsw_slavery[2];
 
 static struct cpsw_priv cpsw_private;
 
@@ -368,6 +435,7 @@ cpsw_phy_reset ( void )
 }
 
 /* we keep track with this */
+/* XXX should migrate to "private" or put info directly into mac_control format */
 #define DUPLEX_HALF		0x00
 #define DUPLEX_FULL		0x01
 
@@ -514,49 +582,14 @@ void NetReceive ( char *, int );
 #define PKT_MIN			60
 #define PKT_MAX			(1500 + 14 + 4 + 4)
 
+/* bits in the mac_control register */
 #define MYSTERY			BIT(5)
 #define GIGABITEN		BIT(7)
 #define FULLDUPLEXEN		BIT(0)
 #define MIIEN			BIT(15)
 
-/* Offsets to access CPDMA registers --
- * this driver doesn't use many DMA Registers
- */
-#define CPDMA_TXCONTROL		0x004
-#define CPDMA_RXCONTROL		0x014
-#define CPDMA_SOFTRESET		0x01c
-#define CPDMA_STATUS		0x024	/* KYU */
-#define CPDMA_RXFREE		0x0e0
-
-/* Not for us - these are offsets in some older version of the chip */
-/* We never use these.
-#define CPDMA_TXHDP_VER1	0x100
-#define CPDMA_RXHDP_VER1	0x120
-#define CPDMA_TXCP_VER1		0x140
-#define CPDMA_RXCP_VER1		0x160
-*/
-
-/* These are the offsets we want */
-#define CPDMA_TXHDP_VER2	0x200
-#define CPDMA_RXHDP_VER2	0x220
-#define CPDMA_TXCP_VER2		0x240
-#define CPDMA_RXCP_VER2		0x260
-
-/* Descriptor mode bits */
-#define CPDMA_DESC_SOP		BIT(31)
-#define CPDMA_DESC_EOP		BIT(30)
-#define CPDMA_DESC_OWNER	BIT(29)
-#define CPDMA_DESC_EOQ		BIT(28)
-
 #define ALE_ENTRY_BITS		68
 #define ALE_ENTRY_WORDS		DIV_ROUND_UP(ALE_ENTRY_BITS, 32)
-
-/* ALE Registers */
-#define ALE_CONTROL		0x08
-#define ALE_UNKNOWNVLAN		0x18
-#define ALE_TABLE_CONTROL	0x20
-#define ALE_TABLE		0x34
-#define ALE_PORTCTL		0x40
 
 #define ALE_TABLE_WRITE		BIT(31)
 
@@ -574,13 +607,6 @@ void NetReceive ( char *, int );
 #define ALE_MCAST_BLOCK_LEARN_FWD	1
 #define ALE_MCAST_FWD_LEARN		2
 #define ALE_MCAST_FWD_2			3
-
-enum ale_port_state {
-	ALE_PORT_STATE_DISABLE	= 0x00,
-	ALE_PORT_STATE_BLOCK	= 0x01,
-	ALE_PORT_STATE_LEARN	= 0x02,
-	ALE_PORT_STATE_FORWARD	= 0x03,
-};
 
 /* ALE unicast entry flags - passed into ale_add_ucast() */
 #define ALE_SECURE	1
@@ -666,10 +692,10 @@ ale_read(struct cpsw_priv *priv, int idx, u32 *ale_entry)
 {
 	int i;
 
-	__raw_writel(idx, priv->ale_regs + ALE_TABLE_CONTROL);
+	__raw_writel(idx, priv->ale_base + ALE_TABLE_CONTROL);
 
 	for (i = 0; i < ALE_ENTRY_WORDS; i++)
-		ale_entry[i] = __raw_readl(priv->ale_regs + ALE_TABLE + 4 * i);
+		ale_entry[i] = __raw_readl(priv->ale_base + ALE_TABLE + 4 * i);
 
 	return idx;
 }
@@ -680,9 +706,9 @@ ale_write(struct cpsw_priv *priv, int idx, u32 *ale_entry)
 	int i;
 
 	for (i = 0; i < ALE_ENTRY_WORDS; i++)
-		__raw_writel(ale_entry[i], priv->ale_regs + ALE_TABLE + 4 * i);
+		__raw_writel(ale_entry[i], priv->ale_base + ALE_TABLE + 4 * i);
 
-	__raw_writel(idx | ALE_TABLE_WRITE, priv->ale_regs + ALE_TABLE_CONTROL);
+	__raw_writel(idx | ALE_TABLE_WRITE, priv->ale_base + ALE_TABLE_CONTROL);
 
 	return idx;
 }
@@ -802,15 +828,23 @@ ale_control(struct cpsw_priv *priv, int bit, int val)
 {
 	u32 tmp, mask = BIT(bit);
 
-	tmp  = __raw_readl(priv->ale_regs + ALE_CONTROL);
+	tmp  = __raw_readl(priv->ale_base + ALE_CONTROL);
 	tmp &= ~mask;
 	tmp |= val ? mask : 0;
-	__raw_writel(tmp, priv->ale_regs + ALE_CONTROL);
+	__raw_writel(tmp, priv->ale_base + ALE_CONTROL);
 }
 
 #define ale_enable(priv, val)	ale_control(priv, 31, val)
 #define ale_clear(priv, val)	ale_control(priv, 30, val)
 #define ale_vlan_aware(priv, val)	ale_control(priv,  2, val)
+
+#ifdef notdef
+enum ale_port_state {
+	ALE_PORT_STATE_DISABLE	= 0x00,
+	ALE_PORT_STATE_BLOCK	= 0x01,
+	ALE_PORT_STATE_LEARN	= 0x02,
+	ALE_PORT_STATE_FORWARD	= 0x03,
+};
 
 static inline void
 ale_port_state(struct cpsw_priv *priv, int port, int val)
@@ -818,14 +852,33 @@ ale_port_state(struct cpsw_priv *priv, int port, int val)
 	int offset = ALE_PORTCTL + 4 * port;
 	u32 tmp, mask = 0x3;
 
-	tmp  = __raw_readl(priv->ale_regs + offset);
+	tmp  = __raw_readl(priv->ale_base + offset);
 	tmp &= ~mask;
 	tmp |= val & mask;
-	__raw_writel(tmp, priv->ale_regs + offset);
+	__raw_writel(tmp, priv->ale_base + offset);
+}
+#endif
+
+/* We only ever forward */
+#define	ALE_PORT_STATE_DISABLE	0x00,
+#define	ALE_PORT_STATE_BLOCK	0x01
+#define	ALE_PORT_STATE_LEARN	0x02
+#define	ALE_PORT_STATE_FORWARD	0x03
+
+static void
+ale_port_forward ( int port )
+{
+	struct ale_regs *ale = (struct ale_regs *) ALE_BASE;
+	unsigned long val;
+
+	printf ( "ale_port_control = %08x\n", ale->port_control );
+
+	val = ale->port_control[port] & ~0x3;
+	ale->port_control[port] = val | ALE_PORT_STATE_FORWARD;
 }
 
-/* A couple of registers have self clearing bits,
- * typically to perform a reset.
+/* Three registers have self clearing bits that perform a reset.
+ *  (amazingly the very same bit in each).
  * This function sets the bit and waits for it to clear
  */
 #define CLEAR_BIT		1
@@ -855,7 +908,9 @@ reset_controller ( void )
 static void
 reset_cpdma ( void )
 {
-	setbit_and_wait_for_clear32 ( cpsw_private.dma_regs + CPDMA_SOFTRESET );
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+
+	setbit_and_wait_for_clear32 ( &dma->soft_reset );
 }
 
 #define mac_hi(mac)	(((mac)[0] << 0) | ((mac)[1] << 8) |	\
@@ -872,87 +927,6 @@ cpsw_set_slave_mac(struct cpsw_slave *slave, struct cpsw_priv *priv)
 
 	__raw_writel(mac_hi(priv->enetaddr), &slave->regs->sa_hi);
 	__raw_writel(mac_lo(priv->enetaddr), &slave->regs->sa_lo);
-}
-
-static void
-cpsw_slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
-{
-	u32 mac_control;
-
-	printf ( "Entering cpsw_slave_update_link for slave %d\n", slave->slave_num );
-
-	if (phy_link) { /* link up */
-		mac_control = MYSTERY;
-		if (phy_speed == 1000)
-			mac_control |= GIGABITEN;
-		if (phy_duplex == DUPLEX_FULL)
-			mac_control |= FULLDUPLEXEN;
-		if (phy_speed == 100)
-			mac_control |= MIIEN;
-	} else
-		mac_control = 0;
-
-	if (mac_control == slave->mac_control)
-		return;
-
-	if (mac_control) {
-		printf("link up on port %d, speed %d, %s duplex\n",
-				slave->slave_num, phy_speed,
-				(phy_duplex == DUPLEX_FULL) ? "full" : "half");
-	} else {
-		printf("link down on port %d\n", slave->slave_num);
-	}
-
-	__raw_writel(mac_control, &slave->sliver->mac_control);
-
-	slave->mac_control = mac_control;
-}
-
-/* What the heck is this about??
- *
- * host_port is always 0 on the BBB
- * As near as I can tell, this is the story.
- * host_port is always 0 (which is the CPPI port on the BBB)
- * slave 0 is hardware port 1
- * slave 1 is hardware port 2
- * So this maps the silly fictitious slave port number
- * to the hardware port number.
- * On some other hardware, where the host_port followed the
- *  ethernet ports, slave 0 would be hardware 0.
- */
-static inline u32
-cpsw_get_slave_port(struct cpsw_priv *priv, u32 slave_num)
-{
-	if (priv->host_port == 0)
-		return slave_num + 1;
-	else
-		return slave_num;	/* XXX ??? */
-}
-
-static void
-cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv)
-{
-	u32     slave_port;
-
-	// setbit_and_wait_for_clear32(&slave->sliver->soft_reset);
-	reset_slave ( slave );
-
-	/* setup priority mapping */
-	__raw_writel(0x76543210, &slave->sliver->rx_pri_map);
-	__raw_writel(0x33221100, &slave->regs->tx_pri_map);
-
-	/* setup max packet size, and mac address */
-	__raw_writel(PKT_MAX, &slave->sliver->rx_maxlen);
-
-	cpsw_set_slave_mac(slave, priv);
-
-	slave->mac_control = 0;	/* no link yet */
-
-	/* enable forwarding */
-	slave_port = cpsw_get_slave_port(priv, slave->slave_num);
-	ale_port_state(priv, slave_port, ALE_PORT_STATE_FORWARD);
-
-	ale_add_mcast(priv, NetBcastAddr, 1 << slave_port);
 }
 
 static struct cpdma_desc *
@@ -1035,9 +1009,10 @@ static u32 lstatus = 0;
 static int
 cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, int *len)
 {
-	struct cpdma_desc *desc = chan->head;
+	struct cpdma_desc *desc;
 	u32 status;
 
+	desc = chan->head;
 	if (!desc)
 		return -ENOENT;
 
@@ -1071,6 +1046,84 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, in
 	return 0;
 }
 
+static void
+dma_enable ( void )
+{
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+
+	dma->tx_control = 1;
+	dma->rx_control = 1;
+}
+
+static void
+dma_disable ( void )
+{
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+
+	dma->tx_control = 0;
+	dma->rx_control = 0;
+}
+
+static void
+slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv)
+{
+	u32     slave_port;
+
+	// setbit_and_wait_for_clear32(&slave->sliver->soft_reset);
+	reset_slave ( slave );
+
+	/* setup priority mapping */
+	__raw_writel(0x76543210, &slave->sliver->rx_pri_map);
+	__raw_writel(0x33221100, &slave->regs->tx_pri_map);
+
+	/* setup max packet size, and mac address */
+	__raw_writel(PKT_MAX, &slave->sliver->rx_maxlen);
+
+	cpsw_set_slave_mac(slave, priv);
+
+	slave->mac_control = 0;	/* no link yet */
+
+	/* enable forwarding */
+	slave_port = slave->slave_num + 1;
+	// ale_port_state(priv, slave_port, ALE_PORT_STATE_FORWARD);
+	ale_port_forward ( slave_port );
+	ale_add_mcast(priv, NetBcastAddr, 1 << slave_port);
+}
+
+static void
+slave_update_link(struct cpsw_slave *slave, struct cpsw_priv *priv )
+{
+	u32 mac_control;
+
+	printf ( "Entering slave_update_link for slave %d\n", slave->slave_num );
+
+	if (phy_link) { /* link up */
+		mac_control = MYSTERY;
+		if (phy_speed == 1000)
+			mac_control |= GIGABITEN;
+		if (phy_duplex == DUPLEX_FULL)
+			mac_control |= FULLDUPLEXEN;
+		if (phy_speed == 100)
+			mac_control |= MIIEN;
+	} else
+		mac_control = 0;
+
+	if (mac_control == slave->mac_control)
+		return;
+
+	if (mac_control) {
+		printf("link up on port %d, speed %d, %s duplex\n",
+				slave->slave_num, phy_speed,
+				(phy_duplex == DUPLEX_FULL) ? "full" : "half");
+	} else {
+		printf("link down on port %d\n", slave->slave_num);
+	}
+
+	__raw_writel(mac_control, &slave->sliver->mac_control);
+
+	slave->mac_control = mac_control;
+}
+
 /* for ETH structure (init) */
 /* Was cpsw_init */
 static int
@@ -1078,16 +1131,16 @@ cpsw_setup( void )
 {
 	struct cpsw_priv	*priv = &cpsw_private;
 	struct cpsw_slave	*slave;
-	struct cpsw_host_regs *hreg = (struct cpsw_host_regs *) PORT0_BASE;
+	struct host_regs *hreg = (struct host_regs *) PORT0_BASE;
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
+	struct cpsw_regs *regs = (struct cpsw_regs *) CPSW_BASE;
+	struct cpdma_desc *bdram;
 	int i, ret;
 
-	// printf ( "Resetting controller using %08x\n", &priv->regs->soft_reset );
-
-	/* soft reset the controller and initialize priv */
-	// setbit_and_wait_for_clear32(&priv->regs->soft_reset);
 	reset_controller ();
 
-	// printf ( "Reset done\n" );
+	// printf ( "CPDMA rxfree = %08x\n", dma->rxfree );
 
 	/* initialize and reset the address lookup engine */
 	ale_enable(priv, 1);
@@ -1101,56 +1154,76 @@ cpsw_setup( void )
 	hreg->cpdma_rx_chan_map = 0;
 
 	/* disable priority elevation and enable statistics on all ports */
-	__raw_writel(0, &priv->regs->ptype);
+	// __raw_writel(0, &priv->regs->ptype);
+	regs->ptype = 0;
 
 	/* enable statistics collection only on the host port */
-	__raw_writel(BIT(priv->host_port), &priv->regs->stat_port_en);
-	__raw_writel(0x7, &priv->regs->stat_port_en);
+	//__raw_writel(BIT(priv->host_port), &priv->regs->stat_port_en);
+	//__raw_writel(0x7, &priv->regs->stat_port_en);
+	regs->stat_port_en = BIT(HOST_PORT);
+	regs->stat_port_en = 0x7;
 
-	ale_port_state(priv, priv->host_port, ALE_PORT_STATE_FORWARD);
+	// ale_port_state(priv, HOST_PORT, ALE_PORT_STATE_FORWARD);
+	ale_port_forward ( HOST_PORT );
 
-	ale_add_ucast(priv, priv->enetaddr, priv->host_port, ALE_SECURE);
+	ale_add_ucast(priv, priv->enetaddr, HOST_PORT, ALE_SECURE);
 
-	ale_add_mcast(priv, NetBcastAddr, 1 << priv->host_port);
+	ale_add_mcast(priv, NetBcastAddr, 1 << HOST_PORT);
 
 	/* BBB only has one slave (0) */
-	cpsw_slave_init ( &priv->slaves[0], priv );
-	cpsw_slave_update_link ( &priv->slaves[0], priv );
+	slave_init ( &priv->slaves[0], priv );
+	slave_update_link ( &priv->slaves[0], priv );
 
+	// priv->descs		= (struct cpdma_desc *) BDRAM_BASE;
+	//	desc_write(&priv->descs[i], hw_next,
+	//	   (i == (NUM_DESCS - 1)) ? 0 : &priv->descs[i+1]);
 	/* init descriptor pool */
+
+	bdram = (struct cpdma_desc *) BDRAM_BASE;
 	for (i = 0; i < NUM_DESCS; i++) {
-		desc_write(&priv->descs[i], hw_next,
-			   (i == (NUM_DESCS - 1)) ? 0 : &priv->descs[i+1]);
+		desc_write(&bdram[i], hw_next,
+			   (i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1]);
 	}
-	priv->desc_free = &priv->descs[0];
+
+	// priv->desc_free = &priv->descs[0];
+	priv->desc_free = bdram;
 
 	/* initialize channels */
 	/* am335x devices are version 2 */
 	memset(&priv->rx_chan, 0, sizeof(struct cpdma_chan));
-	priv->rx_chan.hdp       = priv->dma_regs + CPDMA_RXHDP_VER2;
-	priv->rx_chan.cp        = priv->dma_regs + CPDMA_RXCP_VER2;
-	priv->rx_chan.rxfree    = priv->dma_regs + CPDMA_RXFREE;
+	//priv->rx_chan.hdp       = priv->dma_regs + CPDMA_RXHDP_VER2;
+	//priv->rx_chan.cp        = priv->dma_regs + CPDMA_RXCP_VER2;
+	// priv->rx_chan.rxfree    = priv->dma_regs + CPDMA_RXFREE;
+
+	priv->rx_chan.hdp = stram->rxhdp;
+	priv->rx_chan.cp = stram->rxcp;
+	priv->rx_chan.rxfree = dma->rxfree;
 
 	memset(&priv->tx_chan, 0, sizeof(struct cpdma_chan));
-	priv->tx_chan.hdp       = priv->dma_regs + CPDMA_TXHDP_VER2;
-	priv->tx_chan.cp        = priv->dma_regs + CPDMA_TXCP_VER2;
+	// priv->tx_chan.hdp       = priv->dma_regs + CPDMA_TXHDP_VER2;
+	// priv->tx_chan.cp        = priv->dma_regs + CPDMA_TXCP_VER2;
+	priv->tx_chan.hdp = stram->txhdp;
+	priv->tx_chan.cp = stram->txcp;
 
 	/* clear dma state */
-	// setbit_and_wait_for_clear32(priv->dma_regs + CPDMA_SOFTRESET);
 	reset_cpdma ();
 
 	// for (i = 0; i < priv->data.channels; i++) {
 	for (i = 0; i < NUM_CPDMA_CHANNELS; i++) {
-		__raw_writel(0, priv->dma_regs + CPDMA_RXHDP_VER2 + 4 * i);
-		__raw_writel(0, priv->dma_regs + CPDMA_RXFREE + 4 * i);
-		__raw_writel(0, priv->dma_regs + CPDMA_RXCP_VER2 + 4 * i);
-		__raw_writel(0, priv->dma_regs + CPDMA_TXHDP_VER2 + 4 * i);
-		__raw_writel(0, priv->dma_regs + CPDMA_TXCP_VER2 + 4 * i);
+		//__raw_writel(0, priv->dma_regs + CPDMA_RXFREE + 4 * i);
+		//__raw_writel(0, priv->dma_regs + CPDMA_RXHDP_VER2 + 4 * i);
+		//__raw_writel(0, priv->dma_regs + CPDMA_RXCP_VER2 + 4 * i);
+		//__raw_writel(0, priv->dma_regs + CPDMA_TXHDP_VER2 + 4 * i);
+		//__raw_writel(0, priv->dma_regs + CPDMA_TXCP_VER2 + 4 * i);
+		dma->rxfree[i] = 0;
+		stram->rxhdp[i] = 0;
+		stram->rxcp[i] = 0;
+		stram->txhdp[i] = 0;
+		stram->txcp[i] = 0;
 	}
 
 	/* enable both rx and tx */
-	__raw_writel(1, priv->dma_regs + CPDMA_TXCONTROL);
-	__raw_writel(1, priv->dma_regs + CPDMA_RXCONTROL);
+	dma_enable ();
 
 	/*
 	printf ( "Writing to dma regs at %08x\n", priv->dma_regs );
@@ -1169,29 +1242,16 @@ cpsw_setup( void )
 		}
 	}
 
-	/*
-	printf ( "cpsw_setup done\n" );
-	*/
 	return 0;
 }
 
-/* was for ETH structure - never called at present */
+/* used to exist for ETH structure - never called at present */
 static void
 // cpsw_halt(struct eth_device *dev)
 cpsw_halt( void )
 {
-	// struct cpsw_priv	*priv = dev->priv;
-	struct cpsw_priv	*priv = &cpsw_private;
-
-	__raw_writel(0, priv->dma_regs + CPDMA_TXCONTROL);
-	__raw_writel(0, priv->dma_regs + CPDMA_RXCONTROL);
-
-	/* soft reset the controller and initialize priv */
-	// setbit_and_wait_for_clear32(&priv->regs->soft_reset);
+	dma_disable ();
 	reset_controller ();
-
-	/* clear dma state */
-	// setbit_and_wait_for_clear32(priv->dma_regs + CPDMA_SOFTRESET);
 	reset_cpdma ();
 }
 
@@ -1250,35 +1310,22 @@ cpsw_register ( void )
 	struct cpsw_priv	*priv = &cpsw_private;
 	struct cpsw_slave	*slave;
 
-	/* This performs a structure copy */
-	/* XXX - should just change to a pointer */
-	/* XXX - or merge it into the private structure */
-	// priv->data = *data;
-
-	/* pointer to array of two gizmos */
-	priv->slaves = cpsw_slavery;
-
-	/* XXX - 0 */
-	priv->host_port		= HOST_PORT_NUM;
-
-	priv->regs		= (struct cpsw_regs *) CPSW_BASE;
-	priv->dma_regs		= (void *) CPDMA_BASE;
-	priv->ale_regs		= (void *) ALE_BASE;
-	priv->descs		= (struct cpdma_desc *) BDRAM_BASE;
+	priv->ale_base		= (void *) ALE_BASE;
 
 	slave = &priv->slaves[0];
 	slave->slave_num = 0;
-	slave->regs	  = (struct cpsw_slave_regs *) PORT1_BASE;
-	slave->sliver = (struct cpsw_sliver_regs *) SLIVER1_BASE;
+	slave->regs	  = (struct port_regs *) PORT1_BASE;
+	slave->sliver = (struct sliver_regs *) SLIVER1_BASE;
 
 	slave = &priv->slaves[1];
 	slave->slave_num = 1;
-	slave->regs	  = (struct cpsw_slave_regs *) PORT2_BASE;
-	slave->sliver = (struct cpsw_sliver_regs *) SLIVER2_BASE;
+	slave->regs	  = (struct port_regs *) PORT2_BASE;
+	slave->sliver = (struct sliver_regs *) SLIVER2_BASE;
 
 	cm_get_mac0 ( priv->enetaddr );
 }
 
+#ifdef KYU_EEPROM
 /*
  * TI AM335x parts define a system EEPROM that defines certain sub-fields.
  * We use these fields to in turn see what board we are on, and what
@@ -1302,6 +1349,7 @@ board_is_bone(struct am335x_baseboard_id *header)
 {
 	return !strncmp(header->name, "A335BONE", HDR_NAME_LEN);
 }
+#endif
 
 /*
  * eth_init (previously board_eth_init())
@@ -1321,9 +1369,8 @@ board_is_bone(struct am335x_baseboard_id *header)
 void
 eth_init ( void )
 {
-	// int rv, n = 0;
-
 #ifdef KYU_MAC
+	/* not used */
 	uint8_t mac_addr[6];
 	uint32_t mac_hi, mac_lo;
 
@@ -1393,11 +1440,6 @@ eth_start ( void )
 	    NetRxPackets[i] = (char *) ((pkaddr+63) & ~0x3f);
 	}
 
-	/*
-	printf ("Calling cpsw_setup\n" );
-	cpsw_setup ();
-	printf ("Done with cpsw_setup\n" );
-	*/
 	cpsw_setup ();
 
 #ifdef notdef
@@ -1417,34 +1459,21 @@ eth_start ( void )
 static unsigned long
 get_dmastat ( void )
 {
-	struct cpsw_priv	*priv = &cpsw_private;
-	// unsigned long *lp = (unsigned long *) (priv->dma_regs + CPDMA_STATUS);
-	/*
-	printf ("Get dma status from %08x (%08x)\n", lp, *lp );
-	*/
-	//return *lp;
-	return * (unsigned long *) (priv->dma_regs + CPDMA_STATUS);
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+
+	return dma->status;
 }
 
 static void
 show_dmastatus ( void )
 {
-	struct cpsw_dma *dp = (struct cpsw_dma *) CPDMA_BASE;
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
 
-	printf ( "DMA base at %08x\n", dp );
-	printf ( "DMA tx control: %08x\n", dp->tx_control );
-	printf ( "DMA rx control: %08x\n", dp->rx_control );
-	printf ( "DMA status:   %08x\n", dp->status );
+	printf ( "DMA base at %08x\n", dma );
+	printf ( "DMA tx control: %08x\n", dma->tx_control );
+	printf ( "DMA rx control: %08x\n", dma->rx_control );
+	printf ( "DMA status:   %08x\n", dma->status );
 
-}
-
-static void
-dma_enable ( void )
-{
-	struct cpsw_dma *dp = (struct cpsw_dma *) CPDMA_BASE;
-
-	dp->tx_control = 1;
-	dp->rx_control = 1;
 }
 
 #define TLIMIT 10
