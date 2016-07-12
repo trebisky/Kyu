@@ -80,23 +80,23 @@
 
 struct cpdma_desc {
 	/* hardware fields */
-	u32			hw_next;
-	u32			hw_buffer;
+	struct cpdma_desc *	hw_next;
+	void *			hw_buffer;
 	u32			hw_len;
 	u32			hw_mode;
 	/* software fields */
-	u32			sw_buffer;
+	void *			sw_buffer;
 	u32			sw_len;
 };
 
-/* Offsets to access CPDMA registers --
- * this driver doesn't use many DMA Registers
- */
-//#define CPDMA_TXCONTROL		0x004
-//#define CPDMA_RXCONTROL		0x014
-// #define CPDMA_SOFTRESET		0x01c
-// #define CPDMA_STATUS		0x024	/* KYU */
-// #define CPDMA_RXFREE		0x0e0
+/* Near as I can tell this is entirely software defined */
+struct cpdma_chan {
+	struct cpdma_desc	*head;
+	struct cpdma_desc	*tail;
+	volatile unsigned long	*hdp;		/* points into stateram */
+	volatile unsigned long    *cp;		/* points into stateram */
+	volatile unsigned long    *rxfree;	/* points to cpdma hardware */
+};
 
 struct dma_regs {
 	volatile unsigned long tx_ver;				/* 00 */
@@ -138,13 +138,6 @@ struct dma_regs {
 #define CPDMA_TXCP_VER2		0x240
 #define CPDMA_RXCP_VER2		0x260
 #endif
-
-/* ALE Registers */
-// #define ALE_CONTROL		0x08
-// #define ALE_UNKNOWNVLAN		0x18
-// #define ALE_TABLE_CONTROL	0x20
-// #define ALE_TABLE		0x34
-// #define ALE_PORTCTL		0x40
 
 #define NUM_ALE_PORTS		6
 
@@ -282,16 +275,6 @@ struct cpsw_port {
 	int				port_num;
 	u32				mac_control;
 };
-
-/* Near as I can tell this is software defined */
-struct cpdma_chan {
-	struct cpdma_desc	*head;
-	struct cpdma_desc	*tail;
-	volatile void	*hdp;		/* points into stateram */
-	volatile void    *cp;		/* points into stateram */
-	volatile void    *rxfree;	/* points to cpdma hardware */
-};
-
 
 struct cpsw_priv {
         unsigned char			enetaddr[6];	/* XXX should be per port */
@@ -624,19 +607,6 @@ void NetReceive ( char *, int );
 #define ALE_MCAST_BLOCK_LEARN_FWD	1
 #define ALE_MCAST_FWD_LEARN		2
 #define ALE_MCAST_FWD_2			3
-
-#ifdef KYU
-#define __xraw_writel(v,a)	(*((volatile unsigned long *)(a)) = (v))
-#define __xraw_readl(a)		(*((volatile unsigned long *)(a)))
-#endif
-
-#define desc_write(desc, fld, val)	__xraw_writel((u32)(val), &(desc)->fld)
-#define desc_read(desc, fld)		__xraw_readl(&(desc)->fld)
-#define desc_read_ptr(desc, fld)	((void *)__xraw_readl(&(desc)->fld))
-
-#define chan_write(chan, fld, val)	__xraw_writel((u32)(val), (chan)->fld)
-#define chan_read(chan, fld)		__xraw_readl((chan)->fld)
-#define chan_read_ptr(chan, fld)	((void *)__xraw_readl((chan)->fld))
 
 static inline int
 ale_get_field(u32 *ale_entry, u32 start, u32 bits)
@@ -1009,7 +979,7 @@ cpdma_desc_alloc(struct cpsw_priv *priv)
 	struct cpdma_desc *desc = priv->desc_free;
 
 	if (desc)
-		priv->desc_free = desc_read_ptr(desc, hw_next);
+		priv->desc_free = desc->hw_next;
 
 	return desc;
 }
@@ -1018,7 +988,7 @@ static void
 cpdma_desc_free(struct cpsw_priv *priv, struct cpdma_desc *desc)
 {
 	if (desc) {
-		desc_write(desc, hw_next, priv->desc_free);
+		desc->hw_next = priv->desc_free;
 		priv->desc_free = desc;
 	}
 }
@@ -1044,33 +1014,38 @@ cpdma_submit(struct cpsw_priv *priv, struct cpdma_chan *chan, void *buffer, int 
 
 	mode = CPDMA_DESC_OWNER | CPDMA_DESC_SOP | CPDMA_DESC_EOP;
 
-	desc_write(desc, hw_next,   0);
-	desc_write(desc, hw_buffer, buffer);
-	desc_write(desc, hw_len,    len);
-	desc_write(desc, hw_mode,   mode | len);
-	desc_write(desc, sw_buffer, buffer);
-	desc_write(desc, sw_len,    len);
+	desc->hw_next = 0;
+	desc->hw_buffer = buffer;
+	desc->hw_len = len;
+	desc->hw_mode = mode | len;
+
+	desc->sw_buffer = buffer;
+	desc->sw_len = len;
 
 	if (!chan->head) {
 		/* simple case - first packet enqueued */
 		chan->head = desc;
 		chan->tail = desc;
-		chan_write(chan, hdp, desc);
+		// chan_write(chan, hdp, desc);
+		*(chan->hdp) = (u32) desc;
 		goto done;
 	}
 
 	/* not the first packet - enqueue at the tail */
 	prev = chan->tail;
-	desc_write(prev, hw_next, desc);
+	prev->hw_next = desc;
 	chan->tail = desc;
 
 	/* next check if EOQ has been triggered already */
-	if (desc_read(prev, hw_mode) & CPDMA_DESC_EOQ)
-		chan_write(chan, hdp, desc);
+	if ( prev->hw_mode & CPDMA_DESC_EOQ)
+		// chan_write(chan, hdp, desc);
+		*(chan->hdp) = (u32) desc;
 
 done:
 	if (chan->rxfree)
-		chan_write(chan, rxfree, 1);
+		// chan_write(chan, rxfree, 1);
+		// XXX ?! but it works.
+		*(chan->rxfree) = 1;
 	return 0;
 }
 
@@ -1090,7 +1065,7 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, in
 	if (!desc)
 		return -ENOENT;
 
-	status = desc_read(desc, hw_mode);
+	status = desc->hw_mode;
 	/* KYU
 	if ( status != lstatus ) {
 	    printf ( "cpdma_process %08x from %08x\n", status, desc );
@@ -1102,19 +1077,21 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, in
 		*len = status & 0x7ff;
 
 	if (buffer)
-		*buffer = desc_read_ptr(desc, sw_buffer);
+		*buffer = desc->sw_buffer;
 
 	if (status & CPDMA_DESC_OWNER) {
-		if (chan_read(chan, hdp) == 0) {
-			if (desc_read(desc, hw_mode) & CPDMA_DESC_OWNER)
-				chan_write(chan, hdp, desc);
+		if ( chan->hdp == 0) {
+			if ( desc->hw_mode & CPDMA_DESC_OWNER)
+				// chan_write(chan, hdp, desc);
+				*(chan->hdp) = (u32) desc;
 		}
 
 		return -EBUSY;
 	}
 
-	chan->head = desc_read_ptr(desc, hw_next);
-	chan_write(chan, cp, desc);
+	chan->head = desc->hw_next;
+	// chan_write(chan, cp, desc);
+	*(chan->cp) = (u32) desc;
 
 	cpdma_desc_free(priv, desc);
 	return 0;
@@ -1147,14 +1124,10 @@ port_init(struct cpsw_port *port )
 	reset_port ( port );
 
 	/* setup priority mapping */
-	// __raw_writel(0x76543210, &port->sliver->rx_pri_map);
-	// __raw_writel(0x33221100, &port->regs->tx_pri_map);
-
 	port->sliver->rx_pri_map = 0x76543210;
 	port->regs->tx_pri_map = 0x33221100;
 
 	/* setup max packet size, and mac address */
-	// __raw_writel(PKT_MAX, &port->sliver->rx_maxlen);
 	port->sliver->rx_maxlen = PKT_MAX;
 
 	set_port_mac ( port );
@@ -1194,7 +1167,6 @@ update_link ( struct cpsw_port *port )
 		printf("link down on port %d\n", port->port_num);
 	}
 
-	// __raw_writel(mac_control, &port->sliver->mac_control);
 	port->sliver->mac_control = mac_control;
 
 	port->mac_control = mac_control;
@@ -1230,18 +1202,13 @@ cpsw_setup( void )
 	// ale_vlan_aware(priv, 0); /* vlan unaware mode */
 
 	/* setup host port priority mapping */
-	// __raw_writel(0x76543210, &priv->host_port_regs->cpdma_tx_pri_map);
-	// __raw_writel(0, &priv->host_port_regs->cpdma_rx_chan_map);
 	hreg->cpdma_tx_pri_map = 0x76543210;
 	hreg->cpdma_rx_chan_map = 0;
 
 	/* disable priority elevation and enable statistics on all ports */
-	// __raw_writel(0, &priv->regs->ptype);
 	regs->ptype = 0;
 
 	/* enable statistics collection only on the host port */
-	//__raw_writel(BIT(priv->host_port), &priv->regs->stat_port_en);
-	//__raw_writel(0x7, &priv->regs->stat_port_en);
 	regs->stat_port_en = BIT(HOST_PORT);
 	regs->stat_port_en = 0x7;
 
@@ -1264,8 +1231,9 @@ cpsw_setup( void )
 
 	bdram = (struct cpdma_desc *) BDRAM_BASE;
 	for (i = 0; i < NUM_DESCS; i++) {
-		desc_write(&bdram[i], hw_next,
-			   (i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1]);
+		bdram[i].hw_next = (i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1];
+		//desc_write(&bdram[i], hw_next,
+			   //(i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1]);
 	}
 
 	// priv->desc_free = &priv->descs[0];
@@ -1293,11 +1261,6 @@ cpsw_setup( void )
 
 	// for (i = 0; i < priv->data.channels; i++) {
 	for (i = 0; i < NUM_CPDMA_CHANNELS; i++) {
-		//__raw_writel(0, priv->dma_regs + CPDMA_RXFREE + 4 * i);
-		//__raw_writel(0, priv->dma_regs + CPDMA_RXHDP_VER2 + 4 * i);
-		//__raw_writel(0, priv->dma_regs + CPDMA_RXCP_VER2 + 4 * i);
-		//__raw_writel(0, priv->dma_regs + CPDMA_TXHDP_VER2 + 4 * i);
-		//__raw_writel(0, priv->dma_regs + CPDMA_TXCP_VER2 + 4 * i);
 		dma->rxfree[i] = 0;
 		stram->rxhdp[i] = 0;
 		stram->rxcp[i] = 0;
