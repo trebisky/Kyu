@@ -973,23 +973,36 @@ set_port_mac ( struct cpsw_port *port )
 	// __raw_writel(mac_lo(priv->enetaddr), &port->regs->sa_lo);
 }
 
-static struct cpdma_desc *
-cpdma_desc_alloc(struct cpsw_priv *priv)
+static void
+cpdma_desc_init ( void )
 {
-	struct cpdma_desc *desc = priv->desc_free;
+	struct cpdma_desc *bdram = (struct cpdma_desc *) BDRAM_BASE;
+	int i;
+
+	for (i = 0; i < NUM_DESCS; i++) {
+		bdram[i].hw_next = (i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1];
+	}
+
+	cpsw_private.desc_free = bdram;
+}
+
+static struct cpdma_desc *
+cpdma_desc_alloc ( void )
+{
+	struct cpdma_desc *desc = cpsw_private.desc_free;
 
 	if (desc)
-		priv->desc_free = desc->hw_next;
+		cpsw_private.desc_free = desc->hw_next;
 
 	return desc;
 }
 
 static void
-cpdma_desc_free(struct cpsw_priv *priv, struct cpdma_desc *desc)
+cpdma_desc_free ( struct cpdma_desc *desc )
 {
 	if (desc) {
-		desc->hw_next = priv->desc_free;
-		priv->desc_free = desc;
+		desc->hw_next = cpsw_private.desc_free;
+		cpsw_private.desc_free = desc;
 	}
 }
 
@@ -998,12 +1011,12 @@ cpdma_desc_free(struct cpsw_priv *priv, struct cpdma_desc *desc)
  *  for a read, it adds an empty buffer to the receive list.
  */
 static int
-cpdma_submit(struct cpsw_priv *priv, struct cpdma_chan *chan, void *buffer, int len)
+cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
 {
 	struct cpdma_desc *desc, *prev;
 	u32 mode;
 
-	desc = cpdma_desc_alloc(priv);
+	desc = cpdma_desc_alloc();
 	if (!desc) {
 	    printf ("cpdma_submit - dropping (no memory)\n" );
 	    return -ENOMEM;
@@ -1056,7 +1069,7 @@ static u32 lstatus = 0;
  * For reads it harvests data that has arrived.
  */
 static int
-cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, int *len)
+cpdma_process ( struct cpdma_chan *chan, void **buffer, int *len)
 {
 	struct cpdma_desc *desc;
 	u32 status;
@@ -1093,7 +1106,7 @@ cpdma_process(struct cpsw_priv *priv, struct cpdma_chan *chan, void **buffer, in
 	// chan_write(chan, cp, desc);
 	*(chan->cp) = (u32) desc;
 
-	cpdma_desc_free(priv, desc);
+	cpdma_desc_free(desc);
 	return 0;
 }
 
@@ -1184,8 +1197,8 @@ cpsw_setup( void )
 	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
 	struct cpsw_regs *regs = (struct cpsw_regs *) CPSW_BASE;
 	struct ale_regs *ale = (struct ale_regs *) ALE_BASE;
-	struct cpdma_desc *bdram;
-	int i, ret;
+	int i;
+	int ret;
 
 	reset_controller ();
 
@@ -1224,20 +1237,7 @@ cpsw_setup( void )
 	port_init ( &priv->ports[0] );
 	update_link ( &priv->ports[0] );
 
-	// priv->descs		= (struct cpdma_desc *) BDRAM_BASE;
-	//	desc_write(&priv->descs[i], hw_next,
-	//	   (i == (NUM_DESCS - 1)) ? 0 : &priv->descs[i+1]);
-	/* init descriptor pool */
-
-	bdram = (struct cpdma_desc *) BDRAM_BASE;
-	for (i = 0; i < NUM_DESCS; i++) {
-		bdram[i].hw_next = (i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1];
-		//desc_write(&bdram[i], hw_next,
-			   //(i == (NUM_DESCS - 1)) ? 0 : &bdram[i+1]);
-	}
-
-	// priv->desc_free = &priv->descs[0];
-	priv->desc_free = bdram;
+	cpdma_desc_init ();
 
 	/* initialize channels */
 	/* am335x devices are version 2 */
@@ -1280,8 +1280,7 @@ cpsw_setup( void )
 
 	/* submit rx descs */
 	for (i = 0; i < PKTBUFSRX; i++) {
-		ret = cpdma_submit(priv, &priv->rx_chan, NetRxPackets[i],
-				   PKTSIZE);
+		ret = cpdma_submit ( &priv->rx_chan, NetRxPackets[i], PKTSIZE);
 		if (ret < 0) {
 			printf("error %d submitting rx desc\n", ret);
 			break;
@@ -1308,16 +1307,14 @@ static int
 // cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 cpsw_sendpk( void *packet, int length )
 {
-	struct cpsw_priv	*priv = &cpsw_private;
 	void *buffer;
 	int len;
 	int timeout = CPDMA_TIMEOUT;
 
-	flush_dcache_range((unsigned long)packet,
-			   (unsigned long)packet + length);
+	flush_dcache_range((unsigned long)packet, (unsigned long)packet + length);
 
 	/* first reap completed packets */
-	while (timeout-- && (cpdma_process(priv, &priv->tx_chan, &buffer, &len) >= 0))
+	while (timeout-- && ( cpdma_process ( &cpsw_private.tx_chan, &buffer, &len) >= 0))
 		;
 
 	if (timeout == -1) {
@@ -1325,7 +1322,7 @@ cpsw_sendpk( void *packet, int length )
 		return -ETIMEDOUT;
 	}
 
-	return cpdma_submit(priv, &priv->tx_chan, packet, length);
+	return cpdma_submit ( &cpsw_private.tx_chan, packet, length);
 }
 
 /* was for ETH structure - never called at present */
@@ -1333,18 +1330,17 @@ static int
 // cpsw_recv(struct eth_device *dev)
 cpsw_recv( void )
 {
-	struct cpsw_priv	*priv = &cpsw_private;
 	void *buffer;
 	int len;
 
-	while (cpdma_process(priv, &priv->rx_chan, &buffer, &len) >= 0) {
+	while ( cpdma_process ( &cpsw_private.rx_chan, &buffer, &len ) >= 0) {
 		invalidate_dcache_range((unsigned long)buffer,
 					(unsigned long)buffer + PKTSIZE_ALIGN);
 
 		/* XXX - in U-boot this gets called for every packet received */
 		NetReceive(buffer, len);
 
-		cpdma_submit(priv, &priv->rx_chan, buffer, PKTSIZE);
+		cpdma_submit ( &cpsw_private.rx_chan, buffer, PKTSIZE);
 	}
 
 	return 0;
@@ -1597,14 +1593,12 @@ static int tx_int_count = 0;
 static void
 cpsw_reaper ( int xxx )
 {
-	struct cpsw_priv *priv = &cpsw_private;
-	struct cpdma_chan *rx_chan = &priv->rx_chan;
 	void *buffer;
 	int len;
 	struct netbuf *nbp;
 
 	for ( ;; ) {
-	    if ( cpdma_process ( priv, rx_chan, &buffer, &len ) >= 0 ) {
+	    if ( cpdma_process ( &cpsw_private.rx_chan, &buffer, &len ) >= 0 ) {
 		invalidate_dcache_range((unsigned long)buffer,
 					(unsigned long)buffer + PKTSIZE_ALIGN);
 
@@ -1633,7 +1627,7 @@ cpsw_reaper ( int xxx )
 		net_rcv ( nbp );
 
 		/* recycle receive buffer */
-		cpdma_submit ( priv, rx_chan, buffer, PKTSIZE );
+		cpdma_submit ( &cpsw_private.rx_chan, buffer, PKTSIZE );
 	    } else {
 		thr_delay ( 1 );
 	    }
