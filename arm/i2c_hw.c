@@ -51,7 +51,7 @@
 
 #define I2C0_BASE      0x44E0B000
 #define I2C1_BASE      0x4802A000
-#define I2C2_BASE      0x4819C000
+#define I2C2_BASE      0x4819C000	/* Gets data abort */
 
 struct i2c_dev {
 	volatile unsigned long revlo;		/* 00 */

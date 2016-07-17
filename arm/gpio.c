@@ -448,14 +448,38 @@ gpio_test7 ( void )
 void
 gpio_test8 ( void )
 {
-	int n;
+	unsigned long t1, t2;
 
-	gpio_out_init ( TEST8_BIT );
+	timer_xxx ();
+
+	thr_delay ( 2 );
+	reset_ccnt ();
+	xxx_arm ();
+
+	t1 = get_ccnt();
+	thr_delay ( 5 );
+	t2 = get_ccnt();
+
+	printf ( "DELAY done: %d %d %d\n", t1, t2, t2-t1 );
+	show_xxx ();
+
+}
+
+/* Generate pulses to test my Rigol DS1054Z oscilloscope.
+ * This is the test that exposed my even/odd timer bug
+ *  in July of 2016
+ */
+#define TEST9_BIT	GPIO_2_2
+void
+gpio_test9 ( void )
+{
+	int n;
+	gpio_out_init ( TEST9_BIT );
 
 	for ( ;; ) {
 	    for ( n=0; n<10; n++ ) {
-		gpio_clear_bit ( TEST8_BIT );
-		gpio_set_bit ( TEST8_BIT );
+		gpio_clear_bit ( TEST9_BIT );
+		gpio_set_bit ( TEST9_BIT );
 	    }
 	    thr_delay ( 1 );
 	}
@@ -498,6 +522,7 @@ gpio_test ( void )
 	// iic_test ();
 	// i2c_test ();
 	gpio_test8 ();
+	// gpio_test9 ();
 }
 
 /* THE END */

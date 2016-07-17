@@ -75,6 +75,7 @@ reset_ccnt ( void )
  * Also, beware of the compiler optimizing this away.
  * There is about 60 ns extra delay (call overhead).
  * A fussy caller could subtract 50 ns from the argument.
+ * Good for up to 4.3 second delays.
  */
 void
 delay_ns ( int delay )
@@ -98,13 +99,13 @@ hardware_init ( void )
 	intcon_init ();
 	cm_init ();
 
+	enable_ccnt ( 0 );
+
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	/* CPU interrupts on */
 	enable_irq ();
-
-	enable_ccnt ( 0 );
 
 	gpio_init ();
 	i2c_init ();

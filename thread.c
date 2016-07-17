@@ -2040,6 +2040,37 @@ cpu_wait ( struct sem *xp )
  * --------------
  */
 
+static int xxx_first = 1;
+static int xxx_trigger = 5;
+static int xxx_debug = 0;
+
+struct xxx_info {
+	unsigned long ccnt;
+	int delay; 
+};
+
+static struct xxx_info xxx_data[10];
+static int xxx_count = 0;
+
+void
+show_xxx ( void )
+{
+	int i;
+	struct xxx_info *d;
+
+	for ( i=0; i<xxx_count; i++ ) {
+	    d = &xxx_data[i];
+	    printf ( " xxx: %d %10d\n", d->delay, d->ccnt );
+	}
+}
+
+void
+xxx_arm ( void )
+{
+	xxx_first = 1;
+	xxx_count = 0;
+}
+
 /* Called once for every timer interrupt.
  * Runs at interrupt level.
  * Handles delays and repeats.
@@ -2051,6 +2082,13 @@ thread_tick ( void )
 
 	/* Process delays */
 	if ( wait_head ) {
+	    // if ( xxx_debug ) { printf ( "wait tick: %d\n", wait_head->delay ); }
+	    if ( xxx_debug ) {
+		struct xxx_info *d;
+		d = &xxx_data[xxx_count++];
+		d->delay = wait_head->delay;
+		d->ccnt = get_ccnt ();
+	    }
 	    --wait_head->delay;
 	    while ( wait_head && wait_head->delay == 0 ) {
 		tp = wait_head;
@@ -2060,6 +2098,8 @@ thread_tick ( void )
 		    printf ( "Remove wait: %s\n", tp->name );
 		}
 		*/
+		//if ( xxx_debug ) printf ( "GO\n" );
+		if ( xxx_debug ) xxx_debug = 0;
 	    	thr_unblock ( tp );
 	    }
 	}
@@ -2093,6 +2133,12 @@ timer_add_wait_int ( struct thread *tp, int delay )
 {
 	struct thread *p, *lp;
 
+	if ( delay == xxx_trigger ) {
+	    if ( xxx_first ) xxx_debug = 1;
+	    xxx_first = 0;
+	} else
+	    xxx_debug = 0;
+
 	p = wait_head;
 
 	while ( p && p->delay <= delay ) {
@@ -2111,6 +2157,13 @@ timer_add_wait_int ( struct thread *tp, int delay )
 	    wait_head = tp;
 	else
 	    lp->wnext = tp;
+
+	if ( xxx_debug ) {
+	    for ( p=wait_head; p; p = p->wnext ) {
+		printf ( "add wait %d\n", p->delay );
+	    }
+	    xxx_first = 0;
+	}
 	/*
 	printf ( "Add wait: %d\n", delay );
 	*/
