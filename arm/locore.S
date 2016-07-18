@@ -395,6 +395,22 @@ get_sctrl:
 	mrc     p15, 0, r0, c1, c0, 0
 	bx	lr
 
+	.globl set_sctrl
+set_sctrl:
+	mcr 	p15, 0, r0, c1, c0, 0
+	bx	lr
+
+/* MMU table base */
+	.globl get_mmu
+get_mmu:
+	mrc     p15, 0, r0, c2, c0, 0
+	bx	lr
+
+	.globl set_mmu
+set_mmu:
+	mcr 	p15, 0, r0, c2, c0, 0
+	bx	lr
+
 /* The cycle count register is a 32 bit register
  * This is for a Cortex A8 arm chip.
  */

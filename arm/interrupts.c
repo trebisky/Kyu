@@ -192,7 +192,7 @@ void do_irq ( void )
 	spin ();
 #endif
 
-	/* Tell thread system we are in an interrupt */
+	/* Tell Kyu thread system we are in an interrupt */
 	start_interrupt ();
 
 	nint = intcon_irqwho ();
@@ -216,6 +216,9 @@ void do_irq ( void )
 	 */
 	(irq_table[nint].func)( irq_table[nint].arg );
 
+	intcon_irqack ();
+
+	/* Tell Kyu thread system we are done with an interrupt */
 	finish_interrupt ();
 
 	panic ( "do_irq, resume" );

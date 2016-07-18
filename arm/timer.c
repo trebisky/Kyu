@@ -32,8 +32,13 @@ void thread_tick ( void );
 
 //#define TIMER_BASE	TIMER1MS_BASE
 
-#define TIMER_BASE	TIMER0_BASE
-#define TIMER_IRQ	IRQ_TIMER0
+// #define TIMER_BASE	TIMER0_BASE
+// #define TIMER_IRQ	IRQ_TIMER0
+
+// By default this one runs at 24 Mhz
+//  "32K timer running at 24000007 Hz"
+#define TIMER_BASE	TIMER2_BASE
+#define TIMER_IRQ	IRQ_TIMER2
 
 /* XXX - this doesn't belong here, but
  * I discovered when trying to use other than timer 0
@@ -148,12 +153,13 @@ struct dmtimer1 {
  * This is chapter 8 of the TRM.  Especially pages 901 to 902
  */
 
-/* XXX - The weird 76677 gives close to 100 Hz ticks */
-/*
+// #define TIMER_CLOCK	38194
 #define TIMER_CLOCK	32768
+
+/* This should get overwritten by the value
+ * determined by calibration
  */
-//#define TIMER_CLOCK	76677
-#define TIMER_CLOCK	38194
+static int timer_hz = TIMER_CLOCK;
 
 static volatile long timer_count_t;
 static volatile long timer_count_s;
@@ -171,6 +177,7 @@ static int timer_rate;
 
 /* --------------------------------------------------- */
 
+#ifdef TIMER_DEBUG
 #define NXXX	20
 
 static int xxx_first = NXXX;
@@ -181,6 +188,7 @@ static int xxx_counts[20];
 static unsigned long xxx_stat[20];
 static int xxx_count = 0;
 
+/* Needs to get called from someplace to display this info. */
 void
 timer_xxx ( void )
 {
@@ -189,6 +197,7 @@ timer_xxx ( void )
 	for ( i=0; i<NXXX; i++ )
 	    printf ( "XXX timer; %d %08x %08x\n", xxx_data[i], xxx_counts[i], xxx_stat[i] );
 }
+#endif
 
 /* --------------------------------------------------- */
 /* --------------------------------------------------- */
@@ -260,6 +269,23 @@ get_timer_count_s ( void )
 	return timer_count_s;
 }
 
+static int bogus_count = 0;
+
+void
+show_bogus_timer ( void )
+{
+	if ( bogus_count == 0 )
+	    printf ( " No bogus timer interrupts !!!!!!!!!!\n" );
+	else
+	    printf ( " %d bogus timer interrupts\n", bogus_count );
+}
+
+/* ---------------------------------------------------------- */
+/* The routines below with prefix "dmtimer_" handle the timers
+ * with the structure other than timer1
+ */
+/* ---------------------------------------------------------- */
+
 static void
 post_spin ( int mask )
 {
@@ -269,8 +295,11 @@ post_spin ( int mask )
 	    ;
 }
 
-/* These routines with prefix "dmtimer_" handle the timers
- * with the structure other than timer1
+
+/* Note that with a 32769 Hz timer and a 1000 Hz tick rate,
+ * the load value is -33 or something close.  This is pretty
+ * doggone imprecise (we can do no better than 3 percent).
+ * No way to beat that rap without using the 1ms Timer 1
  */
 
 static void
@@ -280,8 +309,8 @@ dmtimer_rate_set_i ( int rate )
 	unsigned long val;
 
 	val = 0xffffffff;
-	val -= TIMER_CLOCK / rate;
-	printf ( "Loading: %08x\n", val );
+	val -= timer_hz / rate;
+	// printf ( "Loading: %08x\n", val );
 
 	/* load the timer */
 	post_spin ( POST_LOAD );
@@ -320,7 +349,26 @@ dmtimer_rate_set ( int hz )
 	dmtimer_irqena ();
 }
 
-// static int limit = 20;
+/* On 7-16-2016 I spent most of the day sorting out a problem with
+ * timer interrupts.  I found that I am getting two interrupts in a rapid
+ * burst when the timer overflow happens.  The first is the "real one" with
+ * the OVF bit set in the interrupt status register.  The second one is bogus
+ * and does not have the OVF bit set, which allows me to ignore it.
+ *
+ * However .... this should not be happening at all, and having this bogus
+ * interrupt on every tick is rattling in and out of interrupt context, which
+ * is some amount of unnecessary overhead.  I suspect that I am doing
+ * something wrong, either at the intcon level or the ARM level.
+ * I need to see if other interrupt sources have the same issue or if this
+ * is specific to the timer.  The check to abandon bogus checks could remain
+ * as "belt and suspenders" insurance, even when this gets fixed at that
+ * deeper level.
+ *
+ * The root problem was fixed 7-17-2016 -- I was clearing the interrupt
+ * condition in the intcon before clearing the pending flag here.
+ * This was wrong -- I must clear the pending interrupt here first,
+ *  then on my way out, reset the condition in the interrupt controller.
+ */
 
 /* Handle a timer interrupt */
 void
@@ -330,9 +378,12 @@ dmtimer_int ( int xxx )
 	struct dmtimer *tmr = (struct dmtimer *) TIMER_BASE;
 
 	/* Abandon bogus interrupts */
-	if ( ! (tmr->irq_stat & TIMER_OVF) )
+	if ( ! (tmr->irq_stat & TIMER_OVF) ) {
+	    ++bogus_count;
 	    return;
+	}
 	    
+#ifdef TIMER_DEBUG
 	// printf ( "TIMER int !!\n" );
 	// if ( limit > 0 ) {
 	// post_spin ( POST_COUNT );
@@ -361,6 +412,7 @@ dmtimer_int ( int xxx )
 	    // printf ( " regs 2 -- %08x %08x\n", tmr->irq_stat_raw, tmr->irq_stat );
 	    --xxx_first;
 	}
+#endif
 
 	++jiffies;
 
@@ -406,17 +458,21 @@ dmtimer_int ( int xxx )
  * This is the only possible source for Timer 0.
  *  we could run this calibration and use the determined value.
  */
-void
+static int
 dmtimer_checkrate ( void )
 {
 	struct dmtimer *tmr = (struct dmtimer *) TIMER_BASE;
 	unsigned long v1, v2;
 	unsigned long c1, c2;
 
-	printf ( "Timer control reg = %08x\n", tmr->ctrl );
-	dmtimer_irqdis ();
-	// tmr->ctrl = 0;
+	// printf ( "Timer control reg = %08x\n", tmr->ctrl );
 
+	// stop the timer
+	dmtimer_irqdis ();
+	post_spin ( POST_CTRL );
+	tmr->ctrl = 0;
+
+#ifdef notdef
 	post_spin ( POST_COUNT );
 	tmr->count = 9;
 	post_spin ( POST_LOAD );
@@ -436,16 +492,27 @@ dmtimer_checkrate ( void )
 	delay_ns ( 1000 );
 	post_spin ( POST_COUNT );
 	printf ( "COUNT = %d\n", tmr->count );
+#endif
+
+	// load and start the timer
+	post_spin ( POST_COUNT );
+	tmr->count = 3;	/* anything near zero would do */
+	post_spin ( POST_CTRL );
+	tmr->ctrl = CTRL_START;
 
 	v1 = tmr->count;
 	    delay_ns ( 1000 * 1000 * 1000 );
 	v2 = tmr->count;
 
+	// stop the timer
 	post_spin ( POST_CTRL );
 	tmr->ctrl = 0;
-	printf ( "CCNT = %d\n", get_ccnt() );
 
-	printf ( "Checkrate: %d %d -- %d\n", v1, v2, v2-v1 );
+	// printf ( "CCNT = %d\n", get_ccnt() );
+	// printf ( "Checkrate: %d %d -- %d\n", v1, v2, v2-v1 );
+	printf ( "32K timer running at %d Hz\n", v2-v1 );
+
+	return v2-v1;
 }
 
 void
@@ -453,17 +520,19 @@ dmtimer_init ( int rate )
 {
 	struct dmtimer *tmr = (struct dmtimer *) TIMER_BASE;
 
-	dmtimer_checkrate ();
-
-	/* This is 0x4 from U-boot (posted is set) */
+	/* This arrives set to 0x4 from U-boot (posted bit is set) */
 	// printf ( " SIC == %08x\n", tmr->sic );
 	tmr->sic = SIC_POSTED;
+
+	timer_hz = dmtimer_checkrate ();
 
 	/* Stop the timer */
 	dmtimer_irqdis ();
 	post_spin ( POST_CTRL );
 	tmr->ctrl = 0;
 
+	/* XXX not for us, but for the 1ms timer */
+	/* will need something like this for timer 2 */
 	// prcm_timer1_mux ();
 
 	timer_count_t = 0;
@@ -474,7 +543,7 @@ dmtimer_init ( int rate )
 	net_timer_hook = (vfptr) 0;
 #endif
 
-	printf ( "Timer id: %08x\n", tmr->id );
+	// printf ( "Timer id: %08x\n", tmr->id );
 
 	irq_hookup ( TIMER_IRQ, dmtimer_int, 0 );
 
@@ -487,6 +556,7 @@ dmtimer_init ( int rate )
 	tmr->ctrl = CTRL_START | CTRL_AUTO;
 }
 
+#ifdef TIMER_TEST
 void
 dmtimer_test ( void )
 {
@@ -504,6 +574,7 @@ dmtimer_test ( void )
 	    delay10 ();
 	}
 }
+#endif
 
 /* Called during Kyu startup */
 void

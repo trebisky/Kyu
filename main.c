@@ -51,10 +51,9 @@ kern_startup ( void )
 	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
 	*/
 
-	/* print initial banner on VGA console
-	 * no matter what (in case we get hosed before
-	 * we can set up a serial console.
+	/* print initial banner on console
 	 */
+	printf ( "\n" );
 	printf ( "Kyu %s starting\n", kyu_version );
 
 	/* This will get 0x8ffce on the x86 */

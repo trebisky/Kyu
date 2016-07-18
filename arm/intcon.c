@@ -100,16 +100,30 @@ int
 intcon_irqwho ( void )
 {
 	struct intcon *base = (struct intcon *) INTCON_BASE;
-	int n = base->sir_irq;
-
-	/* ack the irq in the intcon */
-	base->control = 1;
 
 	/*
+	int n = base->sir_irq;
 	printf ("Interrupt: %08x %d\n", n, n&0x7f );
 	*/
 
 	return ( base->sir_irq & 0x7f );
+}
+
+/* It is important to do this only AFTER the interrupt condition
+ * has been cleared at the source.
+ * (the device generating the interrupt).
+ */
+#define IRQ_ACK		1
+#define FIQ_ACK		2
+
+int
+intcon_irqack ( void )
+{
+	struct intcon *base = (struct intcon *) INTCON_BASE;
+
+	/* ack the irq in the intcon */
+	base->control = IRQ_ACK;
+
 }
 
 /* THE END */

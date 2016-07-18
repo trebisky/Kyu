@@ -444,13 +444,13 @@ gpio_test7 ( void )
 	}
 }
 
+#ifdef TIMER_DEBUG
+/* A goofy place for this ... */
 #define TEST8_BIT	GPIO_2_2
 void
 gpio_test8 ( void )
 {
 	unsigned long t1, t2;
-
-	timer_xxx ();
 
 	thr_delay ( 2 );
 	reset_ccnt ();
@@ -464,6 +464,7 @@ gpio_test8 ( void )
 	show_xxx ();
 
 }
+#endif
 
 /* Generate pulses to test my Rigol DS1054Z oscilloscope.
  * This is the test that exposed my even/odd timer bug
@@ -521,8 +522,8 @@ gpio_test ( void )
 	// gpio_test7 ();
 	// iic_test ();
 	// i2c_test ();
-	gpio_test8 ();
-	// gpio_test9 ();
+	// gpio_test8 ();
+	gpio_test9 ();
 }
 
 /* THE END */
