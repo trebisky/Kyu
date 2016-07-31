@@ -411,6 +411,18 @@ set_mmu:
 	mcr 	p15, 0, r0, c2, c0, 0
 	bx	lr
 
+/* Protection Unit base */
+	.globl get_prot
+get_prot:
+	mrc     p15, 0, r0, c6, c0, 0
+	bx	lr
+
+	.globl set_prot
+set_prot:
+	mcr 	p15, 0, r0, c6, c0, 0
+	bx	lr
+
+
 /* The cycle count register is a 32 bit register
  * This is for a Cortex A8 arm chip.
  */

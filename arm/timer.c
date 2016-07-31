@@ -45,7 +45,7 @@ void thread_tick ( void );
  * that the MMU is not configured to let me address everything.
  * Apparently U-boot only sets up a window for timer 0 and 2.
  */
-static int
+int
 peek ( unsigned long *addr )
 {
 	unsigned long val;
@@ -59,6 +59,7 @@ peek ( unsigned long *addr )
 static void
 do_peeks ( void )
 {
+	printf ("Start peeks\n");
 	peek ( (void *) 0x44E0B000 );	/* i2c */
 	peek ( (void *) 0x4802A000 );	/* i2c */
 	//peek ( (void *) 0x4819C000 );	/* i2c */
@@ -70,6 +71,7 @@ do_peeks ( void )
 	// peek ( (void *) TIMER5_BASE );
 	// peek ( (void *) TIMER6_BASE );
 	// peek ( (void *) TIMER7_BASE );
+	printf ("Finish peeks\n");
 }
 
 /* registers in a timer (except the special timer 1) */

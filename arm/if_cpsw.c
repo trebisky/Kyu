@@ -63,6 +63,9 @@
 
 #define NUM_CPDMA_CHANNELS	8
 
+/* Even though there are 8 channels, we use only the first of them */
+#define OUR_CPDMA	0
+
 /* XXX TRM says 1152 entries */
 #define NUM_ALE_ENTRIES		1024
 
@@ -81,24 +84,27 @@
 struct cpdma_desc {
 	/* hardware fields */
 	struct cpdma_desc *	hw_next;
-	void *			hw_buffer;
+	char *			hw_buffer;
 	u32			hw_len;
 	u32			hw_mode;
 	/* software fields */
-	void *			sw_buffer;
+	char *			sw_buffer;
 };
 
 /* XXX in the above sw_buffer is initialized the same as hw_buffer,
  * so unless cpdma changes hw_buffer, this is needless duplication.
+ * (and indeed, packet reception can fiddle with the length, but
+ *  that is constant, so I think we can ditch the software field.
  */
 
+/* XXX - Get rid of this */
 /* Near as I can tell this is entirely software defined */
 struct cpdma_chan {
 	struct cpdma_desc	*head;
-	struct cpdma_desc	*tail;		/* the tail is never used */
-	volatile unsigned long	*hdp;		/* points into stateram */
-	volatile unsigned long    *cp;		/* points into stateram */
-	volatile unsigned long    *rxfree;	/* points to cpdma hardware */
+	struct cpdma_desc	*tail;
+	volatile struct cpdma_desc	**hdp;		/* points into stateram */
+	volatile struct cpdma_desc	**cp;		/* points into stateram */
+	volatile unsigned long    	*rxfree;	/* points to cpdma hardware */
 };
 
 struct dma_regs {
@@ -178,6 +184,7 @@ struct dma_regs {
 #define NUM_ALE_PORTS		6
 
 // #define ALE_ENTRY_BITS		68
+// #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 // #define ALE_ENTRY_WORDS		DIV_ROUND_UP(ALE_ENTRY_BITS, 32)
 #define ALE_ENTRY_SIZE		3
 
@@ -207,11 +214,20 @@ struct ale_regs {
 #define ALE_CTL_VLAN_AWARE	0x4
 #define ALE_CTL_BYPASS		0x10
 
+/*
 struct stateram_regs {
 	volatile unsigned long txhdp[NUM_CPDMA_CHANNELS];
 	volatile unsigned long rxhdp[NUM_CPDMA_CHANNELS];
 	volatile unsigned long txcp[NUM_CPDMA_CHANNELS];
 	volatile unsigned long rxcp[NUM_CPDMA_CHANNELS];
+};
+*/
+
+struct stateram_regs {
+	volatile struct cpdma_desc * txhdp[NUM_CPDMA_CHANNELS];
+	volatile struct cpdma_desc * rxhdp[NUM_CPDMA_CHANNELS];
+	volatile struct cpdma_desc * txcp[NUM_CPDMA_CHANNELS];
+	volatile struct cpdma_desc * rxcp[NUM_CPDMA_CHANNELS];
 };
 
 struct mdio_regs {
@@ -579,30 +595,11 @@ extern struct thread *cur_thread;
 
 static void show_dmastatus ( void );
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-
 /* XXX */
 #define ENOENT          2       /* No such file or directory */
 #define ENOMEM          12      /* Out of memory */
 #define EBUSY           16      /* Device or resource busy */
 #define ETIMEDOUT       110     /* Connection timed out */
-
-/*
- * Maximum packet size; used to allocate packet storage.
- * TFTP packets can be 524 bytes + IP header + ethernet header.
- *
- * maximum packet size =  1518
- * maximum packet size and multiple of 32 bytes =  1536
- * i.e. 48 * 32 = 1536
- */
-#define PKTSIZE                 1518
-#define PKTSIZE_ALIGN           1536
-#define PKTSIZE_ALIGN2          1536 + 64 * 64	/* KYU */
-
-/* Receive packets.
- */
-#define NUM_RX      32
-// static char            *NetRxPackets[NUM_RX];
 
 #ifdef notdef
 /* OLD DEBUG */
@@ -622,8 +619,15 @@ NetReceive ( char *buffer, int len)
 #define BIT(x)				(1 << x)
 #define BITMASK(bits)		(BIT(bits) - 1)
 
-#define PHY_ID_MASK		0x1f
+/* Number of receive packets.
+ */
+#define NUM_RX      32
+
+/* XXX - really should have as many of these as fit into
+ * the 8K of state RAM we have.
+ */
 #define NUM_DESCS		(NUM_RX * 2)
+
 #define PKT_MIN			60
 #define PKT_MAX			(1500 + 14 + 4 + 4)
 
@@ -632,7 +636,6 @@ NetReceive ( char *buffer, int len)
 #define GIGABITEN		BIT(7)
 #define FULLDUPLEXEN		BIT(0)
 #define MIIEN			BIT(15)
-
 
 #define ALE_TABLE_WRITE		BIT(31)
 
@@ -1049,12 +1052,129 @@ cpdma_desc_free ( struct cpdma_desc *desc )
 	}
 }
 
+/*
+ * Maximum packet size; used to allocate packet storage.
+ * TFTP packets can be 524 bytes + IP header + ethernet header.
+ *
+ * maximum packet size =  1518
+ * maximum packet size and multiple of 64 bytes =  1536
+ * i.e. 24 * 64 = 1536
+ */
+
+/* We allocate some extra and don't sweat it.
+ * The main thing is that each buffer should begin and end
+ * on a cache line (which is 64 bytes long).
+ */
+#define PKTSIZE		1536
+
+#define PKT_ALLOC	(NUM_RX*PKTSIZE+64)
+
+static char pkt_buf[PKT_ALLOC];
+
+/* XXX */
+// static int cpdma_submit ( struct cpdma_chan *, char *, int );
+static void rx_buffer_add ( char * );
+
+void
+cpdma_rx_buffers ( void )
+{
+	// struct cpsw_priv	*priv = &cpsw_private;
+	int i;
+	unsigned long addr;
+
+	addr = ((unsigned long)pkt_buf+63) & ~63;
+
+	for (i = 0; i < NUM_RX; i++) {
+	    // if ( cpdma_submit ( &priv->rx_chan, (void *) addr, PKTSIZE) < 0 ) {
+		// printf("error setting up rx desc\n");
+	    // }
+	    rx_buffer_add ( (void *) addr );
+	    addr += PKTSIZE;
+	}
+}
+
+#ifdef OLD_BUFS_notdef
+#define PKTSIZE                 1518
+#define PKTSIZE_ALIGN           1536
+#define PKTSIZE_ALIGN2          1536 + 64 * 64	/* KYU */
+
+void
+cpdma_rx_buffers ( void )
+{
+	struct cpsw_priv	*priv = &cpsw_private;
+	int i;
+	int s;
+	unsigned long pkaddr;
+
+	/* submit rx descs */
+	/* Tricky alignment on 64 byte multiples */
+	for (i = 0; i < NUM_RX; i++) {
+		pkaddr = (unsigned long ) malloc ( PKTSIZE_ALIGN2 );
+		if ( ! pkaddr ) {
+		    printf ("No memory for cpsw receive buffer\n" );
+		    break;
+		}
+		// static char            *NetRxPackets[NUM_RX];
+		// NetRxPackets[i] = (char *) ((pkaddr+63) & ~0x3f);
+		// s = cpdma_submit ( &priv->rx_chan, NetRxPackets[i], PKTSIZE);
+		s = cpdma_submit ( &priv->rx_chan, (void *) ((pkaddr+63) & ~0x3f), PKTSIZE);
+		if (s < 0) {
+			printf("error %d submitting rx desc\n", s);
+			break;
+		}
+	}
+}
+#endif
+
+static void
+rx_buffer_add ( char *buffer )
+{
+	struct cpdma_chan *chan = &cpsw_private.rx_chan;
+	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
+	struct cpdma_desc *desc;
+	struct cpdma_desc *prev;
+	unsigned int mode;
+
+	desc = cpdma_desc_alloc();
+	if ( !desc ) {
+	    printf ("rx_buffer_add - out of descriptors\n" );
+	    return;
+	}
+
+	desc->hw_next = 0;
+	desc->hw_buffer = buffer;
+	desc->hw_len = PKTSIZE;
+	mode = CPDMA_DESC_OWNER | CPDMA_DESC_SOP | CPDMA_DESC_EOP;
+	desc->hw_mode = mode | PKTSIZE;
+
+	desc->sw_buffer = buffer;
+
+	if ( !chan->head ) {
+	    /* simple case - first packet enqueued */
+	    chan->head = desc;
+	    chan->tail = desc;
+	    stram->rxhdp[OUR_CPDMA] = desc;
+	} else {
+	    /* not the first packet - enqueue at the tail */
+	    prev = chan->tail;
+	    prev->hw_next = desc;
+	    chan->tail = desc;
+
+	    /* next check if EOQ has been triggered already */
+	    if ( prev->hw_mode & CPDMA_DESC_EOQ)
+		stram->rxhdp[OUR_CPDMA] = desc;
+	}
+
+	dma->rxfree[OUR_CPDMA] = 1;
+}
+
 /* Used for both writes and reads.
  *  for a write, it queues the packet to be sent.
  *  for a read, it adds an empty buffer to the receive list.
  */
 static int
-cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
+cpdma_submit ( struct cpdma_chan *chan, char *buffer, int len)
 {
 	struct cpdma_desc *desc;
 	struct cpdma_desc *prev;
@@ -1062,8 +1182,8 @@ cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
 
 	desc = cpdma_desc_alloc();
 	if (!desc) {
-	    printf ("cpdma_submit - dropping (no memory)\n" );
-	    return -ENOMEM;
+	    printf ("cpdma_submit - dropping (no descriptor)\n" );
+	    return -1;
 	}
 
 	if (len < PKT_MIN)
@@ -1082,8 +1202,7 @@ cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
 		/* simple case - first packet enqueued */
 		chan->head = desc;
 		chan->tail = desc;
-		// chan_write(chan, hdp, desc);
-		*(chan->hdp) = (u32) desc;
+		*(chan->hdp) = desc;
 	} else {
 	    /* not the first packet - enqueue at the tail */
 	    prev = chan->tail;
@@ -1092,13 +1211,12 @@ cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
 
 	    /* next check if EOQ has been triggered already */
 	    if ( prev->hw_mode & CPDMA_DESC_EOQ)
-		    // chan_write(chan, hdp, desc);
-		    *(chan->hdp) = (u32) desc;
+		    *(chan->hdp) = desc;
 	}
 
+	/* Only Rx has this defined */
 	if (chan->rxfree) {
 		struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
-		// chan_write(chan, rxfree, 1);
 		*(chan->rxfree) = 1;
 		/*
 		printf ( "Rxfree A = %d\n", dma->rxfree[0] );
@@ -1115,7 +1233,7 @@ cpdma_submit ( struct cpdma_chan *chan, void *buffer, int len)
  * For reads it harvests data that has arrived.
  */
 static int
-cpdma_process ( struct cpdma_chan *chan, void **buffer, int *len)
+cpdma_process ( struct cpdma_chan *chan, char **buffer, int *len)
 {
 	struct cpdma_desc *desc;
 	u32 status;
@@ -1136,7 +1254,7 @@ cpdma_process ( struct cpdma_chan *chan, void **buffer, int *len)
 		if ( chan->hdp == 0) {
 			if ( desc->hw_mode & CPDMA_DESC_OWNER)
 				// chan_write(chan, hdp, desc);
-				*(chan->hdp) = (u32) desc;
+				*(chan->hdp) = desc;
 		}
 
 		return -EBUSY;
@@ -1144,7 +1262,7 @@ cpdma_process ( struct cpdma_chan *chan, void **buffer, int *len)
 
 	chan->head = desc->hw_next;
 	// chan_write(chan, cp, desc);
-	*(chan->cp) = (u32) desc;
+	*(chan->cp) = desc;
 
 	cpdma_desc_free(desc);
 	return 0;
@@ -1227,22 +1345,18 @@ update_link ( struct cpsw_port *port )
 
 /* for ETH structure (init) */
 /* Was cpsw_init */
-static int
+static void
 cpsw_setup( void )
 {
 	struct cpsw_priv	*priv = &cpsw_private;
-	// struct cpsw_port	*port;
 	struct host_regs *hreg = (struct host_regs *) PORT0_BASE;
 	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
 	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
 	struct cpsw_regs *ss = (struct cpsw_regs *) CPSW_BASE;
 	struct ale_regs *ale = (struct ale_regs *) ALE_BASE;
 	int i;
-	int ret;
 
 	reset_controller ();
-
-	// printf ( "CPDMA rxfree = %08x\n", dma->rxfree );
 
 	// initially all zeros
 	// printf ( "ALE control = %08x\n", ale->control );
@@ -1279,27 +1393,20 @@ cpsw_setup( void )
 
 	cpdma_desc_init ();
 
-	/* initialize channels */
-	/* am335x devices are version 2 */
+	/* initialize Rx */
 	memset(&priv->rx_chan, 0, sizeof(struct cpdma_chan));
-	//priv->rx_chan.hdp       = priv->dma_regs + CPDMA_RXHDP_VER2;
-	//priv->rx_chan.cp        = priv->dma_regs + CPDMA_RXCP_VER2;
-	// priv->rx_chan.rxfree    = priv->dma_regs + CPDMA_RXFREE;
+	priv->rx_chan.hdp = &stram->rxhdp[OUR_CPDMA];
+	priv->rx_chan.cp = &stram->rxcp[OUR_CPDMA];
+	priv->rx_chan.rxfree = &dma->rxfree[OUR_CPDMA];
 
-	priv->rx_chan.hdp = stram->rxhdp;
-	priv->rx_chan.cp = stram->rxcp;
-	priv->rx_chan.rxfree = dma->rxfree;
-
+	/* initialize Tx */
 	memset(&priv->tx_chan, 0, sizeof(struct cpdma_chan));
-	// priv->tx_chan.hdp       = priv->dma_regs + CPDMA_TXHDP_VER2;
-	// priv->tx_chan.cp        = priv->dma_regs + CPDMA_TXCP_VER2;
-	priv->tx_chan.hdp = stram->txhdp;
-	priv->tx_chan.cp = stram->txcp;
+	priv->tx_chan.hdp = &stram->txhdp[OUR_CPDMA];
+	priv->tx_chan.cp = &stram->txcp[OUR_CPDMA];
 
 	/* clear dma state */
 	reset_cpdma ();
 
-	// for (i = 0; i < priv->data.channels; i++) {
 	for (i = 0; i < NUM_CPDMA_CHANNELS; i++) {
 		dma->rxfree[i] = 0;
 		stram->rxhdp[i] = 0;
@@ -1314,30 +1421,10 @@ cpsw_setup( void )
 	/*
 	printf ( "Writing to dma regs at %08x\n", priv->dma_regs );
 	printf ( "Writing to dma txcon at %08x\n", priv->dma_regs + CPDMA_TXCONTROL );
-
 	show_dmastatus ();
 	*/
 
-	/* submit rx descs */
-	/* Tricky alignment on 64 byte multiples */
-	for (i = 0; i < NUM_RX; i++) {
-		unsigned long pkaddr;
-
-		pkaddr = (unsigned long ) malloc ( PKTSIZE_ALIGN2 );
-		if ( ! pkaddr ) {
-		    printf ("No memory for cpsw receive buffer\n" );
-		    break;
-		}
-		// NetRxPackets[i] = (char *) ((pkaddr+63) & ~0x3f);
-		// ret = cpdma_submit ( &priv->rx_chan, NetRxPackets[i], PKTSIZE);
-		ret = cpdma_submit ( &priv->rx_chan, (void *) ((pkaddr+63) & ~0x3f), PKTSIZE);
-		if (ret < 0) {
-			printf("error %d submitting rx desc\n", ret);
-			break;
-		}
-	}
-
-	return 0;
+	cpdma_rx_buffers ();
 }
 
 /* used to exist for ETH structure - never called at present */
@@ -1357,7 +1444,7 @@ static int
 // cpsw_sendpk(struct eth_device *dev, void *packet, int length)
 cpsw_sendpk( void *packet, int length )
 {
-	void *buffer;
+	char *buffer;
 	int len;
 	int timeout = CPDMA_TIMEOUT;
 
@@ -1381,12 +1468,11 @@ static int
 // cpsw_recv(struct eth_device *dev)
 cpsw_recv( void )
 {
-	void *buffer;
+	char *buffer;
 	int len;
 
 	while ( cpdma_process ( &cpsw_private.rx_chan, &buffer, &len ) >= 0) {
-		invalidate_dcache_range((unsigned long)buffer,
-					(unsigned long)buffer + PKTSIZE_ALIGN);
+		invalidate_dcache_range ( (unsigned long) buffer, (unsigned long) &buffer[PKTSIZE] );
 
 		NetReceive(buffer, len);
 
@@ -1666,7 +1752,7 @@ reap_slow ( void )
 static void
 cpsw_reaper ( int xxx )
 {
-	void *buffer;
+	char *buffer;
 	int len;
 	struct netbuf *nbp;
 
@@ -1685,7 +1771,10 @@ cpsw_reaper ( int xxx )
 		continue;
 	    }
 
-	    invalidate_dcache_range((unsigned long)buffer, (unsigned long)buffer + PKTSIZE_ALIGN);
+	    /* DMA puts the packet in memory behind the back of the cache, so we need to
+	     * invalidate any cache entries that would hide it.  This is the reason for
+	     * the 64 byte buffer alignment */
+	    invalidate_dcache_range ( (unsigned long) buffer, (unsigned long) &buffer[PKTSIZE] );
 
 	    ++rx_count;
 

@@ -24,15 +24,27 @@ toms_debug ( void )
 
 	printf ( "SCTRL = %08x\n", get_sctrl() );
 	printf ( "MMU base = %08x\n", get_mmu() );
+	printf ( "Protection unit base = %08x\n", get_prot() );
 
 #define MMU_SIZE (4*1024)
 
 	mmubase = (unsigned long *) get_mmu ();
-	for ( i=0; i<MMU_SIZE; i++ ) {
-	    if ( mmubase[i] & 0xffff != 0x0c12 )
-		printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
+	if ( ! mmubase )
+	    printf ( "MMU not initialized !\n" );
+
+	if ( mmubase ) {
+	    for ( i=0; i<MMU_SIZE; i++ ) {
+		if ( mmubase[i] & 0xffff != 0x0c12 )
+		    printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
+	    }
+	    printf ( "mmu checking done\n" );
 	}
-	printf ( "mmu checking done\n" );
+
+#ifdef notdef
+	peek ( 0x44E30000 );	/* CM */
+	peek ( 0x44E35000 );	/* WDT1 */
+	peek ( 0x44E31000 ); 	/* Timer 1 */
+#endif
 }
 
 /*
