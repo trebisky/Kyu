@@ -39,7 +39,7 @@ static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 static unsigned char our_mac[ETH_ADDR_SIZE];
 
 static void slow_net ( int );
-static void fast_net ( void );
+// static void fast_net ( void );
 
 static void net_thread ( int );
 static void netbuf_init ( void );
@@ -204,6 +204,7 @@ net_init ( void )
     (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
 
 #ifdef NEW_SLOW_WAY
+    /* We do indeed do the new slow way */
     (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0, system_clock_rate );
 #else
     (void) safe_thr_new ( "net_slow", slow_net, (void *) 0, 11, 0 );

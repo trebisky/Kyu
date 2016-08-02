@@ -40,6 +40,8 @@ toms_debug ( void )
 	    printf ( "mmu checking done\n" );
 	}
 
+	show_cpsw_debug ();
+
 #ifdef notdef
 	peek ( 0x44E30000 );	/* CM */
 	peek ( 0x44E35000 );	/* WDT1 */

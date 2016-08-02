@@ -27,10 +27,10 @@
 
 #define NUM_INTS	128
 
-#define IRQ_CPSW_RX_THR		40
-#define IRQ_CPSW_RX		42
-#define IRQ_CPSW_TX		43
-#define IRQ_CPSW_MISC		44
+#define IRQ_CPSW_RX_THRESH	40
+#define IRQ_CPSW_RX		41
+#define IRQ_CPSW_TX		42
+#define IRQ_CPSW_MISC		43
 
 #define IRQ_I2C0		70
 #define IRQ_I2C1		71

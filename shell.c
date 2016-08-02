@@ -143,8 +143,6 @@ shell_init ( void )
 	printf ( "fetched symbol table: %d bytes\n", count );
 	parse_table (count);
 	free ( sym_buf );
-
-	reap_slow ();	/* XXX */
 }
 
 /* --------------- */
