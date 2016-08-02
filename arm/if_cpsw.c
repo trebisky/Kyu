@@ -93,32 +93,11 @@
 #define ETH_PORT_EXTRA		2
 
 struct cpdma_desc {
-	/* hardware fields */
 	struct cpdma_desc *	next;
 	char *			buffer;
 	u32			len;
 	u32			mode;
-	/* software fields */
-	// char *			sw_buffer;
 };
-
-/* XXX in the above sw_buffer is initialized the same as buffer,
- * so unless cpdma changes buffer, this is needless duplication.
- * (and indeed, packet reception can fiddle with the length, but
- *  that is constant, so I think we can ditch the software field.
- */
-
-#ifdef notdef
-/* XXX - Get rid of this */
-/* Near as I can tell this is entirely software defined */
-struct cpdma_chan {
-	struct cpdma_desc	*head;
-	struct cpdma_desc	*tail;
-	volatile struct cpdma_desc	**hdp;		/* points into stateram */
-	volatile struct cpdma_desc	**cp;		/* points into stateram */
-	volatile unsigned long    	*rxfree;	/* points to cpdma hardware */
-};
-#endif
 
 struct dma_regs {
 	volatile unsigned long tx_ver;				/* 00 */
@@ -176,23 +155,6 @@ struct dma_regs {
 #define CPDMA_DESC_EOP		BIT(30)
 #define CPDMA_DESC_OWN		BIT(29)
 #define CPDMA_DESC_EOQ		BIT(28)
-
-#ifdef notdef
-/* Not for us - these are offsets in some older version of the chip */
-#define CPDMA_TXHDP_VER1	0x100
-#define CPDMA_RXHDP_VER1	0x120
-#define CPDMA_TXCP_VER1		0x140
-#define CPDMA_RXCP_VER1		0x160
-
-/* These are the offsets we want.
- * These offsets are from the cpdma base, but ...
- * They are actually in the State RAM
- */
-#define CPDMA_TXHDP_VER2	0x200
-#define CPDMA_RXHDP_VER2	0x220
-#define CPDMA_TXCP_VER2		0x240
-#define CPDMA_RXCP_VER2		0x260
-#endif
 
 #define NUM_ALE_PORTS		6
 
@@ -651,15 +613,7 @@ cpsw_phy_init ( void )
 /* XXX - just to provide some debug */
 extern struct thread *cur_thread;
 
-#ifdef KYU
-
 static void show_dmastatus ( void );
-
-/* XXX */
-// #define ENOENT          2       /* No such file or directory */
-// #define ENOMEM          12      /* Out of memory */
-// #define EBUSY           16      /* Device or resource busy */
-// #define ETIMEDOUT       110     /* Connection timed out */
 
 #ifdef notdef
 /* OLD DEBUG */
@@ -673,8 +627,6 @@ NetReceive ( char *buffer, int len)
 	pk_count++;
 }
 #endif
-
-#endif	/* KYU */
 
 #define BIT(x)				(1 << x)
 #define BITMASK(bits)		(BIT(bits) - 1)
@@ -1418,27 +1370,6 @@ cpsw_halt( void )
 	reset_cpdma ();
 }
 
-#ifdef notdef
-/* was for ETH structure - never called at present */
-static int
-// cpsw_recv(struct eth_device *dev)
-cpsw_recv( void )
-{
-	char *buffer;
-	int len;
-
-	while ( cpdma_process ( &cpsw_private.rx_chan, &buffer, &len ) >= 0) {
-		invalidate_dcache_range ( (unsigned long) buffer, (unsigned long) &buffer[PKTSIZE] );
-
-		NetReceive(buffer, len);
-
-		cpdma_submit ( &cpsw_private.rx_chan, buffer, PKTSIZE);
-	}
-
-	return 0;
-}
-#endif
-
 void
 cpsw_register ( void )
 {
@@ -1538,53 +1469,6 @@ old_mac_fetch ( void )
 
 #endif
 
-#ifdef notdef
-/*
- * eth_init (previously board_eth_init())
- *
- * This is what we are using (for now) to kick off this driver.
- *
- * This function will:
- * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
- * in the environment
- * Perform fixups to the PHY present on certain boards.  We only need this
- * function in:
- * - SPL with either CPSW or USB ethernet support
- * - Full U-Boot, with either CPSW or USB ethernet
- * Build in only these cases to avoid warnings about unused variables
- * when we build an SPL that has neither option but full U-Boot will.
- */
-void
-eth_init ( void )
-{
-	// old_mac_fetch ();
-
-	/* Kyu only supports the BBB */
-	cm_mii_enable ();
-
-	cpsw_register();
-}
-
-/* Called by cpsw_activate() to actually start packet reception */
-static void
-eth_start ( void )
-{
-	cpsw_setup ();
-
-#ifdef OLD_DEBUG
-	printf ("Waiting for packets\n" );
-
-	/* Loop receiving packets */
-	/* This is effectively polling, it returns all
-	 * the time without a packet.  If you get lucky
-	 * it will trigger a call to NetReceive()
-	 */
-	for ( ;; ) {
-	    cpsw_recv ();
-	}
-#endif
-}
-#endif
 
 static unsigned long
 get_dmastat ( void )
@@ -1692,34 +1576,6 @@ static int tx_count = 0;
 static int tx_int_count = 0;
 static int rx_int_count = 0;
 
-static void reap_one ( struct cpdma_desc * );
-
-static void
-rx_process ( void )
-{
-	struct cpsw_priv *priv = &cpsw_private;
-	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
-	struct cpdma_desc *desc;
-
-	while ( priv->rx_head ) {
-
-	    desc = priv->rx_head;
-
-	    if ( desc->mode & CPDMA_DESC_OWN ) {
-		if ( stram->rxhdp[OUR_CPDMA] == 0 )
-		    stram->rxhdp[OUR_CPDMA] = desc;
-		break;
-	    }
-
-	    // printf ( " RX-- on %08x\n", desc );
-
-	    priv->rx_head = desc->next;
-	    stram->rxcp[OUR_CPDMA] = desc;
-
-	    reap_one ( desc );
-	}
-}
-
 static int reap_delay = 1;
 
 #ifdef notdef
@@ -1730,118 +1586,6 @@ reap_slow ( void )
 {
 	reap_delay = 1000;
 	reap_debug = 1;
-}
-#endif
-
-static void
-reap_one ( struct cpdma_desc *dp )
-{
-	char *buf;
-	int len;
-	struct netbuf *nbp;
-
-	len = dp->mode & 0x7ff;	/* packet length */
-	buf = dp->buffer;
-
-	/* DMA puts the packet in memory behind the back of the cache, so we need to
-	 * invalidate any cache entries that would hide it.  This is the reason for
-	 * the 64 byte buffer alignment.
-	 * XXX - we could use len rather than PKTSIZE
-	 */
-	invalidate_dcache_range ( (unsigned long) buf, (unsigned long) &buf[PKTSIZE] );
-
-	++rx_count;
-
-	nbp = netbuf_alloc ();
-
-	if ( ! nbp )
-	    return;	/* drop packet */
-
-	/* 5-21-2015 - there is a trailing 4 bytes that is being treasured
-	 * in the buffer that we don't want or need (CRC probably)
-	 */
-	nbp->elen = len - 4;
-	memcpy ( (char *) nbp->eptr, buf, len - 4 );
-
-	/* recycle receive buffer */
-	// cpdma_desc_free(dp);
-	// rx_buffer_new ( buf );
-
-	// short cut the above and put it back onto dma list */
-	rx_buffer_add ( dp );
-
-	net_rcv ( nbp );
-}
-
-static void
-cpsw_reaper ( int xxx )
-{
-	for ( ;; ) {
-	    thr_delay ( reap_delay );
-	    rx_process ();
-	}
-}
-
-#ifdef notdef
-/* As a funky hack til we start using interrupts.
- * we launch this thread to harvest packets.
- * Mostly copied from cpsw_recv() above.
- */
-static void
-cpsw_reaper ( int xxx )
-{
-	char *buffer;
-	int len;
-	struct netbuf *nbp;
-
-	for ( ;; ) {
-
-	    thr_delay ( reap_delay );
-
-	    /*
-	    if (reap_debug) {
-		struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
-		printf ( "rx_instat (raw, norm) = %08x %08x %08x\n", dma->rx_intstat_raw, dma->rx_intstat, dma->tx_intstat_raw );
-	    }
-	    */
-
-	    if ( rx_process ( &buffer, &len ) < 0 ) {
-		continue;
-	    }
-
-	    /* DMA puts the packet in memory behind the back of the cache, so we need to
-	     * invalidate any cache entries that would hide it.  This is the reason for
-	     * the 64 byte buffer alignment */
-	    invalidate_dcache_range ( (unsigned long) buffer, (unsigned long) &buffer[PKTSIZE] );
-
-	    ++rx_count;
-
-	    // printf ( "Packet received.\n" );
-
-	    /* KYU */
-	    /* get a netbuf and copy the packet into it */
-
-	    /* XXX only at interrupt level */
-	    /*
-	    nbp = netbuf_alloc_i ();
-	    */
-	    nbp = netbuf_alloc ();
-
-	    if ( ! nbp )
-		continue;
-
-	    /* 5-21-2015 - there is a trailing 4 bytes that is being treasured
-	     * in the buffer that we don't want or need
-	     */
-	    nbp->elen = len - 4;
-	    memcpy ( (char *) nbp->eptr, buffer, len - 4 );
-
-	    // net_wonk ( nbp );	/* XXX */
-	    net_rcv ( nbp );
-
-	    /* recycle receive buffer */
-	    rx_buffer_new ( buffer );
-	}
 }
 #endif
 
@@ -1878,18 +1622,87 @@ cpsw_tx_isr ( int dummy )
 	dma->eoi_vector = TX_EOI;
 }
 
+static void
+reap_one ( struct cpdma_desc *dp )
+{
+	char *buf;
+	int len;
+	struct netbuf *nbp;
+
+	len = dp->mode & 0x7ff;	/* packet length */
+	buf = dp->buffer;
+
+	/* DMA puts the packet in memory behind the back of the cache, so we need to
+	 * invalidate any cache entries that would hide it.  This is the reason for
+	 * the 64 byte buffer alignment.
+	 * XXX - we could use len rather than PKTSIZE
+	 */
+	invalidate_dcache_range ( (unsigned long) buf, (unsigned long) &buf[PKTSIZE] );
+
+	++rx_count;
+
+	// nbp = netbuf_alloc ();
+	nbp = netbuf_alloc_i ();
+
+	if ( ! nbp )
+	    return;	/* drop packet */
+
+	/* 5-21-2015 - there is a trailing 4 bytes that is being treasured
+	 * in the buffer that we don't want or need (CRC probably)
+	 */
+	nbp->elen = len - 4;
+	memcpy ( (char *) nbp->eptr, buf, len - 4 );
+
+	/* Replace the buffer descriptor on the list */
+	rx_buffer_add ( dp );
+
+	net_rcv ( nbp );
+}
+
 void
 cpsw_rx_isr ( int dummy )
 {
+	struct cpsw_priv *priv = &cpsw_private;
+	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
 	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
+	struct cpdma_desc *desc;
 
 	// if ( rx_int_count < 20 )
-	    printf ( "Interrupt (RX): %08x\n", dma->rx_intstat );
+	//    printf ( "Interrupt (RX): %08x\n", dma->rx_intstat );
 	rx_int_count++;
+
+	// rx_process ();
+	while ( priv->rx_head ) {
+
+	    desc = priv->rx_head;
+
+	    if ( desc->mode & CPDMA_DESC_OWN ) {
+		if ( stram->rxhdp[OUR_CPDMA] == 0 )
+		    stram->rxhdp[OUR_CPDMA] = desc;
+		break;
+	    }
+
+	    priv->rx_head = desc->next;
+	    stram->rxcp[OUR_CPDMA] = desc;
+
+	    reap_one ( desc );
+	}
 
 	dma->rx_intstat = OUR_CPDMA_INT;
 	dma->eoi_vector = RX_EOI;
 }
+
+#ifdef notdef
+/* A hack until we get Rx interrupts going */
+static void
+cpsw_reaper ( int xxx )
+{
+	for ( ;; ) {
+	    thr_delay ( reap_delay );
+	    // rx_process ();
+	}
+}
+#endif
 
 void
 cpsw_int_enable ( void )
@@ -1900,8 +1713,8 @@ cpsw_int_enable ( void )
 	dma->tx_int_set = OUR_CPDMA_INT;
 	wrp->c0_tx_ena = OUR_CPDMA_INT;
 
-	// dma->rx_int_set = OUR_CPDMA_INT;
-	// wrp->c0_rx_ena = OUR_CPDMA_INT;
+	dma->rx_int_set = OUR_CPDMA_INT;
+	wrp->c0_rx_ena = OUR_CPDMA_INT;
 }
 
 /* Kyu entry point. */
@@ -1926,7 +1739,7 @@ cpsw_init ( void )
 /* Needs to be above 30 while the
  * test thread runs at 30 with polling
  */
-#define PRI_REAPER	25
+// #define PRI_REAPER	25
 
 void
 cpsw_activate ( void )
@@ -1942,7 +1755,8 @@ cpsw_activate ( void )
 
 	cpsw_int_enable ();
 
-	(void) thr_new ( "cpsw_reaper", cpsw_reaper, (void *) 0, PRI_REAPER, 0 );
+	// (void) thr_new ( "cpsw_reaper", cpsw_reaper, (void *) 0, PRI_REAPER, 0 );
+
 	printf ( "Finished cpsw_activate\n" );
 }
 
@@ -1993,6 +1807,7 @@ show_cpsw_debug ( void )
 
 	cpsw_show ();
 
+#ifdef notdef
 	printf ( "c0_rx_stat %08x\n", wrp->c0_rx_stat );
 	printf ( "c1_rx_stat %08x\n", wrp->c1_rx_stat );
 	printf ( "c2_rx_stat %08x\n", wrp->c2_rx_stat );
@@ -2011,6 +1826,7 @@ show_cpsw_debug ( void )
 
 	printf ( "dma_tx_intstat_raw %08x\n", dma->tx_intstat_raw );
 	printf ( "dma_tx_intstat %08x\n", dma->tx_intstat );
+#endif
 
 	// printf ( "ADDR of: dma_tx_intset %08x\n", &dma->tx_int_set );
 	// printf ( "dma_tx_int_set %08x\n", dma->tx_int_set );

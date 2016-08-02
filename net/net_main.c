@@ -294,7 +294,7 @@ fast_net ( void )
 /* locking added only for BBB -- must be removed when
  * this is handled via receive interrupts */
 void
-net_rcv ( struct netbuf *nbp )
+net_rcv_bbb ( struct netbuf *nbp )
 {
 	int x;
 
@@ -314,6 +314,25 @@ net_rcv ( struct netbuf *nbp )
 	cpu_signal ( inq_sem );
 	*/
 	sem_unblock ( inq_sem );
+}
+
+void
+net_rcv ( struct netbuf *nbp )
+{
+	int x;
+
+	nbp->next = (struct netbuf *) 0;
+
+    	if ( inq_tail ) {
+	    inq_tail->next = nbp;
+	    inq_tail = nbp;
+	} else {
+	    inq_tail = nbp;
+	    inq_head = nbp;
+	}
+
+	cpu_signal ( inq_sem );
+	// sem_unblock ( inq_sem );
 }
 
 /* Thread to process queue of arriving packets */
