@@ -178,7 +178,7 @@ net_init ( void )
 
     arp_init ();
     dns_init ();
-    bootp_init ();
+    // bootp_init ();
     tftp_init ();
 
     inq_head = (struct netbuf *) 0;

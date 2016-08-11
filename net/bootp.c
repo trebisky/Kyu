@@ -1,6 +1,11 @@
 /* bootp.c
  * T. Trebisky  4-11-2005
  * T. Trebisky  6-2-2015 8-10-2016
+ *
+ * The problem with BOOTP is that it is almost obsolete.
+ * Linux DHCP can support it (with "allow bootp;" as an option)
+ * Many routers will do DHCP, but not BOOTP.
+ * Working and tested 8-10-2016
  */
 
 #include "kyulib.h"
@@ -12,10 +17,6 @@
 
 void bootp_rcv ( struct netbuf * );
 void bootp_send ( void );
-
-/* DHCP is a "refinement" of BOOTP and is triggered
- * by a magic cookie value at the start of the options area
- */
 
 void
 bootp_send ( void )
@@ -69,12 +70,13 @@ bootp_rcv ( struct netbuf *nbp )
 	}
 }
 
-// now needless
+#ifdef notdef
 void
 bootp_init ( void )
 {
 	// udp_hookup ( BOOTP_CLIENT, bootp_rcv );
 }
+#endif
 
 #define BOOTP_RETRIES	5
 

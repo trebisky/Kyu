@@ -9,7 +9,8 @@ include ../Makefile.inc
 
 OBJS =  net_main.o in_cksum.o \
     net_arp.o net_icmp.o net_ip.o \
-    net_tcp.o net_udp.o dns.o bootp.o tftp.o
+    net_tcp.o net_udp.o dns.o \
+    dhcp.o bootp.o tftp.o
 
 all: ../net.o
 
