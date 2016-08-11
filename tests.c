@@ -11,6 +11,8 @@
 #include "thread.h"
 #include "malloc.h"
 
+#include "netbuf.h"
+
 extern struct thread *cur_thread;
 
 static int timer_rate;	/* ticks per second */
@@ -86,7 +88,6 @@ static void test_gpio ( int );
 static void test_fault ( int );
 
 #ifdef WANT_NET
-static void test_net ( int );
 static void test_netarp ( int );
 static void test_netping ( int );
 static void test_bootp ( int );
@@ -162,9 +163,8 @@ struct test net_test_list[] = {
 	test_arp,	"one gratu arp",	1,
 	test_arp,	"8 gratu arp",		8,
 	test_tftp,	"Test TFTP",		0,
-	test_udp,	"Test UDP",		1,
+	test_udp,	"Test UDP",		0,
 	test_tcp,	"Test TCP",		1,
-	test_net,	"Net init",		0,
 	0,		0,			0
 };
 #endif
@@ -2641,12 +2641,6 @@ kb_test_5 ( void )
 /* --------------- network tests ------------------ */
 
 #ifdef WANT_NET
-static void
-test_net ( int test )
-{
-	/*
-	*/
-}
 
 static void
 test_netshow ( int test )
@@ -2692,25 +2686,104 @@ test_arp ( int count )
 	}
 }
 
-#define DOOR_SERVER	"192.168.0.5"
-#define DOOR_PORT	9999
+/* The following expects the UDP echo service to
+ * be running on the selected host.
+ * To get this going on a unix system:
+ *   su
+ *   yum install xinetd
+ *   cd /etc/xinetd.d
+ *   edit echo-dgram and enable it
+ *   service xinetd restart
+ * After this,
+ *   "n 9" should run this test
+ * I tried sending 1000 packets with a 10 ms delay, but this triggered some safeguard
+ * on my linux server after 50 packets with the following messages:
+ * Kyu, ready> n 9
+ * sending 1000 UDP messages
+ * 50 responses to 1000 messages
+Aug  2 12:17:43 localhost xinetd[14745]: START: echo-dgram pid=0 from=::ffff:192.168.0.11
+Aug  2 12:17:43 localhost xinetd[14745]: Deactivating service echo due to excessive incoming connections.  Restarting in 10 seconds.
+Aug  2 12:17:43 localhost xinetd[14745]: FAIL: echo-dgram connections per second from=::ffff:192.168.0.11
+Aug  2 12:17:53 localhost xinetd[14745]: Activating service echo
+ *
+ * In many ways the xinetd echo service is unfortunate.
+ * Among other things it puts a line in the log for every packet it echos !!
+ * And it throttles traffic.  So we found a simple UDP echo server online
+ * and use it instead.
+ */
+
+#define UTEST_SERVER	"192.168.0.5"
+#define UTEST_PORT	7
+
+static int udp_echo_count;
 
 static void
-test_udp ( int count )
+udp_test_rcv ( struct netbuf *nbp )
+{
+	// printf ( "UDP response\n" );
+	udp_echo_count++;
+}
+
+/* With the xinetd server, we must delay at least 40 ms
+ * between each packet.  Pretty miserable.
+ */
+// #define ECHO_COUNT 5000
+// #define ECHO_DELAY 50 OK
+// #define ECHO_DELAY 25 too fast
+// #define ECHO_DELAY 40 OK
+
+/* With a real echo server and 5 bytes messages,
+ *  this runs in about 7 seconds.
+ */
+#define ECHO_COUNT 10000
+#define ECHO_DELAY 1
+
+#define UDP_TEST_SIZE	1024
+static char udp_test_buf[UDP_TEST_SIZE];
+
+#define UDP_BURST	5
+
+/* With 1K packets and 5 packet bursts, we can run the test
+ * in about 2 seconds with a decent server on the other end.
+ */
+
+static void
+test_udp ( int xxx )
 {
 	int i;
-	char *msg = "hello";
-	unsigned long door_ip;
+	// char *msg = "hello";
+	unsigned long test_ip;
 	int local_port;
+	int count;
+	int len;
+
+	// strcpy ( udp_test_buf, "hello" );
+	// len = strlen ( udp_test_buf );
+
+	len = UDP_TEST_SIZE;
+	memset ( udp_test_buf, 0xaa, len );
 
 	local_port = get_ephem_port ();
-	(void) net_dots ( DOOR_SERVER, &door_ip );
+	(void) net_dots ( UTEST_SERVER, &test_ip );
+
+	udp_hookup ( local_port, udp_test_rcv );
+
+	count = ECHO_COUNT;
+	udp_echo_count = 0;
+
+	printf ("sending %d UDP messages\n", count );
 
 	for ( i=0; i < count; i++ ) {
-	    printf ("sending UDP\n");
-	    udp_send ( door_ip, local_port, DOOR_PORT, msg, strlen(msg) );
-	    thr_delay ( 10 );
+	    // printf ("sending UDP\n");
+	    udp_send ( test_ip, local_port, UTEST_PORT, udp_test_buf, len );
+	    if ( (i % UDP_BURST) == 0 )
+		thr_delay ( ECHO_DELAY );
 	}
+
+	/* Allow time for last responses to roll in */
+	thr_delay ( 100 );
+
+	printf ( "%d responses to %d messages\n", udp_echo_count, ECHO_COUNT );
 }
 
 #endif	/* WANT_NET */

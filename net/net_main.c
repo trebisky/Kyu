@@ -287,14 +287,14 @@ fast_net ( void )
 }
 #endif
 
-/* Called from interrupt level to place a
- * packet on input queue and awaken handler thread.
+#ifdef notdef
+/* A version of net_rcv() with locking added for initial
+ * work with the BBB -- this was used when I was polling
+ * for receive packets and wanting to call this without
+ * calling it from interrupt level.
  */
-
-/* locking added only for BBB -- must be removed when
- * this is handled via receive interrupts */
 void
-net_rcv_bbb ( struct netbuf *nbp )
+net_rcv_noint ( struct netbuf *nbp )
 {
 	int x;
 
@@ -315,7 +315,11 @@ net_rcv_bbb ( struct netbuf *nbp )
 	*/
 	sem_unblock ( inq_sem );
 }
+#endif
 
+/* Called from interrupt level to place a
+ * packet on input queue and awaken handler thread.
+ */
 void
 net_rcv ( struct netbuf *nbp )
 {

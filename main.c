@@ -36,6 +36,7 @@ clear_bss ( void )
 #endif
 
 /* This is the first bit of C code that runs in 32 bit mode.
+ * (on the x86, it runs on the arm too, but diffent addresses).
  * it runs with a provisional stack at 0x90000 (so it will
  * be down in 0x8ffe0 or so while this runs).  We abandon
  * this is soon as we can and do the rest of the initialization

@@ -11,11 +11,6 @@
 #include "netbuf.h"
 #include "cpu.h"
 
-#define BOOTP_PORT2	68	/* receive on this port */
-#define DNS_PORT	53
-
-void bootp_rcv ( struct netbuf * );
-
 /* 8 bytes */
 struct udp_hdr {
 	unsigned short	sport;
@@ -55,7 +50,6 @@ udp_hookup ( int port, ufptr func )
 	head = pp;
 }
 
-/* XXX - untested */
 void
 udp_unhook ( int port )
 {
@@ -123,6 +117,11 @@ udp_rcv ( struct netbuf *nbp )
 	}
 
 #ifdef notdef
+#define BOOTP_PORT2	68	/* receive on this port */
+#define DNS_PORT	53
+
+	void bootp_rcv ( struct netbuf * );
+
 	if ( BOOTP_PORT2 == ntohs(udp->dport) ) {
 	    bootp_rcv ( nbp );
 	}
@@ -181,7 +180,7 @@ udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
 	bip->proto = IPPROTO_UDP;
 	bip->len = udp->len;
 	bip->dst = dest_ip;
-	bip->src = my_ip;	/* should be zero for BOOTP */
+	bip->src = my_ip;
 
 	/*
 	udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
@@ -189,6 +188,26 @@ udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
 	udp->sum = ~in_cksum_i ( nbp->iptr, nbp->ilen, 0 );
 
 	ip_send ( nbp, dest_ip );
+}
+
+/* This is a kind of funky hack to be sure the source IP gets set to
+ *  zero for a broadcast, even if we know our IP (or think we do).
+ */
+void
+udp_broadcast ( int sport, int dport, char *buf, int size )
+{
+	unsigned int save;
+
+	/* XXX - Kyu really needs a "udp_broadcast" to avoid this hack.
+	 *  things work if we allow our IP to sneak in here, but a broadcast
+	 * really ought to zero the IP field
+	 */
+	save = my_ip;
+	my_ip = 0;
+
+	udp_send ( IP_BROADCAST, sport, dport, buf, size );
+
+	my_ip = save;
 }
 
 /* THE END */

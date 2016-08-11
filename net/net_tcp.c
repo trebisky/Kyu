@@ -129,18 +129,19 @@ tcp_tester ( struct tcp_io *tp, char *buf, int count )
 {
 	char zoot[32];
 
-	printf ( "%d byes of data delivered !!\n", count );
+	printf ( "%d byes of data received !!\n", count );
 
 	/* for Daytime */
+	/*
 	strncpy ( zoot, buf, 24 );
 	zoot[24] = '\0';
 	printf ( "Received: %s\n", zoot );
+	*/
 }
 
 #define	TEST_SERVER	"192.168.0.5"
 #define	ECHO_PORT	7	/* echo */
 #define	DAYTIME_PORT	13	/* daytime */
-#define	TEST_PORT	DAYTIME_PORT
 
 static void
 test_tcp_daytime ( int dummy )
@@ -149,23 +150,27 @@ test_tcp_daytime ( int dummy )
 	struct tcp_io *tio;
 
 	(void) net_dots ( TEST_SERVER, &ip );
-	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+	tio = tcp_connect ( ip, DAYTIME_PORT, tcp_tester );
 }
+
+static char echo_buf[1024];
 
 static void
 test_tcp_echo ( int dummy )
 {
 	unsigned long ip;
 	struct tcp_io *tio;
-	char buf[16];
+	int i;
 
 	(void) net_dots ( TEST_SERVER, &ip );
-	tio = tcp_connect ( ip, TEST_PORT, tcp_tester );
+	tio = tcp_connect ( ip, ECHO_PORT, tcp_tester );
 
-	strcpy ( buf, "test" );
-	tcp_send ( tio, buf, 4 );
+	// strcpy ( echo_buf, "go\r\n" );
+	memset ( echo_buf, 'x', 1024 );
+	for ( i=0; i<16; i++ )
+	    tcp_send ( tio, echo_buf, 1024 );
 
-	tcp_shutdown ( tio );
+	// tcp_shutdown ( tio );
 }
 
 /* This gets called when a new connection arrives on
@@ -181,7 +186,8 @@ test_connect ( struct tcp_io *tp )
 void
 test_tcp ( int dummy )
 {
-	test_tcp_daytime ( dummy );
+	test_tcp_echo ( dummy );
+	// test_tcp_daytime ( dummy );
 }
 
 /* For echo server */
@@ -197,9 +203,6 @@ tcp_echo_rcv ( struct tcp_io *tp, char *buf, int count )
 	tcp_send ( tp, "ECHO\n\r", 6 );
 }
 
-/* XXX - this gets called, but has no purpose yet.
- * Use for debug and ultimately initialization.
- */
 void
 tcp_init ( void )
 {

@@ -389,7 +389,7 @@ set_vbar:
 	mcr 	p15, 0, r0, c12, c0, 0
 	bx	lr
 
-/* SCTRL */
+/* SCTRL - System Control*/
 	.globl get_sctrl
 get_sctrl:
 	mrc     p15, 0, r0, c1, c0, 0
@@ -398,6 +398,17 @@ get_sctrl:
 	.globl set_sctrl
 set_sctrl:
 	mcr 	p15, 0, r0, c1, c0, 0
+	bx	lr
+
+/* ASCTRL - Auxiliary System Control*/
+	.globl get_asctrl
+get_asctrl:
+	mrc     p15, 0, r0, c1, c0, 1
+	bx	lr
+
+	.globl set_asctrl
+set_asctrl:
+	mcr 	p15, 0, r0, c1, c0, 1
 	bx	lr
 
 /* MMU table base */

@@ -636,8 +636,8 @@ NetReceive ( char *buffer, int len)
  * A small number tests recycling logic.
  */
 //#define NUM_RX      32
-//#define NUM_RX      64
-#define NUM_RX      4
+#define NUM_RX      64
+// #define NUM_RX      4
 
 #define PKT_MIN			60
 #define PKT_MAX			(1500 + 14 + 4 + 4)

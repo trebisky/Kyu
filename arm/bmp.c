@@ -875,10 +875,70 @@ hdc_test ( void )
 	thr_new_repeat ( "hdc", hdc_once, ip, 13, 0, 1000 );
 }
 
+static void
+dac_show ( struct i2c *ip )
+{
+	unsigned char io[5];
+
+	dac_read ( ip, io, 5 );
+
+	os_printf ( "DAC status = %02x\n", io[0] );
+	os_printf ( "DAC val = %02x %02x\n", io[1], io[2] );
+	os_printf ( "DAC ee = %02x %02x\n", io[3], io[4] );
+}
+
+static unsigned int dac_val = 0;
+
+static void
+dac_once ( struct i2c *ip )
+{
+	dac_val += 16;
+	if ( dac_val > 4096 ) dac_val = 0;
+	dac_write ( ip, dac_val);
+}
+
+static void
+dac_fast ( struct i2c *ip )
+{
+	dac_val = 0;
+
+	for ( ;; ) {
+	    dac_val += 16;
+	    if ( dac_val > 4096 ) dac_val = 0;
+	    dac_write ( ip, dac_val);
+	    // delay_ns ( 1000 );
+	}
+}
+
+static void
+dac_pulse ( struct i2c *ip )
+{
+	for ( ;; ) {
+	    dac_write ( ip, 0 );
+	    dac_write ( ip, 0xfff );
+	}
+}
+
+
+void
+dac_test ( void )
+{
+	struct i2c *ip;
+
+	ip = i2c_hw_new ( 1 );
+
+	// dac_show ( ip );
+
+	// thr_new_repeat ( "dac", dac_once, ip, 13, 0, 1 );
+	// dac_fast ( ip );
+	dac_pulse ( ip );
+}
+
 /* The tests are run via the shell "x" command, i.e.
  *
  * x bmp_test
  * x hdc_test
+ * x dac_test
  */
 
 /* THE END */
