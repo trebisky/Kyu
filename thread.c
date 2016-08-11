@@ -1868,6 +1868,10 @@ sem_block_q ( struct sem *sem )
 }
 
 #ifdef notyet
+/* seems to me we need
+ * thr_block_cpu_t() and thr_block_t in order
+ * to construct sem_block_t() tjt -- 8-10-2016
+ */
 static
 sem_timeout_func ( void )
 {

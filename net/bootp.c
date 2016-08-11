@@ -55,7 +55,7 @@ bootp_rcv ( struct netbuf *nbp )
 	char dst[20];
 
 	if ( bootp_debug )
-	    printf ("Received BOOTP/DHCP reply (%d bytes)\n", nbp->dlen );
+	    printf ("Received BOOTP reply (%d bytes)\n", nbp->dlen );
 
 	bpp = (struct bootp *) nbp->dptr;
 	bootp_ip = bpp->your_ip;

@@ -91,6 +91,7 @@ static void test_fault ( int );
 static void test_netarp ( int );
 static void test_netping ( int );
 static void test_bootp ( int );
+static void test_dhcp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
 void test_tftp ( int );
@@ -158,6 +159,7 @@ struct test net_test_list[] = {
 	test_netshow,	"Net show",		0,
 	test_netarp,	"ARP ping",		0,
 	test_bootp,	"test BOOTP",		0,
+	test_dhcp,	"test DHCP",		0,
 	test_netping,	"Net ping",		0,
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
@@ -2662,11 +2664,16 @@ test_netping ( int test )
 	ping ( test_ip );
 }
 
-/* Should broadcast BOOTP packet */
 static void
 test_bootp ( int test )
 {
 	bootp_test();
+}
+
+static void
+test_dhcp ( int test )
+{
+	dhcp_test();
 }
 
 static void
