@@ -20,7 +20,7 @@
  */
 #define CONN_PRI	29
 
-extern unsigned long my_ip;
+extern struct host_info host_info;
 
 /* This structure manages TCP connections */
 enum tcp_state { FREE, BORASCO, CWAIT, CONNECT, FWAIT };
@@ -527,7 +527,7 @@ tcp_rcv ( struct netbuf *nbp )
 #endif
 
 	/* At this point, we aren't a gateway, so drop the packet */
-	if ( nbp->iptr->dst != my_ip ) {
+	if ( nbp->iptr->dst != host_info.my_ip ) {
 	    printf ("TCP packet is not for us - dropped\n" );
 	    netbuf_free ( nbp );
 	    return;
@@ -646,7 +646,7 @@ tcp_send_data ( struct tcp_io *tp, int flags, char *buf, int count)
 	tcp->urg = 0;
 
 	/* Setup and checksum the pseudo header */
-	pseudo.src = my_ip;
+	pseudo.src = host_info.my_ip;
 	pseudo.dst = tp->remote_ip;
 
 	pseudo.proto = htons ( IPPROTO_TCP );

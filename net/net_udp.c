@@ -20,7 +20,7 @@ struct udp_hdr {
 	unsigned short sum;
 };
 
-extern unsigned long my_ip;
+extern struct host_info host_info;
 
 struct udp_proto {
 	struct udp_proto *next;
@@ -180,7 +180,7 @@ udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
 	bip->proto = IPPROTO_UDP;
 	bip->len = udp->len;
 	bip->dst = dest_ip;
-	bip->src = my_ip;
+	bip->src = host_info.my_ip;
 
 	/*
 	udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
@@ -202,12 +202,12 @@ udp_broadcast ( int sport, int dport, char *buf, int size )
 	 *  things work if we allow our IP to sneak in here, but a broadcast
 	 * really ought to zero the IP field
 	 */
-	save = my_ip;
-	my_ip = 0;
+	save = host_info.my_ip;
+	host_info.my_ip = 0;
 
 	udp_send ( IP_BROADCAST, sport, dport, buf, size );
 
-	my_ip = save;
+	host_info.my_ip = save;
 }
 
 /* THE END */

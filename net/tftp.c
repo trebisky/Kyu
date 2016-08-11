@@ -24,8 +24,8 @@
 
 #define TFTP_BSIZE	512
 
-extern unsigned long my_ip;
 static unsigned long tftp_ip;
+
 static int tftp_verbose = 0;
 
 int tftp_fetch ( char *, char *, int );

@@ -1,4 +1,4 @@
-/* random.c (at least in Skidoo)
+/* random.c (at least in Kyu)
  * $Id: random.c,v 1.2 2002/09/11 05:09:44 tom Exp $
  * Tom Trebisky 12-10-2001
  */

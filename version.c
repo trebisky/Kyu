@@ -1,6 +1,6 @@
 /* version.c
  */
 
-char *kyu_version = "0.6.0";
+char *kyu_version = "0.7.0";
 
 /* THE END */

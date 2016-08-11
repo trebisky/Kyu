@@ -40,6 +40,18 @@ char * ether2str ( unsigned char * );
 void udp_hookup ( int, ufptr );
 int get_ephem_port ( void );
 
+/* This stuff is either static assigned,
+ * or obtained via DHCP (except mac address)
+ */
+struct host_info {
+	unsigned long my_ip;
+	unsigned long net_mask;
+	unsigned long my_net;
+	unsigned long gate_ip;
+	unsigned char our_mac[ETH_ADDR_SIZE];
+};
+
+
 struct eth_hdr {
     	unsigned char dst[ETH_ADDR_SIZE];
     	unsigned char src[ETH_ADDR_SIZE];

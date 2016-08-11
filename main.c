@@ -107,6 +107,8 @@ sys_init ( int xxx )
 	/* enable interrupts */
 	cpu_leave ();
 
+	gb_init_rand ( 0x163389 );
+
 #ifdef WANT_DELAY
 	/* Cannot do this until the timer is ticking
 	 */

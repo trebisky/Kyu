@@ -36,7 +36,6 @@ unsigned long cholla_ip = 0x3464c480;	/* cholla: 128.196.100.52 */
 unsigned long test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-static unsigned char our_mac[ETH_ADDR_SIZE];
 
 static void slow_net ( int );
 // static void fast_net ( void );
@@ -66,13 +65,7 @@ static int use_rtl = 0;
 
 static int net_state = NET_IDLE;
 
-/* XXX - This really should be part of an interface related
- * datastructure.
- */
-unsigned long my_ip;
-unsigned long gate_ip;
-unsigned long my_net_mask;
-unsigned long my_net;
+struct host_info host_info;
 
 static struct netbuf *inq_head;
 static struct netbuf *inq_tail;
@@ -124,24 +117,9 @@ net_hw_init ( int bogus )
     /* XXX - need cleaner way to set these
      */
     if ( num_rtl > 0 ) {
-	if ( ! net_dots ( "128.196.100.15", &my_ip ) )		/* ringo */
-	    panic ( "netdots" );
-	if ( ! net_dots ( "128.196.100.1", &gate_ip ) )
-	    panic ( "netdots" );
-	my_net_mask = ntohl ( 0xffffff00 );
-	(void ) net_dots ( "128.196.100.0", &my_net );
-	/*
-	ee_activate ();
-	*/
 	rtl_activate ();
 	use_rtl = 1;
     } else {
-	if ( ! net_dots ( "10.0.0.202", &my_ip ) )		/* chorizo */
-	    panic ( "netdots" );
-	if ( ! net_dots ( "10.0.0.1", &gate_ip ) )
-	    panic ( "netdots" );
-	my_net_mask = ntohl ( 0xffffff00 );
-	(void ) net_dots ( "10.0.0.0", &my_net );
 	ee_activate ();
     }
 #endif
@@ -149,7 +127,57 @@ net_hw_init ( int bogus )
     net_state = NET_RUN;
 }
 
-#define NET_STARTUP_WAIT	10
+/* This is as good a place as any to talk a bit about byte order.
+ * Thus far, Kyu has only run on little endian machines (x86 and ARM).
+ * I take a shortcut and keep IP addresses in network byte order.
+ * This means they can just get copied into network packets.
+ * Note that net_dots() produces network byte order.
+ */
+
+static void
+host_info_init ( void )
+{
+	/* This will panic unless we are in NET_RUN */
+	net_addr_get ( host_info.our_mac );
+
+	(void) net_dots ( "192.168.0.11", &host_info.my_ip );
+	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
+	host_info.net_mask = htonl ( 0xffffff00 );
+
+#ifdef notdef
+	if ( ! net_dots ( "128.196.100.15", &my_ip ) )		/* ringo */
+	    panic ( "netdots" );
+	if ( ! net_dots ( "128.196.100.1", &gate_ip ) )
+	    panic ( "netdots" );
+	my_net_mask = htonl ( 0xffffff00 );
+	// (void ) net_dots ( "128.196.100.0", &my_net );
+
+	if ( ! net_dots ( "10.0.0.202", &my_ip ) )		/* chorizo */
+	    panic ( "netdots" );
+	if ( ! net_dots ( "10.0.0.1", &gate_ip ) )
+	    panic ( "netdots" );
+	my_net_mask = htonl ( 0xffffff00 );
+	// (void ) net_dots ( "10.0.0.0", &my_net );
+#endif
+
+#define USE_DHCP
+#ifdef USE_DHCP
+	/* The idea here is to start with the static info above,
+	 *  then let DHCP overwrite any or all of it.
+	 */
+	if ( dhcp_host_info ( &host_info ) )
+	    printf ( "Host info obtained via DHCP\n" );
+	else
+	    printf ( "DHCP failed\n" );
+#endif
+
+	host_info.my_net = host_info.my_ip & host_info.net_mask;
+
+	printf ( "My IP = %s, netmask = %08x\n", ip2strl(host_info.my_ip), ntohl(host_info.net_mask) );
+	printf ( "My network = %s\n", ip2strl(host_info.my_net) );
+	printf ( "My MAC address is: %s\n", ether2str(host_info.our_mac) );
+	printf ( "My gateway: %s\n", ip2strl ( host_info.gate_ip ) );
+}
 
 /* Called during startup if networking
  * is configured.
@@ -158,18 +186,6 @@ void
 net_init ( void )
 {
     int count;
-
-    /*
-    unsigned long xxx;
-    if ( ! net_dots ( "128.196.100.54", &xxx ) )
-	printf ( "Cannot parse dotted address\n" );
-    printf ( "Addr = %08x, %s\n", xxx, ip2strl ( xxx ) );
-    */
-
-    (void) net_dots ( "192.168.0.11", &my_ip );
-    (void) net_dots ( "192.168.0.1", &gate_ip );
-    my_net_mask = ntohl ( 0xffffff00 );
-    (void ) net_dots ( "192.168.0.0", &my_net );
 
     system_clock_rate = timer_rate_get();
 
@@ -190,6 +206,7 @@ net_init ( void )
     inq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! inq_sem )
 	panic ("Cannot get net input semaphore");
+
 
 #ifdef notyet
     /*
@@ -219,6 +236,8 @@ net_init ( void )
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
+#define NET_STARTUP_WAIT	10
+
     count = 0;
     while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
 	printf ( "Net wait %d\n", count );
@@ -230,12 +249,12 @@ net_init ( void )
 	return;
     }
 
-    /* This will panic unless we are in NET_RUN */
-    net_addr_get ( our_mac );
+    host_info_init ();
 
     arp_announce ();
 
     net_show ();
+
 
 #ifdef notdef
     /* XXX - Doing this here interfered with tftp symbol table fetch */
@@ -406,7 +425,7 @@ static int not_our_mac ( struct netbuf *nbp )
 {
 	if ( memcmp ( nbp->eptr->dst, broad, ETH_ADDR_SIZE ) == 0 )
 	    return 1;
-	if ( memcmp ( nbp->eptr->dst, our_mac, ETH_ADDR_SIZE ) != 0 )
+	if ( memcmp ( nbp->eptr->dst, host_info.our_mac, ETH_ADDR_SIZE ) != 0 )
 	    return 1;
 	return 0;
 }
@@ -469,10 +488,10 @@ net_handle ( struct netbuf *nbp )
 void
 net_show ( void )
 {
-	printf ( "My IP address is: %s (%08x)\n", ip2strl ( my_ip ), my_ip );
-	printf ( "My MAC address is: %s\n", ether2str(our_mac) );
+	printf ( "My IP address is: %s (%08x)\n", ip2strl ( host_info.my_ip ), host_info.my_ip );
+	printf ( "My MAC address is: %s\n", ether2str(host_info.our_mac) );
+	printf ( "Gateway: %s\n", ip2strl ( host_info.gate_ip ) );
 
-	printf ( "Gateway: %s\n", ip2strl ( gate_ip ) );
 	printf ( "Packets processed: %d total (%d oddballs)\n", total_count, oddball_count );
 
 #ifdef ARCH_X86

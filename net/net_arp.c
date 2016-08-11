@@ -54,10 +54,7 @@ struct eth_arp {
 #define OP_REQ_SWAP	0x0100
 #define OP_REPLY_SWAP	0x0200
 
-extern unsigned long my_ip;		/* XXX */
-extern unsigned long gate_ip;		/* XXX */
-extern unsigned long my_net;		/* XXX */
-extern unsigned long my_net_mask;	/* XXX */
+extern struct host_info host_info;
 
 static struct sem *arp_ping_sem;
 
@@ -143,7 +140,7 @@ arp_rcv ( struct netbuf *nbp )
 	}
 #endif
 
-	if ( IP(eap->tpa) != my_ip ) {
+	if ( IP(eap->tpa) != host_info.my_ip ) {
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -180,7 +177,7 @@ arp_reply ( struct netbuf *nbp )
 
 	memcpy ( eap->tpa, eap->spa, 4 );
 	memcpy ( eap->tha, eap->sha, ETH_ADDR_SIZE ); 
-	memcpy ( eap->spa, (char *) &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
 	eap->op = OP_REPLY_SWAP;
 
 	net_addr_get ( eap->sha );
@@ -212,7 +209,7 @@ arp_request ( unsigned long target_ip )
 	eap->plen = 4;
 
 	net_addr_get ( eap->sha );
-	memcpy ( eap->spa, (char *) &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
 
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
 	memcpy ( eap->tpa, (char *) &unknown, 4 );
@@ -244,8 +241,8 @@ ip_arp_send ( struct netbuf *nbp )
 	/*  XXX - here is the sum total of our IP routing.
 	 * maybe this should be going to the gateway.
 	 */
-	if ( (dest_ip & my_net_mask) != my_net ) {
-	    dest_ip = gate_ip;
+	if ( (dest_ip & host_info.net_mask) != host_info.my_net ) {
+	    dest_ip = host_info.gate_ip;
 	}
 
 	ap = arp_lookup_e ( dest_ip );
@@ -369,9 +366,9 @@ arp_announce ( void )
 
 	net_addr_get ( eap->sha );
 
-	memcpy ( eap->spa, (char *) &my_ip, 4 );
+	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
-	memcpy ( eap->tpa, (char *) &my_ip, 4 );
+	memcpy ( eap->tpa, (char *) &host_info.my_ip, 4 );
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;

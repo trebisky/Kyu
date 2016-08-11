@@ -10,7 +10,7 @@
 #include "netbuf.h"
 #include "cpu.h"
 
-extern unsigned long my_ip;
+extern struct host_info host_info;
 
 void
 ip_rcv ( struct netbuf *nbp )
@@ -130,7 +130,7 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 
 	/* proto is already filled in by caller */
 
-	ipp->src = my_ip;
+	ipp->src = host_info.my_ip;
 	ipp->dst = dest_ip;
 
 	ipp->sum = 0;
