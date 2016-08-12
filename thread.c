@@ -94,10 +94,16 @@ static void thr_show_state ( struct thread * );
 #define RSF_CONT	0x02
 #define RSF_INTER	0x04
 
+/* not having this an enum allows me to keep these
+ * definitions local to this file.
+ */
+#define SEM_CLEAR	0
+#define SEM_SET		1
+
 void sem_init ( void );
 int sem_block_t ( struct sem *, int );
 void sem_block_m ( struct sem *, struct sem * );
-static struct sem *sem_new ( enum sem_state, int );
+static struct sem *sem_new ( int, int );
 
 /* Some notes on races and synchronization.
  *  5-18-2015
@@ -1684,7 +1690,7 @@ sem_init ( void )
  */
 
 static struct sem *
-sem_new ( enum sem_state state, int flags )
+sem_new ( int state, int flags )
 {
 	struct sem *sp;
 
@@ -1711,13 +1717,13 @@ sem_new ( enum sem_state state, int flags )
 struct sem *
 sem_mutex_new ( int flags )
 {
-	return sem_new ( SET, flags );
+	return sem_new ( SEM_CLEAR, flags );
 }
 
 struct sem *
 sem_signal_new ( int flags )
 {
-	return sem_new ( CLEAR, flags );
+	return sem_new ( SEM_SET, flags );
 }
 
 void
@@ -1728,18 +1734,15 @@ sem_destroy ( struct sem *sp )
 }
 
 /* OK from interrupt code.
- * note that my use of "SET" and "CLEAR" are
- *  perhaps surprising.  A semaphore is CLEAR
- *  when we will block on it.
  */
 void
 sem_unblock ( struct sem *sem )
 {
 	struct thread *tp;
 
-	if ( sem->state == SET ) {
+	if ( sem->state == SEM_CLEAR ) {
 	    return;
-	} else {	/* CLEAR */
+	} else {	/* SEM_SET */
 	    if ( sem->wait ) {
 		/* XXX - race */
 		tp = sem->wait;
@@ -1747,7 +1750,7 @@ sem_unblock ( struct sem *sem )
 	    	thr_unblock ( tp );
 		return;
 	    }
-	    sem->state = SET;
+	    sem->state = SEM_CLEAR;
 	}
 }
 
@@ -1755,7 +1758,7 @@ int
 sem_block_try ( struct sem *sem )
 {
 	cpu_enter ();	/* XXX */
-	if ( sem->state == CLEAR ) {
+	if ( sem->state == SEM_SET ) {
 	    cpu_leave ();
 	    return 0;
 	} else {
@@ -1812,13 +1815,13 @@ sem_add ( struct sem *sem )
 void
 sem_block_cpu ( struct sem *sem )
 {
-	if ( sem->state == SET ) {
-	    sem->state = CLEAR;
+	if ( sem->state == SEM_CLEAR ) {
+	    sem->state = SEM_SET;
 	    cpu_leave ();
 	    return;
 	}
 
-	/* CLEAR */
+	/* SEM_SET */
 	sem_add ( sem );
 
 	thr_block ( SWAIT );
@@ -1842,13 +1845,13 @@ void
 sem_block_c ( struct sem *sem, tfptr func, void *arg )
 {
 	cpu_enter ();	/* XXX */
-	if ( sem->state == SET ) {
-	    sem->state = CLEAR;
+	if ( sem->state == SEM_CLEAR ) {
+	    sem->state = SEM_SET;
 	    cpu_leave ();
 	    return;
 	}
 
-	/* CLEAR */
+	/* SEM_SET */
 	sem_add ( sem );
 	thr_block_c ( SWAIT, func, arg );
 }
@@ -1857,13 +1860,13 @@ void
 sem_block_q ( struct sem *sem )
 {
 	cpu_enter ();	/* XXX */
-	if ( sem->state == SET ) {
-	    sem->state = CLEAR;
+	if ( sem->state == SEM_CLEAR ) {
+	    sem->state = SEM_SET;
 	    cpu_leave ();
 	    return;
 	}
 
-	/* CLEAR */
+	/* SEM_SET */
 	sem_add ( sem );
 	thr_block_q ( SWAIT );
 }
@@ -1925,7 +1928,7 @@ cv_new ( struct sem *mutex )
 	/* allocate a signaling semaphore
 	 * (empty so the first wait will block).
 	 */
-	sp = sem_new ( CLEAR, SEM_FIFO );
+	sp = sem_new ( SEM_SET, SEM_FIFO );
 	if ( ! sp ) {
 	    return (struct cv *) 0;
 	}
@@ -2014,7 +2017,7 @@ void cpu_leave_s ( void )
 struct sem *
 cpu_new ( void )
 {
-	return sem_new ( CLEAR, SEM_FIFO );
+	return sem_new ( SEM_SET, SEM_FIFO );
 }
 
 void

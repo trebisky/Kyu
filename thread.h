@@ -193,10 +193,11 @@ struct thread {
  */
 
 struct sem {
-	struct sem *next;	/* links together avail */
-	enum sem_state state;	/* full or empty */
+	struct sem *next;		/* links together avail */
+	// enum sem_state state;	/* full or empty */
+	int state;			/* full or empty */
 	int flags;
-	struct thread *wait;	/* folks blocked on this */
+	struct thread *wait;		/* list of threads blocked on this */
 };
 
 struct cv {
