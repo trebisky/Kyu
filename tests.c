@@ -82,6 +82,7 @@ static void test_easy ( int );
 static void test_hard ( int );
 static void test_join ( int );
 static void test_mutex ( int );
+static void test_cancel ( int );
 
 /* XXX should be in arch dependent menu */
 static void test_gpio ( int );
@@ -135,6 +136,7 @@ struct test std_test_list[] = {
 	test_cv1,	"CV test",		0,
 	test_join,	"Join test",		0,
 	test_mutex,	"Mutex test",		0,
+	test_cancel,	"Timer cancel test",	0,
 	0,		0,			0
 };
 
@@ -2047,6 +2049,32 @@ test_mutex ( int count )
 
 	sem_destroy ( mutex );
 }
+
+// static struct sem *cat;
+static struct thread *waiter;
+
+static void
+cancel_func ( int time )
+{
+	thr_delay ( 1000 );
+	thr_unblock ( waiter );
+	printf ( "Bang\n" );
+}
+
+/* Test timer cancels and sem with timeout */
+static void
+test_cancel ( int count )
+{
+	struct thread *new;
+
+	/* XXX is there a better way ? */
+	waiter = cur_thread;
+	new =  safe_thr_new ( "tcan", cancel_func, (void *) 1, 10, 0 );
+
+	thr_delay ( 5000 );
+	printf ( "Boom\n" );
+}
+
 /* -------------------------------------------- */
 
 /* Generate a data fault */

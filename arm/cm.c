@@ -32,44 +32,9 @@ struct device_ctrl {
 
 #define DEVICE_BASE	( (struct device_ctrl *) (CTRL_BASE + 0x600))
 
-void cm_get_mac0 ( char * );
-void cm_get_mac1 ( char * );
-
-static void
-show_mac ( char *mac )
-{
-	int i;
-
-	for ( i=0; i<6; i++ ) {
-	    if ( i == 0 )
-		printf ( "%02x", mac[i] );
-	    else
-		printf ( " %02x", mac[i] );
-	}
-}
-
-void
-cm_init ( void )
-{
-	char mac[6];
-
-	cm_get_mac0 ( mac );
-
-	printf ( "MAC 0: " );
-	show_mac ( mac );
-	printf ( "\n" );
-
-	/* -- */
-
-	cm_get_mac1 ( mac );
-
-	printf ( "MAC 1: " );
-	show_mac ( mac );
-	printf ( "\n" );
-}
-
 /* From arch/arm/include/asm/arch-am33xx/cpu.h */
-/* gmii_sel register defines */
+/* gmii_sel register defines
+ */
 #define GMII1_SEL_MII           0x0
 #define GMII1_SEL_RMII          0x1
 #define GMII1_SEL_RGMII         0x2
@@ -95,6 +60,7 @@ cm_mii_enable ( void )
 	cmp->miisel = MII_MODE_ENABLE;
 }
 
+/* This first one we use */
 void
 cm_get_mac0 ( char *buf )
 {
@@ -112,6 +78,8 @@ cm_get_mac0 ( char *buf )
         buf[5] = (data & 0xFF00) >> 8;
 }
 
+#ifdef why_bother
+/* This second one is for the useless second interface */
 void
 cm_get_mac1 ( char *buf )
 {
@@ -127,6 +95,45 @@ cm_get_mac1 ( char *buf )
 	data = cmp->macid_1l;
         buf[4] = data & 0xFF;
         buf[5] = (data & 0xFF00) >> 8;
+}
+#endif
+
+static void
+show_mac ( char *mac )
+{
+	int i;
+
+	for ( i=0; i<6; i++ ) {
+	    if ( i == 0 )
+		printf ( "%02x", mac[i] );
+	    else
+		printf ( " %02x", mac[i] );
+	}
+}
+
+/* XXX - Useless */
+void
+cm_init ( void )
+{
+#ifdef notdef
+	char mac[6];
+
+	/* This first one we use */
+	cm_get_mac0 ( mac );
+
+	printf ( "MAC 0: " );
+	show_mac ( mac );
+	printf ( "\n" );
+
+	/* -- */
+
+	/* This second one is for the useless second interface */
+	cm_get_mac1 ( mac );
+
+	printf ( "MAC 1: " );
+	show_mac ( mac );
+	printf ( "\n" );
+#endif
 }
 
 /* THE END */

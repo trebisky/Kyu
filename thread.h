@@ -58,6 +58,7 @@ struct thread * safe_thr_new ( char *, tfptr, void *, int, int );
  */
 #define	SEM_FIFO	0x0000
 #define	SEM_PRIO	0x0001
+#define	SEM_TIMEOUT	0x0002
 
 enum sem_state { CLEAR, SET };
 
@@ -77,8 +78,6 @@ struct sem * cpu_new ( void );
 void cpu_wait ( struct sem * );
 void cpu_signal ( struct sem * );
 #endif
-
-struct sem * safe_sem_new ( int );
 
 /* This was 6 in Skidoo */
 #define MAX_TNAME	10
@@ -193,11 +192,11 @@ struct thread {
  */
 
 struct sem {
-	struct sem *next;		/* links together avail */
-	// enum sem_state state;	/* full or empty */
-	int state;			/* full or empty */
+	struct sem *next;		/* links together avail and on timer */
+	struct thread *list;		/* list of threads blocked on this */
+	int state;			/* SET or CLEAR */
 	int flags;
-	struct thread *wait;		/* list of threads blocked on this */
+	int delay;			/* for sem with timeout */
 };
 
 struct cv {

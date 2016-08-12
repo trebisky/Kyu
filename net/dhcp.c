@@ -2,7 +2,10 @@
  * T. Trebisky  8-10-2016
  */
 
+#include "kyu.h"
 #include "kyulib.h"
+#include "thread.h"
+
 #include "net.h"
 #include "netbuf.h"
 #include "cpu.h"
@@ -225,6 +228,7 @@ dhcp_show_pkt ( struct bootp *bpp, struct netbuf *nbp )
 
 static int dhcp_debug = 0;
 
+static struct thread *dhcp_thread;
 static int dhcp_state;
 
 #define ST_OWAIT1	1
@@ -232,7 +236,6 @@ static int dhcp_state;
 #define ST_AWAIT1	3
 #define ST_AWAIT2	4
 
-// static int dhcp_ip;
 static struct host_info *hip;
 
 /* packet evaporates once we return,
@@ -278,6 +281,7 @@ dhcp_rcv ( struct netbuf *nbp )
 	    }
 
 	    dhcp_state = ST_OWAIT2;
+	    thr_unblock ( dhcp_thread );
 	}
 	else if ( type == TYPE_ACK && dhcp_state == ST_AWAIT1 ) {
 	    hip->my_ip = bpp->your_ip;			/* many places in packet to get this from */
@@ -289,6 +293,7 @@ dhcp_rcv ( struct netbuf *nbp )
 		memcpy ( &hip->gate_ip, &p[2], 4 );
 
 	    // Other good things we could harvest ...
+	    // Note that hostname may or may not end with null byte(s)
 	    // p = find_option ( bpp, OP_SERVER );	/* Server */
 	    // p = find_option ( bpp, OP_LEASE_TIME );	/* Lease time (seconds) 4 bytes */
 	    // p = find_option ( bpp, OP_DNS );		/* DNS IP (n*4 bytes) */
@@ -296,6 +301,7 @@ dhcp_rcv ( struct netbuf *nbp )
 	    // p = find_option ( bpp, OP_DOMAIN );	/* domain name (8 bytes for "mmto.org") */
 
 	    dhcp_state = ST_AWAIT2;
+	    thr_unblock ( dhcp_thread );
 	}
 	else
 	    printf ( "Ignoring packet\n" );
@@ -306,6 +312,8 @@ dhcp_rcv ( struct netbuf *nbp )
 static int
 dhcp_once ( void )
 {
+	dhcp_thread = thr_self();
+
 	dhcp_state = ST_OWAIT1;
 	dhcp_discover ();
 

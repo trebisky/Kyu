@@ -45,6 +45,10 @@ static struct thread *thread_ready;
 static struct thread *wait_head;
 static struct thread *repeat_head;
 
+/* Holds list of semaphores with timeouts.
+ */
+static struct sem *sem_head;
+
 /* change via thr_debug()
  */
 static int thread_debug;
@@ -73,9 +77,15 @@ static void resched ( int );
 static void setup_c ( struct thread *, tfptr, void * );
 
 static void timer_add_wait_int ( struct thread *, int );
-static void timer_add_wait ( struct thread *tp, int );
+static void timer_add_wait ( struct thread *, int );
+static void timer_cancel ( struct thread * );
+
 static void setup_repeat ( struct thread *, int );
 static void cancel_repeat ( struct thread * );
+
+static void sem_add_wait_int ( struct sem *, int );
+static void sem_add_wait ( struct sem *, int );
+static void sem_cancel_wait ( struct sem * );
 
 void sys_init ( int );
 
@@ -101,7 +111,7 @@ static void thr_show_state ( struct thread * );
 #define SEM_SET		1
 
 void sem_init ( void );
-int sem_block_t ( struct sem *, int );
+void sem_block_t ( struct sem *, int );
 void sem_block_m ( struct sem *, struct sem * );
 static struct sem *sem_new ( int, int );
 
@@ -231,6 +241,8 @@ thr_init ( void )
 
 	wait_head = (struct thread *) 0;
 	repeat_head = (struct thread *) 0;
+
+	sem_head = (struct sem *) 0;
 
 	/*
 	stack_db ( "thread kickoff" );
@@ -1053,6 +1065,14 @@ thr_unblock ( struct thread *tp )
 	if ( tp->state == READY )
 	    return;
 
+	/* Added 8-12-2016 so we can be tidy when unblocking
+	 * a thread waiting for a timer.   To be honest, this
+	 * should just work anyway without this, but this
+	 * is good clean living.
+	 */
+	if ( tp->state == DELAY )
+	    timer_cancel ( tp );
+
 #ifdef notdef
 	/* XXX - should this really be a panic ?? */
 	/* see above */
@@ -1121,6 +1141,44 @@ thr_unblock ( struct thread *tp )
 	    }
 	}
 #endif
+}
+
+/* Unblock all threads waiting on a semaphore.
+ * Used when a sem with timeout has timeout expire.
+ * It is actually rare to have more than one thread on list.
+ * Called from timer interrupt code.
+ */
+static void
+sem_unblock_all ( struct sem *sp )
+{
+	struct thread *tp;
+	struct thread *lowtp;
+
+	if ( sp->state == SEM_CLEAR )
+	    return;
+
+	if ( ! sp->list ) {
+	    sp->state = SEM_CLEAR;
+	    return;
+	}
+
+	lowtp = sp->list;
+	while ( sp->list ) {
+	    tp = sp->list;
+	    sp->list = tp->wnext;
+	    tp->state = READY;
+	    if ( tp->pri < lowtp->pri )
+		lowtp = tp;
+	}
+
+	/* This code is from thr_unblock above.
+	 * if the lowest priority thread we have just made ready
+	 * should run when we finish the interrupt, mark it so.
+	 */
+	if ( cur_thread->state != READY || (lowtp->pri < cur_thread->pri) ) {
+	    if ( ! in_newtp || lowtp->pri < in_newtp->pri )
+		in_newtp = lowtp;
+	}
 }
 
 /* Added 6-2-2015
@@ -1710,7 +1768,7 @@ sem_new ( int state, int flags )
 	sp->state = state;
 	sp->flags = flags;
 
-	sp->wait = (struct thread *) 0;
+	sp->list = (struct thread *) 0;
 	return sp;
 }
 
@@ -1740,18 +1798,22 @@ sem_unblock ( struct sem *sem )
 {
 	struct thread *tp;
 
-	if ( sem->state == SEM_CLEAR ) {
+	if ( sem->state == SEM_CLEAR )
 	    return;
-	} else {	/* SEM_SET */
-	    if ( sem->wait ) {
-		/* XXX - race */
-		tp = sem->wait;
-		sem->wait = tp->wnext;
-	    	thr_unblock ( tp );
-		return;
-	    }
-	    sem->state = SEM_CLEAR;
+
+	/* XXX ??? do I have this right ??? */
+	if ( sem->flags & SEM_TIMEOUT )
+	    sem_cancel_wait ( sem );
+
+	/* SEM_SET */
+	if ( sem->list ) {
+	    /* XXX - race */
+	    tp = sem->list;
+	    sem->list = tp->wnext;
+	    thr_unblock ( tp );
+	    return;
 	}
+	sem->state = SEM_CLEAR;
 }
 
 int
@@ -1778,7 +1840,7 @@ sem_add ( struct sem *sem )
 	if ( sem->flags & SEM_PRIO ) {
 	    /* SEM_PRIO, sort into list
 	     */
-	    p = sem->wait;
+	    p = sem->list;
 	    while ( p && p->pri <= cur_thread->pri ) {
 		lp = p;
 		p = p->wnext;
@@ -1786,8 +1848,8 @@ sem_add ( struct sem *sem )
 
 	    cur_thread->wnext = p;
 
-	    if ( p == sem->wait )
-		sem->wait = cur_thread;
+	    if ( p == sem->list )
+		sem->list = cur_thread;
 	    else
 		lp->wnext = cur_thread;
 
@@ -1795,13 +1857,13 @@ sem_add ( struct sem *sem )
 	    /* SEM_FIFO, put at end of list
 	     */
 	    cur_thread->wnext = (struct thread *) 0;
-	    if ( sem->wait ) {
-		tp = sem->wait;
+	    if ( sem->list ) {
+		tp = sem->list;
 		while ( tp->wnext )
 		    tp = tp->wnext;
 		tp->wnext = cur_thread;
 	    } else {
-		sem->wait = cur_thread;
+		sem->list = cur_thread;
 	    }
 	}
 }
@@ -1829,7 +1891,6 @@ sem_block_cpu ( struct sem *sem )
 	 * but can if this is the only thread.
 	 */
 }
-
 
 /* XXX - should never be called from interrupt code,
  * perhaps should be a panic if we do ??
@@ -1871,28 +1932,27 @@ sem_block_q ( struct sem *sem )
 	thr_block_q ( SWAIT );
 }
 
-#ifdef notyet
-/* seems to me we need
- * thr_block_cpu_t() and thr_block_t in order
- * to construct sem_block_t() tjt -- 8-10-2016
- */
-static
-sem_timeout_func ( void )
-{
-}
-
 /* NEW - block on semaphore with timeout.
  *	(timeout is number of ticks)
+ * It would be nice to return as follows, but ...
  *	returns: 0 when normal return.
  *	returns: 1 when timed out.
+ *
+ * Experimental as of 8-12-2016
  */
-int
-sem_block_t ( struct sem *sem, int timeout );
+void
+sem_block_t ( struct sem *sem, int timeout )
 {
-	sem_block ( sem );
-	return 0;
+	cpu_enter ();
+	if ( sem->state == SEM_SET ) {
+	    /* maybe we should have thr_block_t()
+	     * to handle this.
+	     */
+	    sem_add_wait ( sem, timeout );
+	    sem->flags |= SEM_TIMEOUT;
+	}
+	sem_block_cpu ( sem );
 }
-#endif
 
 /* Condition Variable style blocking
  */
@@ -2087,6 +2147,7 @@ void
 thread_tick ( void )
 {
 	struct thread *tp;
+	struct sem *sp;
 
 	/* Process delays */
 	if ( wait_head ) {
@@ -2112,7 +2173,11 @@ thread_tick ( void )
 	    }
 	}
 
-	/* Process repeats */
+	/* Process repeats.
+	 *  repeats are not like waits where we only have to fool
+	 *  with the head of the list, we loop through all of them
+	 *  and keep them in no particular order.
+	 */
 	for ( tp=repeat_head; tp; tp = tp->rep_next ) {
 	    --tp->rep_count;
 	    if ( tp->rep_count < 1 ) {
@@ -2121,6 +2186,17 @@ thread_tick ( void )
 		    tp->overruns++;
 		tp->rep_count = tp->rep_reload;
 	    	thr_unblock ( tp );
+	    }
+	}
+
+	/* Process semaphores with timeouts */
+	if ( sem_head ) {
+	    --sem_head->delay;
+	    while ( sem_head && sem_head->delay == 0 ) {
+		sp = sem_head;
+		sem_head = sem_head->next;
+		sem_unblock_all ( sp );
+		sp->flags &= ~SEM_TIMEOUT;
 	    }
 	}
 }
@@ -2223,11 +2299,100 @@ cancel_repeat ( struct thread *tp )
 static void
 timer_add_wait ( struct thread *tp, int delay )
 {
-	int x = splhigh ();
+	cpu_enter ();
 
 	timer_add_wait_int ( tp, delay );
 
-	splx ( x );
+	cpu_leave ();
+}
+
+static void
+sem_add_wait_int ( struct sem *sp, int delay )
+{
+	struct sem *p, *lp;
+
+	p = sem_head;
+
+	while ( p && p->delay <= delay ) {
+	    delay -= p->delay;
+	    lp = p;
+	    p = p->next;
+	}
+
+	if ( p )
+	    p->delay -= delay;
+
+	sp->delay = delay;
+	sp->next = p;
+
+	if ( p == sem_head )
+	    sem_head = sp;
+	else
+	    lp->next = sp;
+}
+
+static void
+sem_add_wait ( struct sem *sp, int delay )
+{
+	cpu_enter ();
+
+	sem_add_wait_int ( sp, delay );
+
+	cpu_leave ();
+}
+
+/* This gets called from sen_unblock() when we
+ * unblock via a semaphore with a timeout.
+ * It may or may not be called from interrupt code.
+ * pull a sem_timeout off the list.
+ */
+static void
+sem_cancel_wait ( struct sem *sp )
+{
+	struct sem *lp;
+
+	if ( ! in_interrupt ) cpu_enter ();
+
+	sp->flags &= ~SEM_TIMEOUT;
+
+	if ( sem_head == sp )
+	    sem_head = sp->next;
+	else {
+	    for ( lp = sem_head; lp; lp = lp->next )
+		if ( lp == sp )
+		    lp = sp->next;
+	}
+
+	if ( ! in_interrupt ) cpu_leave ();
+}
+
+/* This gets called from thr_unblock() when we
+ * unblock a thread with a running delay timer.
+ * could be called from interrupt code.
+ */
+static void
+timer_cancel ( struct thread *tp )
+{
+	struct thread *lp;
+
+	if ( ! in_interrupt ) cpu_enter ();
+
+	if ( wait_head == tp ) {
+	    wait_head = tp->wnext;
+	    if ( wait_head )
+		wait_head->delay += tp->delay;
+	} else {
+	    for ( lp = wait_head; lp; lp = lp->wnext )
+		if ( lp == tp ) {
+		    lp = tp->wnext;
+		    if ( lp )
+			lp->delay += tp->delay;
+		}
+	}
+
+	tp->delay = 0;	/* not really necessary */
+
+	if ( ! in_interrupt ) cpu_leave ();
 }
 
 /* THE END */

@@ -21,8 +21,6 @@
 #include "netbuf.h"
 #include "cpu.h"
 
-#define NEW_SLOW_WAY
-
 #ifdef notdef
 unsigned long agate_ip = 0x0100000a;	/* agate: 10.0.0.1 */
 unsigned long trona_ip = 0x3600000a;	/* trona: 10.0.0.54 */
@@ -76,10 +74,6 @@ static struct sem *outq_sem;
 */
 
 static int system_clock_rate;
-
-#ifndef NEW_SLOW_WAY
-static struct sem *slow_net_sem;
-#endif
 
 static int net_debug_f = 0;
 
@@ -220,28 +214,29 @@ net_init ( void )
     /* XXX review and revise priorities someday */
     (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
 
-#ifdef NEW_SLOW_WAY
     /* We do indeed do the new slow way */
     (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0, system_clock_rate );
-#else
-    (void) safe_thr_new ( "net_slow", slow_net, (void *) 0, 11, 0 );
-
-    slow_net_sem = sem_signal_new ( SEM_FIFO );
-    net_timer_hookup ( fast_net );
-#endif
 
     /* Here is where we initialize hardware.
      * no network traffic until after this is done
+     * We do the initialization in a separate thread
+     * (and do this sloppy synchronization) because the cpsw driver
+     * used to hang at least half the time.
+     * XXX - This went away when we rewrote it and we could do away
+     *  now with this extra thread and the synchronization.
      */
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
-#define NET_STARTUP_WAIT	10
+/* With the BBB, this usually takes about 3 seconds, with the
+ * time for autonegotiation (about 2.1 seconds) dominating.
+ */
+#define NET_STARTUP_WAIT	12
 
     count = 0;
     while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
-	printf ( "Net wait %d\n", count );
-	thr_delay ( system_clock_rate );
+	// printf ( "Net wait %d\n", count );
+	thr_delay ( system_clock_rate/2 );
     }
 
     if ( num_eth == 0 ) {
@@ -253,7 +248,7 @@ net_init ( void )
 
     arp_announce ();
 
-    net_show ();
+    // net_show ();
 
 
 #ifdef notdef
@@ -269,42 +264,13 @@ net_init ( void )
     */
 }
 
-#ifdef NEW_SLOW_WAY
-/* Do this now using a repeat.
- * This makes the need for a special hook
- * in the timer routine obsolete.
- */
+/* This runs as a thread on a repeat at 1 Hz */
 static void
 slow_net ( int xxx )
 {
 	arp_tick ();
 	dns_tick ();
 }
-#else
-/* Activated roughly at 1 Hz */
-static void
-slow_net ( int arg )
-{
-    	for ( ;; ) {
-	    sem_block ( slow_net_sem );
-	    arp_tick ();
-	    dns_tick ();
-	}
-	/* NOTREACHED */
-}
-
-static int fast_net_clock = 0;
-
-/* Called at the system clock rate
- * (either 100 or 1000 Hz, probably)
- */
-static void
-fast_net ( void )
-{
-	if ( ( fast_net_clock++ % system_clock_rate ) == 0 )
-	    sem_unblock ( slow_net_sem );
-}
-#endif
 
 #ifdef notdef
 /* A version of net_rcv() with locking added for initial

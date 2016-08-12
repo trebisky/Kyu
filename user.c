@@ -14,33 +14,44 @@ void test_main ( int );
 /* Introduced 7-17-2016 while playing with
  * ARM timers and the ARM mmu
  */
+#define MMU_SIZE (4*1024)
+
+static void
+mmu_scan ( unsigned long *mmubase )
+{
+	int i;
+
+	/* There is a big zone (over RAM with 0x0c0e */
+	for ( i=0; i<MMU_SIZE; i++ ) {
+	    if ( (mmubase[i] & 0xffff) != 0x0c12 )
+		printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
+	}
+}
+
 void
 toms_debug ( void )
 {
 	unsigned long *mmubase;
-	int i;
 
-	show_bogus_timer ();
+	// show_bogus_timer ();
 
 	printf ( "SCTRL = %08x\n", get_sctrl() );
-	printf ( "MMU base = %08x\n", get_mmu() );
-	printf ( "Protection unit base = %08x\n", get_prot() );
-
-#define MMU_SIZE (4*1024)
 
 	mmubase = (unsigned long *) get_mmu ();
 	if ( ! mmubase )
 	    printf ( "MMU not initialized !\n" );
+	else
+	    printf ( "MMU base = %08x\n", get_mmu() );
+
+	if ( get_prot () )
+	    printf ( "Protection unit base = %08x\n", get_prot() );
 
 	if ( mmubase ) {
-	    for ( i=0; i<MMU_SIZE; i++ ) {
-		if ( mmubase[i] & 0xffff != 0x0c12 )
-		    printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
-	    }
-	    printf ( "mmu checking done\n" );
+	    // mmu_scan ( mmubase );
+	    // printf ( "mmu checking done\n" );
 	}
 
-	show_cpsw_debug ();
+	// show_cpsw_debug ();
 
 #ifdef notdef
 	peek ( 0x44E30000 );	/* CM */

@@ -495,6 +495,8 @@ cpsw_phy_verify ( void )
  * Also note that there is a bit to restart autonegotiation,
  * which it seems we could use instead of a full reset, but no
  * harm seems to be done by a full reset like this.
+ *
+ * This is fast (takes maybe 2 milliseconds).
  */
 static void
 cpsw_phy_reset ( void )
@@ -510,8 +512,8 @@ cpsw_phy_reset ( void )
 	while ( tmo-- && (mdio_read(PHY_BMCR) & BMCR_RESET ) )
 	    thr_delay ( 1 );
 
-	printf ( "Reset cleared in %d milliseconds\n", (500-tmo) );
-	printf ( "Reset status CR: %04x\n", mdio_read ( PHY_BMCR ) );
+	// printf ( "Reset cleared in %d milliseconds\n", (500-tmo) );
+	// printf ( "Reset status CR: %04x\n", mdio_read ( PHY_BMCR ) );
 }
 
 /* we keep track with this */
@@ -526,7 +528,7 @@ int phy_speed;
 int phy_duplex;
 
 /* Give this 5 seconds.
- * I am seeting this complete in about 1.6 seconds.
+ * I am seeing this complete in from 1.6 to 2.5 seconds.
  *
  * In the case of Kyu, which at present always boots over the network,
  *  we never expect to see the link fail to be present on startup.
@@ -540,7 +542,7 @@ cpsw_phy_wait_aneg ( void )
 {
 	int tmo = 2500;
 
-	printf ( "Aneg wait starts: %04x\n", mdio_read ( PHY_BMSR ) );
+	// printf ( "Aneg wait starts: %04x\n", mdio_read ( PHY_BMSR ) );
 
 	while ( tmo-- ) {
 	    if ( mdio_read ( PHY_BMSR ) & BMSR_ANEGCOMPLETE ) {
@@ -581,8 +583,8 @@ cpsw_phy_aneg ( void )
 	cpsw_phy_reset ();
 	cpsw_phy_wait_aneg ();
 
-	printf ( "Aneg wait finished: %04x\n", mdio_read ( PHY_BMSR ) );
-	printf ( "Final status CR: %04x\n", mdio_read ( PHY_BMCR ) );
+	// printf ( "Aneg wait finished: %04x\n", mdio_read ( PHY_BMSR ) );
+	// printf ( "Final status CR: %04x\n", mdio_read ( PHY_BMCR ) );
 
 	if ( phy_link ) {
 	    cpsw_phy_link_status ();
@@ -1252,7 +1254,7 @@ update_link ( struct cpsw_port *port )
 {
 	u32 mac_control;
 
-	printf ( "Entering update_link for port %d\n", port->port_num );
+	// printf ( "Entering update_link for port %d\n", port->port_num );
 
 	if (phy_link) { /* link up */
 		mac_control = MYSTERY;
@@ -1723,7 +1725,7 @@ cpsw_int_enable ( void )
 int
 cpsw_init ( void )
 {
-	printf ( "Starting cpsw_init\n" );
+	// printf ( "Starting cpsw_init\n" );
 	cpsw_phy_init ();
 
 	/* Kyu only supports the BBB */
@@ -1732,7 +1734,7 @@ cpsw_init ( void )
 
 	cpsw_register();
 
-	printf ( "Finished cpsw_init\n" );
+	// printf ( "Finished cpsw_init\n" );
 	return 1;
 }
 
@@ -1744,7 +1746,7 @@ cpsw_init ( void )
 void
 cpsw_activate ( void )
 {
-	printf ( "Starting cpsw_activate\n" );
+	// printf ( "Starting cpsw_activate\n" );
 	cpsw_setup ();
 
 	irq_hookup ( IRQ_CPSW_TX, cpsw_tx_isr, 0 );
@@ -1757,7 +1759,7 @@ cpsw_activate ( void )
 
 	// (void) thr_new ( "cpsw_reaper", cpsw_reaper, (void *) 0, PRI_REAPER, 0 );
 
-	printf ( "Finished cpsw_activate\n" );
+	// printf ( "Finished cpsw_activate\n" );
 }
 
 void
