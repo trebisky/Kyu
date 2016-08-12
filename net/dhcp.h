@@ -8,6 +8,8 @@
 #define BOOTP_SERVER	67	/* receive on this */
 #define BOOTP_CLIENT	68	/* send on this */
 
+#define DHCP_OPTION_SIZE	312
+
 struct bootp {
     	unsigned char op;
     	unsigned char htype;
@@ -30,7 +32,7 @@ struct bootp {
 #ifdef notdef
 	char options[64];	/* BOOTP */
 #endif
-	char options[312];	/* DHCP */
+	char options[DHCP_OPTION_SIZE];	/* DHCP */
 };
 
 /* dhcp expands options (vendor) field to 312 from 64 bytes.

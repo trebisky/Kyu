@@ -97,6 +97,7 @@ static void thr_show_state ( struct thread * );
 void sem_init ( void );
 int sem_block_t ( struct sem *, int );
 void sem_block_m ( struct sem *, struct sem * );
+static struct sem *sem_new ( enum sem_state, int );
 
 /* Some notes on races and synchronization.
  *  5-18-2015
@@ -1682,7 +1683,7 @@ sem_init ( void )
  * XXX - ignore flags for now.
  */
 
-struct sem *
+static struct sem *
 sem_new ( enum sem_state state, int flags )
 {
 	struct sem *sp;

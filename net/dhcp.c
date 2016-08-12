@@ -176,8 +176,9 @@ static void
 show_options ( struct bootp *bpp )
 {
 	char *op = bpp->options + 4;
+	char *opend = bpp->options + DHCP_OPTION_SIZE;
 
-	while ( *op != OP_END ) {
+	while ( op < opend && *op != OP_END ) {
 	    if ( *op == 0 ) {
 		printf ( "Pad\n" ); op++;
 		continue;
@@ -191,8 +192,9 @@ static char *
 find_option ( struct bootp *bpp, int key )
 {
 	char *op = bpp->options + 4;
+	char *opend = bpp->options + DHCP_OPTION_SIZE;
 
-	while ( *op != OP_END ) {
+	while ( op < opend && *op != OP_END ) {
 	    if ( *op == 0 )
 		op++;
 	    else {

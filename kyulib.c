@@ -607,22 +607,6 @@ safe_thr_new ( char *nm, tfptr func, void *arg, int pri, int flags )
 	return rv;
 }
 
-/* Wrapper function to catch troubles when making new semaphores.
- */
-struct sem *
-safe_sem_new ( int val )
-{
-	struct sem *rv;
-
-	rv = sem_new ( val, SEM_FIFO );
-	if ( ! rv ) {
-	    printf ( "Cannot create new semaphore\n" );
-	    panic ( "user sem new" );
-	}
-
-	return rv;
-}
-
 /* XXX Move this */
 #ifdef ARCH_X86
 #ifdef LED_DEBUG

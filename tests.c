@@ -107,6 +107,7 @@ struct test {
 };
 
 /* These are the tests we run in the automatic regression set
+ * Don't put anything ugly in here we cannot run in a loop.
  */
 struct test std_test_list[] = {
 	test_basic,	"Basic tests",		0,
@@ -134,14 +135,14 @@ struct test std_test_list[] = {
 	test_cv1,	"CV test",		0,
 	test_join,	"Join test",		0,
 	test_mutex,	"Mutex test",		0,
-	test_fault,	"Fault test",		0,
-	test_gpio,	"BBB gpio test",	0,
 	0,		0,			0
 };
 
 struct test io_test_list[] = {
 	test_sort,	"Thread sort test",	5,
 	test_ran,	"Random test",		0,
+	test_fault,	"Fault test",		0,
+	test_gpio,	"BBB gpio test",	0,
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
 	test_pci,	"PCI scan",		0,
@@ -175,6 +176,23 @@ struct test *cur_test_list = std_test_list;
 
 static int test_debug = 0;
 
+/* Wrapper function to catch troubles when making new semaphores.
+ */
+static struct sem *
+safe_sem_signal_new ( void )
+{
+	struct sem *rv;
+
+	rv = sem_signal_new ( SEM_FIFO );
+	if ( ! rv ) {
+	    printf ( "Cannot create new semaphore\n" );
+	    panic ( "user sem new" );
+	}
+
+	return rv;
+}
+
+
 #ifdef ARCH_X86
 void
 stack_db ( char *msg )
@@ -192,7 +210,7 @@ kb_debug ( int val )
 	stack_db ( "kb_debug thread");
 	*/
 
-	kbd_sem = safe_sem_new ( CLEAR );
+	kbd_sem = safe_sem_signal_new ();
 	kb_hookup ( 0x3c, kbd_sem );
 
 	for ( ;; ) {
@@ -248,7 +266,7 @@ run_test ( tfptr func, int arg )
 
 	info.func = func;
 	info.arg = arg;
-	info.sem = safe_sem_new ( CLEAR );
+	info.sem = safe_sem_signal_new ();
 	info.times = 1;	/* ignored */
 
 	(void) safe_thr_new ( 
@@ -321,7 +339,7 @@ single_test ( struct test *tstp, int times )
 	info.func = tstp->func;
 	info.arg = tstp->arg;
 	/*
-	info.sem = safe_sem_new ( CLEAR );
+	info.sem = safe_sem_signal_new ();
 	*/
 	info.times = times;
 
@@ -1521,8 +1539,8 @@ test_thread3 ( int xx )
 
 	printf ( "Starting semaphore test\n");
 
-	sem1 = safe_sem_new ( CLEAR );
-	sem2 = safe_sem_new ( CLEAR );
+	sem1 = safe_sem_signal_new ();
+	sem2 = safe_sem_signal_new ();
 
 	(void) safe_thr_new ( "t3f1", t3_f1, 0, PRI_TEST, 0 );
 	(void) safe_thr_new ( "t3f2", t3_f2, 0, PRI_TEST, 0 );
@@ -1663,7 +1681,7 @@ test_thread5 ( int count )
 	t5_tick = 0;
 	timer_hookup ( t5_ticker );
 
-	t5_sem = safe_sem_new ( CLEAR );
+	t5_sem = safe_sem_signal_new ();
 
 	(void) safe_thr_new ( "slave", t5_slave, (void *) 1, PRI_TEST, 0 );
 	(void) safe_thr_new ( "slave", t5_slave, (void *) 2, PRI_TEST, 0 );
@@ -1731,7 +1749,7 @@ test_fancy ( int count )
 
 	timer_hookup ( t6_ticker );
 
-	t6_sem = safe_sem_new ( CLEAR );
+	t6_sem = safe_sem_signal_new ();
 
 	(void) safe_thr_new ( "slave", t6_slave, (void *) 1, PRI_TEST, 0 );
 	(void) safe_thr_new ( "slave", t6_slave, (void *) 2, PRI_TEST, 0 );
@@ -1845,7 +1863,7 @@ test_79 ( int count, int nice )
 {
 	t7_run = 1;
 	t7_tick = 0;
-	t7_sem = safe_sem_new ( CLEAR );
+	t7_sem = safe_sem_signal_new ();
 
 	timer_hookup ( t7_ticker );
 

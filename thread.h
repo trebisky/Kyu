@@ -61,7 +61,7 @@ struct thread * safe_thr_new ( char *, tfptr, void *, int, int );
 
 enum sem_state { CLEAR, SET };
 
-struct sem *sem_new ( enum sem_state, int );
+// struct sem *sem_new ( enum sem_state, int );
 struct sem *sem_mutex_new ( int );
 struct sem *sem_signal_new ( int );
 
