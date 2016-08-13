@@ -1055,6 +1055,12 @@ thr_unblock ( struct thread *tp )
 		printf ( "thr_unblock: %s\n", tp->name );
 	}
 
+	/* Added 8-12-2016 when having problems
+	 * with test 4 (continuations)
+	 */
+	if ( ! tp )
+	    panic ( "Yikes!  null tp in thr_unblock" );
+
 	/* This would mean we ran over our tail in
 	 * some time delay loop or something of the
 	 * sort.  If the thread is ready we don't

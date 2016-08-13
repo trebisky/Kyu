@@ -322,21 +322,37 @@ wrapper ( int arg )
 	struct test_info *ip = (struct test_info *) arg;
 	int i;
 
+	// printf ( "&ip = %08x, ip = %08x, ip->times = %d\n", &ip, ip, ip->times );
+
 	for ( i=0; i< ip->times; i++ ) {
-	    if ( ! test_running )
+	    // printf ( "RUNNING test (%d of %d)\n", i+1, ip->times);
+	    // printf ( "Stack at %08x\n", get_sp() );
+
+	    if ( ! test_running ) {
 		break;
+	    }
+
 	    (*ip->func) ( ip->arg );
+
+	    // printf ( "FINISH test (%d of %d)\n", i+1, ip->times);
 	}
+
+	// printf ( "&ip = %08x, ip = %08x, ip->times = %d\n", &ip, ip, ip->times );
 
 	/*
 	sem_unblock ( ip->sem );
 	*/
 }
 
+static struct test_info info;
+
 static void
 single_test ( struct test *tstp, int times )
 {
-	struct test_info info;
+	/* Having this on the stack, calling a thread,
+	 * then returning from this function is very bad.
+	 */
+	// struct test_info info;
 
 	info.func = tstp->func;
 	info.arg = tstp->arg;
@@ -1212,7 +1228,7 @@ static void alarm ( int );
 static void slave1 ( int );
 static void slave2 ( int );
 
-static struct thread *cont_thread;
+// static struct thread *cont_thread;
 static struct thread *cont_slave;
 
 static volatile int ready;
@@ -1232,21 +1248,41 @@ slave1 ( int xx )
 {
 	ready = 1;
 	thr_block_c ( WAIT, slave2, 0 );
-
 	panic ( "slave1, oops, shouldn't be here." );
+
+	//thr_block ( WAIT );
+	//printf ( "slave1, oops, shouldn't be here." );
+
+#ifdef notdef
+	/* This is hardly race free */
+	while ( ready )
+	    thr_yield ();
 	thr_unblock ( cont_thread );
+#endif
 }
 
 static void
 slave2 ( int yy )
 {
-	printf ( " OK, cool -- got a continuation\n" );
+	printf ( " OK, cool -- got a continuation." );
+
+#ifdef notdef
+	/* This is hardly race free */
+	while ( ready )
+	    thr_yield ();
 	thr_unblock ( cont_thread );
+#endif
 }
 
+/* Runs at PRI 20 in wrapper context.
+ * The other boys run at PRI 10.
+ * usual delay is 10 on single test, 1 when looping.
+ */
 static void
 test_contin1 ( int xx )
 {
+	// cont_thread = thr_self ();
+
 	printf ("Let's try a continuation.\n");
 	ready = 0;
 	cont_slave = safe_thr_new ( "slave", slave1, (void *)0, PRI_TEST, 0 );
@@ -1256,9 +1292,16 @@ test_contin1 ( int xx )
 
 	(void) safe_thr_new ( "alarm", alarm, (void *)0, PRI_TEST, 0 );
 
-	printf ( "Waiting ..." );
-	cont_thread = thr_self ();
+#ifdef notdef
+	/* Sorta like a join, but with nasty races. */
+	// printf ( "Waiting ..." );
+	ready = 0;
 	thr_block ( WAIT );
+#endif
+
+	thr_join ( cont_slave );
+
+	printf ( " Done\n" );
 }
 /* --------------------------------------------
  * Delay via continuation test.
@@ -2050,15 +2093,19 @@ test_mutex ( int count )
 	sem_destroy ( mutex );
 }
 
-// static struct sem *cat;
 static struct thread *waiter;
+static struct sem *waiter_sem;
 
 static void
-cancel_func ( int time )
+cancel_func ( int type )
 {
-	thr_delay ( 1000 );
-	thr_unblock ( waiter );
-	printf ( "Bang\n" );
+	thr_delay ( 50 );
+
+	if ( type == 0 ) {
+	    thr_unblock ( waiter );
+	} else {
+	    sem_unblock ( waiter_sem );
+	}
 }
 
 /* Test timer cancels and sem with timeout */
@@ -2066,13 +2113,39 @@ static void
 test_cancel ( int count )
 {
 	struct thread *new;
+	int start_time;
 
-	/* XXX is there a better way ? */
-	waiter = cur_thread;
+	waiter = thr_self ();
+	waiter_sem = safe_sem_signal_new ();
+
+	/* First test delay */
+	printf ("Delay ");
+	start_time = get_timer_count_t ();
+	new =  safe_thr_new ( "tcan", cancel_func, (void *) 0, 10, 0 );
+
+	thr_delay ( 100 );
+	// printf ( "Boom\n" );
+
+	if ( get_timer_count_t () - start_time < 60 )
+	    printf ( "OK" );
+	else
+	    printf ( "Fail" );
+
+	/* Then test semaphore */
+	printf (" Sem ");
+	start_time = get_timer_count_t ();
 	new =  safe_thr_new ( "tcan", cancel_func, (void *) 1, 10, 0 );
 
-	thr_delay ( 5000 );
-	printf ( "Boom\n" );
+	sem_block_t ( waiter_sem, 25 );
+
+	if ( get_timer_count_t () - start_time < 30 )
+	    printf ( "OK" );
+	else
+	    printf ( "Fail" );
+
+	printf ("\n");
+
+	sem_destroy ( waiter_sem );
 }
 
 /* -------------------------------------------- */
