@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+
+# Holy cow! A perl script!!
+# usage: mkversion -ihexapod_version -v$(shell cat VERSION) >version.c
+
+$ident = "";
+$vernum = "";
+
+$user = `whoami`;
+chomp $user;
+
+# Command line arguments, -v and -i
+while ( $_ = $ARGV[0] ) {
+    last unless /^-/;
+    shift;
+
+    ($ident = $_) =~ s/^..// if /^-i/;
+    ($vernum = $_) =~ s/^..// if /^-v/;
+}
+
+$ident = "kyu_version" if ( $ident eq "" );
+$vernum = "0.0" if ( $vernum eq "" );
+
+$date = `date`;
+chomp $date;
+
+print <<EOF;
+/* version.c
+ */
+
+EOF
+
+#char *mount_version = "version 1.12, Compiled: Sun Jan 20 16:31:52 MST 2002";
+
+print "char \*$ident";
+print " = \"version $vernum, Compiled by $user: $date\"\;\n";
+
+print <<EOF;
+
+/* THE END */
+EOF

@@ -26,11 +26,6 @@ static int timer_rate;	/* ticks per second */
 
 static int usual_delay = USER_DELAY;
 
-/* Don't run these tests automatically
- */
-static void test_sort ( int );
-static void test_ran ( int );
-
 #ifdef ARCH_X86
 extern struct desc48 vector_desc;
 extern struct gate vector_table[];
@@ -84,23 +79,6 @@ static void test_join ( int );
 static void test_mutex ( int );
 static void test_cancel ( int );
 
-/* XXX should be in arch dependent menu */
-static void test_gpio ( int );
-static void test_fault ( int );
-
-#ifdef WANT_NET
-static void test_netarp ( int );
-static void test_netping ( int );
-static void test_bootp ( int );
-static void test_dhcp ( int );
-static void test_dns ( int );
-static void test_arp ( int );
-void test_tftp ( int );
-static void test_udp ( int );
-void test_tcp ( int );
-static void test_netshow ( int );
-#endif
-
 struct test {
 	tfptr	func;
 	char	*desc;
@@ -140,11 +118,33 @@ struct test std_test_list[] = {
 	0,		0,			0
 };
 
+/* These go in the "i" menu which is kind of a grab bag
+ * of mostly architecture dependent tests.
+ *
+ * Don't run these tests automatically.
+ * Don't run them in a repeat loop either.
+ */
+static void test_sort ( int );
+static void test_ran ( int );
+static void test_blink ( int );
+static void test_gpio ( int );
+static void test_malloc ( int );
+static void test_wait ( int );
+static void test_fault ( int );
+static void test_zdiv ( int );
+
+
 struct test io_test_list[] = {
 	test_sort,	"Thread sort test",	5,
 	test_ran,	"Random test",		0,
-	test_fault,	"Fault test",		0,
+	test_blink,	"BBB blink test",	0,
+	test_blink,	"stop BBB blink test",	1,
 	test_gpio,	"BBB gpio test",	0,
+	test_malloc,	"malloc test",		0,
+	test_wait,	"wait for 5 seconds",	0,
+	test_fault,	"Fault test",		0,
+	test_zdiv,	"Zero divide test",	0,
+
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
 	test_pci,	"PCI scan",		0,
@@ -157,7 +157,20 @@ struct test io_test_list[] = {
 	0,		0,			0
 };
 
-#ifdef WANT_NET 
+
+#ifdef WANT_NET
+static void test_netshow ( int );
+static void test_netarp ( int );
+static void test_bootp ( int );
+static void test_dhcp ( int );
+static void test_netping ( int );
+static void test_dns ( int );
+static void test_arp ( int );
+void test_tftp ( int );
+static void test_udp ( int );
+void test_tcp ( int );
+
+
 struct test net_test_list[] = {
 	test_netshow,	"Net show",		0,
 	test_netarp,	"ARP ping",		0,
@@ -496,22 +509,6 @@ rom_search ( void )
 }
 #endif
 
-void
-malloc_test ()
-{
-	char *p;
-
-	p = malloc ( 1024 );
-	printf ( "Malloc gives: %08x\n", p );
-	memset ( p, 0, 1024 );
-
-	free ( p );
-
-	p = malloc ( 1024 );
-	printf ( "Malloc gives: %08x\n", p );
-	memset ( p, 0, 1024 );
-}
-
 static void
 help_tests ( struct test *tp, int nt )
 {
@@ -540,31 +537,6 @@ x_test ( void )
 	printf ( "F %08x\n", &cur_thread->iregs );
 }
 #endif
-
-static void
-bbb_blinker ( int xx )
-{
-	/* Writing a "1" does turn the LED on */
-	gpio_led_set ( 1 );
-	thr_delay ( 100 );
-	gpio_led_set ( 0 );
-}
-
-static struct thread *bbb_tp;
-
-static void
-start_bbb_blink ( void )
-{
-	// gpio_led_init ();
-	bbb_tp = thr_new_repeat ( "blinker", bbb_blinker, 0, 10, 0, 1000 );
-}
-
-static void
-stop_bbb_blink ( void )
-{
-	printf ( "Stop the blink\n" );
-	thr_repeat_stop ( bbb_tp );
-}
 
 #define MAXB	64
 #define MAXW	4
@@ -627,7 +599,7 @@ tester ( void )
 
 	    /* Select special IO test menu */
 	    if ( **wp == 'i' ) {
-		printf ( "select io test menu\n" );
+		printf ( "select io test menu (q to quit)\n" );
 	    	cur_test_list = io_test_list;
 	    }
 	    /* Restore standard test menu */
@@ -646,6 +618,7 @@ tester ( void )
 		}
 	    }
 #endif
+
 	    if ( **wp == 'e' ) {
 		printf ( "Test told to stop\n" );
 		test_running = 0;
@@ -703,38 +676,28 @@ tester ( void )
 
 #endif
 
-	    /* Run BBB blink test */
-	    if ( **wp == 'b' && nw == 1 ) {
-		start_bbb_blink ();
-	    }
-
-	    /* Stop BBB blink test */
-	    if ( **wp == 'b' && nw == 2 ) {
-		stop_bbb_blink ();
-	    }
-
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
-	    	dump_b ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'b', wp[1], wp[2] );
 		continue;
 	    }
 
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'w' && nw == 3 ) {
-	    	dump_w ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'w', wp[1], wp[2] );
 		continue;
 	    }
 
 	    if ( **wp == 'd' && nw == 3 ) {
-	    	dump_l ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'l', wp[1], wp[2] );
 		continue;
 	    }
 
+#ifdef notdef
 	    if ( **wp == 'w' && nw == 2 ) {
 		nw = atoi(wp[1]);
 		printf ("Delay for %d seconds\n", nw );
 		thr_delay ( nw * timer_rate );
 	    }
 
-#ifdef notdef
 	    if ( **wp == 's' ) {
 		static int screen;
 
@@ -788,14 +751,17 @@ tester ( void )
 		    thr_debug ( 0 );
 	    }
 
+	    /* Show a specific thread
+	     */
+	    if ( **wp == 'u' && nw == 2 ) {
+	    	thr_show_name ( wp[1] );
+	    }
+
+
 	    /* Show threads */
 	    /* Conflicts with t for test mode below */
 	    if ( **wp == 't' && nw == 1 ) {
 	    	thr_show ();
-	    }
-
-	    if ( **wp == 'u' && nw == 2 ) {
-	    	thr_show_name ( wp[1] );
 	    }
 
 	    /* Run a test or tests */
@@ -808,10 +774,14 @@ tester ( void )
 		if ( nl < 1 )
 		    nl = 1;
 
-		if ( n == 0 ) {
+		if ( n == 0 && cur_test_list == std_test_list ) {
 		    all_tests ( nl );
 		    continue;
 		}
+
+		/* No looping except for standard tests */
+		if ( cur_test_list != std_test_list )
+		    nl = 1;
 
 		if ( n < 1 || n > nt ) {
 		    printf ( " ... No such test.\n" );
@@ -830,28 +800,6 @@ tester ( void )
 		/* run single test, perhaps several times
 		 */
 		single_test ( &cur_test_list[n-1], nl );
-	    }
-
-	    /* provoke a divide by zero */
-	    if ( **wp == 'z' ) {
-		volatile int a = 1;
-		int b = 0;
-
-		printf ("Lets try a divide by zero ...\n");
-		a = a / b;
-		printf ("... All done!\n");
-	    }
-
-	    if ( **wp == 'm' ) {
-		malloc_test ();
-	    }
-
-	    /* cpsw test */
-	    if ( **wp == 'c' ) {
-		if ( nw < 2 )
-		    eth_test ( 0 );
-		else
-		    eth_test ( atoi(wp[1]) );
 	    }
 
 #ifdef notdef
@@ -1115,25 +1063,6 @@ test_basic ( int xx )
 	    panic ( "test thread" );
 
 	printf (" Go!!\n");
-
-#ifdef notdef
-	/* OK, now we are ready to start tests in  earnest.
-	 */
-	run_test ( test_timer, 5 );
-	run_test ( test_delay, 5 );
-	run_test ( test_contin, 0 );
-
-	run_test ( test_thread0, 0 );
-	run_test ( test_thread1, 4 );
-	run_test ( test_thread2, 0 );
-	run_test ( test_thread3, 0 );
-	run_test ( test_thread4, 8 );
-	run_test ( test_thread5, 6 );
-	run_test ( test_fancy, 5 );
-
-	run_test ( test_easy, 5 );
-	run_test ( test_hard, 5 );
-#endif
 
 	printf ( " ........ Basic diagnostics OK\n" );
 }
@@ -2150,7 +2079,36 @@ test_cancel ( int count )
 
 /* -------------------------------------------- */
 
-/* Generate a data fault */
+static void
+test_malloc ( int xxx )
+{
+	char *p;
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+
+	free ( p );
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+}
+
+/* Wait for 5 seconds */
+/* This runs in its own thread,
+ * which can be interesting.
+ */
+static void
+test_wait ( int xxx )
+{
+	thr_delay ( 5 * timer_rate );
+	printf ( "Done waiting\n" );
+}
+
+/* -------------------------------------------- */
+
+/* Generate a data abort on ARM */
 static void
 test_fault ( int xxx )
 {
@@ -2158,6 +2116,58 @@ test_fault ( int xxx )
 	char *p = (char *) 0;
 
 	junk = *p;
+}
+
+static void
+test_zdiv ( int xxx )
+{
+	volatile int a = 1;
+	int b = 0;
+
+	printf ("Lets try a divide by zero ...\n");
+	a = a / b;
+	printf ("... All done!\n");
+}
+
+/* -------------------------------------------- */
+
+/* BBB blink test - also a good test of
+ * mixing repeats and delays
+ */
+static void
+bbb_blinker ( int xx )
+{
+	/* Writing a "1" does turn the LED on */
+	gpio_led_set ( 1 );
+	thr_delay ( 100 );
+	gpio_led_set ( 0 );
+}
+
+static struct thread *bbb_tp;
+
+static void
+start_bbb_blink ( void )
+{
+	// gpio_led_init ();
+	bbb_tp = thr_new_repeat ( "blinker", bbb_blinker, 0, 10, 0, 1000 );
+}
+
+static void
+stop_bbb_blink ( void )
+{
+	printf ( "Stop the blink\n" );
+	thr_repeat_stop ( bbb_tp );
+}
+
+
+static void
+test_blink ( int arg )
+{
+
+	if ( arg == 0 )
+	    start_bbb_blink ();
+	else
+	    stop_bbb_blink ();
 }
 
 /* -------------------------------------------- */

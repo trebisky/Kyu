@@ -1492,14 +1492,9 @@ show_dmastatus ( void )
 
 }
 
-/* Hook from test menu */
-void
-eth_test ( int arg )
-{
-	printf ( "Sorry, no eth test at this time\n" );
-}
-
 #ifdef notdef
+/* Obsolete and abandoned (but got us started) */
+
 #define TLIMIT 10
 #define RLIMIT 30 * 20
 

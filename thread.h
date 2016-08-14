@@ -100,11 +100,11 @@ struct int_regs {
 };
 
 /* These aren't really registers.
- * We bit the bullet on the arm, and put the
+ * We bit the bullet on the ARM, and put the
  * info for cont (and quick) in their own place
- * I think there were bugs waiting by trying to keep
- * this in the jmp_regs, so this ought to be retroed
- * to the x86 someday.
+ * I think there were bugs waiting in the x86 code by
+ * trying to keep this in the jmp_regs, so this ought
+ * to be retroed to the x86 someday.
  */
 struct cont_regs {
 	int regs[4];

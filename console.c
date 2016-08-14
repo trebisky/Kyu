@@ -421,6 +421,63 @@ panic_debug ( void )
 }
 #endif
 
+/* This is specific to the BBB due to the RAM range test,
+ * but it avoids a bunch of annoying data aborts.
+ */
+static void *
+arm_address_fix ( unsigned int addr )
+{
+	if ( ! valid_ram_address ( addr ) )
+	    return (void *) 0;
+
+	/* No odd addresses */
+	// addr &= ~1;
+	/* This is even better */
+	addr &= ~0xf;
+
+	return (void *) addr;
+}
+
+/* Shared by code in tests.c
+ * Data aborts just waste time and cause frustration
+ * when debugging.
+ */
+void
+mem_dumper ( int type, char *a_start, char *a_lines )
+{
+	unsigned int addr;
+	void *start;
+	int lines;
+
+	if ( strncmp ( a_start, "0x", 2 ) == 0 )
+	    addr = atoi ( a_start );
+	else
+	    addr = hextoi ( a_start );
+
+	start = arm_address_fix ( addr );
+	lines = atoi ( a_lines );
+
+	// printf ( "DUMP at %08x\n", start );
+	if ( ! start ) {
+	    printf ( "Start address not in RAM\n" );
+	    return;
+	}
+
+	/* check end address too */
+	addr = (unsigned int) start + 16 * lines - 1;
+	if ( ! valid_ram_address ( addr ) ) {
+	    printf ( "End address not in RAM\n" );
+	    return;
+	}
+
+	if ( type == 'b' )
+	    dump_b ( start, lines );
+	else if ( type == 'w' )
+	    dump_w ( start, lines );
+	else
+	    dump_l ( start, lines );
+}
+
 /* The idea here is
  * that we can call this from any place we are interested
  * in examining, interact with this, then type "c"
@@ -439,6 +496,7 @@ kyu_debugger ( void )
 	char buf[MAXB];
 	char *wp[MAXW];
 	int nw;
+	void *start;
 
 	for ( ;; ) {
 	    printf ( "Kyu, debug> " );
@@ -495,19 +553,19 @@ kyu_debugger ( void )
 
 	    /* dump memory as bytes */
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
-	    	dump_b ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'b', wp[1], wp[2] );
 		continue;
 	    }
 
 	    /* dump memory as words */
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'w' && nw == 3 ) {
-	    	dump_w ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'w', wp[1], wp[2] );
 		continue;
 	    }
 
 	    /* dump memory as longs */
 	    if ( **wp == 'd' && nw == 3 ) {
-	    	dump_l ( (void *) atoi(wp[1]), atoi(wp[2]) );
+		mem_dumper ( 'l', wp[1], wp[2] );
 		continue;
 	    }
 	}

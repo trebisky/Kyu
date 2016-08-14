@@ -107,6 +107,49 @@ sym_lookup ( char *x )
 	return NULL;
 }
 
+/* Do a reverse lookup, given an address,
+ *  find the entry less that, but closest to the address given.
+ */
+struct symtab *
+sym_rlookup ( int addr )
+{
+	struct symtab *sp;
+	struct symtab *best_sp;
+	int best, gap;
+
+	best = 0x10000000;
+	best_sp = sym_table;
+
+	for ( sp = sym_table; sp; sp = sp->next ) {
+	    /* printf ( "checking %s %08x\n", sp->name, sp->addr ); */
+	    gap = addr - sp->addr;
+	    if ( gap < 0 )
+		continue;
+	    if ( gap < best ) {
+		best = gap;
+		best_sp = sp;
+	    }
+	}
+	return best_sp;
+}
+
+char * mk_symaddr ( int addr )
+{
+	struct symtab *sp;
+	int off;
+	static char rbuf[32];	/* XXX */
+
+	sp = sym_rlookup ( addr );
+	off = addr - sp->addr;
+	if ( off ) {
+	    sprintf ( rbuf, "%s+%x", sp->name, off );
+	    return rbuf;
+	}
+
+	/* every proper trace ends in thr_exit */
+	return sp->name;
+}
+
 #define NBUF	128
 #define MAXW	4
 

@@ -298,6 +298,10 @@ thr_sched ( void )
 	/* NOTREACHED */
 }
 
+/* Show lots of stuff for one particular thread
+ * Note that there is a lot of stuff (like displaying all registers)
+ * in arm/show_regs.c that would be worth looking at.
+ */
 void
 thr_one_all ( struct thread *tp, char *msg )
 {
@@ -309,6 +313,25 @@ thr_one_all ( struct thread *tp, char *msg )
 	printf ( "\n" );
 
 	printf ( " stack: %8x\n", (int) tp->stack );
+
+	if ( tp->mode == JMP )
+	    printf ( " mode: JMP\n" );
+	else if ( tp->mode == INT )
+	    printf ( " mode: INT\n" );
+	else if ( tp->mode == CONT )
+	    printf ( " mode: CONT\n" );
+	else
+	    printf ( " unknown mode: %d\n", tp->mode );
+
+	/* XXX - ARM specific, register 11 is fp */
+	/* Seems to work fine 8-14-2016 */
+
+#define ARM_FP	11
+
+	if ( tp->mode == JMP ) {
+	    unroll_fp ( tp->regs.regs[ARM_FP] );
+	}
+
 #ifdef ARCH_X86
 	printf ( " esp: %8x\n", tp->regs.esp );
 	printf ( " eip: %8x\n", tp->regs.eip );
@@ -333,7 +356,7 @@ thr_show_name ( char *name )
 	    }
 	}
 	if ( ! ok )
-		printf ( "Oops, no such thread\n" );
+	    printf ( "Oops, no such thread\n" );
 }
 
 static void
@@ -551,6 +574,7 @@ thr_alloc ( void )
 	struct thread *tp;
 	char *stack;
 
+	/* XXX - this does not look right XXX XXX */
 	if ( ! thread_avail ) {
 	    thr_free ( stack, STACK_SIZE );
 	    /* XXX - bad bugs come when we

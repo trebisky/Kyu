@@ -2,6 +2,9 @@
 #
 # Tom Trebisky  4-15-2015
 
+# Here is where you set the Kyu version number.
+VERSION = 0.7.0
+
 INCS = -I. -Iarm
 
 include Makefile.inc
@@ -61,6 +64,13 @@ dlmalloc.o:	malloc.h
 thread.e:	thread.c
 	$(CC) -E thread.c -o thread.e
 
+# This is a weird make idiom to cause this to be rebuilt every time.
+FORCE:
+
+version.c:	FORCE
+	rm -f version.c
+	./mkversion -ikyu_version -v$(VERSION) >version.c
+
 #.PHONY: subdirs $(SUBDIRS)
 #
 #subdirs: $(SUBDIRS)
@@ -77,9 +87,6 @@ kyu.dump:	kyu
 
 kyu.sym:	kyu
 	$(NM) kyu >kyu.sym
-
-version:
-	$(CC) --version
 
 help:
 	$(CC) --help=optimizers

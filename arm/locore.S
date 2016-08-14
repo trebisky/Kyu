@@ -220,6 +220,7 @@ resume_c:
 	bic	r1, r1, #0xff
 	orr	r1, r1, #PSR_M_SUPER	/* enable both IRQ and FIQ */
 	msr	cpsr, r1
+	mov	fp, #0		/* added 8-13-2016 to end backtraces */
 	mov	pc, ip
 
 /* resume_j and save_j don't need to save all registers
@@ -335,6 +336,11 @@ fiq:
         .globl get_sp
 get_sp:
         add     r0, sp, #0
+	bx	lr
+
+        .globl get_fp
+get_fp:
+        add     r0, fp, #0
 	bx	lr
 
 /* Use only in dire situations */

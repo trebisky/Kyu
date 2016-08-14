@@ -121,12 +121,16 @@ hardware_init ( void )
 #endif
 }
 
+#define BBB_RAM_START	0x80000000
+#define BBB_RAM_END	0x9FFFFFFF
+#define BBB_RAM_ENDP	0xA0000000
+
 int
 valid_ram_address ( unsigned long addr )
 {
-	if ( addr < 0x80000000 )
+	if ( addr < BBB_RAM_START )
 	    return 0;
-	if ( addr >= 0x90000000 )
+	if ( addr > BBB_RAM_END )
 	    return 0;
 	return 1;
 }
