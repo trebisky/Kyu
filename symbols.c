@@ -251,18 +251,46 @@ shell_x ( char **arg, int narg )
 	}
 }
 
-#ifdef notdef
+/* Do a stack traceback -- ARM specific
+ */
 void
-shell_test1 ( int arg )
+unroll_fp ( int *fp )
 {
-	printf ( "Called with %d\n", arg );
+	int limit;
+	char *msg;
+
+	/* could also check is fp ever moves to lower addresses on stack and stop */
+	limit = 16;
+	while ( limit > 0 && fp ) {
+	    msg = mk_symaddr ( fp[0] );
+	    printf ( "Called from %s -- %08x, (next fp = %08x)\n", msg, fp[0], fp[-1] );
+	    fp = (int *) fp[-1];
+	    limit--;
+	}
 }
 
+/* Do a stack backtrace on current thread,
+ * along with dumping a fair bit of the stack.
+ * XXX - what about all registers ??
+ * what if mode is not JMP for current thread ???
+ */
 void
-shell_test2 ( char *arg )
+unroll_cur ( void )
 {
-	printf ( "Called with string: %s\n", arg );
+	int *fp;
+	char stbuf[16];
+	struct thread *cp;
+
+	fp = (int *) get_fp ();
+
+	cp = thr_self ();
+	printf ( "Current thread is %s\n", cp->name );
+	printf ( " SP = %08x,  FP = %08x\n", get_sp(), get_fp() );
+
+	sprintf ( stbuf, "%08x", get_sp() );
+	mem_dumper ( 'l', stbuf, "16" );
+
+	unroll_fp ( fp );
 }
-#endif
 
 /* THE END */

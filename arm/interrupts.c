@@ -115,10 +115,15 @@ void do_fiq ( void )
  * It is called from:
  *  ./arch/arm/lib/lib1funcs.S:	bl	__div0
  *  ./arch/arm/lib/div64.S:	bl	__div0
+ *
+ * Note that there is no reason to expect this call
+ * to happen at interrupt level.
  */
 void __div0 ( void )
 {
-	evil_exception ("divide by zero", F_FIQ);
+	printf ("divide by zero");
+	thr_block ( FAULT );
+	// evil_exception ("divide by zero", F_FIQ);
 }
 
 /* -------------------------------------------- */

@@ -130,6 +130,7 @@ static void test_blink ( int );
 static void test_gpio ( int );
 static void test_malloc ( int );
 static void test_wait ( int );
+static void test_unroll ( int );
 static void test_fault ( int );
 static void test_zdiv ( int );
 
@@ -142,6 +143,7 @@ struct test io_test_list[] = {
 	test_gpio,	"BBB gpio test",	0,
 	test_malloc,	"malloc test",		0,
 	test_wait,	"wait for 5 seconds",	0,
+	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
 
@@ -2107,6 +2109,13 @@ test_wait ( int xxx )
 }
 
 /* -------------------------------------------- */
+
+/* test ARM stack backtrace */
+static void
+test_unroll ( int xxx )
+{
+	unroll_cur();
+}
 
 /* Generate a data abort on ARM */
 static void

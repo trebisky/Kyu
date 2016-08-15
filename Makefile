@@ -26,7 +26,7 @@ include Makefile.inc
 OBJS =  machine.o net.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
-    shell.o \
+    symbols.o \
     dlmalloc.o random.o \
     kyulib.o \
     linux/linux-lib.o

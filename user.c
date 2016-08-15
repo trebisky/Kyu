@@ -45,42 +45,6 @@ floater ( void )
 }
 #endif
 
-/* See if we can do a stack traceback */
-/* Maybe combine this with symtab code in shell.c and
- * put them in their own file */
-void
-unroll_fp ( int *fp )
-{
-	int limit;
-	char *msg;
-
-	/* could also check is fp ever moves to lower addresses on stack and stop */
-	limit = 16;
-	while ( limit > 0 && fp ) {
-	    msg = mk_symaddr ( fp[0] );
-	    printf ( "Called from %s -- %08x, (next fp = %08x)\n", msg, fp[0], fp[-1] );
-	    fp = (int *) fp[-1];
-	    limit--;
-	}
-}
-
-/* Do a stack backtrace on current thread */
-void
-unroll_cur ( void )
-{
-	int *fp;
-	char stbuf[16];
-
-	fp = (int *) get_fp ();
-
-	printf ( " SP = %08x,  FP = %08x\n", get_sp(), get_fp() );
-
-	sprintf ( stbuf, "%08x", get_sp() );
-	mem_dumper ( 'l', stbuf, "16" );
-
-	unroll_fp ( fp );
-}
-
 void
 toms_debug ( void )
 {
@@ -108,7 +72,7 @@ toms_debug ( void )
 
 	// floater ();
 
-	unroll_cur ();
+	// unroll_cur ();
 
 #ifdef notdef
 	peek ( 0x44E30000 );	/* CM */
