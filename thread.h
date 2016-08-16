@@ -21,6 +21,7 @@ typedef void (*vfptr) ( void );
 #define		PRI_USER	10
 #define		PRI_MAGIC	900
 #define		MAX_PRI		1001
+#define		PRI_IDLE	1234
 
 enum thread_state {
 	READY,		/* 0 - ready to go */

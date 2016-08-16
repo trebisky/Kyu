@@ -11,6 +11,7 @@
 
 extern struct thread *cur_thread;
 
+#ifdef notdef
 void
 interrupt_test_dabort ( void )
 {
@@ -33,49 +34,49 @@ zdiv_test ( void )
 	for ( i=5; i > -10; i-- )
 	    val /= i;
 }
+#endif
 
-/* XXX - someday mark the offending thread and let it be.
+/* mark the offending thread and abandon it.
+ *
+ * For a data abort (which is far and away the common
+ * issue on the ARM, the stack is perfectly healthy
+ * and pertinent in fact.
+ *
+ * What we want to do is: thr_block ( FAULT );
+ * but from interrupt level.
+ *
+ * An interrupt (or exception) saves all the registers
+ * into "iregs", conveniently right at the start of
+ * the thread structure.  An array of 17 on ARM.
+ *
+ * -----------------------
+ *
  * To just return usually means the exception hits us again
  * immediately and we get a flood of stupid output.
  * Resetting the cpu (like U-boot) just puts us into a slower loop.
  * To spin is bad, but at least we get sensible output.
  */
+
+char *mk_symaddr(int);
+
 void
 evil_exception ( char *msg, int code )
 {
-	struct thread *tp;
-	unsigned long oldsp;
+	int pc;
 
-	/* Tell thread system we are in an interrupt */
-	start_interrupt ();
+	printf ( "%s\n", msg );
 
-	if ( valid_ram_address ( get_sp() ) ) {
-	    oldsp = get_sp();
-	    set_sp ( EVIL_STACK_BASE );
-	    printf ("Switched to evil stack from %08x\n", oldsp );
-	}
-
-	printf ( "\n" );
-	printf ( "%s in thread %s\n", msg, cur_thread->name );
 	show_thread_regs ( cur_thread );
 
-	/*
-	spin();
-	*/
+#define ARM_FP	11
+#define ARM_PC	15
+	pc = cur_thread->iregs.regs[ARM_PC];
+	printf ( "PC = %08x ( %s )\n", pc, mk_symaddr(pc) );
 
-	thr_show ();
+	unroll_fp ( cur_thread->iregs.regs[ARM_FP] );
 
-	/* There is no plan B if thr_suspend() returns */
-	for ( ;; ) {
-	    printf ( "Suspending thread: %s\n", cur_thread->name );
-	    thr_suspend ( code );
-	    printf ("Uh oh\n");
-	    spin();
-	}
-
-	/*
-	finish_interrupt ();
-	*/
+	/* Let code in thread.c handle this */
+	thr_suspend ( code );
 }
 
 void do_undefined_instruction ( void )
@@ -116,14 +117,14 @@ void do_fiq ( void )
  *  ./arch/arm/lib/lib1funcs.S:	bl	__div0
  *  ./arch/arm/lib/div64.S:	bl	__div0
  *
- * Note that there is no reason to expect this call
- * to happen at interrupt level.
+ * Note that on the ARM this does NOT happen
+ *  at interrupt level, so it is easy to handle.
+ * This works great.  8-14-2016
  */
 void __div0 ( void )
 {
 	printf ("divide by zero");
 	thr_block ( FAULT );
-	// evil_exception ("divide by zero", F_FIQ);
 }
 
 /* -------------------------------------------- */

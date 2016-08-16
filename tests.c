@@ -365,7 +365,9 @@ static void
 single_test ( struct test *tstp, int times )
 {
 	/* Having this on the stack, calling a thread,
-	 * then returning from this function is very bad.
+	 * then returning from this function is very bad,
+	 * if the thread we pass it to expects this data
+	 * to be stable.
 	 */
 	// struct test_info info;
 
@@ -2118,7 +2120,7 @@ test_unroll ( int xxx )
 }
 
 /* Generate a data abort on ARM */
-static void
+void
 test_fault ( int xxx )
 {
 	volatile int junk;

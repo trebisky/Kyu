@@ -297,9 +297,7 @@ panic ( char *msg )
 	 */
 #endif
 
-	thr_suspend ( F_PANIC );
-	spin ();
-
+	thr_block ( FAULT );
 }
 
 /* temporary debugging panic

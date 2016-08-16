@@ -169,9 +169,8 @@ parse_table ( int count )
 
 	while ( getl ( line, NBUF ) ) {
 	    nw = split ( line, wp, MAXW );
-	    if ( *wp[1] != 'T' )
-		continue;
-	    add_symbol ( hextoi(wp[0]), wp[2] );
+	    if ( *wp[1] == 'T' || *wp[1] == 't'  )
+		add_symbol ( hextoi(wp[0]), wp[2] );
 	}
 	printf ( "%d symbols\n", nsym );
 }
@@ -251,6 +250,8 @@ shell_x ( char **arg, int narg )
 	}
 }
 
+#include "hardware.h"
+
 /* Do a stack traceback -- ARM specific
  */
 void
@@ -262,9 +263,15 @@ unroll_fp ( int *fp )
 	/* could also check is fp ever moves to lower addresses on stack and stop */
 	limit = 16;
 	while ( limit > 0 && fp ) {
-	    msg = mk_symaddr ( fp[0] );
-	    printf ( "Called from %s -- %08x, (next fp = %08x)\n", msg, fp[0], fp[-1] );
-	    fp = (int *) fp[-1];
+	    if ( fp[0] < THR_STACK_BASE ) {
+		msg = mk_symaddr ( fp[0] );
+		printf ( "Called from %s -- %08x\n", msg, fp[0] );
+		fp = (int *) fp[-1];
+	    } else {
+		printf ( "Leaf routine\n" );
+		fp = (int *) fp[0];
+	    }
+	    // printf ( "Called from %s -- %08x, (next fp = %08x)\n", msg, fp[0], fp[-1] );
 	    limit--;
 	}
 }

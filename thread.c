@@ -88,6 +88,7 @@ static void sem_add_wait ( struct sem *, int );
 static void sem_cancel_wait ( struct sem * );
 
 void sys_init ( int );
+void thr_idle ( int );
 
 void thr_show ( void );
 
@@ -248,9 +249,20 @@ thr_init ( void )
 	stack_db ( "thread kickoff" );
 	*/
 
-	/* let this be the initial thead.
+	/* sys_init will be the first thread that runs.
+	 * the idle thread (added 8-15-2016) exists to ensure
+	 * that a suspended thread always has someplace to transfer to.
+	 *
+	 * This threads will not run until thr_sched()
+	 *   launches the current thread.  
+	 * The sys thread run briefly performing initialization.
+	 *   initialization lauches the network threads net and net_slow
+	 * Finally, the sys thread launches the user thread and exits.
+	 * At the present time, the user thread simply launches
+	 *   the test thread and exits.
 	 */
 	cur_thread = thr_new ( "sys", sys_init, (void *) 0, PRI_SYS, 0 );
+	(void) thr_new ( "idle", thr_idle, (void *) 0, PRI_IDLE, 0 );
 }
 
 /* OK, I have gotten tired of uncommenting and
@@ -440,7 +452,7 @@ thr_show ( void )
 {
 	struct thread *tp;
 
-	printf ( "  Thread:      name (  &tp   )  state     esp     pri\n");
+	printf ( "  Thread:       name (  &tp   )    state     esp     pri\n");
 	/*
 	thr_one ( thread0 );
 	*/
@@ -1211,65 +1223,6 @@ sem_unblock_all ( struct sem *sp )
 	}
 }
 
-/* Added 6-2-2015
- * A close brother to thr_unblock in an odd way
- * Should always be called from interrupt level
- * when something evil has happened in the current thread.
- */
-void
-thr_suspend ( int why )
-{
-	if ( thread_debug )
-	    printf ( "thr_suspend: %s\n", cur_thread->name );
-
-	cur_thread->state = FAULT;
-	cur_thread->fault = why;
-
-	resched ( 0 );
-
-	/* NOTREACHED ? */
-}
-
-#ifdef notdef
-/* Called from interrupt level when
- * current thread does something evil like
- * addressing invalid memory or trying to
- * execute an invalid instruction.
- */
-void
-thr_fault ( int why )
-{
-	struct thread *tp;
-
-	cur_thread->state = FAULT;
-	cur_thread->fault = why;
-
-	/* XXX this isn't quite right.
-	 * we really want to call thr_block,
-	 * but that routine is not yet ready
-	 * to be called from interrupt level
-	 */
-
-	/* Find some other thread to run */
-	for ( tp=thread_ready; tp; tp = tp->next ) {
-	    if ( tp->state != READY ) {
-	    	in_newtp = tp;
-		return;
-	    }
-	}
-
-	/* XXX */
-	spin ();
-	/*
-	kyu_startup ();
-	*/
-
-	/* NOTREACHED */
-
-	panic ( "thr_fault - resched" );
-}
-#endif
-
 /* put a thread on a waiting list till
  * a certain number of clock ticks elapses.
  */
@@ -1411,6 +1364,48 @@ finish_interrupt ( void )
 	/* NOTREACHED */
 
 	panic ( "finish_interrupt , resume_i" );
+}
+
+/* Called at interrupt level when an exception
+ *  (such as a data abort) happens.
+ * Added 6-2-2015
+ * This has yet to work.
+ * We would like it to be identical to thr_block()
+ * We cannot call that at interrupt level.
+ */
+void
+thr_suspend ( int why )
+{
+	int best_pri;
+	struct thread *tp;
+
+	start_interrupt ();
+
+	if ( thread_debug )
+	    printf ( "thr_suspend: %s\n", cur_thread->name );
+
+	cur_thread->state = FAULT;
+	cur_thread->fault = why;
+
+	// Can't do this at interrupt level.
+	// resched ( 0 );
+
+	best_pri = 999999;
+
+	/* Copied from resched() */
+	for ( tp=thread_ready; tp; tp = tp->next ) {
+	    if ( tp->state != READY )
+	    	continue;
+	    if ( tp->pri > best_pri )
+	    	continue;
+	    best_pri = tp->pri;
+	    in_newtp = tp;
+	}
+
+	if ( ! in_newtp )
+	    panic ( "thr_suspend can find no ready thread" );
+
+	finish_interrupt ();
 }
 
 /* We have decided to resume some other
@@ -1624,6 +1619,7 @@ resched ( int options )
 	cpu_enter ();		/* XXX XXX */
 
 #ifdef SORT_PRI
+	/* We do not currently do this */
 	/* Now we keep the ready list in priority order,
 	 * so we can just run the first ready thing
 	 * we find (and we never examine the current
@@ -1641,6 +1637,8 @@ resched ( int options )
 	}
 
 #else
+	/* We currently do this (8-2016) */
+	/* This code is copied also to thr_suspend()
 	/* Try to find some other thread we can run.
 	 */
 	for ( tp=thread_ready; tp; tp = tp->next ) {
@@ -1708,7 +1706,10 @@ resched ( int options )
 	 * some volatile declaration).
 	 *
 	 * What happens if we have several blocked threads?
-	 * In particular, what if when some event (interrupt) happens?
+	 * It is anybodies guess which thread will actually end
+	 * up spinning here, and it doesn't really matter.
+	 *
+	 * What if when some event (interrupt) happens?
 	 * If the interrupt unblocks the current thread,
 	 *  then this loop pops loose and that is the easy case.
 	 * What if some other thread gets unblocked?
@@ -1728,6 +1729,20 @@ resched ( int options )
 	    printf ( "Awake in %s\n", cur_thread->name );
 
 	return;
+}
+
+/* This routine only exists to support an idle
+ * thread that exists only to support the case where
+ * thr_suspend() could otherwise find no ready thread to
+ * switch to.  Someday I will find a way around this.
+ *
+ * This is the idle thread.
+ */
+void
+thr_idle ( int xxx )
+{
+	for ( ;; )
+	    ;
 }
 
 /*-------------------------------------
