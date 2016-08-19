@@ -64,7 +64,7 @@ evil_exception ( char *msg, int code )
 {
 	int pc;
 
-	printf ( "%s\n", msg );
+	printf ( "%s in thread %s\n", msg, cur_thread->name );
 
 	show_thread_regs ( cur_thread );
 

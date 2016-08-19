@@ -83,6 +83,7 @@ void
 tftp_init ( void )
 {
 	tftp_server ( TFTP_SERVER );
+	tftp_sem = sem_signal_new ( SEM_FIFO );
 }
 
 #define TFS_IDLE	0
@@ -146,7 +147,6 @@ tftp_fetch ( char *file, char *buf, int limit )
 	tftp_buf = buf;
 	tftp_limit = limit;
 	tftp_count = 0;
-	tftp_sem = sem_signal_new ( SEM_FIFO );
 
 	tftp_state = TFS_START;
 	(void) safe_thr_new ( "tftp_wdog", tftp_wdog, (void *) 0, 13, 0 );
@@ -155,6 +155,8 @@ tftp_fetch ( char *file, char *buf, int limit )
 
 	/* Wait here for transfer to finish (or timeout) */
 	sem_block ( tftp_sem );
+	udp_unhook ( local_port );
+
 	return tftp_count;
 }
 
@@ -211,9 +213,15 @@ tftp_rcv ( struct netbuf *nbp )
 	*/
 
 	code = nbp->dptr[1];
+
+	/* This may be expected if we are probing for a file
+	 * that does not exist.
+	 */
 	if ( code == TFTP_ERR ) {
-	    dump_buf ( nbp->dptr, nbp->dlen );
-	    printf ( "TFTP error: %s\n", &nbp->dptr[4] );
+	    if ( tftp_verbose ) {
+		dump_buf ( nbp->dptr, nbp->dlen );
+		printf ( "TFTP error: %s\n", &nbp->dptr[4] );
+	    }
 	    tftp_count = 0;
 	    sem_unblock ( tftp_sem );
 	    tftp_state = TFS_IDLE;

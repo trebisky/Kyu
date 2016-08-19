@@ -184,6 +184,7 @@ net_init ( void )
     system_clock_rate = timer_rate_get();
 
     netbuf_init ();
+    udp_init ();
     tcp_init ();
 
     arp_init ();

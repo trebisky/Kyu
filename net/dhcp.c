@@ -112,14 +112,14 @@ dhcp_discover ( void )
 
 	dhcp.xid = our_xid;
 	dhcp.secs = our_clock;
-	dhcp.flags = 0;			/* ignored by bootp */
+	dhcp.flags = 0;
 
 	dhcp.client_ip = 0;
 	dhcp.your_ip = 0;
 	dhcp.server_ip = 0;
 	dhcp.gateway_ip = 0;
 
-	net_addr_get ( dhcp.chaddr );	/* client MAC address (allows server to bypass ARP to reply */
+	net_addr_get ( dhcp.chaddr );	/* client MAC address (allows server to bypass ARP to reply) */
 
 	op = dhcp.options;
 	memcpy ( dhcp.options, cookie, 4 );
@@ -154,7 +154,7 @@ dhcp_request ( void )
 	dhcp.hops = 0;
 
 	dhcp.xid = our_xid;
-	dhcp.secs = 10;			/* XXX should be how many seconds we've been trying */
+	dhcp.secs = our_clock;
 	dhcp.flags = 0;			/* ignored by bootp */
 
 	dhcp.client_ip = 0;
@@ -231,6 +231,7 @@ static int dhcp_debug = 0;
 static struct thread *dhcp_thread;
 static int dhcp_state;
 
+/* A little state machine */
 #define ST_OWAIT1	1
 #define ST_OWAIT2	2
 #define ST_AWAIT1	3
@@ -317,7 +318,11 @@ dhcp_once ( void )
 	dhcp_state = ST_OWAIT1;
 	dhcp_discover ();
 
-	/* XXX - this would be an ideal place for a semaphore with a timeout */
+	/* This delay is what motivated adding the ability in Kyu
+	 * to unblock a thread that is doing a delay.
+	 * That makes this just a timeout, but we expect to be
+	 * signaled when we get a response we like.
+	 */
 	thr_delay ( 1000 );	/* wait for offers */
 	if ( dhcp_state != ST_OWAIT2 )
 	    return 0;
@@ -325,7 +330,6 @@ dhcp_once ( void )
 	dhcp_state = ST_AWAIT1;
 	dhcp_request ();
 
-	/* XXX - ditto on the semaphore*/
 	thr_delay ( 1000 );	/* wait for ACK */
 	if ( dhcp_state != ST_AWAIT2 )
 	    return 0;
@@ -357,6 +361,7 @@ dhcp_set_debug ( int val )
 	dhcp_debug = 1;
 }
 
+/* This is what the system calls to do DHCP */
 int
 dhcp_host_info ( struct host_info *hp )
 {

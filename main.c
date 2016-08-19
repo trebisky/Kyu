@@ -132,9 +132,14 @@ sys_init ( int xxx )
 	net_init ();
 #endif
 
+/* These things must be after net_init() because
+ * they will try to do tftp.
+ */
 #ifdef WANT_SHELL
 	shell_init ();
 #endif
+
+	hardware_init_net ();
 
 #ifdef notyet
 	init_pcmcia_ds ();

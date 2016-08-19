@@ -6,6 +6,7 @@
 #include <kyu.h>
 #include <kyulib.h>
 #include <malloc.h>
+#include <thread.h>
 
 #include "net.h"
 #include "netbuf.h"
@@ -30,15 +31,31 @@ struct udp_proto {
 
 static struct udp_proto *head = (struct udp_proto *) 0;
 
+/* 8-17-2016 - we really need this to avoid a race between
+ * unhook and checking the table during packet reception.
+ */
+static struct sem *udp_sem;
+
+#define UDP_LOCK	sem_block ( udp_sem )
+#define UDP_UNLOCK	sem_unblock ( udp_sem )
+
+void
+udp_init ( void )
+{
+	udp_sem = sem_mutex_new ( SEM_FIFO );
+}
+
 void
 udp_hookup ( int port, ufptr func )
 {
 	struct udp_proto *pp;
 
+	UDP_LOCK;
 	/* replace any existing entry (untested) */
 	for ( pp = head; pp; pp = pp->next ) {
 	    if ( pp->port == port ) {
 		pp->func = func;
+		UDP_UNLOCK;
 		return;
 	    }
 	}
@@ -48,7 +65,20 @@ udp_hookup ( int port, ufptr func )
 	pp->func = func;
 	pp->next = head;
 	head = pp;
+	UDP_UNLOCK;
 }
+
+#ifdef notdef
+void
+udp_showl ( void )
+{
+	struct udp_proto *pp;
+
+	printf ( "UDP head: %08x\n", head );
+	for ( pp = head; pp; pp = pp->next )
+	    printf ( "UDP port %d\n", pp->port );
+}
+#endif
 
 void
 udp_unhook ( int port )
@@ -57,13 +87,17 @@ udp_unhook ( int port )
 	struct udp_proto *prior;
 	struct udp_proto *save;
 
+	// printf ( "UDP unhook for %d\n", port );
 	if ( ! head )
 	    return;
 
+	UDP_LOCK;
 	if ( head->port == port ) {
 	    save = head;
 	    head = save->next;
 	    free ( save );
+	    UDP_UNLOCK;
+	    //udp_showl ();
 	    return;
 	}
 
@@ -72,10 +106,14 @@ udp_unhook ( int port )
 	    if ( pp->port == port ) {
 		prior->next = pp->next;
 		free ( pp );
+		UDP_UNLOCK;
+		//udp_showl ();
 		return;
 	    }
 	    prior = pp;
 	}
+
+	UDP_UNLOCK;
 }
 
 int
@@ -111,25 +149,18 @@ udp_rcv ( struct netbuf *nbp )
 
 	port = ntohs(udp->dport);
 
+	// printf ( "UDP receive for port %d\n", port );
+	// udp_showl ();
+
+	UDP_LOCK;
 	for ( pp = head; pp; pp = pp->next ) {
 	    if ( port == pp->port )
-		( *pp->func ) ( nbp );
+		break;
 	}
+	UDP_UNLOCK;
 
-#ifdef notdef
-#define BOOTP_PORT2	68	/* receive on this port */
-#define DNS_PORT	53
-
-	void bootp_rcv ( struct netbuf * );
-
-	if ( BOOTP_PORT2 == ntohs(udp->dport) ) {
-	    bootp_rcv ( nbp );
-	}
-
-	if ( DNS_PORT == ntohs(udp->dport) ) {
-	    dns_rcv ( nbp );
-	}
-#endif
+	if ( pp )
+	    ( *pp->func ) ( nbp );
 }
 
 struct bogus_ip {
@@ -198,9 +229,7 @@ udp_broadcast ( int sport, int dport, char *buf, int size )
 {
 	unsigned int save;
 
-	/* XXX - Kyu really needs a "udp_broadcast" to avoid this hack.
-	 *  things work if we allow our IP to sneak in here, but a broadcast
-	 * really ought to zero the IP field
+	/* XXX - maybe Kyu needs an "ip_broadcast" to avoid this hack.
 	 */
 	save = host_info.my_ip;
 	host_info.my_ip = 0;
