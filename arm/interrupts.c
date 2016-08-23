@@ -11,30 +11,7 @@
 
 extern struct thread *cur_thread;
 
-#ifdef notdef
-void
-interrupt_test_dabort ( void )
-{
-	/* generate a data abort */
-	int *p = (int *) 0;
-	volatile int x = *p;
-}
-
-/* Try to generate a divide by zero without the compiler
- * optimizing it away.  Apparently the ARM does not care?
- */
-volatile int val;
-
-void
-zdiv_test ( void )
-{
-	int i;
-
-	val = 9;
-	for ( i=5; i > -10; i-- )
-	    val /= i;
-}
-#endif
+static vfptr data_abort_hook;
 
 /* mark the offending thread and abandon it.
  *
@@ -79,35 +56,87 @@ evil_exception ( char *msg, int code )
 	thr_suspend ( code );
 }
 
+void
+data_abort_hookup ( vfptr new )
+{
+	data_abort_hook = new;
+}
+
+static int data_abort_flag;
+
+/* If we don't bump the PC, we just return to faulted instruction
+ * and get into a vicious loop
+ */
+void
+data_abort_handler ( void )
+{
+	data_abort_flag = 1;
+	cur_thread->iregs.regs[ARM_PC] += 4;
+}
+
+int
+data_abort_probe ( unsigned long *addr )
+{
+	int val;
+
+	data_abort_hookup ( data_abort_handler );
+
+	data_abort_flag = 0;
+	val = *addr;
+
+	data_abort_hookup ( (vfptr) 0 );
+
+	return data_abort_flag;
+}
+
 void do_undefined_instruction ( void )
 {
 	evil_exception ("undefined instruction", F_UNDEF);
+
+	/* NOTREACHED */
+	finish_exception ();
 }
 
 void do_software_interrupt ( void )
 {
 	evil_exception ("software interrupt", F_SWI);
+
+	/* NOTREACHED */
+	finish_exception ();
 }
 
 void do_prefetch_abort ( void )
 {
 	evil_exception ("prefetch abort", F_PABT);
+
+	/* NOTREACHED */
+	finish_exception ();
 }
 
 void do_data_abort ( void )
 {
-	evil_exception ("data abort", F_DABT);
+	if ( data_abort_hook ) {
+	    (*data_abort_hook) ();
+	    finish_exception ();
+	} else
+	    evil_exception ("data abort", F_DABT);
 }
 
 void do_not_used ( void )
 {
 	evil_exception ("not used", F_NU);
+
+	/* NOTREACHED */
+	finish_exception ();
 }
 
 /* evil for now */
 void do_fiq ( void )
 {
 	evil_exception ("fast interrupt request", F_FIQ);
+
+	/* NOTREACHED */
+	finish_exception ();
 }
 
 /* -------------------------------------------- */

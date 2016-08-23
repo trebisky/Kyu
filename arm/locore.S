@@ -58,7 +58,7 @@ loop:	cmp	r3, r2
  *
  * Someday we could eliminate U-boot, although I don't know why,
  * and just let the SPL load us directly.
- * At any rate, the reset vector won't get any use on this architecture.
+ * At any rate, the reset vector here won't get any use on the BBB.
  */
 
 /* Note on ".align".  On some processors (like the x86, not the arm)

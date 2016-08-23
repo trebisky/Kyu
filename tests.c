@@ -132,6 +132,7 @@ static void test_malloc ( int );
 static void test_wait ( int );
 static void test_unroll ( int );
 static void test_fault ( int );
+static void test_fault2 ( int );
 static void test_zdiv ( int );
 
 
@@ -145,6 +146,7 @@ struct test io_test_list[] = {
 	test_wait,	"wait for 5 seconds",	0,
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
+	test_fault2,	"data abort probe",	0,
 	test_zdiv,	"Zero divide test",	0,
 
 #ifdef ARCH_X86
@@ -2129,6 +2131,46 @@ test_fault ( int xxx )
 	junk = *p;
 }
 
+/* Use data abort to poke at some fishy addresses on the BBB */
+
+static void
+prober ( unsigned int addr )
+{
+	int s;
+
+	s = data_abort_probe ( addr );
+	printf ( "Probe address %08x ", addr );
+	if ( s )
+	    printf ( "Fails\n" );
+	else
+	    printf ( "ok\n" );
+}
+
+void
+test_fault2 ( int xxx )
+{
+	unsigned long s;
+	char *p;
+
+	prober ( 0x44e30000 );	/* CM */
+	prober ( 0x44e35000 );	/* WDT1 */
+	prober ( 0x44e31000 );	/* Timer 1 (ms) */
+	prober ( 0x4a334000 );	/* PRU 0 iram */
+	prober ( 0x4a338000 );	/* PRU 1 iram */
+#define I2C0_BASE      0x44E0B000
+	prober ( I2C0_BASE );
+#define I2C1_BASE      0x4802A000
+	prober ( I2C1_BASE );
+#define I2C2_BASE      0x4819C000       /* Gets data abort */
+	prober ( I2C2_BASE );
+
+	p = (char *) &s;
+
+	prober ( (unsigned int) p );
+	prober ( (unsigned int) (p + 1) );
+	prober ( (unsigned int) (p + 2) );
+}
+
 static void
 test_zdiv ( int xxx )
 {
@@ -2452,7 +2494,7 @@ test_ran ( int count )
 
 static void f_croak ( int junk )
 {
-	printf ( "Gone!\n");
+	printf ( "thr_sort: Gone!\n");
 }
 
 static void f_linger ( int time )
@@ -2461,7 +2503,7 @@ static void f_linger ( int time )
 	thr_delay ( time * timer_rate );
 	*/
 	thr_delay_c ( time * timer_rate, f_croak, 0 );
-	printf ( "Exit!\n");
+	printf ( "thr_sort: Exit!\n");
 }
 
 /* This test just verifies that threads get inserted into

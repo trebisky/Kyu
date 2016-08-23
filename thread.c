@@ -1366,6 +1366,18 @@ finish_interrupt ( void )
 	panic ( "finish_interrupt , resume_i" );
 }
 
+/* This is rarely called, since we hardly ever actually
+ * want to return from an exception to the faulted thread.
+ */
+void
+finish_exception ( void )
+{
+	resume_i ( &cur_thread->iregs );
+	/* NOTREACHED */
+
+	panic ( "finish_exception , resume_i" );
+}
+
 /* Called at interrupt level when an exception
  *  (such as a data abort) happens.
  * Added 6-2-2015
