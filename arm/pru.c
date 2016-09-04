@@ -10,19 +10,52 @@
 
 #define	PRU_SIZE	8192
 
-#ifdef notyet
+#define PRU_BASE	0x4a300000	/* PRU memory and control */
+
+#define PRM_PER_BASE	0x44e00c00	/* PRU reset bit is in here */
+
+struct prm {
+	volatile unsigned long rstctrl;		/* 00 */
+	long _pad0;
+	volatile unsigned long pwrstst;		/* 08 */
+	volatile unsigned long pwrstctl;	/* 0c */
+};
+
 #define PRU_DRAM0_BASE	0x4a300000	/* 8K data */
 #define PRU_DRAM1_BASE	0x4a302000	/* 8K data */
 #define PRU_SRAM_BASE	0x4a310000	/* 8K shared */
 #define PRU_IRAM0_BASE	0x4a334000	/* 8K instructions */
 #define PRU_IRAM1_BASE	0x4a338000	/* 8K instructions */
-#endif
 
 static char pru_buf[PRU_SIZE];
 
+#ifdef notdef
 /* XXX - Hack for now */
 #define PRU_IRAM0_BASE	pru_buf
 #define PRU_IRAM1_BASE	pru_buf
+#endif
+
+static void
+probeit ( unsigned long addr )
+{
+	int s;
+
+	s = data_abort_probe ( addr );
+	if ( s )
+		printf ( "Probe at %08x, Fails\n", addr );
+	else
+		printf ( "Probe at %08x, ok\n", addr );
+}
+
+void
+pru_mem_probe ( void )
+{
+	probeit ( PRU_IRAM0_BASE );
+	probeit ( PRU_IRAM1_BASE );
+	probeit ( PRU_DRAM0_BASE );
+	probeit ( PRU_DRAM1_BASE );
+	probeit ( PRU_SRAM_BASE );
+}
 
 void
 pru_init ( void )
@@ -45,6 +78,7 @@ pru_init ( void )
 	*p = 0;
 	printf ( "Probing done\n" );
 #endif
+	pru_mem_probe ();
 
 	/* XXX - we could just be silent when these fail */
 	n = tftp_fetch ( PRU1_FILE, PRU_IRAM0_BASE, PRU_SIZE );
@@ -54,6 +88,16 @@ pru_init ( void )
 	n = tftp_fetch ( PRU1_FILE, PRU_IRAM1_BASE, PRU_SIZE );
 	if ( n == 0 )
 	    printf ( "Did not find %s\n", PRU2_FILE ); 
+}
+
+void
+pru_reset ( void )
+{
+	struct prm *pp = (struct prm *) PRM_PER_BASE;
+
+	/* pulse the reset bit */
+	pp->rstctrl != 0x2;
+	pp->rstctrl &= ~0x2;
 }
 
 /* THE END */

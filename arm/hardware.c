@@ -95,11 +95,14 @@ hardware_init ( void )
 #ifdef ARCH_ARM
 	wdt_disable ();
 
+	enable_ccnt ( 0 );
+
+	clocks_init ();
+	modules_init ();
+
 	mux_init ();
 	intcon_init ();
 	cm_init ();
-
-	enable_ccnt ( 0 );
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
