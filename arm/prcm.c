@@ -142,6 +142,42 @@ module_enable ( volatile unsigned int *mp )
 	    // panic ("Cannot enable module" );
 }
 
+/* The following does NOT work.
+ * You take the PRU out of standby from code
+ * running in the PRU (this is often the first
+ * thing a piece of PRU code does, via:
+ * LBCO r0, C4, 4, 4
+ * CLR r0, r0, 4
+ * SBCO r0, C4, 4, 4
+ * The standby status bit should then reflect
+ * that this has been done.
+ */
+
+#ifdef notdef
+/* Take a module out of standby */
+void
+module_run ( volatile unsigned int *mp )
+{
+	int timeout = 1000000;
+
+	printf ( "Standby clk = %08x\n", *mp );
+
+	*mp &= ~MODULE_STBY_STBY;
+
+	/* Now wait for results */
+	while ( timeout-- ) {
+	    if ( (*mp & MODULE_STBY_STATUS) == 0 )
+		break;
+	    delay_ns ( 1000 );	/* XXX */
+	}
+
+	printf ( "STandby clk = %08x\n", *mp );
+	if ( timeout <= 0 )
+	    printf ("Cannot take module out of standby\n" );
+}
+#endif
+
+/* XXX - where does this really belong ? */
 static void
 pru_module_init ( void )
 {
@@ -163,6 +199,7 @@ modules_init ( void )
 	module_enable ( &pp->i2c1 );
 	printf ( "Enable i2c2\n" );
 	module_enable ( &pp->i2c2 );
+
 	printf ( "Enable PRU\n" );
 	pru_module_init ();
 }
