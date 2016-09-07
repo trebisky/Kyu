@@ -183,7 +183,7 @@ pru_module_init ( void )
 {
 	struct cm_perpll *pp;
 
-	pru_reset ();
+	pru_reset_module ();
 	pp = (struct cm_perpll *) PER_BASE;
 	module_enable ( &pp->pru );
 }

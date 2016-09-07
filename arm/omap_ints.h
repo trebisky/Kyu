@@ -27,6 +27,15 @@
 
 #define NUM_INTS	128
 
+#define IRQ_PRU_EV0		20
+#define IRQ_PRU_EV1		21
+#define IRQ_PRU_EV2		22
+#define IRQ_PRU_EV3		23
+#define IRQ_PRU_EV4		24
+#define IRQ_PRU_EV5		25
+#define IRQ_PRU_EV6		26
+#define IRQ_PRU_EV7		27
+
 #define IRQ_CPSW_RX_THRESH	40
 #define IRQ_CPSW_RX		41
 #define IRQ_CPSW_TX		42
