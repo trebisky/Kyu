@@ -72,7 +72,8 @@ struct pru_intc {
  */
 #define PRU_INTC_BASE	0x4a320000
 
-/* index numbers for registers like hieisr */
+/* index numbers for host events */
+/* use these in hieisr and such */
 #define PRU0                    0
 #define PRU1                    1
 #define PRU_EVTOUT0             2
@@ -83,14 +84,6 @@ struct pru_intc {
 #define PRU_EVTOUT5             7
 #define PRU_EVTOUT6             8
 #define PRU_EVTOUT7             9
-
-/* sys events */
-#define PRU0_PRU1_INTERRUPT     17
-#define PRU1_PRU0_INTERRUPT     18
-#define PRU0_ARM_INTERRUPT      19
-#define PRU1_ARM_INTERRUPT      20
-#define ARM_PRU0_INTERRUPT      21
-#define ARM_PRU1_INTERRUPT      22
 
 /* makes things more readable */
 #define CHANNEL0                0
@@ -104,6 +97,30 @@ struct pru_intc {
 #define CHANNEL8                8
 #define CHANNEL9                9
 
+/* System events */
+/* XXX - skip 16 */
+#define PRU0_PRU1_INTERRUPT     17	/* PRU event 1 */
+#define PRU1_PRU0_INTERRUPT     18	/* PRU event 2 */
+#define PRU0_ARM_INTERRUPT      19	/* PRU event 3 */
+#define PRU1_ARM_INTERRUPT      20	/* PRU event 4 */
+#define ARM_PRU0_INTERRUPT      21	/* PRU event 5 */
+#define ARM_PRU1_INTERRUPT      22	/* PRU event 6 */
+
+/* For a PRU to generate a system event, it writes to R31.
+ * It sets a strobe bit (0x20) plus a value 0-15.
+ * For the current setup:
+ *   value = 0 is undefined (system event 16)
+ *   value = 1 is from PRU0 to PRU1 (event 17)
+ *   value = 2 is from PRU1 to PRU0 (event 18)
+ *   value = 3 is from PRU0 to ARM (event 19)
+ *   value = 4 is from PRU1 to ARM (event 20)
+ *
+ *   Note that PRU0 can lie and write the value 4 and
+ *   generate an interrupt that looks like it came from PRU1.
+ *   These are just conventions.
+ *
+ *   How does the ARM generate system events 21 and 22 ??
+ */
 
 static void
 set_x4 ( volatile unsigned long *reg, int chan, int host )
@@ -116,8 +133,19 @@ set_x4 ( volatile unsigned long *reg, int chan, int host )
 	reg[who] |= (host & 0xf) << (index * 8);
 }
 
+#ifdef TI_SETUP
+/* This is only one of many possible setups.
+ * It uses only 4 channels
+ * As near as I can tell, this is the setup used in the TI driver
+ *  for the PRU supplied by Texas Instuments.
+ *  Channel 0 sends interrupts to PRU0 (from PRU1 or the ARM)
+ *  Channel 1 sends interrupts to PRU1 (from PRU0 or the ARM)
+ *  Channel 2 sends interrupts from PRU0 to the ARM on EVTOUT0
+ *  Channel 3 sends interrupts from PRU1 to the ARM on EVTOUT1
+ */
+
 void
-pru_intc_init ( void )
+pru_intc_init_ti ( void )
 {
 	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
 	unsigned int m1, m2;
@@ -126,6 +154,7 @@ pru_intc_init ( void )
 	pi->sipr1 = 0xffffffff;
 	pi->sipr2 = 0xffffffff;
 
+	/* Channel map, maps "system event" to the 10 channels */
 	for ( i=0; i<16; i++ )
 		pi->cmr[0] = 0;
 
@@ -136,6 +165,9 @@ pru_intc_init ( void )
 	set_x4 ( pi->cmr, ARM_PRU0_INTERRUPT, CHANNEL0 );
 	set_x4 ( pi->cmr, ARM_PRU1_INTERRUPT, CHANNEL1 );
 
+	/* Host map, we have 10 channels and 10 host assignments.
+         *  we use only 4.
+         */
 	for ( i=0; i<3; i++ )
 		pi->hmr[0] = 0;
 
@@ -151,7 +183,9 @@ pru_intc_init ( void )
 	m1 = 0;
 	m2 = 0;
 
-	/* events 0-31 are in the "1" register */
+	/* events 0-31 are in the esr1/secr1 register.
+         *  out of "sheer luck" we ignore esr2/secr2 for now.
+         */
 	m1 |= 1 << PRU0_PRU1_INTERRUPT;
 	m1 |= 1 << PRU1_PRU0_INTERRUPT;
 	m1 |= 1 << PRU0_ARM_INTERRUPT;
@@ -168,6 +202,119 @@ pru_intc_init ( void )
  	pi->hieisr = PRU1;
  	pi->hieisr = PRU_EVTOUT0;
  	pi->hieisr = PRU_EVTOUT1;
+
+	/* global interrupt bit on */
+	pi->ger = 1;
+
+}
+#endif
+
+/* another way to do things */
+#define ARM_EVT0      16	/* PRU event 0 */
+#define ARM_EVT1      17	/* PRU event 1 */
+#define ARM_EVT2      18	/* PRU event 2 */
+#define ARM_EVT3      19	/* PRU event 3 */
+#define ARM_EVT4      20	/* PRU event 4 */
+#define ARM_EVT5      21	/* PRU event 5 */
+#define ARM_EVT6      22	/* PRU event 6 */
+#define ARM_EVT7      23	/* PRU event 7 */
+
+#define ARM_PRU0_INT      24	/* PRU event 8 */
+#define ARM_PRU1_INT      25	/* PRU event 9 */
+
+#define PRU0_PRU1_INT     26	/* PRU event 10 */
+#define PRU1_PRU0_INT     27	/* PRU event 11 */
+
+void
+pru_intc_init ( void )
+{
+	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
+	unsigned int m1, m2;
+	int i;
+
+	pi->sipr1 = 0xffffffff;
+	pi->sipr2 = 0xffffffff;
+
+	/* Channel map, maps "system event" to the 10 channels */
+	for ( i=0; i<16; i++ )
+		pi->cmr[0] = 0;
+
+	set_x4 ( pi->cmr, PRU0_PRU1_INTERRUPT, CHANNEL1 );
+	set_x4 ( pi->cmr, PRU1_PRU0_INTERRUPT, CHANNEL0 );
+	set_x4 ( pi->cmr, ARM_PRU0_INTERRUPT, CHANNEL0 );
+	set_x4 ( pi->cmr, ARM_PRU1_INTERRUPT, CHANNEL1 );
+
+	set_x4 ( pi->cmr, PRU0_ARM_INTERRUPT, CHANNEL2 );
+	set_x4 ( pi->cmr, PRU1_ARM_INTERRUPT, CHANNEL3 );
+
+#ifdef notyet
+	set_x4 ( pi->cmr, ARM_EVT0, CHANNEL2 );
+	set_x4 ( pi->cmr, ARM_EVT1, CHANNEL3 );
+	set_x4 ( pi->cmr, ARM_EVT2, CHANNEL4 );
+	set_x4 ( pi->cmr, ARM_EVT3, CHANNEL5 );
+	set_x4 ( pi->cmr, ARM_EVT4, CHANNEL6 );
+	set_x4 ( pi->cmr, ARM_EVT5, CHANNEL7 );
+#endif
+
+	/* Host map, we have 10 channels and 10 host assignments.
+         *  we use only 4.
+         */
+	for ( i=0; i<3; i++ )
+		pi->hmr[0] = 0;
+
+	set_x4 ( pi->hmr, CHANNEL0, PRU0 );
+	set_x4 ( pi->hmr, CHANNEL1, PRU1 );
+	set_x4 ( pi->hmr, CHANNEL2, PRU_EVTOUT0 );
+	set_x4 ( pi->hmr, CHANNEL3, PRU_EVTOUT1 );
+
+	/* Add these for the heck of it */
+	set_x4 ( pi->hmr, CHANNEL4, PRU_EVTOUT2 );
+	set_x4 ( pi->hmr, CHANNEL5, PRU_EVTOUT3 );
+	set_x4 ( pi->hmr, CHANNEL6, PRU_EVTOUT4 );
+	set_x4 ( pi->hmr, CHANNEL7, PRU_EVTOUT5 );
+	set_x4 ( pi->hmr, CHANNEL8, PRU_EVTOUT6 );
+	set_x4 ( pi->hmr, CHANNEL9, PRU_EVTOUT7 );
+
+	pi->sitr1 = 0;
+	pi->sitr2 = 0;
+
+	m1 = 0;
+	m2 = 0;
+
+	/* XXX introduce a function to set bits in these
+ 	 * 64 bit arrays, would be used when we clear
+ 	 * interrupts also.  Something like:
+ 	 *  set64 ( pi->esr, PRU0_PRU1_INTERRUPT );
+ 	 * Ultimately will also want a way to test
+ 	 *  bits in such bit arrays also.
+ 	 */
+	/* events 0-31 are in the esr1/secr1 register.
+         *  out of "sheer luck" we ignore esr2/secr2 for now.
+         */
+	m1 |= 1 << PRU0_PRU1_INTERRUPT;
+	m1 |= 1 << PRU1_PRU0_INTERRUPT;
+	m1 |= 1 << PRU0_ARM_INTERRUPT;
+	m1 |= 1 << PRU1_ARM_INTERRUPT;
+	m1 |= 1 << ARM_PRU0_INTERRUPT;
+	m1 |= 1 << ARM_PRU1_INTERRUPT;
+
+	pi->esr1 = m1;
+	pi->esr2 = m2;
+	pi->secr1 = m1;
+	pi->secr2 = m2;
+
+ 	pi->hieisr = PRU0;
+ 	pi->hieisr = PRU1;
+ 	pi->hieisr = PRU_EVTOUT0;
+ 	pi->hieisr = PRU_EVTOUT1;
+
+	/* Enable these too */
+ 	pi->hieisr = PRU_EVTOUT2;
+ 	pi->hieisr = PRU_EVTOUT3;
+ 	pi->hieisr = PRU_EVTOUT4;
+ 	pi->hieisr = PRU_EVTOUT5;
+ 	pi->hieisr = PRU_EVTOUT6;
+ 	pi->hieisr = PRU_EVTOUT7;
 
 	/* global interrupt bit on */
 	pi->ger = 1;
