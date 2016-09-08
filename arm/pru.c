@@ -330,27 +330,14 @@ pru_intc_ack ( int event )
 {
 	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
 
-	printf ( "SRSR 0 = %08x\n", pi->srsr1 );
-	pi->secr1 = 1 << PRU0_ARM_INTERRUPT;
+	// printf ( "SRSR 0 = %08x\n", pi->srsr1 );
+	if ( event == 2 )
+		pi->secr1 = 1 << PRU0_ARM_INTERRUPT;
+	else /* 3 */
+		pi->secr1 = 1 << PRU1_ARM_INTERRUPT;
+
 	//pi->hidisr = event;	/* disables */
 	// pi->hieisr = event;	/* reenables */
-}
-
-void
-pru_intc_test ( void )
-{
-	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
-	int i;
-
-	printf ( "INTC hier: %08x\n", pi->hier );
-	for ( i=0; i<10; i++ ) {
-		pi->hieisr = i;
-		printf ( "INTC hier %d: %08x\n", i, pi->hier );
-	}
-
-	pi->hier = 0x3ff;
-	printf ( "INTC hier: %08x\n", pi->hier );
-
 }
 
 void
@@ -549,7 +536,7 @@ pru_isr ( int event )
 #define BL_COUNT	2
 
 void
-pru_test ( void )
+pru_test_blink ( void )
 {
 	int *dram = (int *) PRU_DRAM0_BASE;
 	int i;
@@ -568,6 +555,44 @@ pru_test ( void )
 	dram[0] = BL_COUNT;
 	dram[1] = 10;
 	dram[2] = 0x00f00000;	/* delay */
+
+	pru_start ( 0 );
+
+/*
+	for ( i=0; i< 12; i++ ) {
+		thr_delay ( 1000 );
+		pru_int_status ();
+	}
+
+	printf ( "INTC: %08x\n", &pi->srsr1 );
+	printf ( "INTC: %08x\n", &pi->cmr[0]);
+	printf ( "INTC: %08x\n", &pi->sitr1 );
+	printf ( "INTC: %08x\n", &pi->hier );
+*/
+}
+
+/* For use with the newer eblink2 */
+void
+pru_test ( void )
+{
+	int *dram = (int *) PRU_DRAM0_BASE;
+	int i;
+
+	pru_intc_init ();
+
+	irq_hookup ( IRQ_PRU_EV0, pru_isr, PRU_EVTOUT0 );
+	irq_hookup ( IRQ_PRU_EV1, pru_isr, PRU_EVTOUT1 );
+
+#ifdef notdef
+	dram[0] = BL_RUN;	/* run forever */
+	dram[1] = 0;		/* ignored (count) */
+	dram[2] = 0x00f00000;	/* delay */
+#endif
+
+	dram[0] = BL_COUNT;
+	dram[1] = 5;
+	dram[2] = 0x00c00000;	/* delay */
+	dram[3] = 0x00c00000;	/* delay */
 
 	pru_start ( 0 );
 
