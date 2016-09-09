@@ -28,6 +28,7 @@ struct pru_intc {
 	volatile unsigned long ger;	/* 10 */
 	long _pad1[2];
 	volatile unsigned long gnlr;
+
 	volatile unsigned long sisr;	/* 20 */
 	volatile unsigned long sicr;
 	volatile unsigned long eisr;
@@ -38,17 +39,13 @@ struct pru_intc {
 	long _pad3[17];
 	volatile unsigned long gpir;	/* 80 */
 	long _pad4[95];
-	volatile unsigned long srsr1;	/* 200 */
-	volatile unsigned long srsr2;
+	volatile unsigned long srsr[2];	/* 200 */
 	long _pad5[30];
-	volatile unsigned long secr1;	/* 280 */
-	volatile unsigned long secr2;
+	volatile unsigned long secr[2];	/* 280 */
 	long _pad6[30];
-	volatile unsigned long esr1;	/* 300 */
-	volatile unsigned long esr2;
+	volatile unsigned long esr[2];	/* 300 */
 	long _pad7[30];
-	volatile unsigned long ecr1;	/* 380 */
-	volatile unsigned long ecr2;
+	volatile unsigned long ecr[2];	/* 380 */
 	long _pad8[30];
 	volatile unsigned long cmr[16];		/* 400 */
 	long _pad9[240];
@@ -56,11 +53,9 @@ struct pru_intc {
 	long _pad9b[61];
 	volatile unsigned long hipir[10];	/* 900 */
 	long _pad10[246];
-	volatile unsigned long sipr1;		/* d00 */
-	volatile unsigned long sipr2;
+	volatile unsigned long sipr[2];		/* d00 */
 	long _pad11[30];
-	volatile unsigned long sitr1;		/* d80 */
-	volatile unsigned long sitr2;
+	volatile unsigned long sitr[2];		/* d80 */
 	long _pad12[478];
 	volatile unsigned long hier;		/* 1500 */
 };
@@ -133,6 +128,21 @@ set_x4 ( volatile unsigned long *reg, int chan, int host )
 	reg[who] |= (host & 0xf) << (index * 8);
 }
 
+/* Many registers that hold bits for the 64 system events
+ *  are of the sort that a write of zero has no effect.
+ *  esr, ecr, secr
+ */
+void
+set_64 ( volatile unsigned long *reg, int index )
+{
+	unsigned long mask = 1 << (index & 0x1f );
+	
+	if ( index > 31 )
+		reg[1] = mask;
+	else
+		reg[0] = mask;
+}
+
 #ifdef TI_SETUP
 /* This is only one of many possible setups.
  * It uses only 4 channels
@@ -151,8 +161,11 @@ pru_intc_init_ti ( void )
 	unsigned int m1, m2;
 	int i;
 
-	pi->sipr1 = 0xffffffff;
-	pi->sipr2 = 0xffffffff;
+	pi->sipr[0] = 0xffffffff;
+	pi->sipr[1] = 0xffffffff;
+
+	pi->sitr[0] = 0;
+	pi->sitr[1] = 0;
 
 	/* Channel map, maps "system event" to the 10 channels */
 	for ( i=0; i<16; i++ )
@@ -177,26 +190,19 @@ pru_intc_init_ti ( void )
 	set_x4 ( pi->hmr, CHANNEL2, PRU_EVTOUT0 );
 	set_x4 ( pi->hmr, CHANNEL3, PRU_EVTOUT1 );
 
-	pi->sitr1 = 0;
-	pi->sitr2 = 0;
+	set_64 ( pi->esr, PRU0_PRU1_INTERRUPT );
+	set_64 ( pi->esr, PRU1_PRU0_INTERRUPT );
+	set_64 ( pi->esr, PRU0_ARM_INTERRUPT );
+	set_64 ( pi->esr, PRU1_ARM_INTERRUPT );
+	set_64 ( pi->esr, ARM_PRU0_INTERRUPT );
+	set_64 ( pi->esr, ARM_PRU1_INTERRUPT );
 
-	m1 = 0;
-	m2 = 0;
-
-	/* events 0-31 are in the esr1/secr1 register.
-         *  out of "sheer luck" we ignore esr2/secr2 for now.
-         */
-	m1 |= 1 << PRU0_PRU1_INTERRUPT;
-	m1 |= 1 << PRU1_PRU0_INTERRUPT;
-	m1 |= 1 << PRU0_ARM_INTERRUPT;
-	m1 |= 1 << PRU1_ARM_INTERRUPT;
-	m1 |= 1 << ARM_PRU0_INTERRUPT;
-	m1 |= 1 << ARM_PRU1_INTERRUPT;
-
-	pi->esr1 = m1;
-	pi->esr2 = m2;
-	pi->secr1 = m1;
-	pi->secr2 = m2;
+	set_64 ( pi->secr, PRU0_PRU1_INTERRUPT );
+	set_64 ( pi->secr, PRU1_PRU0_INTERRUPT );
+	set_64 ( pi->secr, PRU0_ARM_INTERRUPT );
+	set_64 ( pi->secr, PRU1_ARM_INTERRUPT );
+	set_64 ( pi->secr, ARM_PRU0_INTERRUPT );
+	set_64 ( pi->secr, ARM_PRU1_INTERRUPT );
 
  	pi->hieisr = PRU0;
  	pi->hieisr = PRU1;
@@ -232,8 +238,13 @@ pru_intc_init ( void )
 	unsigned int m1, m2;
 	int i;
 
-	pi->sipr1 = 0xffffffff;
-	pi->sipr2 = 0xffffffff;
+	/* active high */
+	pi->sipr[0] = 0xffffffff;
+	pi->sipr[1] = 0xffffffff;
+
+	/* pulse (also called level), not edge */
+	pi->sitr[0] = 0;
+	pi->sitr[1] = 0;
 
 	/* Channel map, maps "system event" to the 10 channels */
 	for ( i=0; i<16; i++ )
@@ -275,33 +286,19 @@ pru_intc_init ( void )
 	set_x4 ( pi->hmr, CHANNEL8, PRU_EVTOUT6 );
 	set_x4 ( pi->hmr, CHANNEL9, PRU_EVTOUT7 );
 
-	pi->sitr1 = 0;
-	pi->sitr2 = 0;
+	set_64 ( pi->esr, PRU0_PRU1_INTERRUPT );
+	set_64 ( pi->esr, PRU1_PRU0_INTERRUPT );
+	set_64 ( pi->esr, PRU0_ARM_INTERRUPT );
+	set_64 ( pi->esr, PRU1_ARM_INTERRUPT );
+	set_64 ( pi->esr, ARM_PRU0_INTERRUPT );
+	set_64 ( pi->esr, ARM_PRU1_INTERRUPT );
 
-	m1 = 0;
-	m2 = 0;
-
-	/* XXX introduce a function to set bits in these
- 	 * 64 bit arrays, would be used when we clear
- 	 * interrupts also.  Something like:
- 	 *  set64 ( pi->esr, PRU0_PRU1_INTERRUPT );
- 	 * Ultimately will also want a way to test
- 	 *  bits in such bit arrays also.
- 	 */
-	/* events 0-31 are in the esr1/secr1 register.
-         *  out of "sheer luck" we ignore esr2/secr2 for now.
-         */
-	m1 |= 1 << PRU0_PRU1_INTERRUPT;
-	m1 |= 1 << PRU1_PRU0_INTERRUPT;
-	m1 |= 1 << PRU0_ARM_INTERRUPT;
-	m1 |= 1 << PRU1_ARM_INTERRUPT;
-	m1 |= 1 << ARM_PRU0_INTERRUPT;
-	m1 |= 1 << ARM_PRU1_INTERRUPT;
-
-	pi->esr1 = m1;
-	pi->esr2 = m2;
-	pi->secr1 = m1;
-	pi->secr2 = m2;
+	set_64 ( pi->secr, PRU0_PRU1_INTERRUPT );
+	set_64 ( pi->secr, PRU1_PRU0_INTERRUPT );
+	set_64 ( pi->secr, PRU0_ARM_INTERRUPT );
+	set_64 ( pi->secr, PRU1_ARM_INTERRUPT );
+	set_64 ( pi->secr, ARM_PRU0_INTERRUPT );
+	set_64 ( pi->secr, ARM_PRU1_INTERRUPT );
 
  	pi->hieisr = PRU0;
  	pi->hieisr = PRU1;
@@ -321,20 +318,33 @@ pru_intc_init ( void )
 
 }
 
+/* Write to the SRSR register to send an "interrupt"
+ * to the PRU.
+ * Reading this register gives raw status.
+ * The event index is 0-63
+ */
+void
+post_interrupt ( int event )
+{
+	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
+
+	set_64 ( pi->srsr, event );
+}
+
 /* When we enable EVTOUT0, we get event 2 (EVTOUT0)
  * We also see srsr1 set to 0x00080000.
  * This is shifted over 19 zeros (PRU0_ARM_INTERRUPT)
  */
 void
-pru_intc_ack ( int event )
+pru_intc_ack ( int sys_event )
 {
 	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
 
-	// printf ( "SRSR 0 = %08x\n", pi->srsr1 );
-	if ( event == 2 )
-		pi->secr1 = 1 << PRU0_ARM_INTERRUPT;
-	else /* 3 */
-		pi->secr1 = 1 << PRU1_ARM_INTERRUPT;
+	/* Clear the interrupt */
+	set_64 ( pi->secr, sys_event );
+
+	/* As near as I can tell, this is the same as: */
+	// pi->sicr = sys_event;
 
 	//pi->hidisr = event;	/* disables */
 	// pi->hieisr = event;	/* reenables */
@@ -523,10 +533,10 @@ pru_cstatus ( int pru )
 }
 
 void
-pru_isr ( int event )
+pru_isr ( int sys_event )
 {
-	printf ( "PRU interrupt: %d\n", event );
-	pru_intc_ack ( event );
+	printf ( "PRU interrupt: %d\n", sys_event );
+	pru_intc_ack ( sys_event );
 }
 
 /* This test is for Tom's blink firmware */
@@ -543,8 +553,8 @@ pru_test_blink ( void )
 
 	pru_intc_init ();
 
-	irq_hookup ( IRQ_PRU_EV0, pru_isr, PRU_EVTOUT0 );
-	irq_hookup ( IRQ_PRU_EV1, pru_isr, PRU_EVTOUT1 );
+	irq_hookup ( IRQ_PRU_EV0, pru_isr, PRU0_ARM_INTERRUPT );
+	irq_hookup ( IRQ_PRU_EV1, pru_isr, PRU1_ARM_INTERRUPT );
 
 #ifdef notdef
 	dram[0] = BL_RUN;	/* run forever */
@@ -557,31 +567,19 @@ pru_test_blink ( void )
 	dram[2] = 0x00f00000;	/* delay */
 
 	pru_start ( 0 );
-
-/*
-	for ( i=0; i< 12; i++ ) {
-		thr_delay ( 1000 );
-		pru_int_status ();
-	}
-
-	printf ( "INTC: %08x\n", &pi->srsr1 );
-	printf ( "INTC: %08x\n", &pi->cmr[0]);
-	printf ( "INTC: %08x\n", &pi->sitr1 );
-	printf ( "INTC: %08x\n", &pi->hier );
-*/
 }
 
 /* For use with the newer eblink2 */
 void
-pru_test ( void )
+pru_tester ( void *xxx )
 {
 	int *dram = (int *) PRU_DRAM0_BASE;
 	int i;
 
 	pru_intc_init ();
 
-	irq_hookup ( IRQ_PRU_EV0, pru_isr, PRU_EVTOUT0 );
-	irq_hookup ( IRQ_PRU_EV1, pru_isr, PRU_EVTOUT1 );
+	irq_hookup ( IRQ_PRU_EV0, pru_isr, PRU0_ARM_INTERRUPT );
+	irq_hookup ( IRQ_PRU_EV1, pru_isr, PRU1_ARM_INTERRUPT );
 
 #ifdef notdef
 	dram[0] = BL_RUN;	/* run forever */
@@ -589,6 +587,7 @@ pru_test ( void )
 	dram[2] = 0x00f00000;	/* delay */
 #endif
 
+	/* First 5 pulses */
 	dram[0] = BL_COUNT;
 	dram[1] = 5;
 	dram[2] = 0x00c00000;	/* delay */
@@ -596,17 +595,20 @@ pru_test ( void )
 
 	pru_start ( 0 );
 
-/*
-	for ( i=0; i< 12; i++ ) {
-		thr_delay ( 1000 );
-		pru_int_status ();
-	}
+	thr_delay ( 2000 );
 
-	printf ( "INTC: %08x\n", &pi->srsr1 );
-	printf ( "INTC: %08x\n", &pi->cmr[0]);
-	printf ( "INTC: %08x\n", &pi->sitr1 );
-	printf ( "INTC: %08x\n", &pi->hier );
-*/
+	/* Then each time we interrupt, get 2 pulses from PRU firmware */
+	for ( ;; ) {
+		// printf ( "Go\n" );
+		post_interrupt ( ARM_PRU0_INTERRUPT );
+		thr_delay ( 1000 );
+	}
+}
+
+void
+pru_test ( void )
+{
+	// (void) thr_new ( "pru_tester", pru_tester, (void *) 0, 13, 0 );
 }
 
 /* For use from shell */
