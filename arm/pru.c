@@ -138,9 +138,9 @@ set_64 ( volatile unsigned long *reg, int index )
 	unsigned long mask = 1 << (index & 0x1f );
 	
 	if ( index > 31 )
-		reg[1] = mask;
+	    reg[1] = mask;
 	else
-		reg[0] = mask;
+	    reg[0] = mask;
 }
 
 #ifdef TI_SETUP
@@ -169,7 +169,7 @@ pru_intc_init_ti ( void )
 
 	/* Channel map, maps "system event" to the 10 channels */
 	for ( i=0; i<16; i++ )
-		pi->cmr[0] = 0;
+	    pi->cmr[0] = 0;
 
 	set_x4 ( pi->cmr, PRU0_PRU1_INTERRUPT, CHANNEL1 );
 	set_x4 ( pi->cmr, PRU1_PRU0_INTERRUPT, CHANNEL0 );
@@ -182,7 +182,7 @@ pru_intc_init_ti ( void )
          *  we use only 4.
          */
 	for ( i=0; i<3; i++ )
-		pi->hmr[0] = 0;
+	    pi->hmr[0] = 0;
 
 	/* we have 10 channels, we set 4 */
 	set_x4 ( pi->hmr, CHANNEL0, PRU0 );
@@ -211,7 +211,6 @@ pru_intc_init_ti ( void )
 
 	/* global interrupt bit on */
 	pi->ger = 1;
-
 }
 #endif
 
@@ -248,7 +247,7 @@ pru_intc_init ( void )
 
 	/* Channel map, maps "system event" to the 10 channels */
 	for ( i=0; i<16; i++ )
-		pi->cmr[0] = 0;
+	    pi->cmr[0] = 0;
 
 	set_x4 ( pi->cmr, PRU0_PRU1_INTERRUPT, CHANNEL1 );
 	set_x4 ( pi->cmr, PRU1_PRU0_INTERRUPT, CHANNEL0 );
@@ -271,7 +270,7 @@ pru_intc_init ( void )
          *  we use only 4.
          */
 	for ( i=0; i<3; i++ )
-		pi->hmr[0] = 0;
+	    pi->hmr[0] = 0;
 
 	set_x4 ( pi->hmr, CHANNEL0, PRU0 );
 	set_x4 ( pi->hmr, CHANNEL1, PRU1 );
@@ -315,7 +314,6 @@ pru_intc_init ( void )
 
 	/* global interrupt bit on */
 	pi->ger = 1;
-
 }
 
 /* Write to the SRSR register to send an "interrupt"
@@ -349,18 +347,6 @@ pru_intc_ack ( int sys_event )
 	//pi->hidisr = event;	/* disables */
 	// pi->hieisr = event;	/* reenables */
 }
-
-void
-pru_int_status ( void )
-{
-	struct pru_intc  * pi = (struct pru_intc *) PRU_INTC_BASE;
-	int i;
-
-	for ( i=0; i<10; i++ ) {
-		printf ( "HIPIR %d = %08x\n", i, pi->hipir[i] );
-	}
-}
-
 
 /* End of PRU INTC stuff */
 
@@ -445,13 +431,6 @@ struct pru_debug {
 };
 
 #ifdef notdef
-static char pru_buf[PRU_SIZE];
-
-/* XXX - Hack for now */
-#define PRU_IRAM0_BASE	pru_buf
-#define PRU_IRAM1_BASE	pru_buf
-#endif
-
 static void
 probeit ( unsigned long addr )
 {
@@ -459,9 +438,9 @@ probeit ( unsigned long addr )
 
 	s = data_abort_probe ( addr );
 	if ( s )
-		printf ( "Probe at %08x, Fails\n", addr );
+	    printf ( "Probe at %08x, Fails\n", addr );
 	else
-		printf ( "Probe at %08x, ok\n", addr );
+	    printf ( "Probe at %08x, ok\n", addr );
 }
 
 void
@@ -473,7 +452,9 @@ pru_mem_probe ( void )
 	probeit ( PRU_DRAM1_BASE );
 	probeit ( PRU_SRAM_BASE );
 }
+#endif
 
+/* XXX - belongs in prcm.c */
 void
 pru_reset_module ( void )
 {
@@ -501,6 +482,15 @@ pru_reset ( int pru )
 	struct pru_ctrl *p = PRU_CTRL_BASE(pru);
 
 	p->control = 0;
+}
+
+/* untested */
+void
+pru_reset_pc ( int pru, unsigned int pc )
+{
+	struct pru_ctrl *p = PRU_CTRL_BASE(pru);
+
+	p->control = pc << CTRL_PC_SHIFT;
 }
 
 /* As above, we clear the last bit (causing a reset),
@@ -599,9 +589,9 @@ pru_tester ( void *xxx )
 
 	/* Then each time we interrupt, get 2 pulses from PRU firmware */
 	for ( ;; ) {
-		// printf ( "Go\n" );
-		post_interrupt ( ARM_PRU0_INTERRUPT );
-		thr_delay ( 1000 );
+	    // printf ( "Go\n" );
+	    post_interrupt ( ARM_PRU0_INTERRUPT );
+	    thr_delay ( 1000 );
 	}
 }
 
@@ -636,7 +626,7 @@ pru_init ( void )
 {
 	int n;
 
-	pru_mem_probe ();
+	// pru_mem_probe ();
 
 	/* XXX - we could just be silent when these fail */
 	n = tftp_fetch ( PRU0_FILE, PRU_IRAM0_BASE, PRU_SIZE );
