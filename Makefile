@@ -9,8 +9,6 @@ INCS = -I. -Iarm
 
 include Makefile.inc
 
-#subdirs = arm
-
 # This is clean with no dependencies
 #    linux/linux-lib.o \
 
