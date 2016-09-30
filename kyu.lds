@@ -1,23 +1,15 @@
-/* ld script to make skidoo
- * $Id: skidoo.lds,v 1.2 2002/09/11 05:09:44 tom Exp $
+/* ld script to make kyu
  * Modified from the linux .lds script, 8/2002 tjt
  * Modified from the skidoo .lds script, 9/2015 tjt
  *
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
-/*
-OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
-*/
 OUTPUT_ARCH(arm)
 ENTRY(_begin)
 SECTIONS
 {
   /* Text and read-only data */
   . = 0x80300000;
-  /*
-  _text = .;			
-  kyu_startup = .;
-  */
   .text : {
 	*(.text)
 	*(.text.unlikely)
@@ -64,14 +56,4 @@ SECTIONS
 	*(.data.exit)
 	*(.exitcall.exit)
 	}
-
-  /* Stabs debugging sections.
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) }
-  */
 }

@@ -17,6 +17,7 @@ arm/OLD
 linux/mm
 linux/mm/Makefile
 linux/mm/*
+linux/include/linux/compiler-gcc_OLD/
 z
 zz
 zzz

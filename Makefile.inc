@@ -12,9 +12,10 @@
 
 # This has to be adjusted every time a new compiler version comes along.
 # As of 5-26-2016 ...
-GCCVERSION = 5.3.1
+#GCCVERSION = 5.3.1
 # As of 8-30-2016 (Fedora 24)
-#GCCVERSION = 6.1.1
+# As of 9-17-2016 (Fedora 24)
+GCCVERSION = 6.1.1
 
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
