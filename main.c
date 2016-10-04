@@ -52,6 +52,18 @@ kern_startup ( void )
 	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
 	*/
 
+	//sanity ();
+	/* A sanity thing in case printf is broken */
+	puts ( "Kyu starting" );
+
+	/* debug broken linux printf */
+#ifdef notdef
+	xprintf ( "blow up\n" );
+	puts ( "Made it !!" );	/* XXX */
+
+	spin ();
+#endif
+
 	/* print initial banner on console
 	 */
 	printf ( "\n" );

@@ -26,8 +26,9 @@ OBJS =  machine.o net.o \
     console.o thread.o prf.o \
     symbols.o \
     dlmalloc.o random.o \
-    kyulib.o \
-    linux/linux-lib.o
+    kyulib.o lib.o
+#    kyulib.o linux/linux-lib.o
+#    kyulib.o lib.o
 
 # For experimenting with linux imported stuff
 #OBJS =  machine.o net.o \
@@ -53,6 +54,7 @@ tags:
 machine.o:	bogus
 	cd arm ; make
 	cd net ; make
+	cd lib ; make
 	cd linux ; make
 
 bogus:
@@ -103,4 +105,5 @@ clean:
 	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.sym
 	cd arm ; make clean
 	cd net ; make clean
+	cd lib ; make clean
 	cd linux ; make clean

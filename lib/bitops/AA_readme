@@ -1,0 +1,15 @@
+
+bitops directory  10-2-2016
+
+I decided to copy this entire directory,
+ lock stock and barrel, about 1000 lines of code.
+
+This directory holds files that would be in
+    include/asm-generic/bitops
+Such as:
+    include/asm-generic/bitops/non-atomic.h
+
+Note that these are GENERIC, so there is no reason to
+    put them under arm as arm/bitops/xyz.h
+
+So, I put them into bitops/xyz.h

@@ -84,8 +84,29 @@ delay_ns ( int delay )
 	while ( get_ccnt() < delay )
 	    ;
 }
-
 #endif
+
+/* We are curious as to just what the state of things
+ * is as handed to us by U-boot.
+ */
+void
+mmu_status ( void )
+{
+	int cr_val;
+	int mmu_base;
+
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (cr_val) : : "cc");
+
+	if ( cr_val & 0x01 )
+	    printf ( "MMU enabled\n" );
+	if ( cr_val & 0x04 )
+	    printf ( "D cache enabled\n" );
+	if ( cr_val & 0x1000 )
+	    printf ( "I cache enabled\n" );
+
+	asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r" (mmu_base) : : "cc");
+	printf ( "MMU base: %08x\n", mmu_base );
+}
 
 void
 hardware_init ( void )
@@ -106,6 +127,8 @@ hardware_init ( void )
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
+
+	mmu_status ();
 
 	/* CPU interrupts on */
 	enable_irq ();

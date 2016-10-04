@@ -910,6 +910,15 @@ dac_fast ( struct i2c *ip )
 	}
 }
 
+/* This showed that with back to back writes like this,
+ * I can update the dac every 319 microseconds.
+ * This is a dac update rate of 3140 Hz.
+ * And this is about right with a 100 kHz clock.
+ * We send 3 bytes (address and two data) and if you
+ * figure 10 bits on the wire for each byte this is
+ * 30 bits so 100 khz / 30 = 3.3 khz
+ */
+
 static void
 dac_pulse ( struct i2c *ip )
 {

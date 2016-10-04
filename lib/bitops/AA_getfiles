@@ -1,0 +1,2 @@
+#!/bin/sh
+cp /u1/BBB/Kyu/src/linux/include/asm-generic/bitops/* .

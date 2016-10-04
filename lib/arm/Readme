@@ -1,0 +1,15 @@
+My original build ran like this:
+
+arm-linux-gnu-gcc -DKYU -nostdinc -fno-builtin -Wno-implicit-function-declaration -fno-omit-frame-pointer -marm -march=armv7-a -msoft-float -I.. -Iinclude -Iinclude/uapi -Iinclude/generated/uapi -Iarch/arm/include -Iarch/arm/include/uapi -Iarch/arm/include/generated -Iarch/arm/include/generated/uapi -include include/linux/kconfig.h -isystem /usr/lib/gcc/arm-linux-gnueabi/6.1.1/include -D__KERNEL__ -D__LINUX_ARM_ARCH__=5 -DCC_HAVE_ASM_GOTO -D__ASSEMBLY__ -include asm/unified.h -o arch/arm/lib/findbit.o -c arch/arm/lib/findbit.S
+
+arm-linux-gnu-ld.bfd -r -o linux-lib.o lib/string.o lib/string_helpers.o lib/vsprintf.o lib/bitmap.o lib/ctype.o lib/div64.o lib/hexdump.o lib/kstrtox.o lib/hweight.o lib/bsearch.o lib/kasprintf.o lib/dump_stack.o lib/rbtree.o arch/arm/lib/memcpy.o arch/arm/lib/memset.o arch/arm/lib/memchr.o arch/arm/lib/memmove.o arch/arm/lib/memzero.o arch/arm/lib/strchr.o arch/arm/lib/strrchr.o arch/arm/lib/lib1funcs.o arch/arm/lib/lshrdi3.o arch/arm/lib/ashldi3.o arch/arm/lib/div64.o arch/arm/lib/setbit.o arch/arm/lib/findbit.o
+
+Note embedded in the gcc invocation above:
+
+-include include/linux/kconfig.h
+-include asm/unified.h
+
+-D__KERNEL__
+-D__LINUX_ARM_ARCH__=5
+-DCC_HAVE_ASM_GOTO
+-D__ASSEMBLY__

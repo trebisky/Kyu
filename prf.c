@@ -56,9 +56,17 @@ shex8( char *buf, char *end, int val )
 	return shex2(buf,end,val);
 }
 
+#undef USE_LINUX_PRF
+
+// #define VSNPRINTF	vsnprintf
+#define VSNPRINTF	xsnprintf
+// #define SPRINTF	sprintf
+#define SPRINTF	xprintf
+
 /* We now use routines in linux/lib
  */
 #ifndef USE_LINUX_PRF
+
 /*
  * Printn prints a number n in base b.
  * We don't use recursion to avoid deep kernel stacks.
@@ -113,7 +121,8 @@ sprintu( char *buf, char *end, unsigned int n, int b)
 
 /* -------------------------------------------------- */
 
-int snprintf(char * buf, unsigned int size, const char *fmt, ...)
+static int
+snprintf(char * buf, unsigned int size, const char *fmt, ...)
 {
         va_list args;
         int rv;
@@ -124,7 +133,9 @@ int snprintf(char * buf, unsigned int size, const char *fmt, ...)
         return rv;
 }
 
-int sprintf(char *buf, const char *fmt, ...)
+#ifdef notdef
+static int
+sprintf(char *buf, const char *fmt, ...)
 {
         va_list args;
         int rv;
@@ -134,8 +145,10 @@ int sprintf(char *buf, const char *fmt, ...)
         va_end(args);
         return rv;
 }
+#endif
 
-int vsprintf(char *buf, const char *fmt, va_list args)
+static int
+vsprintf(char *buf, const char *fmt, va_list args)
 {
 	/*
         return vsnprintf(buf, 0xFFFFFFFFUL, fmt, args);
@@ -146,7 +159,8 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 /* XXX size should/could really be size_t
  * (which is unsigned long/int)
  */
-int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
+static int
+VSNPRINTF (char *abuf, unsigned int size, const char *fmt, va_list args)
 {
     char *buf, *end;
     int c;
@@ -303,5 +317,75 @@ int vsnprintf(char *abuf, unsigned int size, const char *fmt, va_list args)
     return buf-abuf;
 }
 #endif	/* USE_LINUX_PRF */
+
+#define PRINTF_BUF_SIZE 128
+
+int
+printf ( const char *fmt, ... )
+{
+	char buf[PRINTF_BUF_SIZE];
+	va_list args;
+	int rv;
+
+	va_start ( args, fmt );
+	rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+	va_end ( args );
+
+	console_puts ( buf );
+	return rv;
+}
+
+/* Alternative to printf while debugging new printf */
+int
+xprintf ( const char *fmt, ... )
+{
+	char buf[PRINTF_BUF_SIZE];
+	va_list args;
+	int rv;
+
+	va_start ( args, fmt );
+	rv = xsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+	va_end ( args );
+
+	console_puts ( buf );
+	return rv;
+}
+
+/* ------------------------------------------ */
+/* ------------------------------------------ */
+
+/* simple and quick version to get some linux
+ * library routines online  6-11-2015
+ *
+ * Note that the real linux version does lots
+ * of nice and fancy things.  It puts messages
+ * into a circular buffer, perhaps sends them
+ * to syslog, watches for ugly scenarios, all
+ * desirable in a big system.
+ *
+ * see linux/printk.h and kernel/printk/prink.c
+ *
+ * Also note that linux messages may be prefixed
+ * by a 3 character logging priority that looks like
+ * <x> where x is 0-7 or "d" to get the current default.
+ * XXX - We could at least strip this off.
+ */
+
+#ifdef notdef
+int
+printk ( const char *fmt, ... )
+{
+	char buf[PRINTF_BUF_SIZE];
+	va_list args;
+	int rv;
+
+	va_start ( args, fmt );
+	rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+	va_end ( args );
+
+	console_puts ( buf );
+	return rv;
+}
+#endif
 
 /* THE END */

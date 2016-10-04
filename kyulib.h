@@ -28,7 +28,7 @@ void dump_l ( void *, int );
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 
-typedef int size_t;
+typedef unsigned int size_t;
 
 #ifdef USE_GCC_BUILTINS
 #define memcpy(a,b,c)   __builtin_memcpy((a),(b),(c))

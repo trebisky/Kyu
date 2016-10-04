@@ -210,10 +210,15 @@ getline ( char *buf, int n )
 void
 puts ( char *buf )
 {
+	/* On the arm/BBB - this is all we got ! */
+	serial_puts ( buf );
+	serial_putc ( '\n' );
+#ifdef notdef
 	if ( cur_thread->con_mode == SERIAL ) {
 	    serial_puts ( buf );
 	    serial_putc ( '\n' );
 	}
+#endif
 #ifdef ARCH_X86
 	if ( cur_thread->con_mode == SIO_0 ) {
 	    sio_puts ( 0, buf );
@@ -237,15 +242,12 @@ putchar ( int ch )
 #endif
 }
 
-#define PRINTF_BUF_SIZE 128
-
-int vprintf ( const char *fmt, va_list args )
+/* Only used by printf()/vprintf() (probably)
+ * Unlike real puts() does not add newline
+ */
+void
+console_puts ( char *buf )
 {
-	char buf[PRINTF_BUF_SIZE];
-	int rv;
-
-	rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
-
 #ifdef ARCH_ARM
 	serial_puts ( buf );
 #endif
@@ -255,20 +257,6 @@ int vprintf ( const char *fmt, va_list args )
 	else
 	    vga_puts ( buf );
 #endif
-
-	return rv;
-}
-
-int
-printf ( const char *fmt, ... )
-{
-	va_list args;
-	int rv;
-
-	va_start ( args, fmt );
-	rv = vprintf ( fmt, args );
-	va_end ( args );
-	return rv;
 }
 
 /* ------------------------------------------ */
@@ -292,9 +280,6 @@ panic ( char *msg )
 
 #ifdef PANIC_DEBUG
 	panic_debug ();
-	/* returning here is probably a BAD idea.
-	 * (but, what the heck ...).
-	 */
 #endif
 
 	thr_block ( FAULT );
@@ -315,38 +300,6 @@ dpanic ( char *msg )
 #endif
 	/* OK to return and continue here.
 	 */
-}
-
-/* ------------------------------------------ */
-/* ------------------------------------------ */
-
-/* simple and quick version to get some linux
- * library routines online  6-11-2015
- *
- * Note that the real linux version does lots
- * of nice and fancy things.  It puts messages
- * into a circular buffer, perhaps sends them
- * to syslog, watches for ugly scenarios, all
- * desirable someday.
- *
- * see linux/printk.h and kernel/printk/prink.c
- *
- * Also note that linux messages may be prefixed
- * by a 3 character logging priority that looks like
- * <x> where x is 0-7 or "d" to get the current default.
- * XXX - We could at least strip this off.
- */
-
-int
-printk ( const char *fmt, ... )
-{
-	va_list args;
-	int rv;
-
-	va_start ( args, fmt );
-	rv = vprintf ( fmt, args );
-	va_end ( args );
-	return rv;
 }
 
 /* ------------------------------------------ */

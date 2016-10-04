@@ -14,6 +14,7 @@ kyu.sym
 OLD
 OLD/*
 arm/OLD
+lib/OLD
 linux/mm
 linux/mm/Makefile
 linux/mm/*

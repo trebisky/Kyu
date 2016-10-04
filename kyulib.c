@@ -13,6 +13,20 @@
 #include "kyulib.h"
 #include "malloc.h"
 
+// #define LIBSTUBS
+#ifdef LIBSTUBS
+void * memcpy ( void *s1, char *s2, size_t count ) {}
+int memcmp ( void *s1, void *s2, size_t count ) {}
+void * memset ( void *buf, int val, size_t count ) {}
+char * strcpy ( char *ds, const char *ss ) {}
+int strcmp ( const char *s1, const char *s2 ) {}
+int strncmp ( const char *s1, const char *s2, int n ) {}
+int strlen ( const char *s ) {}
+int sprintf(char *buf, const char *fmt, ...) {}
+#include <stdarg.h>
+int vsnprintf(char *buf, int size, const char *fmt, va_list args) {}
+#endif
+
 /* Argument in microseconds.
  * silly to try to make this "fast"
  * XXX - this could be more clever.

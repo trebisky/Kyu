@@ -52,6 +52,21 @@ loop:	cmp	r3, r2
 	bcc	loop
 	bx	lr
 
+xdelay:
+	mov	r0, #0xFFFFFF
+dloop:	sub	r0, #1
+	cmp	r0, #0
+	bgt	dloop
+	bx	lr
+
+/* spit out endless characters -- sanity check */
+	.globl sanity
+sanity:
+	movw	r0, #'b'
+	bl	serial_putc
+	bl	xdelay
+	b	sanity
+
 /* on the BBB, the reset vector will never come here, it will start the
  * firmware ROM code running, which will transfer to the SPL, which will
  * transfer to U-boot, which will finally transfer to us.
