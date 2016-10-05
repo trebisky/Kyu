@@ -56,12 +56,18 @@ shex8( char *buf, char *end, int val )
 	return shex2(buf,end,val);
 }
 
+#ifdef DESPERATE_TIMES
+/* This subterfuge was used when we patched in a vsnprintf()
+ * from the linux sources and it went berzerk due to a
+ * faulty macro definition.
+ * The idea here is to have a working fallback version
+ * while we debug the defective one.
+ */
 #undef USE_LINUX_PRF
-
 // #define VSNPRINTF	vsnprintf
 #define VSNPRINTF	xsnprintf
-// #define SPRINTF	sprintf
-#define SPRINTF	xprintf
+
+#endif
 
 /* We now use routines in linux/lib
  */
@@ -335,6 +341,7 @@ printf ( const char *fmt, ... )
 	return rv;
 }
 
+#ifdef DESPERATE_TIMES
 /* Alternative to printf while debugging new printf */
 int
 xprintf ( const char *fmt, ... )
@@ -350,6 +357,7 @@ xprintf ( const char *fmt, ... )
 	console_puts ( buf );
 	return rv;
 }
+#endif
 
 /* ------------------------------------------ */
 /* ------------------------------------------ */

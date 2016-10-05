@@ -13,7 +13,6 @@ OBJS =  string.o ctype.o vsprintf.o string_helpers.o \
 	findbit.o \
 	div64asm.o
 
-
 #AOPTS = -D__ASSEMBLY__ -include asm/unified.h
 AOPTS = -D__ASSEMBLY__
 

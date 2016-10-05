@@ -625,6 +625,7 @@ tester ( void )
 	    }
 #endif
 
+	    /* Dubious usefulness these days */
 	    if ( **wp == 'e' ) {
 		printf ( "Test told to stop\n" );
 		test_running = 0;
@@ -635,11 +636,14 @@ tester ( void )
 	    }
 
 #ifdef ARCH_ARM
+#ifdef notdef
+/* Does not work, just use reboot */
 	    if ( **wp == 'r' ) {
 	    	/* restart the software */
 		printf ( "Restarting\n" );
 	    	kyu_startup ();
 	    }
+#endif
 
 	    if ( **wp == 'R' ) {
 	    	/* Reboot the machine */
