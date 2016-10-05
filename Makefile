@@ -103,6 +103,7 @@ kyu.bin: kyu
 
 clean:
 	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.sym
+	rm -f tags
 	cd arm ; make clean
 	cd net ; make clean
 	cd lib ; make clean
