@@ -1,2 +1,0 @@
-#!/bin/sh
-cp ../../linux/arch/arm/lib/div64.S .
