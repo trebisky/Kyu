@@ -10,9 +10,6 @@ INCS = -I. -Iarm
 include Makefile.inc
 
 # This is clean with no dependencies
-#    linux/linux-lib.o \
-
-#    linux/linux-i2c.o \
 #    linux/linux-mm.o \
 
 # For now, machine.o must come first since U-boot simply branches
@@ -27,16 +24,6 @@ OBJS =  machine.o net.o \
     symbols.o \
     dlmalloc.o random.o \
     kyulib.o lib.o
-#    kyulib.o linux/linux-lib.o
-#    kyulib.o lib.o
-
-# For experimenting with linux imported stuff
-#OBJS =  machine.o net.o \
-#    linux/linux-lib.o \
-#    linux/linux-mm.o \
-#    main.o version.o user.o tests.o \
-#    console.o thread.o prf.o \
-#    dlmalloc.o random.o kyulib.o
 
 all: install dump sym tags
 
@@ -55,7 +42,7 @@ machine.o:	bogus
 	cd arm ; make
 	cd net ; make
 	cd lib ; make
-	cd linux ; make
+#	cd linux ; make
 
 bogus:
 
@@ -107,4 +94,4 @@ clean:
 	cd arm ; make clean
 	cd net ; make clean
 	cd lib ; make clean
-	cd linux ; make clean
+#	cd linux ; make clean

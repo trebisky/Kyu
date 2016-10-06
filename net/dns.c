@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ */
 /* dns.c
  * Handle a DNS cache and resolver.
  * T. Trebisky  5-24-2005

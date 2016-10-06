@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ */
 /* das16.c
  * $Id: das16.c,v 1.10 2002/12/17 04:13:44 tom Exp $
  *

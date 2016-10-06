@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ */
 /* net_main.c
  * T. Trebisky  3-24-2005
  * T. Trebisky  6-1-2015

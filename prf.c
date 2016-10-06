@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ */
 /* prf.c
  * $Id: prf.c,v 1.7 2002/12/22 01:31:16 tom Exp $
  *

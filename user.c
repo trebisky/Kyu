@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ */
 /* user.c
  * $Id: user.c,v 1.15 2005/03/25 20:52:50 tom Exp $
  * Tom Trebisky  11/17/2001
