@@ -18,7 +18,7 @@
 #define GPIO3_BASE      ( (struct gpio *) 0x481AE000 )
 
 #include <kyulib.h>
-#include <omap_gpio.h>
+#include <gpio.h>
 #include <omap_mux.h>
 
 /* Lookup table to map gpio number to mux index.

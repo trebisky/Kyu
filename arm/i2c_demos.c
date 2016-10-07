@@ -17,7 +17,7 @@
 #endif
 
 #ifdef ARCH_ARM
-#include "omap_gpio.h"
+#include "gpio.h"
 #define os_printf	printf
 #define ICACHE_FLASH_ATTR
 #define os_delay_us(x)	delay_ns ( 1000 * (x) )

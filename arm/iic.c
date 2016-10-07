@@ -33,7 +33,7 @@
 #endif
 
 #ifdef ARCH_ARM
-#include "omap_gpio.h"
+#include "gpio.h"
 #endif
 
 static void iic_setdc ( int, int );

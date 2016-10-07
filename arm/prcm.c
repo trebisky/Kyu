@@ -18,10 +18,6 @@
  * PRCM is "power, reset, and clock management
  */
 
-#define PER_BASE      0x44E00000
-#define WKUP_BASE     0x44E00400
-#define PRM_BASE      0x44E00F00
-
 /* A module on the am3359 is something like a single uart,
  *  i2c controller, or the PRU.
  * Each module has a "clock control register".
@@ -125,16 +121,83 @@ struct cm_perpll {
         volatile unsigned int clk_24m_st; /* offset 0x150 */
 };
 
+/* I touch very few of the following registers and the names I have
+ * assigned are awful, but we need them as spacers for the few things
+ * we do need to fiddle with.
+ */
+
+struct cm_wakeup {
+        volatile unsigned int wake_clk_st;	/* 00 */
+        volatile unsigned int wake_clk;		/* 04 */
+        volatile unsigned int gpio0;		/* 08 */
+        volatile unsigned int l4wkup;		/* 0c */
+        volatile unsigned int timer0;		/* 10 */
+        volatile unsigned int debugss;		/* 14 */
+        volatile unsigned int l3_aon;		/* 18 */
+        volatile unsigned int autoidle_mpu;	/* 1c */
+        volatile unsigned int dpll_mpu0;	/* 20 */
+        volatile unsigned int ssc_delta;	/* 24 */
+        volatile unsigned int ssc_modfreq;	/* 28 */
+        volatile unsigned int dpll_mpu;		/* 2c */
+        volatile unsigned int dpll_ddr;		/* 30 */
+        volatile unsigned int idlest_dpll_ddr;	/* 34 */
+        volatile unsigned int ssc_delta_d;	/* 38 */
+        volatile unsigned int ssc_modfreq_d;	/* 3c */
+        volatile unsigned int clksel_dpll_ddr;	/* 40 */
+        volatile unsigned int ai_dpll_ddr;	/* 44 */
+        volatile unsigned int idlest_dpll_disp;	/* 48 */
+        volatile unsigned int ssc_delta_d2;	/* 4c */
+        volatile unsigned int ssc_modfreq_d2;	/* 50 */
+        volatile unsigned int dpll_disp;	/* 54 */
+        volatile unsigned int dpll_core;	/* 58 */
+        volatile unsigned int idlest_dpll_core;	/* 5c */
+        volatile unsigned int ssc_delta_c;	/* 60 */
+        volatile unsigned int ssc_modfreq_c;	/* 64 */
+        volatile unsigned int clksel_dpll_core;	/* 68 */
+        volatile unsigned int ai_dpll_per;	/* 6c */
+        volatile unsigned int idlest_dpll_per;	/* 70 */
+        volatile unsigned int ssc_delta_p;	/* 74 */
+        volatile unsigned int ssc_modfreq_p;	/* 78 */
+        volatile unsigned int clkdcold0;	/* 7c */
+        volatile unsigned int div_m4;		/* 80 */
+        volatile unsigned int div_m5;		/* 84 */
+        volatile unsigned int mode_dpll_mpu;	/* 88 */
+        volatile unsigned int mode_dpll_per;	/* 8c */
+        volatile unsigned int mode_dpll_core;	/* 90 */
+        volatile unsigned int mode_dpll_ddr;	/* 94 */
+        volatile unsigned int mode_dpll_disp;	/* 98 */
+        volatile unsigned int dpll_periph;	/* 9c */
+
+        volatile unsigned int div_m2_ddr;	/* a0 */
+        volatile unsigned int div_m2_disp;	/* a4 */
+        volatile unsigned int div_m2_mpu;	/* a8 */
+        volatile unsigned int div_m2_per;	/* ac */
+
+        volatile unsigned int wkup_m3;		/* b0 */
+        volatile unsigned int wkup_uart0;	/* b4 */
+        volatile unsigned int wkup_i2c0;	/* b8 */
+        volatile unsigned int wkup_adc;		/* bc <--- */
+        volatile unsigned int wkup_smart0;	/* c0 */
+        volatile unsigned int wkup_timer1;	/* c4 */
+        volatile unsigned int wkup_smart1;	/* c8 */
+        volatile unsigned int wkup_aon;		/* cc */
+	unsigned int __pad0;
+        volatile unsigned int wkup_wdt1;	/* d4 */
+        volatile unsigned int div_m6;		/* d8 */
+};
+
+#define PER_BASE      ( (struct cm_perpll *) 0x44E00000 )
+#define WKUP_BASE     ( (struct cm_wakeup *) 0x44E00400 )
 
 void
 module_enable ( volatile unsigned int *mp )
 {
 	int timeout = 1000000;
 
-	printf ( "Module &clk = %08x\n", mp );
-	printf ( "Module clk = %08x\n", *mp );
+	// printf ( "Module &clk = %08x\n", mp );
+	// printf ( "Module clk = %08x\n", *mp );
 	*mp = ((*mp) & ~MODULE_MODE) | MODULE_MODE_ENABLE;
-	printf ( "Module clk = %08x\n", *mp );
+	// printf ( "Module clk = %08x\n", *mp );
 
 	/* Now wait for results */
 	while ( timeout-- ) {
@@ -143,7 +206,7 @@ module_enable ( volatile unsigned int *mp )
 	    delay_ns ( 1000 );	/* XXX */
 	}
 
-	printf ( "Module clk = %08x\n", *mp );
+	// printf ( "Module clk = %08x\n", *mp );
 
 	if ( timeout <= 0 )
 	    printf ("Cannot enable module\n" );
@@ -192,23 +255,26 @@ pru_module_init ( void )
 	struct cm_perpll *pp;
 
 	pru_reset_module ();
-	pp = (struct cm_perpll *) PER_BASE;
+	pp = PER_BASE;
 	module_enable ( &pp->pru );
 }
 
 void
 modules_init ( void )
 {
-	struct cm_perpll *pp;
+	struct cm_perpll *pp = PER_BASE;
+	struct cm_wakeup *wp = WKUP_BASE;
 
-	pp = (struct cm_perpll *) PER_BASE;
-
-	printf ( "Enable i2c1\n" );
+	// printf ( "Enable i2c1\n" );
 	module_enable ( &pp->i2c1 );
-	printf ( "Enable i2c2\n" );
+
+	// printf ( "Enable i2c2\n" );
 	module_enable ( &pp->i2c2 );
 
-	printf ( "Enable PRU\n" );
+	// printf ( "Enable adc\n" );
+	module_enable ( &wp->wkup_adc );
+
+	// printf ( "Enable PRU\n" );
 	pru_module_init ();
 }
 
@@ -230,6 +296,8 @@ struct prm {
 	volatile unsigned long ldo_sram_mpu_ctrl;
 };
 
+#define PRM_BASE      ( (struct prm *) 0x44E00F00 )
+
 /* The difference between warm and cold is unclear.
  * The TRM says that if you do a cold reset, you
  *  "must ensure the SDRAM is properly put in sef-refresh
@@ -241,9 +309,9 @@ struct prm {
 void
 reset_cpu ( void )
 {
-	struct prm *base = (struct prm *) PRM_BASE;
+	struct prm *rp = PRM_BASE;
 
-	base->rstctl = WARM_RESET;
+	rp->rstctl = WARM_RESET;
 }
 
 /* THE END */

@@ -116,7 +116,7 @@ sym_lookup ( char *x )
 }
 
 /* Do a reverse lookup, given an address,
- *  find the entry less that, but closest to the address given.
+ *  find the entry less than, but closest to the address given.
  */
 struct symtab *
 sym_rlookup ( int addr )
@@ -141,11 +141,20 @@ sym_rlookup ( int addr )
 	return best_sp;
 }
 
-char * mk_symaddr ( int addr )
+static char no_sym[] = "-?-";
+
+char *
+mk_symaddr ( int addr )
 {
 	struct symtab *sp;
 	int off;
 	static char rbuf[32];	/* XXX */
+
+	/* This can get called early in the game
+	 *  before there is a symbol table loaded.
+	 */
+	if ( ! sym_table )
+	    return no_sym;
 
 	sp = sym_rlookup ( addr );
 	off = addr - sp->addr;

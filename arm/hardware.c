@@ -143,6 +143,8 @@ hardware_init ( void )
 
 	gpio_init ();
 	i2c_init ();
+
+	adc_init ();
 #endif
 
 #ifdef ARCH_X86
