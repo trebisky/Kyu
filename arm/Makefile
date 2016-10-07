@@ -12,7 +12,7 @@ include ../Makefile.inc
 # locore must be first
 OBJS =  locore.o hardware.o \
 	wdt.o timer.o serial.o mux.o prcm.o gpio.o cm.o \
-	pru.o i2c.o i2c_hw.o iic.o bmp.o \
+	pru.o i2c.o i2c_hw.o iic.o i2c_demos.o \
 	if_cpsw.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
