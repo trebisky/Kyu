@@ -5,8 +5,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* Kyu Project
+ *
+ *  Kyu Project
  *
  * cm.c - driver code for the am3359 control module.
  *  the pinmux part of this device is in mux.c
@@ -117,6 +117,14 @@ show_mac ( char *mac )
 	    else
 		printf ( " %02x", mac[i] );
 	}
+}
+
+void
+cm_adc_mux ( int val )
+{
+	volatile unsigned long *adcmux = (unsigned long *) (CTRL_BASE + 0xFD8);
+
+	*adcmux = val;
 }
 
 /* XXX - Useless */
