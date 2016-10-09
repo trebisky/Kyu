@@ -11,8 +11,9 @@
  * driver for the analog input section of the BBB
  *
  * This is called the "touchscreen controller" in the TRM
- * and is described in section 12.
+ *   and is described in section 12.
  * It is also referred to as the ADC_TSC
+ * We neither use nor support any of the touch screen features here.
  *
  * It is an 8 channel, 12 bit adc capable of 125 ns conversions
  * The first 7 of the 8 are available on the BBB P9 connector as AIN 0-6
@@ -112,7 +113,11 @@ struct adc {
 #define	STEP_CHAN_VREF			0x00400000
 #define	STEP_CHAN(x)			((x)<<19)
 
-/* "real" channels are 0-7 */
+/* "real" channels are 0-7
+ * and on the BBB channel 8 comes from a fixed 1.65 volt divider.
+ */
+#define CHAN_1			0
+#define CHAN_8			7
 #define CHAN_VREF		8
 
 /* bits in the control register
@@ -138,6 +143,8 @@ struct adc {
 #define STAT_IDLE		0x10
 #define STAT_CHARGE		0x11
 
+static unsigned int step_enables;
+
 /* ------------------------------ */
 /* ------------------------------ */
 
@@ -154,7 +161,7 @@ hw_trigger ( void )
 	cm_adc_mux ( HWT_TIMER4 );
 }
 
-void
+static void
 adc_enable ( void )
 {
 	struct adc *ap = ADC_BASE;
@@ -162,8 +169,8 @@ adc_enable ( void )
 	ap->control |= CTRL_ENA;
 }
 
-void
-adc_trigger ( void )
+static void
+adc_pulse ( void )
 {
 	struct adc *ap = ADC_BASE;
 
@@ -171,7 +178,7 @@ adc_trigger ( void )
 	ap->control |= CTRL_ENA;
 }
 
-void
+static void
 adc_disable ( void )
 {
 	struct adc *ap = ADC_BASE;
@@ -179,72 +186,114 @@ adc_disable ( void )
 	ap->control &= ~CTRL_ENA;
 }
 
+/* Heaven knows what this really should be or how it should change
+ * if we don't average 16 readings.
+ */
+#define MAGIC_DELAY	152
 
-void
-setup_once ( int chan )
+static void
+setup_single ( int chan )
 {
 	struct adc *ap = ADC_BASE;
 
 	// ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
 	ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
-	ap->steps[0].delay = 152;
-	ap->step_enable = 0x2;
+	ap->steps[0].delay = MAGIC_DELAY;
+
+	step_enables = 1<<1;
+	// ap->step_enable = step_enables;
 }
 
-void
-show_fifo ( void )
+static void
+setup_scan ( void )
+{
+	struct adc *ap = ADC_BASE;
+	int chan;
+
+	/* it is entirely coincidence that chan and step index match here */
+	for ( chan=0; chan <= CHAN_VREF; chan++ ) {
+	    ap->steps[chan].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
+	    ap->steps[chan].delay = MAGIC_DELAY;
+	}
+
+	step_enables = 0x1ff << 1;
+	// ap->step_enable = step_enables;
+}
+
+static void
+adc_trigger ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	ap->step_enable = step_enables;
+}
+
+/* This works, but perhaps it would be better to poll on the BUSY bit ?
+ */
+static void
+wait_idle ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	while ( (ap->status & STAT_MASK) == STAT_IDLE )
+	    ;
+	while ( (ap->status & STAT_MASK) != STAT_IDLE )
+	    ;
+}
+
+static void
+show_data ( void )
 {
 	struct adc *ap = ADC_BASE;
 	unsigned int data;
 
-	printf ( "ADC fifo, se, control, status:  %d  %08x %08x %08x\n", ap->fifo0_count,
-	    ap->step_enable, ap->control, ap->status ); 
-	if ( ap->fifo0_count > 0 ) {
+	while ( ap->fifo0_count > 0 ) {
 	    data = ap->fifo0_data;
-	    printf ( "ADC data: %08x\n", data );
+	    printf ( " ADC data: %08x %d\n", data, data );
 	}
 }
 
-void
-watch_fifo ( void )
+static void
+show_fifo ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	printf ( "ADC fifo, se, control, status:  %d  %08x %08x %08x\n", ap->fifo0_count,
+	    ap->step_enable, ap->control, ap->status ); 
+}
+
+static void
+watch_adc ( void )
 {
 	struct adc *ap = ADC_BASE;
 	int i;
 
-	for ( i=0; i<10; i++ ) {
-	    thr_delay ( 10 );
+	for ( i=0; i<5; i++ ) {
+	    // thr_delay ( 10 );
+	    adc_trigger ();
+	    wait_idle ();
 	    show_fifo ();
-	    // adc_disable ();
-	    // setup_once ( CHAN_VREF );
-	    // adc_enable ();
-	    ap->step_enable = 0x2;
+	    show_data ();
 	}
-}
-
-void
-poll_data ( void )
-{
-	struct adc *ap = ADC_BASE;
-	unsigned int data;
-
-	while ( ap->fifo0_count <= 0 )
-	    ;
-	show_fifo ();
-	data = ap->fifo0_data;
-	show_fifo ();
-	printf ( "ADC data: %08x\n", data );
 }
 
 void
 adc_init ( void )
 {
 	struct adc *ap = ADC_BASE;
-	int i;
 
 	/* yields 0x47300001, which is correct */
 	// printf ( "ADC revision = %08x\n", ap->rev );
 
-	setup_once ( CHAN_VREF );
+	setup_scan ();
+	    adc_trigger ();
+	    show_fifo ();
+	adc_enable ();
+
+	watch_adc ();
+
+#ifdef notdef
+	setup_single ( CHAN_VREF );
 	show_fifo ();
 	adc_enable ();
 	show_fifo ();
@@ -257,12 +306,6 @@ adc_init ( void )
 	// printf ( "\n" );
 
 	watch_fifo ();
-
-#ifdef notdef
-	for ( i=0; i<5; i++ ) {
-	    adc_trigger ();
-	    poll_data ();
-	}
 #endif
 
 	/*
