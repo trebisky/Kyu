@@ -71,7 +71,7 @@ struct adc {
 	volatile unsigned long step_enable;	/* 0x54 */
 	volatile unsigned long idle_config;	/* 0x58 */
 
-	struct step charge;			/* ox5c */
+	struct step charge;			/* 0x5c */
 	struct step steps[NUM_STEPS];
 
 	volatile unsigned long fifo0_count;	/* 0xE4 */
@@ -84,6 +84,7 @@ struct adc {
 
 	long _pad2;
 	volatile unsigned long fifo0_data;	/* 0x100 */
+
 	long _pad3[63];
 	volatile unsigned long fifo1_data;	/* 0x200 */
 };
@@ -101,7 +102,9 @@ struct adc {
 #define	STEP_AVG_8			0x0C
 #define	STEP_AVG_16			0x10
 
-/* If we don't set this, results go to Fifo 0 */
+/* If we don't set this, results go to Fifo 0
+ *  (which is fine by us).
+ */
 #define STEP_FIFO1			0x04000000
 
 /* documentation numbers channels 1-8
@@ -277,6 +280,26 @@ watch_adc ( void )
 	}
 }
 
+/* XXX - note the buffer overrun issue here.
+ * This is a tentative interface.
+ */
+int
+adc_read ( unsigned int *buf )
+{
+	struct adc *ap = ADC_BASE;
+	int rv = 0;
+
+	adc_trigger ();
+	wait_idle ();
+
+	while ( ap->fifo0_count > 0 ) {
+	    *buf = ap->fifo0_data;
+	    rv++;
+	}
+
+	return rv;
+}
+
 void
 adc_init ( void )
 {
@@ -286,8 +309,6 @@ adc_init ( void )
 	// printf ( "ADC revision = %08x\n", ap->rev );
 
 	setup_scan ();
-	    adc_trigger ();
-	    show_fifo ();
 	adc_enable ();
 
 	watch_adc ();
