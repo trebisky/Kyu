@@ -5,17 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* prcm.c
  *
- * Tom Trebisky  Kyu project  5-11-2015
- * Tom Trebisky  Kyu project  8-23-2016
+ * prcm.c
  *
  * Driver for PRCM stuff on the am3359
- */
-
-/*
  * PRCM is "power, reset, and clock management
+ *
+ * Tom Trebisky  Kyu project  8-23-2016
  */
 
 /* A module on the am3359 is something like a single uart,
@@ -178,7 +174,7 @@ struct cm_wakeup {
         volatile unsigned int wkup_i2c0;	/* b8 */
         volatile unsigned int wkup_adc;		/* bc <--- */
         volatile unsigned int wkup_smart0;	/* c0 */
-        volatile unsigned int wkup_timer1;	/* c4 */
+        volatile unsigned int timer1;		/* c4 <--- */
         volatile unsigned int wkup_smart1;	/* c8 */
         volatile unsigned int wkup_aon;		/* cc */
 	unsigned int __pad0;
@@ -190,14 +186,18 @@ struct cm_wakeup {
 #define WKUP_BASE     ( (struct cm_wakeup *) 0x44E00400 )
 
 void
-module_enable ( volatile unsigned int *mp )
+module_enable ( char *msg, volatile unsigned int *mp, int verbose )
 {
 	int timeout = 1000000;
 
-	// printf ( "Module &clk = %08x\n", mp );
-	// printf ( "Module clk = %08x\n", *mp );
+	if ( verbose ) {
+	    printf ( "Enabling %s\n", msg );
+	    printf ( "Module &clk = %08x\n", mp );
+	    printf ( "Module clk = %08x\n", *mp );
+	}
 	*mp = ((*mp) & ~MODULE_MODE) | MODULE_MODE_ENABLE;
-	// printf ( "Module clk = %08x\n", *mp );
+	if ( verbose )
+	    printf ( "Module clk = %08x\n", *mp );
 
 	/* Now wait for results */
 	while ( timeout-- ) {
@@ -206,10 +206,11 @@ module_enable ( volatile unsigned int *mp )
 	    delay_ns ( 1000 );	/* XXX */
 	}
 
-	// printf ( "Module clk = %08x\n", *mp );
+	if ( verbose )
+	    printf ( "Module clk = %08x\n", *mp );
 
 	if ( timeout <= 0 )
-	    printf ("Cannot enable module\n" );
+	    printf ("Cannot enable module: %s\n", msg );
 	    // panic ("Cannot enable module" );
 }
 
@@ -248,34 +249,31 @@ module_run ( volatile unsigned int *mp )
 }
 #endif
 
-/* XXX - where does this really belong ? */
-static void
-pru_module_init ( void )
-{
-	struct cm_perpll *pp;
-
-	pru_reset_module ();
-	pp = PER_BASE;
-	module_enable ( &pp->pru );
-}
-
 void
 modules_init ( void )
 {
 	struct cm_perpll *pp = PER_BASE;
 	struct cm_wakeup *wp = WKUP_BASE;
 
-	// printf ( "Enable i2c1\n" );
-	module_enable ( &pp->i2c1 );
+	module_enable ( "i2c1", &pp->i2c1, 0 );
+	module_enable ( "i2c2", &pp->i2c2, 0 );
+	module_enable ( "adc", &wp->wkup_adc, 0 );
 
-	// printf ( "Enable i2c2\n" );
-	module_enable ( &pp->i2c2 );
+	pru_reset_module ();
+	module_enable ( "pru", &pp->pru, 0 );
 
-	// printf ( "Enable adc\n" );
-	module_enable ( &wp->wkup_adc );
-
-	// printf ( "Enable PRU\n" );
-	pru_module_init ();
+	/* Timers -- 0 and 2 are already enabled by U-boot.
+	 * We use 2 for our 1 ms tick.
+	 * 3 and 6 refuse this attempt to turn them on.
+	 */
+	// module_enable ( "timer0", &wp->timer0, 0 );
+	module_enable ( "timer1", &wp->timer1, 0 );
+	// module_enable ( "timer2", &pp->timer2, 0 );
+	// module_enable ( "timer3", &pp->timer3, 1 );
+	module_enable ( "timer4", &pp->timer4, 0 );
+	module_enable ( "timer5", &pp->timer5, 0 );
+	// module_enable ( "timer6", &pp->timer6, 1 );
+	module_enable ( "timer7", &pp->timer7, 0 );
 }
 
 void

@@ -28,9 +28,7 @@ extern struct thread *cur_thread;
 void thread_tick ( void );
 
 #define TIMER0_BASE      0x44E05000
-
-#define TIMER1MS_BASE    0x44E31000	/* gets data abort */
-
+#define TIMER1MS_BASE    0x44E31000
 #define TIMER2_BASE      0x48040000
 #define TIMER3_BASE      0x48042000
 #define TIMER4_BASE      0x48044000
@@ -43,43 +41,38 @@ void thread_tick ( void );
 // #define TIMER_BASE	TIMER0_BASE
 // #define TIMER_IRQ	IRQ_TIMER0
 
+// We use timer 2 for our 1 ms tick 
 // By default this one runs at 24 Mhz
 //  "32K timer running at 24000007 Hz"
 #define TIMER_BASE	TIMER2_BASE
 #define TIMER_IRQ	IRQ_TIMER2
 
-/* XXX - this doesn't belong here, but
- * I discovered when trying to use other than timer 0
- * that the MMU is not configured to let me address everything.
- * Apparently U-boot only sets up a window for timer 0 and 2.
- */
-int
-peek ( unsigned long *addr )
+static void
+probeit ( char *msg, unsigned long addr )
 {
-	unsigned long val;
+	int s;
 
-	printf ( "Peeking at %08x\n", addr );
-	val = *addr;
-	printf ( "Poke at %08x yielded %08x\n", addr, val );
-
+	s = data_abort_probe ( addr );
+	if ( s )
+	    printf ( "Probe %s at %08x, Fails\n", msg, addr );
+	else
+	    printf ( "Probe %s at %08x, ok\n", msg, addr );
 }
 
-static void
-do_peeks ( void )
+/* This reveals that all except 0 and 2 yield data aborts.
+ * So, U-boot only enables clocks for 0 and 2.
+ */
+void
+timer_probe ( void )
 {
-	printf ("Start peeks\n");
-	peek ( (void *) 0x44E0B000 );	/* i2c */
-	peek ( (void *) 0x4802A000 );	/* i2c */
-	//peek ( (void *) 0x4819C000 );	/* i2c */
-	peek ( (void *) TIMER0_BASE );
-	// peek ( (void *) TIMER1MS_BASE );
-	peek ( (void *) TIMER2_BASE );
-	// peek ( (void *) TIMER3_BASE );
-	// peek ( (void *) TIMER4_BASE );
-	// peek ( (void *) TIMER5_BASE );
-	// peek ( (void *) TIMER6_BASE );
-	// peek ( (void *) TIMER7_BASE );
-	printf ("Finish peeks\n");
+	probeit ( "timer0", TIMER0_BASE );	/* ok */
+	probeit ( "timer1", TIMER1MS_BASE );
+	probeit ( "timer2", TIMER2_BASE );	/* ok */
+	probeit ( "timer3", TIMER3_BASE );
+	probeit ( "timer0", TIMER4_BASE );
+	probeit ( "timer5", TIMER5_BASE );
+	probeit ( "timer6", TIMER6_BASE );
+	probeit ( "timer7", TIMER7_BASE );
 }
 
 /* registers in a timer (except the special timer 1) */
@@ -590,9 +583,8 @@ dmtimer_test ( void )
 void
 timer_init ( int rate )
 {
-	// struct dmtimer1 *tmr = (struct dmtimer1 *) TIMER_BASE;
-	// printf ( "Timer ID = %08x\n", tmr->id );
-	// do_peeks ();
+	/* XXX */
+	timer_probe ();
 
 	dmtimer_init ( rate );
 }
