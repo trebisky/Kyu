@@ -15,7 +15,7 @@
 #include <thread.h>
 
 #include "hardware.h"
-#include "omap_ints.h"
+#include "interrupts.h"
 
 extern struct thread *cur_thread;
 

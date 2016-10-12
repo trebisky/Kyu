@@ -5,15 +5,15 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* intcon.c
+ *
+ * intcon.c
  *
  * Driver for the am3359 interrupt controller
  *   see TRM pages 212 and therabouts
  * 
  */
 #include "kyulib.h"
-#include "omap_ints.h"
+#include "interrupts.h"
 
 #define INTCON_BASE      0x48200000
 

@@ -35,6 +35,8 @@
 
 #define NUM_INTS	128
 
+#define IRQ_ADC			16
+
 #define IRQ_PRU_EV0		20
 #define IRQ_PRU_EV1		21
 #define IRQ_PRU_EV2		22
@@ -63,5 +65,7 @@
 #define IRQ_TIMER7	95
 
 #define IRQ_UART0	72
+
+#define IRQ_ADC_TSC_PENINT	115
 
 /* THE END */

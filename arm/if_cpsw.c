@@ -48,7 +48,7 @@
 #include <kyulib.h>
 #include <thread.h>
 #include <malloc.h>
-#include <omap_ints.h>
+#include <interrupts.h>
 
 /* Hardware base addresses */
 /* from the TRM, chapter 2, pages 175-176 */

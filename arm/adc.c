@@ -36,7 +36,8 @@
 #define ADC_BASE      ( (struct adc *) 0x44E0D000 )
 
 #include <kyulib.h>
-#include <omap_mux.h>
+#include <interrupts.h>
+// #include <omap_mux.h>
 
 #define NUM_STEPS	16
 #define NUM_CHAN	8
@@ -164,6 +165,16 @@ hw_trigger ( void )
 	cm_adc_mux ( HWT_TIMER4 );
 }
 
+/* ------------------------------ */
+/* ------------------------------ */
+
+void
+adc_isr ( int xxx )
+{
+	printf ( "ADC interrupt\n" );
+}
+
+
 static void
 adc_enable ( void )
 {
@@ -199,8 +210,8 @@ setup_single ( int chan )
 {
 	struct adc *ap = ADC_BASE;
 
-	// ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
-	ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
+	ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
+	// ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
 	ap->steps[0].delay = MAGIC_DELAY;
 
 	step_enables = 1<<1;
@@ -211,15 +222,54 @@ static void
 setup_scan ( void )
 {
 	struct adc *ap = ADC_BASE;
-	int chan;
+	int config;
+	int start, step, chan;
+	int num_chan = 9;
 
-	/* it is entirely coincidence that chan and step index match here */
+	start = NUM_STEPS - num_chan;
+	step_enables = 0;
+
+	// printf ( "First config register at: %08x\n", &ap->steps[0].config );
+
+	/* it is entirely coincidence if chan and step index match here */
 	for ( chan=0; chan <= CHAN_VREF; chan++ ) {
-	    ap->steps[chan].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
-	    ap->steps[chan].delay = MAGIC_DELAY;
+	    step = start + chan;
+	    config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
+	    // printf ( "Step %d = %08x\n", step, config );
+	    ap->steps[step].config = config;
+	    ap->steps[step].delay = MAGIC_DELAY;
+	    // printf ( "Step %d > %08x\n", step, ap->steps[step].config );
+	    step_enables |= 1<<(step+1);
 	}
+	printf ( "Step enables = %08x\n", step_enables );
 
-	step_enables = 0x1ff << 1;
+	// step_enables = 0x1ff << 1;
+	// ap->step_enable = step_enables;
+}
+
+static void
+setup_mismo ( int mismo_chan )
+{
+	struct adc *ap = ADC_BASE;
+	int config;
+	int start, step, chan;
+	int num_chan = 9;
+
+	start = NUM_STEPS - num_chan;
+	step_enables = 0;
+	printf ( "Setting up all steps to read channel: %d\n", mismo_chan );
+
+	for ( chan=0; chan <= CHAN_VREF; chan++ ) {
+	    step = start + chan;
+	    config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
+	    // printf ( "Step %d = %08x\n", step, config );
+	    ap->steps[step].config = config;
+	    ap->steps[step].delay = MAGIC_DELAY;
+	    step_enables |= 1<<(step+1);
+	}
+	printf ( "Step enables = %08x\n", step_enables );
+
+	// step_enables = 0x1ff << 1;
 	// ap->step_enable = step_enables;
 }
 
@@ -249,10 +299,13 @@ show_data ( void )
 {
 	struct adc *ap = ADC_BASE;
 	unsigned int data;
+	unsigned int val;
 
 	while ( ap->fifo0_count > 0 ) {
 	    data = ap->fifo0_data;
-	    printf ( " ADC data: %08x %d\n", data, data );
+	    val = 180 * data;
+	    val /= 4095;
+	    printf ( " ADC data: %08x %d  %d\n", data, data, val );
 	}
 }
 
@@ -266,12 +319,12 @@ show_fifo ( void )
 }
 
 static void
-watch_adc ( void )
+watch_adc ( int num )
 {
 	struct adc *ap = ADC_BASE;
 	int i;
 
-	for ( i=0; i<5; i++ ) {
+	for ( i=0; i<num; i++ ) {
 	    // thr_delay ( 10 );
 	    adc_trigger ();
 	    wait_idle ();
@@ -300,6 +353,28 @@ adc_read ( unsigned int *buf )
 	return rv;
 }
 
+static void
+test ( void )
+{
+	int i;
+
+	// setup_mismo ( 0 );
+	setup_scan ();
+
+	adc_trigger ();
+	//wait_idle ();
+	thr_delay ( 500 );
+	show_fifo ();
+	show_data ();
+
+	/*
+	for ( i=0; i<9; i++ ) {
+	    setup_mismo ( i );
+	    watch_adc ( 1 );
+	}
+	*/
+}
+
 void
 adc_init ( void )
 {
@@ -308,10 +383,14 @@ adc_init ( void )
 	/* yields 0x47300001, which is correct */
 	// printf ( "ADC revision = %08x\n", ap->rev );
 
+	ap->control |= CTRL_UNLOCK;
+
+	irq_hookup ( IRQ_ADC, adc_isr, 0 );
+
 	setup_scan ();
 	adc_enable ();
 
-	watch_adc ();
+	// test ();
 
 #ifdef notdef
 	setup_single ( CHAN_VREF );
@@ -335,6 +414,13 @@ adc_init ( void )
 	show_fifo ();
 	*/
 
+}
+
+/* Called from IO test menu */
+void
+adc_test ( void )
+{
+	test ();
 }
 
 /* THE END */

@@ -13,7 +13,7 @@ include ../Makefile.inc
 OBJS =  locore.o hardware.o \
 	wdt.o timer.o serial.o mux.o prcm.o gpio.o cm.o \
 	pru.o i2c.o i2c_hw.o iic.o i2c_demos.o \
-	adc.o if_cpsw.o \
+	dma.o adc.o if_cpsw.o \
 	interrupts.o intcon.o \
 	cache_v7.o \
 	show_regs.o \
@@ -24,7 +24,8 @@ all: ../machine.o
 ../machine.o: $(OBJS)
 	$(LD) -r -o ../machine.o $(OBJS)
 
-i2c_hw.o:	omap_ints.h
+i2c_hw.o:	interrupts.h
+adc.o:		interrupts.h
 i2c.o:	i2c.h
 iic.o:	i2c.h
 

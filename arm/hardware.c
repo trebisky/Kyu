@@ -141,6 +141,7 @@ hardware_init ( void )
 	/* CPU interrupts on */
 	enable_irq ();
 
+	dma_init ();
 	gpio_init ();
 	i2c_init ();
 

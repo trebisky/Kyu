@@ -136,6 +136,7 @@ static void test_sort ( int );
 static void test_ran ( int );
 static void test_blink ( int );
 static void test_gpio ( int );
+static void test_adc ( int );
 static void test_malloc ( int );
 static void test_wait ( int );
 static void test_unroll ( int );
@@ -143,6 +144,7 @@ static void test_fault ( int );
 static void test_fault2 ( int );
 static void test_zdiv ( int );
 
+/* Here is the IO test menu */
 
 struct test io_test_list[] = {
 	test_sort,	"Thread sort test",	5,
@@ -156,6 +158,7 @@ struct test io_test_list[] = {
 	test_fault,	"Fault test",		0,
 	test_fault2,	"data abort probe",	0,
 	test_zdiv,	"Zero divide test",	0,
+	test_adc,	"BBB adc test",		0,
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2238,11 +2241,10 @@ test_blink ( int arg )
 /* -------------------------------------------- */
 
 /* Test gpio on BBB */
-static void
-test_gpio ( int count )
-{
-	gpio_test ();
-}
+static void test_gpio ( int count ) { gpio_test (); }
+
+/* Test adc on BBB */
+static void test_adc ( int count ) { adc_test (); }
 
 #ifdef ARCH_X86
 /* -------------------------------------------- */
