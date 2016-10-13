@@ -219,7 +219,31 @@ setup_single ( int chan )
 }
 
 static void
-setup_scan ( void )
+setup_scan ( int num )
+{
+	struct adc *ap = ADC_BASE;
+	int config;
+	int step, chan;
+
+	step_enables = 0;
+
+	// printf ( "First config register at: %08x\n", &ap->steps[0].config );
+
+	/* it is entirely coincidence if chan and step index match here */
+	for ( chan=0; chan < num; chan++ ) {
+	    step = chan;
+	    config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
+	    // printf ( "Step %d = %08x\n", step, config );
+	    ap->steps[step].config = config;
+	    ap->steps[step].delay = MAGIC_DELAY;
+	    // printf ( "Step %d > %08x\n", step, ap->steps[step].config );
+	    step_enables |= 1<<(step+1);
+	}
+	// printf ( "Step enables = %08x\n", step_enables );
+}
+
+static void
+setup_scan_ORIG ( void )
 {
 	struct adc *ap = ADC_BASE;
 	int config;
@@ -239,32 +263,6 @@ setup_scan ( void )
 	    ap->steps[step].config = config;
 	    ap->steps[step].delay = MAGIC_DELAY;
 	    // printf ( "Step %d > %08x\n", step, ap->steps[step].config );
-	    step_enables |= 1<<(step+1);
-	}
-	printf ( "Step enables = %08x\n", step_enables );
-
-	// step_enables = 0x1ff << 1;
-	// ap->step_enable = step_enables;
-}
-
-static void
-setup_mismo ( int mismo_chan )
-{
-	struct adc *ap = ADC_BASE;
-	int config;
-	int start, step, chan;
-	int num_chan = 9;
-
-	start = NUM_STEPS - num_chan;
-	step_enables = 0;
-	printf ( "Setting up all steps to read channel: %d\n", mismo_chan );
-
-	for ( chan=0; chan <= CHAN_VREF; chan++ ) {
-	    step = start + chan;
-	    config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
-	    // printf ( "Step %d = %08x\n", step, config );
-	    ap->steps[step].config = config;
-	    ap->steps[step].delay = MAGIC_DELAY;
 	    step_enables |= 1<<(step+1);
 	}
 	printf ( "Step enables = %08x\n", step_enables );
@@ -333,11 +331,10 @@ watch_adc ( int num )
 	}
 }
 
-/* XXX - note the buffer overrun issue here.
- * This is a tentative interface.
+/* XXX - get rid of this.
  */
-int
-adc_read ( unsigned int *buf )
+static int
+adc_read_fifo ( unsigned int *buf )
 {
 	struct adc *ap = ADC_BASE;
 	int rv = 0;
@@ -353,26 +350,75 @@ adc_read ( unsigned int *buf )
 	return rv;
 }
 
+/* Read a given channel once */
+int
+adc_read ( int chan )
+{
+	struct adc *ap = ADC_BASE;
+
+	setup_single ( chan );
+	adc_trigger ();
+	wait_idle ();
+
+	if ( ap->fifo0_count < 1 )
+	    return -1;
+
+	return ap->fifo0_data;
+}
+
+void
+adc_scan ( int *buf, int num )
+{
+	struct adc *ap = ADC_BASE;
+	int i;
+
+	setup_scan ( num );
+	adc_trigger ();
+	wait_idle ();
+
+	if ( ap->fifo0_count < num ) {
+	    printf ( "ADC fifo underrun %d %d\n", ap->fifo0_count, num );
+	    return;
+	}
+
+	for ( i=0; i<num; i++ )
+	    *buf++ = ap->fifo0_data;
+}
+
 static void
 test ( void )
 {
-	int i;
+	int i, j;
+	int data;
+	int val;
+	int buf[8];
 
-	// setup_mismo ( 0 );
-	setup_scan ();
-
-	adc_trigger ();
-	//wait_idle ();
-	thr_delay ( 500 );
-	show_fifo ();
-	show_data ();
-
-	/*
-	for ( i=0; i<9; i++ ) {
-	    setup_mismo ( i );
-	    watch_adc ( 1 );
+	for ( i=0; i<5; i++ ) {
+	    data = adc_read ( 0 );
+	    val = (180 * data) / 4095;
+	    printf ( " ADC data: %08x %d  %d\n", data, data, val );
 	}
-	*/
+
+	for ( i=0; i<4; i++ ) {
+	    adc_scan ( buf, 8 );
+	    for ( j=0; j<8; j++ )
+		printf ( " %5d", buf[j] );
+	    printf ( "\n" );
+	}
+
+	/* VCC with 0.5 divider */
+	for ( i=0; i<5; i++ ) {
+	    data = adc_read ( 7 );
+	    val = (2 * 180 * data) / 4095;
+	    printf ( " ADC vcc: %08x %d  %d\n", data, data, val );
+	}
+
+	/* reference */
+	for ( i=0; i<5; i++ ) {
+	    data = adc_read ( 8 );
+	    val = (180 * data) / 4095;
+	    printf ( " ADC ref: %08x %d  %d\n", data, data, val );
+	}
 }
 
 void
@@ -387,7 +433,7 @@ adc_init ( void )
 
 	irq_hookup ( IRQ_ADC, adc_isr, 0 );
 
-	setup_scan ();
+	// setup_scan ();
 	adc_enable ();
 
 	// test ();
