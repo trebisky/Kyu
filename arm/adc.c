@@ -111,17 +111,12 @@ struct adc {
 /* documentation numbers channels 1-8
  * VREF is "channel 9" and on.
  */
-#define	STEP_CHAN_1			0x00
-#define	STEP_CHAN_2			0x00080000
-#define	STEP_CHAN_8			0x00380000
-#define	STEP_CHAN_VREF			0x00400000
 #define	STEP_CHAN(x)			((x)<<19)
 
 /* "real" channels are 0-7
  * and on the BBB channel 8 comes from a fixed 1.65 volt divider.
  */
-#define CHAN_1			0
-#define CHAN_8			7
+#define CHAN_VCC		7
 #define CHAN_VREF		8
 
 /* bits in the control register
@@ -132,7 +127,7 @@ struct adc {
 #define CTRL_UNLOCK		0x0004
 #define CTRL_BIAS		0x0008
 #define CTRL_PWRDOWN		0x0010
-/* bits here for tsc control */
+/* more bits here (I skip) for tsc control */
 #define CTRL_TSCENA		0x0080
 #define CTRL_HWEVENT		0x0100
 #define CTRL_PREEMPT		0x0200
@@ -176,13 +171,14 @@ adc_isr ( int xxx )
 
 
 static void
-adc_enable ( void )
+adc_start ( void )
 {
 	struct adc *ap = ADC_BASE;
 
 	ap->control |= CTRL_ENA;
 }
 
+/* XXX - do we need this for anything ?? */
 static void
 adc_pulse ( void )
 {
@@ -193,7 +189,7 @@ adc_pulse ( void )
 }
 
 static void
-adc_disable ( void )
+adc_stop ( void )
 {
 	struct adc *ap = ADC_BASE;
 
@@ -202,6 +198,9 @@ adc_disable ( void )
 
 /* Heaven knows what this really should be or how it should change
  * if we don't average 16 readings.
+ * XXX - I need to experiment with different delays along
+ * with seeing how fast this thing free-runs as currently set up.
+ * I currently set the 16 averaging.  How fast is it with other settings?
  */
 #define MAGIC_DELAY	152
 
@@ -240,35 +239,6 @@ setup_scan ( int num )
 	    step_enables |= 1<<(step+1);
 	}
 	// printf ( "Step enables = %08x\n", step_enables );
-}
-
-static void
-setup_scan_ORIG ( void )
-{
-	struct adc *ap = ADC_BASE;
-	int config;
-	int start, step, chan;
-	int num_chan = 9;
-
-	start = NUM_STEPS - num_chan;
-	step_enables = 0;
-
-	// printf ( "First config register at: %08x\n", &ap->steps[0].config );
-
-	/* it is entirely coincidence if chan and step index match here */
-	for ( chan=0; chan <= CHAN_VREF; chan++ ) {
-	    step = start + chan;
-	    config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
-	    // printf ( "Step %d = %08x\n", step, config );
-	    ap->steps[step].config = config;
-	    ap->steps[step].delay = MAGIC_DELAY;
-	    // printf ( "Step %d > %08x\n", step, ap->steps[step].config );
-	    step_enables |= 1<<(step+1);
-	}
-	printf ( "Step enables = %08x\n", step_enables );
-
-	// step_enables = 0x1ff << 1;
-	// ap->step_enable = step_enables;
 }
 
 static void
@@ -350,7 +320,15 @@ adc_read_fifo ( unsigned int *buf )
 	return rv;
 }
 
-/* Read a given channel once */
+/* ------------------------------------------- */
+/* ------------------------------------------- */
+/* A lot of what is above here is for test and
+ *  development and will get cleaned up (or deleted)
+ *   when I am finished with this driver
+ */
+/* ------------------------------------------- */
+
+/* Read a specified channel once */
 int
 adc_read ( int chan )
 {
@@ -366,6 +344,7 @@ adc_read ( int chan )
 	return ap->fifo0_data;
 }
 
+/* Read a range of channels once */
 void
 adc_scan ( int *buf, int num )
 {
@@ -408,14 +387,14 @@ test ( void )
 
 	/* VCC with 0.5 divider */
 	for ( i=0; i<5; i++ ) {
-	    data = adc_read ( 7 );
+	    data = adc_read ( CHAN_VCC );
 	    val = (2 * 180 * data) / 4095;
 	    printf ( " ADC vcc: %08x %d  %d\n", data, data, val );
 	}
 
 	/* reference */
 	for ( i=0; i<5; i++ ) {
-	    data = adc_read ( 8 );
+	    data = adc_read ( CHAN_VREF );
 	    val = (180 * data) / 4095;
 	    printf ( " ADC ref: %08x %d  %d\n", data, data, val );
 	}
@@ -430,36 +409,9 @@ adc_init ( void )
 	// printf ( "ADC revision = %08x\n", ap->rev );
 
 	ap->control |= CTRL_UNLOCK;
+	ap->control |= CTRL_ENA;
 
 	irq_hookup ( IRQ_ADC, adc_isr, 0 );
-
-	// setup_scan ();
-	adc_enable ();
-
-	// test ();
-
-#ifdef notdef
-	setup_single ( CHAN_VREF );
-	show_fifo ();
-	adc_enable ();
-	show_fifo ();
-
-	thr_delay ( 2 );
-	show_fifo ();
-
-	// adc_disable ();
-	// show_fifo ();
-	// printf ( "\n" );
-
-	watch_fifo ();
-#endif
-
-	/*
-	show_fifo ();
-	thr_delay ( 500 );
-	show_fifo ();
-	*/
-
 }
 
 /* Called from IO test menu */
