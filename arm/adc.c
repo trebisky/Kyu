@@ -91,12 +91,20 @@ struct adc {
 };
 
 /* bits in step registers */
+/* when the mode is "ONE", the step_enable bits get cleared
+ * after each step and the sequencer goes idle after they
+ * all end up cleared.  When the mode is CONT, the bits stay
+ * set and the sequencer will run forever, or even longer.
+ */
 
 #define	STEP_MODE_SW_ONE		0x00
 #define	STEP_MODE_SW_CONT		0x01
 #define	STEP_MODE_HW_ONE		0x02
 #define	STEP_MODE_HW_CONT		0x03
 
+/* I have only ever tried 16 so far ...
+ * It might go faster without averaging (almost surely).
+ */
 #define	STEP_AVG_1			0x00
 #define	STEP_AVG_2			0x04
 #define	STEP_AVG_4			0x08
@@ -104,30 +112,36 @@ struct adc {
 #define	STEP_AVG_16			0x10
 
 /* If we don't set this, results go to Fifo 0
- *  (which is fine by us).
+ *  (which suits me fine).
+ * Note that since this is set (or not) for each step,
+ * some data could be directed to one fifo, and some to the other.
  */
 #define STEP_FIFO1			0x04000000
 
-/* documentation numbers channels 1-8
- * VREF is "channel 9" and on.
+/* documentation labels the channels 1-8
+ * and calls VREF "channel 9" but we ignore all that
+ * and count from 0 like any good C programmer.
  */
 #define	STEP_CHAN(x)			((x)<<19)
 
-/* "real" channels are 0-7
- * and on the BBB channel 8 comes from a fixed 1.65 volt divider.
+/* "real" channels are 0-6
+ * and on the BBB channel 7 comes from a fixed 1.65 volt divider.
+ * channel 8 is the ADC system Vref, which has a bunch of bits in
+ * the step config register to allow it to be dorked with.
  */
 #define CHAN_VCC		7
 #define CHAN_VREF		8
 
 /* bits in the control register
- * We use ENA, and might use TAG
+ * We use ENA, and might use TAG someday.
+ * We learned the hard way that you better set UNLOCK.
  */
 #define CTRL_ENA		0x0001
 #define CTRL_TAG		0x0002
 #define CTRL_UNLOCK		0x0004
 #define CTRL_BIAS		0x0008
 #define CTRL_PWRDOWN		0x0010
-/* more bits here (I skip) for tsc control */
+/* bits here (that I skip) for tsc control */
 #define CTRL_TSCENA		0x0080
 #define CTRL_HWEVENT		0x0100
 #define CTRL_PREEMPT		0x0200
@@ -155,7 +169,7 @@ static unsigned int step_enables;
 #define HWT_TIMER7	4
 
 static void
-hw_trigger ( void )
+select_hw_trigger ( void )
 {
 	cm_adc_mux ( HWT_TIMER4 );
 }
@@ -226,6 +240,7 @@ setup_scan ( int num )
 
 	step_enables = 0;
 
+	// At 0x44E0D064, which is correct.
 	// printf ( "First config register at: %08x\n", &ap->steps[0].config );
 
 	/* it is entirely coincidence if chan and step index match here */
@@ -238,6 +253,7 @@ setup_scan ( int num )
 	    // printf ( "Step %d > %08x\n", step, ap->steps[step].config );
 	    step_enables |= 1<<(step+1);
 	}
+
 	// printf ( "Step enables = %08x\n", step_enables );
 }
 
@@ -407,6 +423,9 @@ adc_init ( void )
 
 	/* yields 0x47300001, which is correct */
 	// printf ( "ADC revision = %08x\n", ap->rev );
+
+	/* Not actually using this yet */
+	select_hw_trigger ();
 
 	ap->control |= CTRL_UNLOCK;
 	ap->control |= CTRL_ENA;
