@@ -35,9 +35,10 @@
 
 #define ADC_BASE      ( (struct adc *) 0x44E0D000 )
 
+#include <kyu.h>
 #include <kyulib.h>
 #include <interrupts.h>
-// #include <omap_mux.h>
+#include <thread.h>
 
 #define NUM_STEPS	16
 #define NUM_CHAN	8
@@ -156,7 +157,28 @@ struct adc {
 #define STAT_IDLE		0x10
 #define STAT_CHARGE		0x11
 
+/* Bits in the interrupt registers
+ */
+#define INT_PEN_AS		0x01
+#define INT_EOS			0x02
+#define INT_THR0		0x04
+#define INT_OR0			0x08
+#define INT_UF0			0x10
+#define INT_THR1		0x20
+#define INT_OR1			0x40
+#define INT_UF1			0x80
+#define INT_OOR			0x100
+#define INT_PENUP		0x200
+#define INT_PEN_SY		0x400
+
+/* ------------------------------ */
+
+extern struct thread *cur_thread;
+
 static unsigned int step_enables;
+static struct thread *waiting_thread;
+
+static void wait_idle ( void );
 
 /* ------------------------------ */
 /* ------------------------------ */
@@ -180,7 +202,15 @@ select_hw_trigger ( void )
 void
 adc_isr ( int xxx )
 {
-	printf ( "ADC interrupt\n" );
+	struct adc *ap = ADC_BASE;
+
+	// printf ( "ADC interrupt: %08x\n", ap->irqstat_raw );
+
+	/* Ack the interrupt */
+	ap->irqstat = INT_EOS;
+
+	if ( waiting_thread )
+	    thr_unblock ( waiting_thread );
 }
 
 
@@ -265,19 +295,6 @@ adc_trigger ( void )
 	ap->step_enable = step_enables;
 }
 
-/* This works, but perhaps it would be better to poll on the BUSY bit ?
- */
-static void
-wait_idle ( void )
-{
-	struct adc *ap = ADC_BASE;
-
-	while ( (ap->status & STAT_MASK) == STAT_IDLE )
-	    ;
-	while ( (ap->status & STAT_MASK) != STAT_IDLE )
-	    ;
-}
-
 static void
 show_data ( void )
 {
@@ -334,6 +351,34 @@ adc_read_fifo ( unsigned int *buf )
 	}
 
 	return rv;
+}
+
+/* wait for completion interrupt.
+ * the ADC is very fast.  We might as well just poll.
+ * We use thr_block/unblock as they are very light weight.
+ */
+static void
+wait_idle ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	waiting_thread = cur_thread;
+	ap->irqena_set = INT_EOS;
+
+	thr_block ( WAIT );
+}
+
+/* This works, but perhaps it would be better to poll on the BUSY bit ?
+ */
+static void
+wait_idle_poll ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	while ( (ap->status & STAT_MASK) == STAT_IDLE )
+	    ;
+	while ( (ap->status & STAT_MASK) != STAT_IDLE )
+	    ;
 }
 
 /* ------------------------------------------- */
@@ -426,6 +471,8 @@ adc_init ( void )
 
 	/* Not actually using this yet */
 	select_hw_trigger ();
+
+	waiting_thread = NULL;
 
 	ap->control |= CTRL_UNLOCK;
 	ap->control |= CTRL_ENA;
