@@ -103,9 +103,6 @@ struct adc {
 #define	STEP_MODE_HW_ONE		0x02
 #define	STEP_MODE_HW_CONT		0x03
 
-/* I have only ever tried 16 so far ...
- * It might go faster without averaging (almost surely).
- */
 #define	STEP_AVG_1			0x00
 #define	STEP_AVG_2			0x04
 #define	STEP_AVG_4			0x08
@@ -178,6 +175,11 @@ extern struct thread *cur_thread;
 static unsigned int step_enables;
 static struct thread *waiting_thread;
 
+#define MODE_SINGLE	1
+#define MODE_RUN	2
+
+static int adc_mode;
+
 static void wait_idle ( void );
 
 /* ------------------------------ */
@@ -199,13 +201,32 @@ select_hw_trigger ( void )
 /* ------------------------------ */
 /* ------------------------------ */
 
+static int data_count;
+
 void
 adc_isr ( int xxx )
 {
 	struct adc *ap = ADC_BASE;
+	int junk;
 
 	// printf ( "ADC interrupt: %08x\n", ap->irqstat_raw );
 
+	if ( adc_mode == MODE_RUN ) {
+	    while ( ap->fifo0_count > 0 ) {
+		junk = ap->fifo0_data;
+		++data_count;
+	    }
+	    /*
+	    if ( data_count > 1000 ) {
+		printf ( "ADC run finished\n" );
+		thr_unblock ( waiting_thread );
+	    }
+	    */
+	    ap->irqstat = INT_THR0;
+	    return;
+	}
+
+	/* MODE_SINGLE */
 	/* Ack the interrupt */
 	ap->irqstat = INT_EOS;
 
@@ -213,6 +234,15 @@ adc_isr ( int xxx )
 	    thr_unblock ( waiting_thread );
 }
 
+static void
+flush_fifo ( void )
+{
+	struct adc *ap = ADC_BASE;
+	int junk;
+
+	while ( ap->fifo0_count > 0 )
+	    junk = ap->fifo0_data;
+}
 
 static void
 adc_start ( void )
@@ -254,11 +284,23 @@ setup_single ( int chan )
 	struct adc *ap = ADC_BASE;
 
 	ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_ONE | STEP_CHAN(chan);
-	// ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
 	ap->steps[0].delay = MAGIC_DELAY;
 
 	step_enables = 1<<1;
 	// ap->step_enable = step_enables;
+}
+
+static void
+setup_run ( int chan )
+{
+	struct adc *ap = ADC_BASE;
+
+	ap->steps[0].config = STEP_AVG_16 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
+	// ap->steps[0].config = STEP_AVG_1 | STEP_MODE_SW_CONT | STEP_CHAN(chan);
+	// ap->steps[0].delay = MAGIC_DELAY;
+	ap->steps[0].delay = 0;
+
+	step_enables = 1<<1;
 }
 
 static void
@@ -396,6 +438,7 @@ adc_read ( int chan )
 	struct adc *ap = ADC_BASE;
 
 	setup_single ( chan );
+	adc_mode = MODE_SINGLE;
 	adc_trigger ();
 	wait_idle ();
 
@@ -403,6 +446,32 @@ adc_read ( int chan )
 	    return -1;
 
 	return ap->fifo0_data;
+}
+
+/* Read a single channel willy-nilly */
+void
+adc_run ( int chan )
+{
+	struct adc *ap = ADC_BASE;
+
+	data_count = 0;
+	adc_mode = MODE_RUN;
+	ap->fifo0_thresh = 20;
+	setup_run ( chan );
+	ap->irqena_set = INT_THR0;
+	adc_trigger ();
+
+#ifdef notdef
+	// wait_idle ();
+	waiting_thread = cur_thread;
+	// ap->irqena_set = INT_THR0;
+	thr_block ( WAIT );
+	ap->irqena_clr = INT_THR0;
+	ap->step_enable = 0;
+
+	printf ( "Run finished with %d points\n", data_count );
+	flush_fifo ();
+#endif
 }
 
 /* Read a range of channels once */
@@ -413,6 +482,7 @@ adc_scan ( int *buf, int num )
 	int i;
 
 	setup_scan ( num );
+	adc_mode = MODE_SINGLE;
 	adc_trigger ();
 	wait_idle ();
 
@@ -426,7 +496,7 @@ adc_scan ( int *buf, int num )
 }
 
 static void
-test ( void )
+test1 ( void )
 {
 	int i, j;
 	int data;
@@ -461,6 +531,70 @@ test ( void )
 	}
 }
 
+/* This is not entirely clean, we should maybe poll till idle */
+static void
+stop_run ( void )
+{
+	struct adc *ap = ADC_BASE;
+
+	ap->step_enable = 0;
+	ap->irqena_clr = INT_THR0;
+	flush_fifo ();
+}
+
+/* The following shows we get 61290 samples per second.
+ * This is with 16x averaging and the MAGIC_DELAY of 152.
+ * So this is a sample every 16.316 microseconds.
+ * So with 16x averaging, this means we sample every microsecond.
+ *
+ * Indeed, if we change to 1x averaging, we get 143858 samples,
+ * which is not 16x faster (but is every 6.95 microseconds).
+ *
+ * With 1x averaging, we get 143858 samples per second.
+ * With 2x averaging, we get 132000 samples per second.
+ * With 4x averaging, we get 113322 samples per second.
+ * With 8x averaging, we get 88326 samples per second.
+ * With 16x averaging, we get 61290 samples per second.
+ *
+ * The TRM says that the ADC gets a 24 Mhz master clock and
+ * that it can sample as fast as every 15 clock cycles.
+ * The 3359 datasheet says it can sample at 200 Khz
+ * I don't know how to reconcile these two statements.
+ *
+ * When I set the MAGIC_DELAY to 0 and use 1x averaging,
+ *  I get 1601670 samples per second.
+ * This is 0.624 microseconds per sample.
+ * Note that 15/24 is 0.625 microseconds,
+ * so this is exactly as it should be!
+ * Just what the data looks like, who can say.
+ *
+ * With Delay = 0 and Avg = 16,
+ *  I get 100107 samples per second.
+ *  Note that 0.625 * 16 = 10, so this is correct.
+ */
+
+static void
+test2 ( void )
+{
+	int i;
+	int count;
+	int last;
+
+	adc_run ( 0 );
+	last = data_count;
+	printf ( "Data count: %d\n", last );
+
+
+	for ( i=0; i<8; i++ ) {
+	    thr_delay ( 1000 );
+	    count = data_count;
+	    printf ( "Data count: %d\n", count-last );
+	    last = count;
+	}
+
+	stop_run ();
+}
+
 void
 adc_init ( void )
 {
@@ -484,7 +618,8 @@ adc_init ( void )
 void
 adc_test ( void )
 {
-	test ();
+	// test1 ();
+	test2 ();
 }
 
 /* THE END */
