@@ -27,6 +27,10 @@ OBJS =  machine.o net.o \
 
 all: install dump sym tags
 
+ver:
+	@echo $(GCCVERSION)
+	@echo $(ABI)
+
 dump: kyu.dump
 
 sym: kyu.sym

@@ -18,7 +18,7 @@
 #include "thread.h"
 #include <stdarg.h>
 
-#include "omap_ints.h"
+#include "interrupts.h"
 
 extern struct thread *cur_thread;
 

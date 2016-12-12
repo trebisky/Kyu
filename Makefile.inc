@@ -2,7 +2,16 @@
 # 
 # These are the common definitions for building on the ARM processor
 #
-# Tom Trebisky  5-18-2015
+# Tom Trebisky  5-18-2015  12-12-2016
+
+CCX = arm-linux-gnu-gcc
+
+# For a long time it was an issue to keep stdarg.h in sync
+#  with the compiler.  Then I realized it was best to just let
+#  the build system find it in the "usual spot", but the usual
+#  spot changed with each compiler version update.
+#  Then I realized I could just ask the compiler for its
+#  version number
 
 # Note that I copied stdarg.h from here.
 # I probably should arange so the compiler looks
@@ -15,7 +24,9 @@
 #GCCVERSION = 5.3.1
 # As of 8-30-2016 (Fedora 24)
 # As of 9-17-2016 (Fedora 24)
-GCCVERSION = 6.1.1
+#GCCVERSION = 6.1.1
+
+GCCVERSION = `$(CCX) -dumpversion`
 
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
@@ -43,7 +54,6 @@ OPT = -fno-omit-frame-pointer
 #OPT = -Os
 #OPT =
 
-CCX = arm-linux-gnu-gcc
 #COPTS = -DKYU -nostdinc -fno-builtin -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc -fno-builtin -Os -marm -march=armv7-a -msoft-float $(INCS)
 #COPTS = -DKYU -nostdinc $(NOB) -Os -marm -march=armv7-a -msoft-float $(INCS)

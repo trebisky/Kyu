@@ -53,6 +53,8 @@ void net_show ( void );
 static void net_handle ( struct netbuf * );
 void net_addr_get ( char * );
 
+static void init_ephem_port ( void );
+
 struct netbuf * netbuf_alloc ( void );
 struct netbuf * netbuf_alloc_i ( void );
 
@@ -141,6 +143,7 @@ host_info_init ( void )
 {
 	/* This will panic unless we are in NET_RUN */
 	net_addr_get ( host_info.our_mac );
+	init_ephem_port ();
 
 	(void) net_dots ( "192.168.0.11", &host_info.my_ip );
 	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
@@ -740,8 +743,17 @@ ether2str ( unsigned char *bytes )
  * I just cycle through these numbers without
  * worrying about conflicts.
  */
+static int next_ephem;
 
-static int next_ephem = 49152;
+static void
+init_ephem_port ( void )
+{
+	int seed;
+
+	seed = (host_info.our_mac[4] << 8) + host_info.our_mac[5];
+	// printf ( "Ephem port seed: %d\n", seed );
+	next_ephem = 49152 + seed % 16384;
+}
 
 int
 get_ephem_port ( void )
