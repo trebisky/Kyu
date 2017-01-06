@@ -30,4 +30,10 @@ end
 system "rm -f board"
 system "ln -s #{target} board"
 
+system "rm -f Makefile"
+system "ln -s configs/Makefile.#{target} Makefile"
+
+system "rm -f kyu.lds"
+system "ln -s configs/#{target}.lds kyu.lds"
+
 puts "Ready for " + target
