@@ -1,0 +1,33 @@
+#!/bin/ruby
+
+# This is the config script for Kyu.
+#
+#  Tom Trebisky  1-6-2017
+#
+
+$targets = %w( bbb orange_pi )
+
+def usage
+    puts "Pick one of the following:"
+    $targets.each { |t|
+	puts "     " + t
+    }
+end
+
+if ARGV.size != 1
+    usage
+    exit
+end
+
+target = ARGV[0]
+
+unless $targets.include? target
+    puts "I don't recognize that target"
+    usage
+    exit
+end
+
+system "rm -f board"
+system "ln -s #{target} board"
+
+puts "Ready for " + target
