@@ -3,7 +3,8 @@
 # Tom Trebisky  4-15-2015
 
 # Here is where you set the Kyu version number.
-VERSION = 0.7.0
+# 0.7.1 introduces Orange Pi
+VERSION = 0.7.1
 
 INCS = -I. -Iarm
 
