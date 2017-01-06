@@ -17,6 +17,8 @@
 #include "thread.h"
 #include "malloc.h"
 
+#include "board/board.h"
+
 /* ------------- */
 
 #define SYM_SIZE       200000

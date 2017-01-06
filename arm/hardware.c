@@ -15,7 +15,7 @@
 
 #include "kyu.h"
 #include "kyulib.h"
-#include "hardware.h"
+#include "board/board.h"
 
 #ifdef ARCH_ARM
 /* Remember the BBB is an ARM Cortex-A8, the cycle count

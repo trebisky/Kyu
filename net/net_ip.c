@@ -16,7 +16,7 @@
 
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 extern struct host_info host_info;
 

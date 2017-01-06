@@ -17,7 +17,7 @@
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 /* XXX - Still not fully complete.
  * For example it fails to resolve pre.ai.mit.edu

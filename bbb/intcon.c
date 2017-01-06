@@ -13,7 +13,7 @@
  * 
  */
 #include "kyulib.h"
-#include "interrupts.h"
+#include "omap_ints.h"
 
 #define INTCON_BASE      0x48200000
 

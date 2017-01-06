@@ -18,7 +18,7 @@
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 /* Priority at which connection threads are launched */
 /* XXX - at this time the test thread does NOT use

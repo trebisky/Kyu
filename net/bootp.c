@@ -19,7 +19,7 @@
 #include "kyulib.h"
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 #include "dhcp.h"
 

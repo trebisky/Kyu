@@ -6,25 +6,24 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  */
-/* hardware.h
- * T. Trebisky  5/26/2015
+/* hardware.h for the ARM
+ *
+ * T. Trebisky  1/7/2017
  */
 
-#ifdef ARCH_ARM
-#define THR_STACK_BASE	0x98000000
-#define THR_STACK_LIMIT	4096 * 128
+/* List of fault codes */
+/* The first 8 are ARM hardware exceptions and interrupts */
 
-/*
-#define EVIL_STACK_BASE 0x9a000000
-*/
+#define F_NONE	0
+#define F_UNDEF	1
+#define F_SWI	2
+#define F_PABT	3
+#define F_DABT	4
+#define F_NU	5
+#define F_FIQ	6	/* not a fault */
+#define F_IRQ	7	/* not a fault */
 
-#define MALLOC_BASE	0x90000000
-#define MALLOC_SIZE	4 * 1024 * 1024
-#endif
-
-#ifdef ARCH_X86
-#define THR_STACK_BASE	0x70000
-#define THR_STACK_LIMIT	4096 * 32 /* (0x20000) */
-#endif
+#define F_DIVZ	8	/* pseudo for linux library */
+#define F_PANIC	9	/* pseudo for Kyu, user panic */
 
 /* THE END */

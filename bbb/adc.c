@@ -37,7 +37,7 @@
 
 #include <kyu.h>
 #include <kyulib.h>
-#include <interrupts.h>
+#include <omap_ints.h>
 #include <thread.h>
 
 #define NUM_STEPS	16

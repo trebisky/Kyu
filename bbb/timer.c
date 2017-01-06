@@ -18,7 +18,7 @@
 #include <kyulib.h>
 #include <thread.h>
 
-#include <interrupts.h>
+#include <omap_ints.h>
 #include <cpu.h>
 
 void prcm_timer1_mux ( void );

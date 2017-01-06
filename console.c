@@ -18,7 +18,7 @@
 #include "thread.h"
 #include <stdarg.h>
 
-#include "interrupts.h"
+// #include "interrupts.h"
 
 extern struct thread *cur_thread;
 

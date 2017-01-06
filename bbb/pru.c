@@ -23,7 +23,7 @@
  * linux-3.8.13/kernel/drivers/uio/uio_pruss.c
  * linux-3.8.13/kernel/include/linux/platform_data/uio_pruss.h
  */
-#include "interrupts.h"
+#include "omap_ints.h"
 
 /* This is PRU INTC stuff */
 /* Someday will move to pru_int.c (maybe) */

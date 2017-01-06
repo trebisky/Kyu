@@ -5,13 +5,31 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* cpu.h
+ *
+ *
+ * cpu.h for the ARM
  *
  * Macros and definitions for the ARM processor
  *
  *  Kyu project  5-18-2015  Tom Trebisky
+ *     Tom Trebisky  1/7/2017
  */
+
+/* List of fault codes */
+/* The first 8 are ARM hardware exceptions and interrupts */
+
+#define F_NONE	0
+#define F_UNDEF	1
+#define F_SWI	2
+#define F_PABT	3
+#define F_DABT	4
+#define F_NU	5
+#define F_FIQ	6	/* not a fault */
+#define F_IRQ	7	/* not a fault */
+
+#define F_DIVZ	8	/* pseudo for linux library */
+#define F_PANIC	9	/* pseudo for Kyu, user panic */
+
 
 /* restore prior interrupt status */
 static inline void splx ( int arg )

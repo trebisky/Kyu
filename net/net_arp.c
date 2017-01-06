@@ -30,7 +30,7 @@
 
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 #define ARP_SIZE	28
 #define ARP_MIN		60

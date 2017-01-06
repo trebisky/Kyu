@@ -11,14 +11,13 @@ include Makefile.inc
 
 # This is clean with no dependencies
 #    linux/linux-mm.o \
+# from below
+#    linux/linux-lib.o
 
 # For now, machine.o must come first since U-boot simply branches
 # to 80300000 to start this running.
 
-# from below
-#    linux/linux-lib.o
-
-OBJS =  machine.o net.o \
+OBJS =  machine.o board.o net.o \
     main.o version.o user.o tests.o \
     console.o thread.o prf.o \
     symbols.o \
@@ -44,6 +43,7 @@ tags:
 
 machine.o:	bogus
 	cd arm ; make
+	cd board ; make
 	cd net ; make
 	cd lib ; make
 #	cd linux ; make

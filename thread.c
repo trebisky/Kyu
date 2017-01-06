@@ -15,8 +15,8 @@
 #include "kyulib.h"
 #include "thread.h"
 
-#include "hardware.h"
-#include "cpu.h"
+#include "board/board.h"
+#include "arch/cpu.h"
 
 /* XXX - still doesn't work (w/ yield).
 #define SORT_PRI

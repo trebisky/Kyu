@@ -18,7 +18,7 @@
 
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 /* 8 bytes */
 struct udp_hdr {

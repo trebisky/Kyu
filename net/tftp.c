@@ -15,7 +15,7 @@
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 #define TFTP_PORT	69
 #define TFTP_SERVER	"192.168.0.5"

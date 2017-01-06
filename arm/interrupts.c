@@ -14,8 +14,8 @@
 #include <kyulib.h>
 #include <thread.h>
 
-#include "hardware.h"
-#include "interrupts.h"
+#include "cpu.h"
+#include "board/board.h"
 
 extern struct thread *cur_thread;
 

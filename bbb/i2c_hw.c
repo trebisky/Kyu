@@ -55,7 +55,7 @@
 
 #include "kyu.h"
 #include "thread.h"
-#include "interrupts.h"
+#include "omap_ints.h"
 
 #define I2C0_BASE      0x44E0B000
 #define I2C1_BASE      0x4802A000

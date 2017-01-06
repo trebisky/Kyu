@@ -16,7 +16,7 @@
 
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 /* bit fields work on little endian */
 struct icmp_hdr {

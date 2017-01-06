@@ -13,7 +13,7 @@
 #include <kyulib.h>
 #include <thread.h>
 
-#include <interrupts.h>
+#include <omap_ints.h>
 #include <cpu.h>
 
 #define DMA_BASE      0x49000000

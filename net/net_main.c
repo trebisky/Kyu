@@ -19,15 +19,12 @@
  * Use netbuf fully and properly.
  */
 
-/*
-#include "intel.h"
-*/
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
 #include "net.h"
 #include "netbuf.h"
-#include "cpu.h"
+#include "arch/cpu.h"
 
 #ifdef notdef
 unsigned long agate_ip = 0x0100000a;	/* agate: 10.0.0.1 */
