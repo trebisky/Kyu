@@ -1,0 +1,100 @@
+# Makefile for Kyu on the ARM processor
+#
+# Tom Trebisky  4-15-2015
+
+# Here is where you set the Kyu version number.
+# 0.7.1 introduces Orange Pi
+VERSION = 0.7.1
+
+INCS = -I. -Iarm
+
+include Makefile.inc
+
+# This is clean with no dependencies
+#    linux/linux-mm.o \
+# from below
+#    linux/linux-lib.o
+
+# For now, machine.o must come first since U-boot simply branches
+# to 80300000 to start this running.
+
+OBJS =  machine.o board.o net.o \
+    main.o version.o user.o tests.o \
+    console.o thread.o prf.o \
+    symbols.o \
+    dlmalloc.o random.o \
+    kyulib.o lib.o
+
+all: install dump sym tags
+
+ver:
+	@echo $(GCCVERSION)
+	@echo $(ABI)
+
+dump: kyu.dump
+
+sym: kyu.sym
+
+term:
+	picocom -b 115200 /dev/ttyUSB0
+
+.PHONY:	tags
+tags:
+	ctags -R
+
+machine.o:	bogus
+	cd arm ; make
+	cd board ; make
+	cd net ; make
+	cd lib ; make
+#	cd linux ; make
+
+bogus:
+
+dlmalloc.o:	malloc.h
+
+thread.e:	thread.c
+	$(CC) -E thread.c -o thread.e
+
+# This is a weird make idiom to cause this to be rebuilt every time.
+FORCE:
+
+version.c:	FORCE
+	rm -f version.c
+	./mkversion -ikyu_version -v$(VERSION) >version.c
+
+#.PHONY: subdirs $(SUBDIRS)
+#
+#subdirs: $(SUBDIRS)
+#
+#$(SUBDIRS):
+#	$(MAKE) -C $@
+
+install: kyu.bin kyu.sym
+	cp kyu.bin /var/lib/tftpboot/orange.bin
+	cp kyu.sym /var/lib/tftpboot/kyu.sym
+
+kyu.dump:	kyu
+	$(DUMP) kyu >kyu.dump
+
+kyu.sym:	kyu
+	$(NM) kyu >kyu.sym
+
+help:
+	$(CC) --help=optimizers
+
+kyu:	kyu.lds
+
+kyu: $(OBJS)
+	$(LD) -g -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+
+kyu.bin: kyu
+	$(BIN) kyu kyu.bin
+
+clean:
+	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.sym
+	rm -f tags
+	cd arm ; make clean
+	cd net ; make clean
+	cd lib ; make clean
+#	cd linux ; make clean
