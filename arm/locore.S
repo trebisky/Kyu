@@ -36,7 +36,7 @@
 uboot_startup:
 	.globl kyu_startup
 kyu_startup:
-	mrs	r0, cpsr	/* disable interrupts */
+	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
 

@@ -1,0 +1,42 @@
+This is a proposed schema for supporting a multitude of boards (and perhaps architectures)
+under the same source tree.  This would involve a reorganization of files, with the major
+benefit being that when board independent enhancements were made, it would be easy to
+simply rebuild all targets to pull in the changes.  The alternative is a separate source
+tree (and kyu project) for every target and merging changes by hand.
+
+boards and targets -- 
+
+I use these terms interchangeably, but the file schema uses board exclusively
+
+board and arch ... and config -- 
+
+The case motivating this is a second ARM target.  We have the BBB, but are adding
+the Orange Pi.  What we would like to do someday is to type "config bbb; make"
+and get the build for a given board target.   This would require a config script
+and a config directory holding Makefiles and perhaps scripts like "config_bbb"
+for each target.  The Makefiles could be handled via symbolic links, as could
+many other things.
+
+I plan to avoid adding drivers and include directories, at least for the
+first run.  Where do we put directories with board files?  For starters
+I plan to just leave them hanging off the main directory as bbb and orange_pi.
+
+What about x86?  I am simply going to procrastinate for now and leave all of
+this in the x86 directory.   Ultimately we need board directories like
+"pc_x86" and "galileo".  Maybe pc_legacy for the old skidoo target with lots
+of ISA stuff (maybe pc_isa).  But for now we ignore all this and issue the
+disclaimer that all x86 target builds are broken at this time.
+
+arch and board.
+
+arch is a link to either arm or x86
+board is a link to either bbb or orange_pi
+
+There should be no direct references to anything other than arch or board.
+
+The make process will produce machine.o from "arch"
+and board.o from "board".
+
+We could someday move all of the arch independent stuff from the root
+directory to "common" or "core" (I like common myself).
+

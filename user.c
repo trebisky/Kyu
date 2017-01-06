@@ -57,8 +57,18 @@ void
 toms_debug ( void )
 {
 	unsigned long *mmubase;
+	unsigned long esp;
 
 	// show_bogus_timer ();
+
+	/* We know this works */
+	esp = get_sp();
+	printf ( " SP = %08x\n", esp );
+
+	/* and so does this !! */
+	esp = 0xBADBAD;
+	asm volatile ("add %0, sp, #0\n" :"=r"(esp));
+	printf ( " SP = %08x\n", esp );
 
 	printf ( "SCTRL = %08x\n", get_sctrl() );
 
