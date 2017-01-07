@@ -1,3 +1,6 @@
+#ifndef _BOARD_H
+#define _BOARD_H
+
 /*
  * Copyright (C) 2017  Tom Trebisky  <tom@mmto.org>
  *
@@ -5,9 +8,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-
-/* board.h for the Orange Pi PC
+ *
+ * board.h for the Orange Pi PC
+ *
  *  Kyu project  1-6-2017  Tom Trebisky
  *
  */
@@ -31,4 +34,11 @@
 #define BOARD_RAM_END	0x7FFFFFFF
 #define BOARD_RAM_ENDP	0x80000000
 
+#define CONSOLE_BAUD		115200
+
+#define INITIAL_CONSOLE		SERIAL
+
+#define DEFAULT_TIMER_RATE	1000
+
 /* THE END */
+#endif /* _BOARD_H */

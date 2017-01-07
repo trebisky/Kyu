@@ -42,20 +42,6 @@
 
 #include "board/board.h"
 
-/* define this even if not using serial console.
-#define CONSOLE_BAUD		38400
- */
-#define CONSOLE_BAUD		115200
-
-/*
-#define INITIAL_CONSOLE		VGA
-#define INITIAL_CONSOLE		SIO_0
-*/
-#define INITIAL_CONSOLE		SERIAL
-
-/* This lets udelay work right */
-#define DEFAULT_TIMER_RATE	1000
-
 /* XXX there should be a better place for all this ..
  * maybe types.h ?
  */

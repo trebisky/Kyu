@@ -1,3 +1,6 @@
+#ifndef _BOARD_H
+#define _BOARD_H
+
 /*
  * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
  *
@@ -35,4 +38,11 @@
 #define BOARD_RAM_END	0x9FFFFFFF
 #define BOARD_RAM_ENDP	0xA0000000
 
+#define CONSOLE_BAUD		115200
+
+#define INITIAL_CONSOLE		SERIAL
+
+#define DEFAULT_TIMER_RATE	1000
+
 /* THE END */
+#endif /* _BOARD_H */
