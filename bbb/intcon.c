@@ -124,8 +124,11 @@ intcon_irqwho ( void )
 #define IRQ_ACK		1
 #define FIQ_ACK		2
 
+/* The omap does not need the interrupt number, but other
+ * interrupt controllers do.
+ */
 int
-intcon_irqack ( void )
+intcon_irqack ( int who )
 {
 	struct intcon *base = (struct intcon *) INTCON_BASE;
 

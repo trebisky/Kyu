@@ -1,1 +1,1 @@
-configs/Makefile.bbb
+configs/Makefile.orange_pi

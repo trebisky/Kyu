@@ -5,8 +5,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* kyu.h
+ *
+ * kyu.h
+ *
  * Parameters and definitions specific to Kyu
  *
  *	Tom Trebisky  11/25/2001
@@ -26,11 +27,6 @@
 #define STACK_SIZE	4096	/* bytes */
 
 /*
-#define	ARCH_X86
-*/
-#define	ARCH_ARM
-
-/*
 #define WANT_DELAY
 #define WANT_PCI
 #define WANT_NET
@@ -41,6 +37,10 @@
 #define WANT_NET
 #define WANT_USER
 #define WANT_SHELL
+
+/* XXX most of the following should migrate to board.h */
+
+#include "board/board.h"
 
 /* define this even if not using serial console.
 #define CONSOLE_BAUD		38400

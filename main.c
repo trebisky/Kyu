@@ -123,6 +123,7 @@ sys_init ( int xxx )
 
 	console_init ();
 	hardware_init ();
+	board_init ();
 
 	/* enable interrupts */
 	cpu_leave ();
@@ -159,7 +160,10 @@ sys_init ( int xxx )
 	shell_init ();
 #endif
 
-	hardware_init_net ();
+	/* allow initialization of things that
+	 * require the network to be alive.
+	 */
+	board_init_net ();
 
 #ifdef notyet
 	init_pcmcia_ds ();

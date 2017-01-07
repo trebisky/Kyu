@@ -5,11 +5,15 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* board.h for the BBB
+ *
+ * board.h for the BBB
+ *
  *  Kyu project  1-6-2017  Tom Trebisky
  *
  */
+
+#define BOARD_BBB
+#define ARCH_ARM
 
 /* The am3359 defines 128 interrupts.
  *
@@ -27,11 +31,8 @@
 #define MALLOC_BASE	0x90000000
 #define MALLOC_SIZE	4 * 1024 * 1024
 
-/* THE END */
-
-#ifdef ARCH_X86
-#define THR_STACK_BASE	0x70000
-#define THR_STACK_LIMIT	4096 * 32 /* (0x20000) */
-#endif
+#define BOARD_RAM_START	0x80000000
+#define BOARD_RAM_END	0x9FFFFFFF
+#define BOARD_RAM_ENDP	0xA0000000
 
 /* THE END */

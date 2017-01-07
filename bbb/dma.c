@@ -14,7 +14,7 @@
 #include <thread.h>
 
 #include <omap_ints.h>
-#include <cpu.h>
+// #include <cpu.h>
 
 #define DMA_BASE      0x49000000
 #define DMA_0_BASE    0x49800000

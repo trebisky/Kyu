@@ -134,31 +134,36 @@ struct test std_test_list[] = {
  */
 static void test_sort ( int );
 static void test_ran ( int );
-static void test_blink ( int );
-static void test_gpio ( int );
-static void test_adc ( int );
 static void test_malloc ( int );
 static void test_wait ( int );
 static void test_unroll ( int );
 static void test_fault ( int );
-static void test_fault2 ( int );
 static void test_zdiv ( int );
+
+#ifdef BOARD_BBB
+static void test_blink ( int );
+static void test_gpio ( int );
+static void test_adc ( int );
+static void test_fault2 ( int );
+#endif
 
 /* Here is the IO test menu */
 
 struct test io_test_list[] = {
 	test_sort,	"Thread sort test",	5,
 	test_ran,	"Random test",		0,
-	test_blink,	"BBB blink test",	0,
-	test_blink,	"stop BBB blink test",	1,
-	test_gpio,	"BBB gpio test",	0,
 	test_malloc,	"malloc test",		0,
 	test_wait,	"wait for 5 seconds",	0,
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
-	test_fault2,	"data abort probe",	0,
 	test_zdiv,	"Zero divide test",	0,
+#ifdef BOARD_BBB
+	test_blink,	"BBB blink test",	0,
+	test_blink,	"stop BBB blink test",	1,
+	test_gpio,	"BBB gpio test",	0,
 	test_adc,	"BBB adc test",		0,
+	test_fault2,	"data abort probe",	0,
+#endif
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2146,6 +2151,18 @@ test_fault ( int xxx )
 	junk = *p;
 }
 
+static void
+test_zdiv ( int xxx )
+{
+	volatile int a = 1;
+	int b = 0;
+
+	printf ("Lets try a divide by zero ...\n");
+	a = a / b;
+	printf ("... All done!\n");
+}
+
+#ifdef BOARD_BBB
 /* Use data abort to poke at some fishy addresses on the BBB */
 
 static void
@@ -2185,20 +2202,11 @@ test_fault2 ( int xxx )
 	prober ( (unsigned int) (p + 1) );
 	prober ( (unsigned int) (p + 2) );
 }
-
-static void
-test_zdiv ( int xxx )
-{
-	volatile int a = 1;
-	int b = 0;
-
-	printf ("Lets try a divide by zero ...\n");
-	a = a / b;
-	printf ("... All done!\n");
-}
+#endif
 
 /* -------------------------------------------- */
 
+#ifdef BOARD_BBB
 /* BBB blink test - also a good test of
  * mixing repeats and delays
  */
@@ -2237,14 +2245,17 @@ test_blink ( int arg )
 	else
 	    stop_bbb_blink ();
 }
+#endif
 
 /* -------------------------------------------- */
 
+#ifdef BOARD_BBB
 /* Test gpio on BBB */
 static void test_gpio ( int count ) { gpio_test (); }
 
 /* Test adc on BBB */
 static void test_adc ( int count ) { adc_test (); }
+#endif
 
 #ifdef ARCH_X86
 /* -------------------------------------------- */

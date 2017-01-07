@@ -58,7 +58,8 @@ struct netbuf * netbuf_alloc_i ( void );
 static int num_ee = 0;
 static int num_rtl = 0;
 static int num_el3 = 0;
-static int num_cpsw = 0;
+
+static int num_net = 0;
 
 static int num_eth = 0;
 
@@ -109,10 +110,10 @@ net_hw_init ( int bogus )
     num_eth += num_el3;
 #endif
 
-    num_cpsw = cpsw_init ();
-    num_eth += num_cpsw;
+    num_net = board_net_init ();
+    num_eth += num_net;
 
-    cpsw_activate ();
+    board_net_activate ();
 
 #ifdef ARCH_X86
     /* XXX - need cleaner way to set these
@@ -473,7 +474,8 @@ net_show ( void )
 	if ( num_ee ) ee_show ();
 	if ( num_rtl ) rtl_show ();
 #endif
-	if ( num_cpsw ) cpsw_show ();
+
+	if ( num_net ) board_net_show ();
 
 	netbuf_show ();
 	arp_show ();
@@ -528,7 +530,7 @@ net_send ( struct netbuf *nbp )
     /*
     printf ("Sending packet\n" );
     */
-    cpsw_send ( nbp );
+    board_net_send ( nbp );
 
     /* XXX - Someday we may have a transmit queue
      * so we must remain free to dispose the netbuf.
@@ -553,7 +555,7 @@ net_addr_get ( char *buf )
     else
 	get_ee_addr ( buf );
 #endif
-	get_cpsw_addr ( buf );
+	get_board_net_addr ( buf );
 }
 
 /* ----------------------------------------- */

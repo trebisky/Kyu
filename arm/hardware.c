@@ -5,21 +5,23 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* hardware.c
- * Tom Trebisky  5/5/2015
  *
- * Each architecture should someday have its own
- * version of this, for now we use ifdefs
+ * arm/hardware.c
+ *
+ * Tom Trebisky  5/5/2015
+ * Tom Trebisky  1/6/2017
+ *
+ * Each architecture should have its own version of this.
  */
 
 #include "kyu.h"
 #include "kyulib.h"
 #include "board/board.h"
 
-#ifdef ARCH_ARM
 /* Remember the BBB is an ARM Cortex-A8, the cycle count
  * registers on other ARM variants have different addresses.
+ * (They are the same on the Cortex-A7 in the Allwinner H3).
+ *
  * All of this ARM cycle count stuff is supported by code
  * in locore.S (we could use inline assembly, but we don't.)
  * The counter runs at the full CPU clock rate (1 Ghz),
@@ -92,7 +94,6 @@ delay_ns ( int delay )
 	while ( get_ccnt() < delay )
 	    ;
 }
-#endif
 
 /* We are curious as to just what the state of things
  * is as handed to us by U-boot.
@@ -121,60 +122,17 @@ hardware_init ( void )
 {
 	mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
-#ifdef ARCH_ARM
-	wdt_disable ();
-
 	enable_ccnt ( 0 );
 
-	clocks_init ();
-	modules_init ();
-
-	mux_init ();
-	intcon_init ();
-	cm_init ();
-
-	serial_init ( CONSOLE_BAUD );
-	timer_init ( DEFAULT_TIMER_RATE );
-
 	mmu_status ();
-
-	/* CPU interrupts on */
-	enable_irq ();
-
-	dma_init ();
-	gpio_init ();
-	i2c_init ();
-
-	adc_init ();
-#endif
-
-#ifdef ARCH_X86
-	/* Must call trap_init() first */
-	trap_init ();
-	timer_init ();
-	/* timer_init ( DEFAULT_TIMER_RATE ); */
-	kb_init ();
-	sio_init ();
-#endif
 }
-
-/* This gets called after the network is alive and well */
-void
-hardware_init_net ( void )
-{
-	pru_init ();
-}
-
-#define BBB_RAM_START	0x80000000
-#define BBB_RAM_END	0x9FFFFFFF
-#define BBB_RAM_ENDP	0xA0000000
 
 int
 valid_ram_address ( unsigned long addr )
 {
-	if ( addr < BBB_RAM_START )
+	if ( addr < BOARD_RAM_START )
 	    return 0;
-	if ( addr > BBB_RAM_END )
+	if ( addr > BOARD_RAM_END )
 	    return 0;
 	return 1;
 }

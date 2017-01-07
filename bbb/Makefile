@@ -7,11 +7,13 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
-OBJS =  intcon.o \
+OBJS =  board_bbb.o \
+	intcon.o \
 	gpio.o mux.o \
 	timer.o wdt.o dma.o \
 	cm.o prcm.o \
 	i2c.o i2c_hw.o iic.o i2c_demos.o \
+	serial.o \
 	if_cpsw.o \
 	spi.o pru.o adc.o
 

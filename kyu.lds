@@ -1,1 +1,1 @@
-configs/bbb.lds
+configs/orange_pi.lds

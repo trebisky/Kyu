@@ -259,7 +259,7 @@ void do_irq ( void )
 	 */
 	(irq_table[nint].func)( irq_table[nint].arg );
 
-	intcon_irqack ();
+	intcon_irqack ( nint );
 
 	/* Tell Kyu thread system we are done with an interrupt */
 	finish_interrupt ();
