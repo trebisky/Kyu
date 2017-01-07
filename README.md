@@ -1,6 +1,9 @@
 Kyu project  October 5, 2016
 
-Kyu is a real time operating system for the BBB (Beaglebone Black).
+Kyu is a real time operating system for:
+
+1. the BBB (Beaglebone Black).
+2. the Orange Pi PC (H3 based board)
 
 Eventually there will be more documentation here:
 
