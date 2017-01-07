@@ -27,13 +27,62 @@ board_init ( void )
 
 	/* CPU interrupts on */
 	enable_irq ();
-
 }
 
 /* This gets called after the network is alive and well */
 void
-board_init_net ( void )
+board_after_net ( void )
 {
+}
+
+/* The rest of this is network interface stuff */
+
+static int num_ee = 0;
+static int num_rtl = 0;
+// static int num_el3 = 0;
+
+/* XXX - trouble if we have more than one network interface */
+int
+board_net_init ( void )
+{
+	int rv = 0;
+
+	num_ee = ee_init ();
+	rv += num_ee;
+
+	num_rtl = rtl_init ();
+	rv += num_rtl;
+
+	// num_el3 = el3_init ();
+	// rv += num_el3;
+}
+
+void
+board_net_activate ( void )
+{
+	if ( num_rtl ) rtl_activate ();
+	if ( num_ee ) ee_activate ();
+}
+
+void
+board_net_show ( void )
+{
+	if ( num_ee ) ee_show ();
+	if ( num_rtl ) rtl_show ();
+}
+
+void
+get_board_net_addr ( char *addr )
+{
+	if ( num_ee ) get_ee_addr ( buf );
+	if ( num_rtl ) get_rtl_addr ( buf );
+}
+
+void
+board_net_send ( struct netbuf *nbp )
+{
+	if ( num_ee ) ee_send ( nbp );
+	if ( num_rtl ) rtl_send ( nbp );
 }
 
 /* THE END */

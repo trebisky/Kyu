@@ -55,21 +55,13 @@ static void init_ephem_port ( void );
 struct netbuf * netbuf_alloc ( void );
 struct netbuf * netbuf_alloc_i ( void );
 
-static int num_ee = 0;
-static int num_rtl = 0;
-static int num_el3 = 0;
-
-static int num_net = 0;
-
 static int num_eth = 0;
-
-static int use_rtl = 0;
 
 #define NET_IDLE	0
 #define NET_INIT	1
 #define NET_RUN		2
 
-static int net_state = NET_IDLE;
+static int net_state;
 
 struct host_info host_info;
 
@@ -100,33 +92,20 @@ net_debug_arm ( void )
 void
 net_hw_init ( int bogus )
 {
-
-#ifdef ARCH_X86
-    num_ee = ee_init ();
-    num_eth += num_ee;
-    num_rtl = rtl_init ();
-    num_eth += num_rtl;
-    num_el3 = el3_init ();
-    num_eth += num_el3;
-#endif
-
-    num_net = board_net_init ();
-    num_eth += num_net;
-
+    num_eth = board_net_init ();
     board_net_activate ();
 
-#ifdef ARCH_X86
-    /* XXX - need cleaner way to set these
-     */
-    if ( num_rtl > 0 ) {
-	rtl_activate ();
-	use_rtl = 1;
-    } else {
-	ee_activate ();
-    }
-#endif
+    if ( num_eth > 0 )
+	net_state = NET_RUN;
+}
 
-    net_state = NET_RUN;
+/* Let other people discover if network is running */
+int
+net_running ( void )
+{
+    if ( net_state == NET_RUN )
+	return 1;
+    return 0;
 }
 
 /* This is as good a place as any to talk a bit about byte order.
@@ -235,6 +214,7 @@ net_init ( void )
      * XXX - This went away when we rewrote it and we could do away
      *  now with this extra thread and the synchronization.
      */
+
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
 
@@ -470,12 +450,7 @@ net_show ( void )
 
 	printf ( "Packets processed: %d total (%d oddballs)\n", total_count, oddball_count );
 
-#ifdef ARCH_X86
-	if ( num_ee ) ee_show ();
-	if ( num_rtl ) rtl_show ();
-#endif
-
-	if ( num_net ) board_net_show ();
+	if ( num_eth ) board_net_show ();
 
 	netbuf_show ();
 	arp_show ();
@@ -521,12 +496,6 @@ net_send ( struct netbuf *nbp )
 	    net_debug_f = 0;
     }
 
-#ifdef ARCH_X86
-    if ( use_rtl )
-	rtl_send ( nbp );
-    else
-	ee_send ( nbp );
-#endif
     /*
     printf ("Sending packet\n" );
     */
@@ -549,12 +518,6 @@ net_addr_get ( char *buf )
     if ( net_state != NET_RUN )
 	panic ( "Premature MAC address access" );
 
-#ifdef ARCH_X86
-    if ( use_rtl )
-	get_rtl_addr ( buf );
-    else
-	get_ee_addr ( buf );
-#endif
 	get_board_net_addr ( buf );
 }
 

@@ -7,29 +7,26 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
-#	phy.o smsc.o \
-
 # locore must be first
-OBJS =  locore.o hardware.o \
-	wdt.o timer.o serial.o mux.o prcm.o gpio.o cm.o \
-	pru.o i2c.o i2c_hw.o iic.o bmp.o \
-	if_cpsw.o \
-	interrupts.o intcon.o \
-	cache_v7.o \
-	show_regs.o \
-	eabi_stubs.o
+OBJS =  locore.o \
+	board_x86.o \
+	interrupts.o \
+	timer.o \
+	serial.o \
+	terminal.o \
+	ee100.o \
+	rtl.o
+
+#	das16.o
+#	el3.o
+#	if_ne.o
+#	user.o
+#	tests.o
 
 all: ../machine.o
 
 ../machine.o: $(OBJS)
 	$(LD) -r -o ../machine.o $(OBJS)
-
-i2c_hw.o:	omap_ints.h
-i2c.o:	i2c.h
-iic.o:	i2c.h
-
-if_cpsw.e:	if_cpsw.c
-	$(CC) -E if_cpsw.c >if_cpsw.e
 
 clean:
 	rm -f *.o

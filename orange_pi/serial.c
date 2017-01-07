@@ -85,6 +85,9 @@ serial_putc ( char c )
 	while ( !(up->lsr & TX_READY) )
 	    ;
 	up->data = c;
+
+	if ( c == '\n' )
+	    serial_putc ( '\r' );
 }
 
 void

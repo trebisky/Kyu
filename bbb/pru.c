@@ -637,17 +637,19 @@ pru_init ( void )
 	// pru_mem_probe ();
 
 	/* XXX - we could just be silent when these fail */
-	n = tftp_fetch ( PRU0_FILE, PRU_IRAM0_BASE, PRU_SIZE );
-	if ( n == 0 )
-	    printf ( "Did not find %s\n", PRU0_FILE ); 
-	else
-	    printf ( "%d bytes loaded for PRU 0\n", n );
+	if ( net_running() ) {
+	    n = tftp_fetch ( PRU0_FILE, PRU_IRAM0_BASE, PRU_SIZE );
+	    if ( n == 0 )
+		printf ( "Did not find %s\n", PRU0_FILE ); 
+	    else
+		printf ( "%d bytes loaded for PRU 0\n", n );
 
-	n = tftp_fetch ( PRU1_FILE, PRU_IRAM1_BASE, PRU_SIZE );
-	if ( n == 0 )
-	    printf ( "Did not find %s\n", PRU1_FILE ); 
-	else
-	    printf ( "%d bytes loaded for PRU 1\n", n );
+	    n = tftp_fetch ( PRU1_FILE, PRU_IRAM1_BASE, PRU_SIZE );
+	    if ( n == 0 )
+		printf ( "Did not find %s\n", PRU1_FILE ); 
+	    else
+		printf ( "%d bytes loaded for PRU 1\n", n );
+	}
 
 	printf ( "PRU 0 control reg: %08x\n", pru_cstatus ( 0 ) );
 	printf ( "PRU 1 control reg: %08x\n", pru_cstatus ( 1 ) );

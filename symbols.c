@@ -180,17 +180,21 @@ parse_table ( int count )
 	unsigned long addr;
 	int nw;
 
-	symp = sym_buf;
-	sym_last = &sym_buf[count];
-
 	nsym = 0;
 	sym_table = NULL;
 
-	while ( getl ( line, NBUF ) ) {
-	    nw = split ( line, wp, MAXW );
-	    if ( *wp[1] == 'T' || *wp[1] == 't'  )
-		add_symbol ( hextoi(wp[0]), wp[2] );
+	if ( count > 0 ) {
+
+	    symp = sym_buf;
+	    sym_last = &sym_buf[count];
+
+	    while ( getl ( line, NBUF ) ) {
+		nw = split ( line, wp, MAXW );
+		if ( *wp[1] == 'T' || *wp[1] == 't'  )
+		    add_symbol ( hextoi(wp[0]), wp[2] );
+	    }
 	}
+
 	printf ( "%d symbols\n", nsym );
 }
 
@@ -198,6 +202,11 @@ void
 shell_init ( void )
 {
 	int count;
+
+	if ( ! net_running() ) {
+	    parse_table ( 0 );
+	    return;
+	}
 
 	sym_buf = malloc ( SYM_SIZE );
 	count = tftp_fetch ( sym_file, sym_buf, SYM_SIZE );

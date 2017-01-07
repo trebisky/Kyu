@@ -40,7 +40,7 @@ board_init ( void )
  *  (a hook for the PRU on the BBB).
  */
 void
-board_init_net ( void )
+board_after_net ( void )
 {
 }
 

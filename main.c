@@ -163,7 +163,7 @@ sys_init ( int xxx )
 	/* allow initialization of things that
 	 * require the network to be alive.
 	 */
-	board_init_net ();
+	board_after_net ();
 
 #ifdef notyet
 	init_pcmcia_ds ();

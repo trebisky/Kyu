@@ -44,7 +44,7 @@ board_init ( void )
 
 /* This gets called after the network is alive and well */
 void
-board_init_net ( void )
+board_after_net ( void )
 {
 	pru_init ();
 }
