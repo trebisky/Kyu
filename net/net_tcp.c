@@ -64,7 +64,7 @@ static void tcp_send_data ( struct tcp_io *, int, char *, int );
 
 void tcp_server ( int, tcp_cptr, tcp_fptr );
 struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
-void tcp_send ( struct tcp_io *, char *, int );
+void tcp_send_pk ( struct tcp_io *, char *, int );
 void tcp_shutdown ( struct tcp_io * );
 
 static struct tcp_io *tcp_io_head;
@@ -176,7 +176,7 @@ test_tcp_echo ( int dummy )
 	// strcpy ( echo_buf, "go\r\n" );
 	memset ( echo_buf, 'x', 1024 );
 	for ( i=0; i<16; i++ )
-	    tcp_send ( tio, echo_buf, 1024 );
+	    tcp_send_pk ( tio, echo_buf, 1024 );
 
 	// tcp_shutdown ( tio );
 }
@@ -208,11 +208,11 @@ tcp_echo_rcv ( struct tcp_io *tp, char *buf, int count )
 	lbuf[count] = '\0';
 	printf ( "%d byes of data received by echo server: !!\n", count );
 	printf ( "Here she is: %s\n", lbuf );
-	tcp_send ( tp, "ECHO\n\r", 6 );
+	tcp_send_pk ( tp, "ECHO\n\r", 6 );
 }
 
 void
-tcp_init ( void )
+tcp_kyu_init ( void )
 {
 	tcp_io_head = NULL;
 	tcp_io_free_list = NULL;
@@ -271,7 +271,7 @@ tcp_io_lookup ( struct netbuf *nbp )
 
 /* Call this to send payload data to remote */
 void
-tcp_send ( struct tcp_io *tp, char *buf, int count )
+tcp_send_pk ( struct tcp_io *tp, char *buf, int count )
 {
 	tcp_send_data ( tp, TH_PUSH | TH_ACK, buf, count );
 	tp->local_seq += count;
@@ -442,7 +442,7 @@ tcp_connect_thread ( int arg )
 	printf ( "Connect thread running\n" );
 
 	/*
-	tcp_send ( tp, "fish", 4 );
+	tcp_send_pk ( tp, "fish", 4 );
 	tcp_shutdown ( tp );
 	*/
 	printf ( "Connect thread done\n" );

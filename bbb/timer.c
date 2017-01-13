@@ -258,7 +258,8 @@ net_timer_hookup ( vfptr new )
 }
 #endif
 
-/* Count in ticks */
+/* Count in ticks (milliseconds) */
+/* TCP timing uses this */
 int
 get_timer_count_t ( void )
 {

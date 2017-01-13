@@ -11,7 +11,8 @@ OBJS =  board_orange_pi.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
-	timer.o
+	timer.o \
+	cpu.o
 
 all: ../board.o
 

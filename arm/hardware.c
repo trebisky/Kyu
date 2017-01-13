@@ -95,27 +95,49 @@ delay_ns ( int delay )
 	    ;
 }
 
+/* All v7 arm chips (so both the Cortex A7 and A8)
+ * have a bit to allow unaligned accesses
+ */
+#define SCTRL_A		0x0002
+
+static void
+enable_unaligned ( void )
+{
+	int scr;
+
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
+
+	scr &= ~SCTRL_A;
+
+	asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (scr) : "cc");
+}
+
 /* We are curious as to just what the state of things
  * is as handed to us by U-boot.
  */
 void
 mmu_status ( void )
 {
-	int cr_val;
+	int scr;
 	int mmu_base;
 
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (cr_val) : : "cc");
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
 
-	if ( cr_val & 0x01 )
+	if ( scr & 0x01 )
 	    printf ( "MMU enabled\n" );
-	if ( cr_val & 0x04 )
+	if ( scr & 0x02 )
+	    printf ( "A alignment enabled\n" );
+	if ( scr & 0x04 )
 	    printf ( "D cache enabled\n" );
-	if ( cr_val & 0x1000 )
+	if ( scr & 0x1000 )
 	    printf ( "I cache enabled\n" );
 
 	asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r" (mmu_base) : : "cc");
 	printf ( "MMU base: %08x\n", mmu_base );
 }
+
+/* The following are "standard" entry points for all hardware */
+/* hardware_init() should not expect printf to work */
 
 void
 hardware_init ( void )
@@ -123,8 +145,25 @@ hardware_init ( void )
 	mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 	enable_ccnt ( 0 );
+	enable_unaligned ();
+}
+
+/* This gets called once printf is working */
+void
+hardware_debug ( void )
+{
+	int scr;
 
 	mmu_status ();
+
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
+	printf ( "Found SCTRL = %08x\n", scr );
+
+	enable_unaligned ();
+
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
+	printf ( "Now SCTRL = %08x\n", scr );
+
 }
 
 int

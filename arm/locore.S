@@ -525,6 +525,11 @@ set_covr:
 	mcr     p15, 0, r0, c9, c12, 3
 	bx	lr
 
+/* XXX XXX - clean up this mess !!
+ * we have way too many ways to disable/enable
+ * processor interrupts.
+ */
+
 /* enable_irq (void); */
 	.globl enable_irq
 enable_irq:
@@ -561,5 +566,26 @@ cpu_leave:
 	bic	r0, r0, #0xc0
 	msr	cpsr, r0
 	bx	lr
+
+/* This is how Xinu does it, returns a mask to later
+ * be passed to restore(m);
+ */
+	.globl disable
+disable:
+        mrs     r0, cpsr        /* Copy the CPSR into r0                */
+        cpsid   i               /* Disable interrupts                   */
+        mov     pc, lr          /* Return the CPSR                      */
+
+	.globl restore
+restore:
+        push    {r1, r2}        /* Save r1, r2 on stack                 */
+        mrs     r1, cpsr        /* Copy CPSR into r1                    */
+        ldr     r2, =0x01F00220
+        and     r1, r1, r2      /* Extract flags and other important    */
+        bic     r0, r0, r2      /*    bits from the mask                */
+        orr     r1, r1, r0
+        msr     cpsr_cfsx, r1   /* Restore the CPSR                     */
+        pop     {r1, r2}        /* Restore r1, r2                       */
+        mov     pc, lr          /* Return to caller                     */
 
 /* THE END */

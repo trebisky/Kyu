@@ -47,7 +47,7 @@ board_after_net ( void )
 void
 reset_cpu ( void )
 {
-    /* how do we do this on orange pi ?? */
+    main_reset ();
 }
 
 /* ---------------------------------- */

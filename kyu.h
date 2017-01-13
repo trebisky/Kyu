@@ -37,8 +37,7 @@
 #define WANT_NET
 #define WANT_USER
 #define WANT_SHELL
-
-/* XXX most of the following should migrate to board.h */
+#define WANT_TCP_XINU
 
 #include "board/board.h"
 

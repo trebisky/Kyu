@@ -53,6 +53,7 @@ clear_bss ( void )
 void
 kern_startup ( void )
 {
+	hardware_init ();
 	console_initialize ();
 
 	/*
@@ -108,11 +109,12 @@ sys_init ( int xxx )
 	printf ( "Sys thread starting with cpsr: %08x\n",  get_cpsr() );
 	*/
 
-	/* XXX - a race!
-	 * Threads are always launched with interrupts enabled.
+	/* XXX - a race! (maybe?)
+	 * On the x86 threads are always launched with interrupts enabled.
+	 * We should probably fix this in locore.S
 	 * This won't matter unless some interrupt source is
-	 * active on startup.  This certainly won't be so on
-	 * the am3359 in the BBB.
+	 * active on startup.
+	 * This is not the case on the ARM
 	 */
 	cpu_enter ();
 
@@ -122,8 +124,11 @@ sys_init ( int xxx )
 	*/
 
 	console_init ();
-	hardware_init ();
+	// hardware_init ();
+	hardware_debug ();
 	board_init ();
+
+	net_bozo ();
 
 	/* enable interrupts */
 	cpu_leave ();

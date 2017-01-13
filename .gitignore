@@ -13,6 +13,9 @@ kyu.sym
 *.OLD
 OLD
 OLD/*
+*.ORIG
+ORIG
+ORIG/*
 arm/OLD
 lib/OLD
 linux/mm
@@ -27,3 +30,4 @@ zprune
 *.list
 board
 arch
+tcp_xinu

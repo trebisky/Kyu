@@ -141,11 +141,12 @@ static void test_fault ( int );
 static void test_zdiv ( int );
 
 #ifdef BOARD_BBB
-static void test_blink ( int );
 static void test_gpio ( int );
 static void test_adc ( int );
 static void test_fault2 ( int );
 #endif
+
+static void test_blink ( int );
 
 /* Here is the IO test menu */
 
@@ -158,12 +159,12 @@ struct test io_test_list[] = {
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
 #ifdef BOARD_BBB
-	test_blink,	"BBB blink test",	0,
-	test_blink,	"stop BBB blink test",	1,
 	test_gpio,	"BBB gpio test",	0,
 	test_adc,	"BBB adc test",		0,
 	test_fault2,	"data abort probe",	0,
 #endif
+	test_blink,	"start LED blink test",	0,
+	test_blink,	"stop LED blink test",	1,
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2141,14 +2142,96 @@ test_unroll ( int xxx )
 	unroll_cur();
 }
 
-/* Generate a data abort on ARM */
+/* Generate a data abort on the BBB
+ * On the BBB this causes a fault, but
+ *  is perfectly fine on the Orange Pi.
+ */
+static void
+fault_addr_zero ( void )
+{
+	volatile int data;
+	char *p = (char *) 0;
+
+	printf ( "Read byte from address zero\n" );
+	data = *p;
+	printf ( " Got: %02x\n", data );
+
+	printf ( "Write byte to address zero\n" );
+	*p = 0xAB;
+
+	printf ( "Read it back\n" );
+	data = *p;
+	printf ( " Got: %02x\n", data );
+}
+
+static int fault_buf[2];
+
+static void
+fault_align ( void )
+{
+	int *p;
+	short *sp;
+	int data;
+
+	fault_buf[0] = 0x12345678;
+	fault_buf[1] = 0x9abcdef0;
+
+	/* This should work */
+	printf ( "Read nicely aligned 4 bytes\n" );
+	p = fault_buf;
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* This should fail */
+	printf ( "Read short aligned 4 bytes\n" );
+	p = (int *) ((short *)p + 1);
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* This should fail also */
+	printf ( "Read byte aligned 4 bytes\n" );
+	p = (int *) ((char *)p + 1);
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* AND - what about 2 byte reads */
+
+	/* This should work */
+	printf ( "Read nicely aligned 2 bytes\n" );
+	sp = (short *) fault_buf;
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+	/* And so should this */
+	sp++;
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+	/* But probably not this */
+	sp = (short *) fault_buf;
+	sp = (short *) ((char *)sp + 1);
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+}
+
 void
 test_fault ( int xxx )
 {
-	volatile int junk;
-	char *p = (char *) 0;
-
-	junk = *p;
+	fault_addr_zero ();
+	fault_align ();
 }
 
 static void
@@ -2210,8 +2293,10 @@ test_fault2 ( int xxx )
 /* BBB blink test - also a good test of
  * mixing repeats and delays
  */
+#define BLINK_RATE	1000
+
 static void
-bbb_blinker ( int xx )
+led_blinker ( int xx )
 {
 	/* Writing a "1" does turn the LED on */
 	gpio_led_set ( 1 );
@@ -2219,33 +2304,55 @@ bbb_blinker ( int xx )
 	gpio_led_set ( 0 );
 }
 
-static struct thread *bbb_tp;
+static void
+led_norm ( void )
+{
+	gpio_led_set ( 0 );
+}
+
+#endif
+
+#ifdef BOARD_ORANGE_PI
+int led_state = 0;
+#define BLINK_RATE	500
 
 static void
-start_bbb_blink ( void )
+led_blinker ( int xx )
 {
-	// gpio_led_init ();
-	bbb_tp = thr_new_repeat ( "blinker", bbb_blinker, 0, 10, 0, 1000 );
+	if ( led_state ) {
+	    pwr_on ();
+	    status_off ();
+	    led_state = 0;
+	} else {
+	    pwr_off ();
+	    status_on ();
+	    led_state = 1;
+	}
 }
 
 static void
-stop_bbb_blink ( void )
+led_norm ( void )
 {
-	printf ( "Stop the blink\n" );
-	thr_repeat_stop ( bbb_tp );
+	pwr_on ();
+	status_off ();
 }
 
+#endif
+
+static struct thread *blink_tp;
 
 static void
 test_blink ( int arg )
 {
-
-	if ( arg == 0 )
-	    start_bbb_blink ();
-	else
-	    stop_bbb_blink ();
+	if ( arg == 0 ) {
+	    printf ( "Start the blink\n" );
+	    blink_tp = thr_new_repeat ( "blinker", led_blinker, 0, 10, 0, BLINK_RATE );
+	} else {
+	    printf ( "Stop the blink\n" );
+	    thr_repeat_stop ( blink_tp );
+	}
+	led_norm ();
 }
-#endif
 
 /* -------------------------------------------- */
 

@@ -97,6 +97,10 @@ net_hw_init ( int bogus )
 
     if ( num_eth > 0 )
 	net_state = NET_RUN;
+    else {
+	net_state = NET_IDLE;
+	printf ( "No network devices found\n" );
+    }
 }
 
 /* Let other people discover if network is running */
@@ -161,6 +165,20 @@ host_info_init ( void )
 	printf ( "My gateway: %s\n", ip2strl ( host_info.gate_ip ) );
 }
 
+/* Introduced for Xinu TCP */
+void
+get_our_mac ( char *buf )
+{
+	memcpy ( buf, host_info.our_mac, ETH_ADDR_SIZE );
+}
+
+/* Swap for Xinu, Kyu keeps addresses in net byte order */
+int
+get_our_ip ( void )
+{
+	return ntohl ( host_info.my_ip );
+}
+
 /* Called during startup if networking
  * is configured.
  */
@@ -173,10 +191,16 @@ net_init ( void )
 
     netbuf_init ();
     udp_init ();
-    tcp_init ();
+
+#ifdef WANT_TCP_XINU
+    tcp_xinu_init ();
+#else
+    tcp_kyu_init ();
+#endif
 
     arp_init ();
     dns_init ();
+
     // bootp_init ();
     tftp_init ();
 
@@ -224,7 +248,8 @@ net_init ( void )
 #define NET_STARTUP_WAIT	12
 
     count = 0;
-    while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
+    // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
+    while ( net_state == NET_INIT && count++ < NET_STARTUP_WAIT ) {
 	// printf ( "Net wait %d\n", count );
 	thr_delay ( system_clock_rate/2 );
     }
@@ -377,7 +402,8 @@ net_thread ( int arg )
 static int oddball_count = 0;
 static int total_count = 0;
 
-static int not_our_mac ( struct netbuf *nbp )
+static int 
+not_our_mac ( struct netbuf *nbp )
 {
 	if ( memcmp ( nbp->eptr->dst, broad, ETH_ADDR_SIZE ) == 0 )
 	    return 1;
