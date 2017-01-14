@@ -40,4 +40,8 @@ system "ln -s configs/#{target}.lds kyu.lds"
 
 system "make clean"
 
+# XXX when we again support the x86
+# we will add galileo as a board
+# AND we will need to make the "arch" link.
+
 puts "Ready for " + target

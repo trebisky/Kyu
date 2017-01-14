@@ -634,8 +634,11 @@ netbuf_alloc_i ( void )
 	rv->bptr = rv->data;
 	rv->eptr = (struct eth_hdr *) (rv->bptr + NETBUF_PREPAD);
 	rv->iptr = (struct ip_hdr *) ((char *) rv->eptr + sizeof ( struct eth_hdr ));
+
+#ifdef ARM_ALIGNMENT_HACK
 	if ( ((unsigned long) rv->iptr) & 0x3 )
 	    panic ( "Bad alignment for netbuf" );
+#endif
 
 	return rv;
 }

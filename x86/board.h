@@ -28,5 +28,17 @@
 
 #define DEFAULT_TIMER_RATE	1000
 
+/* The Tx descriptor for the ee100 driver requires
+ * 16 bytes, keeping a hole at least that big at the start
+ * of the buffer allows us to just put it into the netbuf.
+ *
+ * (This isn't necessary for other drivers, but doesn't
+ * hurt anything and may let the ee100 driver do clever things.)
+ *
+ * If we add other drivers we want to be clever with, we may
+ * need to make this the max of the requirements.
+ */
+#define NETBUF_PREPAD	(8 * sizeof(long))
+
 /* THE END */
 #endif /* _BOARD_H */

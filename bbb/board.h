@@ -44,5 +44,11 @@
 
 #define DEFAULT_TIMER_RATE	1000
 
+/* We add the 2 bytes on the ARM to get 4 byte alignment
+ * of the IP addresses in the IP header.
+ */
+// #define NETBUF_PREPAD	2
+#define NETBUF_PREPAD	0
+
 /* THE END */
 #endif /* _BOARD_H */

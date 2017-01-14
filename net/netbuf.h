@@ -7,6 +7,7 @@
  * more details.
  *
  * Kyu netbuf.
+ *
  * Tom Trebisky  4/9/2005 1/14/2017
  *
  * This structure is used to hold a network packet
@@ -25,7 +26,18 @@
  * buffer and need no extra space, but we need to be flexible.
  */
 
-/* Need some extra space for prepad stuff */
+/* Each board sets a macro NETBUF_PREPAD
+ *
+ * On the x86, the ee100 controllers needs 16 bytes
+ *  for its Tx descriptor.
+ * On the ARM, having 2 bytes of prepad will put
+ *  IP addresses on 4 byte boundaries.
+ *  (this is now an optimization rather than a necessity)
+ * The prepad is handled by skipping over the specified
+ *  number of bytes in "data" when setting the various
+ *  header pointers, in particular eptr.
+ */
+
 /* Strictly speaking 1518 would do,
  * there are alignment issues on the ARM to get
  * the IP fields aligned (prepad by 2) and there are
@@ -69,21 +81,6 @@ struct netbuf {
 struct netbuf * netbuf_alloc ( void );
 struct netbuf * netbuf_alloc_i ( void );
 void netbuf_free ( struct netbuf * );
-
-/* The Tx descriptor for the ee100 driver requires
- * 16 bytes, keeping a hole at least that big at the start
- * of the buffer allows us to just put it into the netbuf.
- *
- * (This isn't necessary for other drivers, but doesn't
- * hurt anything and may let the ee100 driver do clever things.)
- *
- * If we add other drivers we want to be clever with, we may
- * need the make this the max of the requirements.
- *
- * We add the 2 bytes on the ARM to get 4 byte alignment
- * of the IP addresses in the IP header.
- */
-#define NETBUF_PREPAD	2 + (8 * sizeof(long))
 
 #endif /* __NETBUF_H__ */
 /* THE END */

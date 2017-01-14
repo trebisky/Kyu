@@ -32,17 +32,19 @@
 #include "netbuf.h"
 #include "arch/cpu.h"
 
+// #define DEBUG_ARP
+// #define DEBUG_ARP_MUCHO
+
 #define ARP_SIZE	28
 #define ARP_MIN		60
 
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 static unsigned char zeros[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-/* Gcc has special ideas about alignment in this structure
- * that frustrates my attempts to declare spa and tpa as longs.
- * And, when this code was ported from the x86 to the ARM
- * I get data faults because these longs are not properly aligned.
- * The problem is the 6 byte length of the ethernet addresses.
+/* GCC by default wants to align structure elements on 4 byte
+ * boundaries.  This leads to trouble with the alignment of
+ * spa and tpa in the following structure.
+ * Using "pragma pack" fixes this.
  */
 #pragma pack(2)
 struct eth_arp {
@@ -58,7 +60,7 @@ struct eth_arp {
 	// unsigned char tpa[4];
 	unsigned long tpa;
 };
-#pragma
+#pragma pack()
 
 #define OP_REQ		1
 #define OP_REPLY	2
@@ -90,6 +92,7 @@ struct arp_data {
 static int arp_save ( char *, unsigned long );
 void arp_save_icmp ( char *, unsigned long );
 
+void arp_show ( void );
 void arp_reply ( struct netbuf * );
 static struct arp_data * arp_alloc ( void );
 
@@ -124,21 +127,6 @@ arp_lookup_e ( unsigned long ip_addr )
 
 /* -------------------------- */
 
-#ifdef ARM_ALIGNMENT_HACK
-/* Workaround for ARM alignment issues */
-static inline unsigned long __ul_ip ( unsigned char *x )
-{
-	unsigned long rv;
-
-	memcpy ( &rv, x, 4);
-	return rv;
-}
-
-#define IP(x)	__ul_ip((x))
-#else
-#define IP(x)	(*(long *) (x))
-#endif
-
 void
 arp_rcv ( struct netbuf *nbp )
 {
@@ -148,13 +136,13 @@ arp_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_ARP_MUCHO
 	if ( eap->op == OP_REQ_SWAP ) {
-	    arp_show_stuff ( "ARP request ", eap );
+	    arp_show_stuff ( "ARP request received ", eap );
+	    arp_show ();
 	} else {
-	    arp_show_stuff ( "  ARP reply ", eap );
+	    arp_show_stuff ( "  ARP reply received ", eap );
 	}
 #endif
 
-	// if ( IP(eap->tpa) != host_info.my_ip ) {
 	if ( eap->tpa != host_info.my_ip ) {
 	    netbuf_free ( nbp );
 	    return;
@@ -162,9 +150,9 @@ arp_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_ARP
 	if ( eap->op == OP_REQ_SWAP ) {
-	    arp_show_stuff ( "ARP request ", eap );
+	    arp_show_stuff ( "ARP request received ", eap );
 	} else {
-	    arp_show_stuff ( "  ARP reply ", eap );
+	    arp_show_stuff ( "  ARP reply received ", eap );
 	}
 #endif
 
@@ -212,7 +200,7 @@ arp_request ( unsigned long target_ip )
 {
 	struct netbuf *nbp;
 	struct eth_arp *eap;
-	unsigned long unknown = target_ip;
+	// unsigned long unknown = target_ip;
 
 	/* get a netbuf for this */
 	if ( ! (nbp = netbuf_alloc ()) )
@@ -231,7 +219,8 @@ arp_request ( unsigned long target_ip )
 
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
 	// memcpy ( eap->tpa, (char *) &unknown, 4 );
-	eap->tpa, unknown;
+	// eap->tpa =  unknown;
+	eap->tpa = target_ip;;
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;
@@ -268,6 +257,9 @@ ip_arp_send ( struct netbuf *nbp )
 	if ( ap ) {
 	    memcpy ( nbp->eptr->dst, ap->ether, ETH_ADDR_SIZE );
 	    net_send ( nbp );
+#ifdef DEBUG_ARP
+	    printf ( "IP arp send -- sent packet to %s\n", ip2strl ( dest_ip ) );
+#endif
 	    return;
 	}
 
@@ -278,9 +270,9 @@ ip_arp_send ( struct netbuf *nbp )
 	ap->ip_addr = dest_ip;
 	ap->flags = F_PENDING;
 
-	/*
-	printf ("ARP request sent for %s\n", ip2strl ( dest_ip ) );
-	*/
+#ifdef DEBUG_ARP
+	printf ("IP arp send: ARP request sent for %s\n", ip2strl ( dest_ip ) );
+#endif
 
 	/* We only wait 20 seconds.
 	 * (BSD waits 3 minutes)
@@ -290,9 +282,9 @@ ip_arp_send ( struct netbuf *nbp )
 	nbp->refcount++;
 	ap->outq = nbp;
 
-	/*
-	printf ("Pending packet queued\n");
-	*/
+#ifdef DEBUG_ARP
+	printf ("Pending packet queued for %s\n", ip2strl ( ap->ip_addr ) );
+#endif
 
 	arp_request ( dest_ip );
 }
@@ -510,7 +502,6 @@ arp_alloc ( void )
 
 static int
 arp_save ( char *ether, unsigned long ip_addr )
-// arp_save ( char *ether, unsigned char *ip_addr )
 {
 	int i;
 	struct arp_data *ap;
@@ -521,7 +512,6 @@ arp_save ( char *ether, unsigned long ip_addr )
 
 	for ( i=0; i<MAX_ARP_CACHE; i++ ) {
 	    ap = &arp_cache[i];
-	    // if ( ap->ip_addr == IP(ip_addr) ) {
 	    if ( ap->ip_addr == ip_addr ) {
 		/* Refresh entry or filling a pending request */
 		memcpy ( ap->ether, ether, ETH_ADDR_SIZE ); 
@@ -579,7 +569,6 @@ arp_save ( char *ether, unsigned long ip_addr )
  */
 void
 arp_save_icmp ( char *ether, unsigned long ip_addr )
-// arp_save_icmp ( char *ether, unsigned char *ip_addr )
 {
 	if ( arp_save ( ether, ip_addr ) ) {
 	    /*
