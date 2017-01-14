@@ -1,1 +1,0 @@
-configs/orange_pi.lds
