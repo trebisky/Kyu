@@ -23,6 +23,7 @@ OBJS =  machine.o board.o net.o \
     console.o thread.o prf.o \
     symbols.o \
     dlmalloc.o random.o \
+    tcp_xinu.o \
     kyulib.o lib.o
 
 all: install dump sym tags
@@ -47,6 +48,7 @@ machine.o:	bogus
 	cd board ; make
 	cd net ; make
 	cd lib ; make
+	cd tcp_xinu ; make
 #	cd linux ; make
 
 bogus:
@@ -99,4 +101,7 @@ clean:
 	cd arm ; make clean
 	cd net ; make clean
 	cd lib ; make clean
+	cd tcp_xinu ; make clean
 #	cd linux ; make clean
+
+# THE END

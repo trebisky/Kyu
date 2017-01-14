@@ -31,3 +31,5 @@ zprune
 board
 arch
 tcp_xinu
+kyu.lds
+Makefile

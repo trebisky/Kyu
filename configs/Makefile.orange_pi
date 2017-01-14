@@ -99,4 +99,7 @@ clean:
 	cd arm ; make clean
 	cd net ; make clean
 	cd lib ; make clean
+	cd tcp_xinu ; make clean
 #	cd linux ; make clean
+
+# THE END

@@ -27,6 +27,8 @@ unless $targets.include? target
     exit
 end
 
+system "make clean"
+
 system "rm -f board"
 system "ln -s #{target} board"
 
@@ -35,5 +37,7 @@ system "ln -s configs/Makefile.#{target} Makefile"
 
 system "rm -f kyu.lds"
 system "ln -s configs/#{target}.lds kyu.lds"
+
+system "make clean"
 
 puts "Ready for " + target
