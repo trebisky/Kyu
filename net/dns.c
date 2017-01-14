@@ -253,6 +253,7 @@ dns_lookup_t ( char *host, int timeout )
 
 	np = dns_pack ( host, dp->buf );
 
+#ifdef ARM_ALIGNMENT_HACK
 	/* must be careful about ARM alignment */
 	val = htons ( Q_A );
 	memcpy ( np, (char *) &val, 2 );
@@ -260,6 +261,12 @@ dns_lookup_t ( char *host, int timeout )
 	val = htons ( C_IN );
 	memcpy ( np, (char *) &val, 2 );
 	np += 2;
+#else
+	*((short *) np) = htons ( Q_A );
+	np += 2;
+	*((short *) np) = htons ( C_IN );
+	np += 2;
+#endif
 
 	/* build cache entry */
 	dcp = dns_alloc ();
@@ -409,19 +416,20 @@ dns_rcv ( struct netbuf *nbp )
 	/* get the resource record */
 	rp = (struct rr_info *) dns_unpack ( (char *) dp, cp, buf );
 
+#ifdef ARM_ALIGNMENT_HACK
 	/* ARM alignment issues */
 	memcpy ( &len, (char *) &rp->len, 2 );
 	if ( ntohs(len) != 4 )
 	    return;
 
-	/* ARM alignment issues */
-	/*
-	ip = *(unsigned long *) rp->buf;
-	*/
 	memcpy ( &ip, rp->buf, 4 );
-	/*
-	printf ("IP = %s\n", ip2strl(ip) );
-	*/
+#else
+	// len = rp->len;
+	if ( ntohs(rp->len) != 4 )
+	    return;
+	ip = *(unsigned long *) rp->buf;
+#endif
+	// printf ("IP = %s\n", ip2strl(ip) );
 
 	ap = find_pending ( ntohs ( dp->id ) );
 	if ( ap ) {

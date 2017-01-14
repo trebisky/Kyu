@@ -5,11 +5,17 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* hardware.h for the ARM
+ *
+ * hardware.h for the ARM
  *
  * T. Trebisky  1/7/2017
  */
+
+/* We no longer need this now that we have discovered the A bit in
+ * the system control register and all this should be deleted once
+ * we have thoroughly tested the network stack without it.
+ */
+// #define ARM_ALIGNMENT_HACK
 
 /* List of fault codes */
 /* The first 8 are ARM hardware exceptions and interrupts */

@@ -44,6 +44,7 @@ static unsigned char zeros[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
  * I get data faults because these longs are not properly aligned.
  * The problem is the 6 byte length of the ethernet addresses.
  */
+#pragma pack(2)
 struct eth_arp {
 	unsigned short hfmt;
 	unsigned short pfmt;
@@ -51,10 +52,13 @@ struct eth_arp {
 	unsigned char plen;
 	unsigned short op;
 	unsigned char sha[ETH_ADDR_SIZE];
-	unsigned char spa[4];
+	// unsigned char spa[4];
+	unsigned long spa;
 	unsigned char tha[ETH_ADDR_SIZE];
-	unsigned char tpa[4];
+	// unsigned char tpa[4];
+	unsigned long tpa;
 };
+#pragma
 
 #define OP_REQ		1
 #define OP_REPLY	2
@@ -81,9 +85,12 @@ struct arp_data {
 	struct netbuf *outq;
 } arp_cache[MAX_ARP_CACHE];
 
+// static int arp_save ( char *, unsigned char * );
+// void arp_save_icmp ( char *, unsigned char * );
+static int arp_save ( char *, unsigned long );
+void arp_save_icmp ( char *, unsigned long );
+
 void arp_reply ( struct netbuf * );
-static int arp_save ( char *, unsigned char * );
-void arp_save_icmp ( char *, unsigned char * );
 static struct arp_data * arp_alloc ( void );
 
 static void
@@ -92,10 +99,12 @@ arp_show_stuff ( char *str, struct eth_arp *eap )
 	printf ( "%s\n", str );
 
 	printf ( "Source: %s", ether2str(eap->sha) );
-	printf ( " (%s) ", ip2str ( eap->spa ) );
+	// printf ( " (%s) ", ip2str ( eap->spa ) );
+	printf ( " (%s) ", ip2str ( (char *) &eap->spa ) );
 
 	printf ( "Target: %s", ether2str(eap->tha) );
-	printf ( " (%s)\n", ip2str ( eap->tpa ) );
+	// printf ( " (%s)\n", ip2str ( eap->tpa ) );
+	printf ( " (%s)\n", ip2str ( (char *) &eap->tpa ) );
 }
 
 struct arp_data *
@@ -115,12 +124,7 @@ arp_lookup_e ( unsigned long ip_addr )
 
 /* -------------------------- */
 
-#ifdef ARCH_X86
-/* This works on the x86 */
-#define IP(x)	(*(long *) (x))
-#endif
-
-#ifdef ARCH_ARM
+#ifdef ARM_ALIGNMENT_HACK
 /* Workaround for ARM alignment issues */
 static inline unsigned long __ul_ip ( unsigned char *x )
 {
@@ -131,6 +135,8 @@ static inline unsigned long __ul_ip ( unsigned char *x )
 }
 
 #define IP(x)	__ul_ip((x))
+#else
+#define IP(x)	(*(long *) (x))
 #endif
 
 void
@@ -148,7 +154,8 @@ arp_rcv ( struct netbuf *nbp )
 	}
 #endif
 
-	if ( IP(eap->tpa) != host_info.my_ip ) {
+	// if ( IP(eap->tpa) != host_info.my_ip ) {
+	if ( eap->tpa != host_info.my_ip ) {
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -183,9 +190,11 @@ arp_reply ( struct netbuf *nbp )
 	 */
 	eap = (struct eth_arp *) nbp->iptr;
 
-	memcpy ( eap->tpa, eap->spa, 4 );
+	// memcpy ( eap->tpa, eap->spa, 4 );
+	eap->tpa = eap->spa;
 	memcpy ( eap->tha, eap->sha, ETH_ADDR_SIZE ); 
-	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	// memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	eap->spa = host_info.my_ip;
 	eap->op = OP_REPLY_SWAP;
 
 	net_addr_get ( eap->sha );
@@ -217,10 +226,12 @@ arp_request ( unsigned long target_ip )
 	eap->plen = 4;
 
 	net_addr_get ( eap->sha );
-	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	// memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	eap->spa = host_info.my_ip;
 
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
-	memcpy ( eap->tpa, (char *) &unknown, 4 );
+	// memcpy ( eap->tpa, (char *) &unknown, 4 );
+	eap->tpa, unknown;
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;
@@ -374,9 +385,11 @@ arp_announce ( void )
 
 	net_addr_get ( eap->sha );
 
-	memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	// memcpy ( eap->spa, (char *) &host_info.my_ip, 4 );
+	eap->spa = host_info.my_ip;
 	memcpy ( eap->tha, zeros, ETH_ADDR_SIZE ); 
-	memcpy ( eap->tpa, (char *) &host_info.my_ip, 4 );
+	// memcpy ( eap->tpa, (char *) &host_info.my_ip, 4 );
+	eap->tpa = host_info.my_ip;
 	eap->op = OP_REQ_SWAP;
 
 	nbp->eptr->type = ETH_ARP_SWAP;
@@ -496,7 +509,8 @@ arp_alloc ( void )
 }
 
 static int
-arp_save ( char *ether, unsigned char *ip_addr )
+arp_save ( char *ether, unsigned long ip_addr )
+// arp_save ( char *ether, unsigned char *ip_addr )
 {
 	int i;
 	struct arp_data *ap;
@@ -507,7 +521,8 @@ arp_save ( char *ether, unsigned char *ip_addr )
 
 	for ( i=0; i<MAX_ARP_CACHE; i++ ) {
 	    ap = &arp_cache[i];
-	    if ( ap->ip_addr == IP(ip_addr) ) {
+	    // if ( ap->ip_addr == IP(ip_addr) ) {
+	    if ( ap->ip_addr == ip_addr ) {
 		/* Refresh entry or filling a pending request */
 		memcpy ( ap->ether, ether, ETH_ADDR_SIZE ); 
 		ap->ttl = 20 * 60;
@@ -549,7 +564,8 @@ arp_save ( char *ether, unsigned char *ip_addr )
 	zp = arp_alloc ();
 
 	/* New entry */
-	memcpy ( &zp->ip_addr, ip_addr, 4 );
+	// memcpy ( &zp->ip_addr, ip_addr, 4 );
+	zp->ip_addr = ip_addr;
 	memcpy ( zp->ether, ether, ETH_ADDR_SIZE );
 	zp->flags = 0;
 	zp->ttl = 20 * 60;
@@ -562,7 +578,8 @@ arp_save ( char *ether, unsigned char *ip_addr )
  * Same as above, but allows debug.
  */
 void
-arp_save_icmp ( char *ether, unsigned char *ip_addr )
+arp_save_icmp ( char *ether, unsigned long ip_addr )
+// arp_save_icmp ( char *ether, unsigned char *ip_addr )
 {
 	if ( arp_save ( ether, ip_addr ) ) {
 	    /*

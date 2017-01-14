@@ -39,7 +39,8 @@ static void icmp_reply ( struct netbuf *, int );
 static void
 icmp_arp_evil ( struct netbuf *nbp )
 {
-    	arp_save_icmp ( nbp->eptr->src, (unsigned char *) &nbp->iptr->src );
+    	// arp_save_icmp ( nbp->eptr->src, (unsigned char *) &nbp->iptr->src );
+    	arp_save_icmp ( nbp->eptr->src, nbp->iptr->src );
 }
 
 void

@@ -5,9 +5,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* skidoo netbuf.
- * Tom Trebisky  4/9/2005
+ *
+ * Kyu netbuf.
+ * Tom Trebisky  4/9/2005 1/14/2017
+ *
  * This structure is used to hold a network packet
  * as it rattles around the system.
  *
