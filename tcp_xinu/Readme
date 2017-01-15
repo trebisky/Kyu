@@ -1,0 +1,48 @@
+This is the Xinu TCP code.
+
+From the Intel Galileo project  1-10-2017
+
+cd xinu-galileo-git
+git checkout master-tcp
+cd net/tcp
+tar cvf ../tcp_xinu.tar
+
+Also from Xinu ./include/*.h
+
+--------------------------------
+
+kyu_glue.c has a variety of mappings from the Xinu namespace
+to the Kyu namespace, as does kyu_glue.h
+
+xinu.h is a collection of every include file that could
+possibly be needed.  I added kyu_glue.h to the collection.
+Also I have only those header files that are actually needed.
+
+---------------
+
+semaphores.  Xinu semaphores are counting semaphores.
+The only actual use of counting was in mkbufpool.c
+and in getbuf.c (which I am doing away with).  Other than that
+we have:
+
+semcreate ( 1 ) to create a locking semaphore (mutex)
+semcreate ( 0 ) to create a signaling semaphore
+
+These later cases map nicely onto Kyu semaphores.
+
+------------------
+
+Xinu did something clever in getbuf/freebuf.
+getbuf returns the address of a network packet
+    (struct netpacket *)
+But the allocator actually provides a hidden 4 byte
+object at the head of the packet (and returns a pointer
+to the region just after it).  This means that freebuf
+can take the pointer it is given, move back 4 bytes and
+find this 4 byte object.  In the case of Xinu this is the
+buffer pool index, but I am thinking of making this a
+pointer to a netbuf for my own compatibility purposes.
+
+So I will implement my own getbuf and freebuf in kyu_glue.c
+Xinu will have no idea the netpacket it is using is embedded
+in a Kyu netbuf structure.
