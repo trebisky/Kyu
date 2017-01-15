@@ -46,3 +46,112 @@ pointer to a netbuf for my own compatibility purposes.
 So I will implement my own getbuf and freebuf in kyu_glue.c
 Xinu will have no idea the netpacket it is using is embedded
 in a Kyu netbuf structure.
+
+----------------------------
+
+The Xinu TCP system runs two threads:
+
+xinu_time runs in timer()  in timer.c
+xinu_tcpout runs in tcp_out()  in tcp_out.c
+
+Kyu, ready> t
+  Thread:       name (  &tp   )    state     esp     pri
+  Thread:        net (803abee8)      SEM J 98004000   10
+  Thread:   net_slow (803abdfc)   REPEAT C 98005000   11
+  Thread:  xinu_time (803ac0c0)      SEM J 98002000   28
+  Thread:  xinu_tcpo (803abfd4)      SEM I 98003000   29
+* Thread:       test (803ac298)    READY I 98000000   30
+  Thread:       idle (803ac1ac)    READY C 98001000 1234
+  Thread  Cur : (803ac298)
+
+----------------------------
+
+TCP Packet reception in Kyu
+
+Driver gets Rx interrupt and calls net_rcv ( nbp ) at interrupt level.
+(typically in bbb/ip_cpsw.c).
+
+net_rcv() is in net/net_main.c -- it simply puts the packet on the network
+input queue and quickly returns.  Thus very little code runs at interrupt level.
+
+net_thread() is in net/net_main.c, running at priority 10 as thread "net".
+It removes packets from the input queue and calls net_handle with each.
+
+net_handle(nbp) in net/net_main.c gets called for each received packet.
+It checks the type field and for IP packets calls ip_rcv(nbp).
+
+ip_rcv(nbp) is in net/net_ip.c
+  It validates the checksum
+  It does not yet handle fragmentation
+  It checks the protocol byte and for TCP calls tcp_xinu_rcv(nbp)
+
+tcp_xinu_rcv(nbp) is in tcp_xinu/kyu_glue.c
+  It pulls the packet pointer out of netbuf and calls:
+  tcp_in ( pkt )
+
+tcp_in (pkt) is in tcp_xinu/tcp_in.c and is Xinu code.
+
+----------------------------
+
+TCP Packet sending in Kyu via Xinu code
+
+Somebody calls ip_enqueue ( pkt)
+
+ip_enque(pkt) is in tcp_xinu/kyu_glue.c
+  It calls ip_send(nbp,dest_ip)
+
+ip_send(nbp,dest_ip) is in net_ip.c
+  It fills in the header and calculates the checksum
+  It calls ip_arp_send ( nbp )
+
+ip_arp_send(nbp) is in net_arp.c
+  Sooner or later this calls net_send(nbp)
+
+net_send is in net/net_main.c
+  There is no queueing.
+  This calls board_net_send(nbp) in bbb/board_bbb.c
+  This in turn calls cpsw_send(nbp) in bbb/if_cpsw.c
+
+----------------------------
+
+What about the "end user" interface to TCP ??
+
+Xinu used to have a TCP device, but now a new scheme is used.
+
+slot = tcp_register ( ip, port, active )
+
+    active is 0 for a server (passive connection)
+    active is 1 for a client
+
+    For a passive connection ip=0 and port is set
+	int lslot;
+	lslot = tcp_register ( 0, 80, 0 );
+
+    For an active connection both ip and port are set
+	int slot;
+	int serv_ip;
+	dot2ip("128.10.136.101", &serverip);
+	slot = tcp_register ( serv_ip, 80, 1 );
+
+    slot returns an integer which is an internal index to the TCB table
+    This is just a cookie to pass to tcp_send and/or tcp_recv.
+
+tcp_send() and tcp_recv() are used once a connection is registered.
+
+For an active connection
+  slot = tcp_register ( serv_ip, 80, 1 );
+  The slot returned can be used for send and recv.
+
+For a passive connection, the slot index returned by tcp_register can
+  be used to listen on for connections (like accept in BSD), so:
+
+  lslot = tcp_register ( 0, 80, 0 );
+  tcp_recv ( lslot, &slot, 5 );
+
+  When a connection comes along, tcp_recv returns a slot that
+  can be used to do send and recv just like an active connection.
+
+Note in particular that recv can be expected to block, this is not an
+  event driven API.  Send can also block.
+
+THE END

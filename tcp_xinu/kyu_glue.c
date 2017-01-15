@@ -65,7 +65,7 @@ ip_enqueue ( struct netpacket *pkt )
 	struct netbuf **nbpt;
 
 	nbpt = (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
-	ip_send ( *nbpt );
+	ip_send ( *nbpt, pkt->net_ipdst );
 }
 
 /* We now hide a pointer to the netbuf inside the netbuf

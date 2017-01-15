@@ -53,16 +53,17 @@ int32	tcp_register (
 	int32		state;		/* Connection state		*/
 	int32		slot;		/* Slot in TCB table		*/
 
+#ifdef notdef
 	/* Parse "X:machine:port" string and set variables, where	*/
 	/*	X	- either 'a' or 'p' for "active" or "passive"	*/
 	/*	machine	- an IP address in dotted decimal		*/
 	/*	port	- a protocol port number			*/
-/*
+
 	spec = (char *)arg1;
 	if (tcpparse (spec, &ip, &port, &active) == SYSERR) {
 		return SYSERR;
 	}
-*/
+#endif
 	/* Obtain exclusive use, find free TCB, and clear it */
 
 	wait (Tcp.tcpmutex);
