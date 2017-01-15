@@ -623,6 +623,7 @@ struct netbuf *
 netbuf_alloc_i ( void )
 {
 	struct netbuf *rv;
+	struct netbuf **nbpt;
 
 	if ( ! free )
 	    return (struct netbuf *) 0;
@@ -632,8 +633,12 @@ netbuf_alloc_i ( void )
 
 	rv->refcount = 1;
 	rv->bptr = rv->data;
-	rv->eptr = (struct eth_hdr *) (rv->bptr + NETBUF_PREPAD);
+	rv->eptr = (struct eth_hdr *) (rv->bptr + NETBUF_PREPAD * sizeof(struct netbuf *));
 	rv->iptr = (struct ip_hdr *) ((char *) rv->eptr + sizeof ( struct eth_hdr ));
+
+	/* Store the embedded back pointer used by Xinu tcp */
+	nbpt = (struct netbuf **) (((char *) rv->eptr) - sizeof(struct netbuf *));
+	*nbpt = rv;
 
 #ifdef ARM_ALIGNMENT_HACK
 	if ( ((unsigned long) rv->iptr) & 0x3 )
@@ -643,6 +648,9 @@ netbuf_alloc_i ( void )
 	return rv;
 }
 
+/* Note that we never actually free memory, we just put the
+ * buffer back on the free list.
+ */
 void
 netbuf_free ( struct netbuf *old )
 {

@@ -128,8 +128,6 @@ sys_init ( int xxx )
 	hardware_debug ();
 	board_init ();
 
-	net_bozo ();
-
 	/* enable interrupts */
 	cpu_leave ();
 
