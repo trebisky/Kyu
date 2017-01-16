@@ -124,7 +124,9 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 {
 	struct ip_hdr *ipp;
 
-	ipp = (struct ip_hdr *) nbp->iptr;
+	// changed for Xinu TCP
+	// ipp = (struct ip_hdr *) nbp->iptr;
+	ipp = (struct ip_hdr *) ((char *) nbp->eptr + sizeof ( struct eth_hdr ));
 
 	/* XXX - why redo this here ?? */
 	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
@@ -134,6 +136,7 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 	ipp->ver = 4;
 
 	ipp->tos = 0;
+	// printf ( "***LEN: %04x %04x\n", ipp->len, nbp->ilen );
 	ipp->len = htons(nbp->ilen);
 
 	ipp->id = ip_id++;

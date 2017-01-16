@@ -61,6 +61,7 @@ struct	netpacket	{
 
 #define	PACKLEN	sizeof(struct netpacket)
 
+#ifndef KYU
 extern	bpid32	netbufpool;		/* ID of net packet buffer pool	*/
 
 struct	network	{
@@ -77,3 +78,4 @@ struct	network	{
 };
 
 extern	struct	network NetData;	/* Local Network Interface	*/
+#endif

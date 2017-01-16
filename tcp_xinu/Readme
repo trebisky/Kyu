@@ -154,4 +154,25 @@ For a passive connection, the slot index returned by tcp_register can
 Note in particular that recv can be expected to block, this is not an
   event driven API.  Send can also block.
 
+================================
+
+Debugging:
+
+Nothing beats telnet for a simple way to exercise TCP
+Without any tcp_register having been done, any SYN packet
+  that tries to open a connection should elicit a RST packet response
+
+Wireshark is very handy.
+Try a capture filter like:
+
+    host 192.168.0.66
+
+Also enable checksum verification.
+This can be done in the decoder by right clicking on the summary line,
+  then clicking on the "protocol preferences" line and selecting
+  validation by ticking a checkbox.
+Or use: Edit -> Preferences -> Protocols -> IPv4
+  and check "Validate the IPv4 checksum if possible"
+<<
+
 THE END

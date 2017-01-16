@@ -6,6 +6,7 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  */
+
 /* portable, naive, but simple */
 unsigned short
 in_cksum ( unsigned short *data, int len )

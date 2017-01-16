@@ -21,51 +21,74 @@ semcreate ( int arg )
 	    sem_signal_new ( SEM_FIFO );
 }
 
-#ifdef notdef
-typedef	int	bpid32;
-bpid32  netbufpool;
-
-/* from include/udp.h */
-#define UDP_SLOTS       6               /* Number of open UDP endpoints */
-#define UDP_QSIZ        8               /* Packets enqueued per endpoint*/
-
-/* from include/icmp.h */
-#define ICMP_SLOTS      10              /* num. of open ICMP endpoints  */
-#define ICMP_QSIZ       8               /* incoming packets per slot    */
-#endif
-
 void
 tcp_xinu_init ( void )
 {
-
-#ifdef notdef
-	int nbufs;
-
-	/* From Xinu net/net.c */
-	bufinit ();
-	nbufs = UDP_SLOTS * UDP_QSIZ + ICMP_SLOTS * ICMP_QSIZ + 1;
-	netbufpool = mkbufpool(PACKLEN, nbufs);
-#endif
-
 	tcp_init ();
+}
+
+// static int kyu_drop = 0;
+
+static void
+ip_ntoh ( struct netpacket *pktptr )
+{
+        pktptr->net_iplen = ntohs(pktptr->net_iplen);
+        pktptr->net_ipid = ntohs(pktptr->net_ipid);
+        pktptr->net_ipfrag = ntohs(pktptr->net_ipfrag);
+        pktptr->net_ipsrc = ntohl(pktptr->net_ipsrc);
+        pktptr->net_ipdst = ntohl(pktptr->net_ipdst);
 }
 
 void
 tcp_xinu_rcv ( struct netbuf *nbp )
 {
+	struct netpacket *pkt;
+
+#ifdef notdef
+	if ( kyu_drop ) {
+	    printf ( "xinu_rcv - drop\n" );
+	    netbuf_free ( nbp );
+	    return;
+	}
+
+	// kyu_drop = 1;
+	printf ( "TCP: xinu_rcv %d\n", ntohs(nbp->iptr->len) );
+#endif
+
 	/* Must give eptr since we may have PREPAD */
-	tcp_in ( (struct netpacket *) nbp->eptr );
-	netbuf_free ( nbp );
+	pkt = (struct netpacket *) nbp->eptr;
+	ip_ntoh ( pkt );
+	tcp_ntoh ( pkt );
+
+	tcp_in ( pkt );
+	/* do NOT free the packet here */
 }
 
 /* XXX - just a stub so we can link for now */
 void
 ip_enqueue ( struct netpacket *pkt ) 
 {
-	struct netbuf **nbpt;
+	struct netbuf *nbp;
+	unsigned short cksum;
 
-	nbpt = (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
-	ip_send ( *nbpt, pkt->net_ipdst );
+	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
+
+	/* XXX - should just be able to set ilen */
+	nbp->ilen = pkt->net_iplen;
+	nbp->plen = pkt->net_iplen - sizeof(struct ip_hdr);
+
+	// printf ( "TCP:  ip_enqueue %d (%d)\n", nbp->ilen, sizeof(struct eth_hdr) );
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	tcp_hton ( pkt );
+	cksum = tcpcksum ( pkt );
+	pkt->net_tcpcksum = htons(cksum) & 0xffff;
+
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	ip_send ( nbp, htonl(pkt->net_ipdst) );
 }
 
 /* We now hide a pointer to the netbuf inside the netbuf
@@ -77,18 +100,21 @@ get_netpacket ( void )
 	struct netbuf *nbp;
 
 	nbp = netbuf_alloc ();
-	if ( nbp )
+	if ( nbp ) {
+	    // printf ( "TCP: alloc %08x, %08x\n", nbp, nbp->eptr );
 	    return (struct netpacket *) nbp->eptr;
+	}
 	return NULL;
 }
 
 void
 free_netpacket ( struct netpacket *pkt )
 {
-	struct netbuf **nbpt;
+	struct netbuf *nbp;
 
-	nbpt = (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
-	netbuf_free ( *nbpt );
+	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
+	// printf ( "TCP: free  %08x, %08x\n", nbp, pkt );
+	netbuf_free ( nbp );
 }
 
 #ifdef notdef

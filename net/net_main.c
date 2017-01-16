@@ -640,6 +640,9 @@ netbuf_alloc_i ( void )
 	nbpt = (struct netbuf **) (((char *) rv->eptr) - sizeof(struct netbuf *));
 	*nbpt = rv;
 
+// XXX debug
+	memset ( rv->data, 0xAB, NETBUF_MAX );
+
 #ifdef ARM_ALIGNMENT_HACK
 	if ( ((unsigned long) rv->iptr) & 0x3 )
 	    panic ( "Bad alignment for netbuf" );

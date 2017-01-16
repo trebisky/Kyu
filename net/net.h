@@ -5,8 +5,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net.h -- Skidoo
+ *
+ * net.h -- Kyu
+ *
  * Tom Trebisky  3-31-2005
  */
 
