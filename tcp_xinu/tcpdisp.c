@@ -14,7 +14,8 @@ int32	tcpnull(
 	return OK;
 }
 
-/*extern int32 *tcplisten(struct tcb *, struct netpacket *);
+#ifdef notdef
+extern int32 *tcplisten(struct tcb *, struct netpacket *);
 extern int32 *tcpsynsent(struct tcb *, struct netpacket *);
 extern int32 *tcpsynrcvd(struct tcb *, struct netpacket *);
 extern int32 *tcpestd(struct tcb *, struct netpacket *);
@@ -23,7 +24,8 @@ extern int32 *tcpfin2(struct tcb *, struct netpacket *);
 extern int32 *tcpcwait(struct tcb *, struct netpacket *);
 extern int32 *tcpclosing(struct tcb *, struct netpacket *);
 extern int32 *tcplastack(struct tcb *, struct netpacket *);
-extern int32 *tcptwait(struct tcb *, struct netpacket *);*/
+extern int32 *tcptwait(struct tcb *, struct netpacket *);
+#endif
 
 int32 (*tcpstatesw[]) (struct tcb *tcbptr,struct netpacket *pkt)
   = {
@@ -59,7 +61,6 @@ void	tcpdisp(
 	/* Obtain the state from the TCB */
 
 	state = tcbptr->tcb_state;
-
 
 	/* Handle a reset */
 

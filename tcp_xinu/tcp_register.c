@@ -177,3 +177,51 @@ int32	tcp_register (
 		return slot;
 	}
 }
+
+/* Added for Kyu - 1-17-2017 */
+int
+tcp_server ( int port, lfptr func )
+{
+	struct tcb	*tcbptr;
+	int slot;
+	int i;
+
+	wait (Tcp.tcpmutex);
+
+	/* Ensure we are not already serving on this port */
+	for (i = 0; i < Ntcp; i++) {
+	    if (tcbtab[i].tcb_state == TCB_LISTEN
+		// && tcbtab[i].tcb_lip == 0
+		&& tcbtab[i].tcb_lport == port) {
+		    signal (Tcp.tcpmutex);
+		    return SYSERR;
+		}
+	}
+
+	/* Find a free TCB */
+	for (slot = 0; slot < Ntcp; slot++) {
+	    if (tcbtab[slot].tcb_state == TCB_FREE)
+		break;
+	}
+
+	if (slot >= Ntcp) {
+	    signal (Tcp.tcpmutex);
+	    return SYSERR;
+	}
+
+	/* New passive endpoint - fill in TCB */
+	tcbptr = &tcbtab[slot];
+	tcbclear (tcbptr);
+
+	tcbptr->tcb_lfunc = func;
+	tcbptr->tcb_slot = slot;
+	tcbptr->tcb_lport = port;
+	tcbptr->tcb_state = TCB_LISTEN;
+	tcbref (tcbptr);
+
+	signal (Tcp.tcpmutex);
+
+	return OK;
+}
+
+/* THE END */

@@ -32,6 +32,9 @@ dots2ip ( char *s )
 	return ntohl ( nip );
 }
 
+/* Test - active connection to Daytime server */
+/* Sometimes this just locks up in SYNSENT ??!! */
+
 static void
 test_client ( void )
 {
@@ -40,14 +43,47 @@ test_client ( void )
 	char buf[100];
 	int n;
 
+	// printf ( "Begin making client connection\n" );
 	slot = tcp_register ( dots2ip(TEST_SERVER), port, 1 );
 	printf ( "Client connection on port %d, slot = %d\n", port, slot );
 	n = tcp_recv ( slot, buf, 100 );
-	printf ( "Client recv returns %d\n", n );
+	printf ( "Client recv returns %d bytes\n", n );
 	buf[n] = '\0';
 	printf ( "Client recv got %s\n", buf );
+	// terminated with \r\n
+	// printf ( "Client %02x\n", buf[n-2] );
+	// printf ( "Client %02x\n", buf[n-1] );
 	tcp_close ( slot );
 }
+
+/* New style passive connection with listener callback */
+/* Note that this just sets up callbacks and evaporates */
+
+static void
+daytime_func ( int slot )
+{
+	static char reply[] = "4 JUL 1776 08:00:00 EST\r\n";
+	int n;
+
+	n = sizeof(reply);
+	printf ( "In daytime callback, slot %d\n", slot );
+	printf ( "In daytime callback, sending %d bytes\n", n );
+	tcp_send ( slot, reply, n );
+	tcp_close ( slot );
+}
+
+static void
+test_daytime ( void )
+{
+	int port = DAYTIME_PORT;
+	int rv;
+
+	rv = tcp_server ( port, daytime_func );
+	printf ( "Listening on port %d via callback (%d)\n", port, rv );
+}
+
+/* Original style passive connection */
+/* This stays around, blocked in tcp_recv() */
 
 static void
 test_server ( void )
@@ -63,6 +99,13 @@ test_server ( void )
 	for ( ;; ) {
 	    printf ( "Waiting for connection\n" );
 	    rv = tcp_recv ( lslot, (char *) &cslot, 4 );
+	    if ( rv < 0 ) {
+		/* Without this check, once we tie up all slots in
+		 * TWAIT, this will yield a runaway loop
+		 */
+		printf ( "recv on port %d fails - maybe no more slots?\n" );
+		break;
+	    }
 	    printf ( "Connection!! %d, %d\n", rv, cslot );
 	    tcp_send ( cslot, "dog\n", 4 );
 	    tcp_send ( cslot, "cat\n", 4 );
@@ -74,6 +117,8 @@ static void
 tcp_xinu_test ( int bogus )
 {
 	test_client ();
+
+	test_daytime ();
 	test_server ();
 }
 
@@ -162,6 +207,7 @@ xinu_show ( void )
 	for (i = 0; i < Ntcp; i++) {
 	    if (tcbtab[i].tcb_state == TCB_FREE)
 		continue;
+
 	    tp = &tcbtab[i];
 	    if ( tp->tcb_state == TCB_LISTEN )
 		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
@@ -172,7 +218,9 @@ xinu_show ( void )
 	    else if ( tp->tcb_state == TCB_CWAIT )
 		printf ( "TCB slot %d: Close wait\n", i );
 	    else if ( tp->tcb_state == TCB_TWAIT )
-		printf ( "TCB slot %d: T wait\n", i );
+		printf ( "TCB slot %d: TWAIT\n", i );
+	    else if ( tp->tcb_state == TCB_SYNSENT )
+		printf ( "TCB slot %d: SYNSENT\n", i );
 	    else
 		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
         }

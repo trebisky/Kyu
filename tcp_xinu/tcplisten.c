@@ -24,25 +24,27 @@ int32	tcplisten(
 
 	wait (Tcp.tcpmutex);
 
-	/* Find a free TCP pseudo-device for this connection */
+	/* Find a free TCB for this connection */
 
 	for (i = 0; i < Ntcp; i++) {
-		if (tcbtab[i].tcb_state == TCB_FREE)
-			break;
+	    if (tcbtab[i].tcb_state == TCB_FREE)
+		break;
 	}
+
 	if (i == Ntcp) {
-
-		/* No free devices */
-
-		signal (Tcp.tcpmutex);
-		return SYSERR;
+	    signal (Tcp.tcpmutex);
+	    return SYSERR;
 	}
 
-	/* Obtain pointer to the device for the new connection	*/
-	/*	and initialize the TCB				*/
+	/*	initialize the TCB				*/
 
 	pnewtcb = &tcbtab[i];
 	tcbclear (pnewtcb);
+
+	/* Kyu */
+	pnewtcb->tcb_lfunc = tcbptr->tcb_lfunc;
+	pnewtcb->tcb_slot = i;
+
 	pnewtcb->tcb_rbuf = (char *)getmem (65535);
 	if (pnewtcb->tcb_rbuf == (char *)SYSERR) {
 		signal (Tcp.tcpmutex);

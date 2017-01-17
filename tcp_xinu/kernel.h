@@ -34,6 +34,10 @@ typedef int32	process;	/* top-level function of a process	*/
 typedef	void	interrupt;	/* interrupt procedure			*/
 typedef	int32	status;		/* returned status value (OK/SYSERR)	*/
 
+/* Callback function types, added for Kyu 1-17-2017 */
+
+typedef void (*lfptr) ( int );	/* listener callback			*/
+
 #define local	static		/* Local procedure or variable declar.	*/
 
 /* Boolean constants */

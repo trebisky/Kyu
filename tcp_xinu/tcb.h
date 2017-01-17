@@ -62,6 +62,9 @@ struct tcb {
 	uint16		tcb_lport;	/* Local port number		*/
 	uint16		tcb_rport;	/* Remote port number		*/
 
+	lfptr		tcb_lfunc;	/* KYU listener callback	*/
+	int32		tcb_slot;	/* Kyy self referential slot 	*/
+
 	/* Miscellaneous information */
 	int32		tcb_flags;	/* Flags			*/
 	int32		tcb_qlen;	/* # of tcbs in the listen queue*/

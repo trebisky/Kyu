@@ -43,6 +43,18 @@ int32	tcpsynsent(
 	tcpdata (tcbptr, pkt);
 	tcpack (tcbptr, TRUE);
 
+	/* this is usually the conclusion of an active open */
+	// KYU printf ( "TCP ESTD - synsent\n" );
+
+#ifdef notdef
+	/* The listener action is over in tcpsynrcvd.c */
+	/* KYU callback addition */
+	if ( tcbptr->tcb_lfunc ) {
+	    (tcbptr->tcb_lfunc) (tcbptr->tcb_slot);
+	    return OK;
+	}
+#endif
+
 	if(tcbptr->tcb_readers) {
 		tcbptr->tcb_readers--;
 		signal(tcbptr->tcb_rblock);

@@ -45,4 +45,6 @@ void	tcbclear(
 	ptcb->tcb_sblen = 0;
 	ptcb->tcb_sbuf = NULL;
 	ptcb->tcb_writers = 0;
+	ptcb->tcb_slot = 0;
+	ptcb->tcb_lfunc = 0;
 }

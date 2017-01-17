@@ -37,10 +37,21 @@ int32	tcpsynrcvd(
 
 	/* Permit reading */
 
+	// KYU printf ( "TCP ESTD - synrcvd\n" );
 	// KYU printf ( "TCP ESTD - signal readers\n" );
-	/* XXX - XXX - Kyu - this is where we "have" the event
-	 * of a signal established.
+
+	/* KYU callback addition */
+	/* We must unlock the mutex or we deadlock.
+	 * This is from tcp_in() via tcpdisp()
+	 * maybe there are better ways to do this?
 	 */
+	if ( tcbptr->tcb_lfunc ) {
+	    signal ( tcbptr->tcb_mutex );
+	    (*tcbptr->tcb_lfunc) (tcbptr->tcb_slot);
+	    wait ( tcbptr->tcb_mutex );
+	    return OK;
+	}
+
 	if (tcbptr->tcb_readers > 0) {
 		tcbptr->tcb_readers--;
 		// KYU printf ( "TCP ESTD - signaling readers\n" );
