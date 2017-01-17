@@ -24,6 +24,7 @@ extern int32 *tcpcwait(struct tcb *, struct netpacket *);
 extern int32 *tcpclosing(struct tcb *, struct netpacket *);
 extern int32 *tcplastack(struct tcb *, struct netpacket *);
 extern int32 *tcptwait(struct tcb *, struct netpacket *);*/
+
 int32 (*tcpstatesw[]) (struct tcb *tcbptr,struct netpacket *pkt)
   = {
 	tcpnull,			/* CLOSED			*/

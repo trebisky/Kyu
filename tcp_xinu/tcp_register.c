@@ -1,9 +1,6 @@
 /* tcpmopen.c  -  checktuple, tcpmopen */
 
 #include <xinu.h>
-/*
-#include <string.h>
-*/
 
 /*------------------------------------------------------------------------
  *  ckecktuple  -  Verify that a TCP connection is not already in use by
@@ -46,7 +43,6 @@ int32	tcp_register (
 	int32	active
 	)
 {
-	// char		*spec;		/* IP:port as a string		*/
 	struct tcb	*tcbptr;	/* Ptr to TCB			*/
 	uint32		lip;		/* Local IP address		*/
 	int32		i;		/* Walks through TCBs		*/
@@ -54,6 +50,7 @@ int32	tcp_register (
 	int32		slot;		/* Slot in TCB table		*/
 
 #ifdef notdef
+	// char		*spec;		/* IP:port as a string		*/
 	/* Parse "X:machine:port" string and set variables, where	*/
 	/*	X	- either 'a' or 'p' for "active" or "passive"	*/
 	/*	machine	- an IP address in dotted decimal		*/

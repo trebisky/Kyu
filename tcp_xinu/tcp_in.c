@@ -30,7 +30,9 @@ void	tcp_in(
 		free_netpacket ( pkt );
 		return;
 	}
-/*DEBUG*/ //kprintf("\nIN: seq %x, ackseq %x\n", pkt->net_tcpseq, pkt->net_tcpack);
+
+	/*DEBUG*/
+	//kprintf("\nIN: seq %x, ackseq %x\n", pkt->net_tcpseq, pkt->net_tcpack);
 	//pdumph(pkt);
 
 	/* Validate header lengths */
@@ -59,11 +61,10 @@ void	tcp_in(
 			/* Accept only if the current entry	*/
 			/* matches and is more specific		*/
 
-			if (((tcbptr->tcb_lip == 0
-			      && partial == -1)
+			if (((tcbptr->tcb_lip == 0 && partial == -1)
 			     || pkt->net_ipdst == tcbptr->tcb_lip)
-			    && pkt->net_tcpdport == tcbptr->tcb_lport) {
-				partial = i;
+				&& pkt->net_tcpdport == tcbptr->tcb_lport) {
+				    partial = i;
 			}
 			continue;
 		} else {

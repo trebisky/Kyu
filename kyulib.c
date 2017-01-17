@@ -132,9 +132,12 @@ split ( char *buf, char **bufp, int max )
 
 /* Take a string of the form 128.196.100.52
  * and convert it to a packed integer in network
- * byte order.  Note that Kyu keeps IP addresses
+ * byte order.
+ * Note that at the present time, Kyu keeps IP addresses
  * in network byte order regardless of the host order
  * and compares them as opaque objects.
+ * This may not be such a good idea and is likely
+ * to be abandoned as we adopt the Xinu network code.
  */
 int
 net_dots ( char *buf, unsigned char *iaddr )

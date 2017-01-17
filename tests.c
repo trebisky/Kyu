@@ -189,7 +189,18 @@ static void test_dns ( int );
 static void test_arp ( int );
 void test_tftp ( int );
 static void test_udp ( int );
-void test_tcp ( int );
+
+void
+test_tcp ( int xxx )
+{
+#ifdef WANT_TCP_XINU
+	printf ( "Testing Xinu TCP\n" );
+	test_xinu_tcp ();
+#else
+	printf ( "Testing Kyu TCP\n" );
+	test_kyu_tcp ();
+#endif
+}
 
 
 struct test net_test_list[] = {

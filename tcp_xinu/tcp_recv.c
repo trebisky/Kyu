@@ -22,6 +22,8 @@ int32	tcp_recv(
 		return SYSERR;
 	}
 
+	printf ( "TCP recv called for slot %d, len = %d\n", slot, len );
+
 	/* Obtain pointer to the TCB for the pseudo device */
 
 	tcbptr = &tcbtab[slot];
@@ -40,6 +42,8 @@ int32	tcp_recv(
 	wait (tcbptr->tcb_mutex);
 	signal (Tcp.tcpmutex);
 
+	printf ( "TCP recv -- have TCB mutex\n" );
+
 	tcbref (tcbptr);
 
 	/* Interpret semantics according to TCB state */
@@ -50,10 +54,13 @@ int32	tcp_recv(
 
 		while (tcbptr->tcb_qlen == 0
 				&& tcbptr->tcb_state != TCB_CLOSED) {
+			printf ( "TCP recv - waiting in listen on port %d\n", tcbptr->tcb_lport );
 			tcbptr->tcb_readers++;
 			signal (tcbptr->tcb_mutex);
 			wait (tcbptr->tcb_rblock);
+			printf ( "TCP recv - waiting for tcb mutex, port %d\n", tcbptr->tcb_lport );
 			wait (tcbptr->tcb_mutex);
+			printf ( "TCP recv - awakened!!! listening on port %d\n", tcbptr->tcb_lport );
 		}
 
 		/* Recheck state to see why we resumed */
@@ -113,6 +120,8 @@ int32	tcp_recv(
 		end = tcbptr->tcb_rbdata + curlen;
 		if (end >= tcbptr->tcb_rbend)
 			end -= tcbptr->tcb_rbsize;
+
+		/* XXX - byte by byte copy */
 		while (tcbptr->tcb_rbdata != end) {
 			data[i++] = *tcbptr->tcb_rbdata++;
 			if (tcbptr->tcb_rbdata >= tcbptr->tcb_rbend)

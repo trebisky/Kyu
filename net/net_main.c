@@ -265,12 +265,6 @@ net_init ( void )
 
     // net_show ();
 
-
-#ifdef notdef
-    /* XXX - Doing this here interfered with tftp symbol table fetch */
-    tcp_test ();	/* XXX XXX */
-#endif
-
     /*
     show_arp_ping ( mmt_ip );
     show_arp_ping ( caliente_ip );
@@ -481,6 +475,10 @@ net_show ( void )
 	netbuf_show ();
 	arp_show ();
 	dns_cache_show ();
+
+#ifdef WANT_TCP_XINU
+	xinu_show ();
+#endif
 }
 
 /* ----------------------------------------- */

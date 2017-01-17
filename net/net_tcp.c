@@ -152,7 +152,7 @@ tcp_tester ( struct tcp_io *tp, char *buf, int count )
 #define	DAYTIME_PORT	13	/* daytime */
 
 static void
-test_tcp_daytime ( int dummy )
+test_tcp_daytime ( void )
 {
 	unsigned long ip;
 	struct tcp_io *tio;
@@ -164,7 +164,7 @@ test_tcp_daytime ( int dummy )
 static char echo_buf[1024];
 
 static void
-test_tcp_echo ( int dummy )
+test_tcp_echo ( void )
 {
 	unsigned long ip;
 	struct tcp_io *tio;
@@ -192,10 +192,10 @@ test_connect ( struct tcp_io *tp )
 
 /* This gets called from the test console */
 void
-test_tcp ( int dummy )
+test_kyu_tcp ( void )
 {
-	test_tcp_echo ( dummy );
-	// test_tcp_daytime ( dummy );
+	test_tcp_echo ();
+	// test_tcp_daytime ();
 }
 
 /* For echo server */

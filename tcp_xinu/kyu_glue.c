@@ -10,8 +10,6 @@
 #include "thread.h"
 #include "../net/net.h"
 
-struct host_info  host_info;
-
 int
 semcreate ( int arg )
 {
@@ -19,6 +17,64 @@ semcreate ( int arg )
 	    sem_mutex_new ( SEM_FIFO );
 	else
 	    sem_signal_new ( SEM_FIFO );
+}
+
+#define TEST_SERVER     "192.168.0.5"
+#define ECHO_PORT       7       /* echo */
+#define DAYTIME_PORT    13      /* daytime */
+
+static unsigned long
+dots2ip ( char *s )
+{
+	int nip;
+
+	(void) net_dots ( s, &nip );
+	return ntohl ( nip );
+}
+
+static void
+test_client ( void )
+{
+	int port = DAYTIME_PORT;
+	int slot;
+
+	slot = tcp_register ( dots2ip(TEST_SERVER), port, 1 );
+	printf ( "Client connection on port %d\n", port );
+	tcp_close ( slot );
+}
+
+static void
+test_server ( void )
+{
+	int lslot;
+	int cslot;
+	int rv;
+	int port = 1234;
+
+	lslot = tcp_register ( 0, port, 0 );
+	printf ( "Listening on port %d (slot %d)\n", port, lslot );
+
+	for ( ;; ) {
+	    printf ( "Waiting for connection\n" );
+	    rv = tcp_recv ( lslot, (char *) &cslot, 4 );
+	    printf ( "Connection!! %d, %d\n", rv, cslot );
+	    tcp_send ( cslot, "dog\n", 4 );
+	    tcp_send ( cslot, "cat\n", 4 );
+	    tcp_close ( cslot );
+	}
+}
+
+static void
+tcp_xinu_test ( int bogus )
+{
+	test_client ();
+	test_server ();
+}
+
+void
+test_xinu_tcp ( void )
+{
+	(void) thr_new ( "xinu_tester", tcp_xinu_test, NULL, 30, 0 );
 }
 
 void
@@ -89,6 +145,31 @@ ip_enqueue ( struct netpacket *pkt )
 	//     pkt->net_tcpsport, pkt->net_tcpdport );
 
 	ip_send ( nbp, htonl(pkt->net_ipdst) );
+}
+
+void
+xinu_show ( void )
+{
+	int i;
+	struct tcb *tp;
+
+	for (i = 0; i < Ntcp; i++) {
+	    if (tcbtab[i].tcb_state == TCB_FREE)
+		continue;
+	    tp = &tcbtab[i];
+	    if ( tp->tcb_state == TCB_LISTEN )
+		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
+	    else if ( tp->tcb_state == TCB_ESTD )
+		printf ( "TCB slot %d: Established %d (%d)\n", i, tp->tcb_lport, tp->tcb_rport );
+	    else if ( tp->tcb_state == TCB_CLOSED )
+		printf ( "TCB slot %d: Closed\n", i );
+	    else if ( tp->tcb_state == TCB_CWAIT )
+		printf ( "TCB slot %d: Close wait\n", i );
+	    else if ( tp->tcb_state == TCB_TWAIT )
+		printf ( "TCB slot %d: T wait\n", i );
+	    else
+		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
+        }
 }
 
 /* We now hide a pointer to the netbuf inside the netbuf
