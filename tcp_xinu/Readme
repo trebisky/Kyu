@@ -173,6 +173,25 @@ This can be done in the decoder by right clicking on the summary line,
   validation by ticking a checkbox.
 Or use: Edit -> Preferences -> Protocols -> IPv4
   and check "Validate the IPv4 checksum if possible"
-<<
+
+To test the TCP client, you need some kind of server.
+What I do on my linux machine is:
+
+    su
+    cd /etc/xinetd.d
+    vi daytime-stream 
+    vi echo-stream 
+
+In the above, edit the "disable" line from yes to no.
+Then:
+
+    service xinetd restart
+    telnet localhost 13
+
+Trying ::1...
+Connected to localhost.
+Escape character is '^]'.
+16 JAN 2017 19:41:48 MST
+Connection closed by foreign host.
 
 THE END

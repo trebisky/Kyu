@@ -22,7 +22,7 @@ int32	tcp_recv(
 		return SYSERR;
 	}
 
-	printf ( "TCP recv called for slot %d, len = %d\n", slot, len );
+	// KYU printf ( "TCP recv called for slot %d, len = %d\n", slot, len );
 
 	/* Obtain pointer to the TCB for the pseudo device */
 
@@ -42,7 +42,7 @@ int32	tcp_recv(
 	wait (tcbptr->tcb_mutex);
 	signal (Tcp.tcpmutex);
 
-	printf ( "TCP recv -- have TCB mutex\n" );
+	// KYU printf ( "TCP recv -- have TCB mutex\n" );
 
 	tcbref (tcbptr);
 
@@ -54,13 +54,13 @@ int32	tcp_recv(
 
 		while (tcbptr->tcb_qlen == 0
 				&& tcbptr->tcb_state != TCB_CLOSED) {
-			printf ( "TCP recv - waiting in listen on port %d\n", tcbptr->tcb_lport );
+			// KYU printf ( "TCP recv - waiting in listen on port %d\n", tcbptr->tcb_lport );
 			tcbptr->tcb_readers++;
 			signal (tcbptr->tcb_mutex);
 			wait (tcbptr->tcb_rblock);
-			printf ( "TCP recv - waiting for tcb mutex, port %d\n", tcbptr->tcb_lport );
+			// KYU printf ( "TCP recv - waiting for tcb mutex, port %d\n", tcbptr->tcb_lport );
 			wait (tcbptr->tcb_mutex);
-			printf ( "TCP recv - awakened!!! listening on port %d\n", tcbptr->tcb_lport );
+			// KYU printf ( "TCP recv - awakened!!! listening on port %d\n", tcbptr->tcb_lport );
 		}
 
 		/* Recheck state to see why we resumed */

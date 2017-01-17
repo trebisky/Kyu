@@ -37,10 +37,13 @@ int32	tcpsynrcvd(
 
 	/* Permit reading */
 
-	printf ( "TCP ESTD - signal readers\n" );
+	// KYU printf ( "TCP ESTD - signal readers\n" );
+	/* XXX - XXX - Kyu - this is where we "have" the event
+	 * of a signal established.
+	 */
 	if (tcbptr->tcb_readers > 0) {
 		tcbptr->tcb_readers--;
-		printf ( "TCP ESTD - signaling readers\n" );
+		// KYU printf ( "TCP ESTD - signaling readers\n" );
 		signal (tcbptr->tcb_rblock);
 	}
 

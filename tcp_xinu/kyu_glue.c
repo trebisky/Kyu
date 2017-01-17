@@ -37,9 +37,15 @@ test_client ( void )
 {
 	int port = DAYTIME_PORT;
 	int slot;
+	char buf[100];
+	int n;
 
 	slot = tcp_register ( dots2ip(TEST_SERVER), port, 1 );
-	printf ( "Client connection on port %d\n", port );
+	printf ( "Client connection on port %d, slot = %d\n", port, slot );
+	n = tcp_recv ( slot, buf, 100 );
+	printf ( "Client recv returns %d\n", n );
+	buf[n] = '\0';
+	printf ( "Client recv got %s\n", buf );
 	tcp_close ( slot );
 }
 
