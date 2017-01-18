@@ -31,7 +31,7 @@ board_init ( void )
 	cm_init ();
 
 	serial_init ( CONSOLE_BAUD );
-	timer_init ( DEFAULT_TIMER_RATE );
+	// board_timer_init ( DEFAULT_TIMER_RATE );
 
 	/* CPU interrupts on */
 	enable_irq ();
@@ -41,6 +41,19 @@ board_init ( void )
 	i2c_init ();
 
 	adc_init ();
+}
+
+void
+board_timer_init ( int rate )
+{
+	// dmtimer_probe ();
+	dmtimer_init ( rate );
+}
+
+void
+board_timer_rate_set ( int rate )
+{
+	dmtimer_rate_set ( rate );
 }
 
 /* This gets called after the network is alive and well */

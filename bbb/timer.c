@@ -5,8 +5,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* timer.c
+ *
+ * timer.c -- timer driver for the BBB
  *
  * Simple driver for the DM timer
  * see section 20 of the am3359 TRM
@@ -21,11 +21,9 @@
 #include <omap_ints.h>
 // #include <cpu.h>
 
+void timer_tick ( void );
+
 void prcm_timer1_mux ( void );
-
-extern struct thread *cur_thread;
-
-void thread_tick ( void );
 
 #define TIMER0_BASE      0x44E05000
 #define TIMER1MS_BASE    0x44E31000
@@ -47,6 +45,7 @@ void thread_tick ( void );
 #define TIMER_BASE	TIMER2_BASE
 #define TIMER_IRQ	IRQ_TIMER2
 
+#ifdef notdef
 static void
 probeit ( char *msg, unsigned long addr )
 {
@@ -63,7 +62,7 @@ probeit ( char *msg, unsigned long addr )
  * So, U-boot only enables clocks for 0 and 2.
  */
 void
-timer_probe ( void )
+dmtimer_probe ( void )
 {
 	probeit ( "timer0", TIMER0_BASE );	/* ok */
 	probeit ( "timer1", TIMER1MS_BASE );
@@ -74,6 +73,7 @@ timer_probe ( void )
 	probeit ( "timer6", TIMER6_BASE );
 	probeit ( "timer7", TIMER7_BASE );
 }
+#endif
 
 /* registers in a timer (except the special timer 1) */
 
@@ -162,21 +162,7 @@ struct dmtimer1 {
 /* This should get overwritten by the value
  * determined by calibration
  */
-static int timer_hz = TIMER_CLOCK;
-
-static volatile long timer_count_t;
-static volatile long timer_count_s;
-
-/* Needed by imported linux code.
- */
-volatile unsigned long jiffies;
-
-static vfptr timer_hook;
-#ifdef WANT_NET_TIMER
-static vfptr net_timer_hook;
-#endif
-
-static int timer_rate;
+static int dmtimer_hz = TIMER_CLOCK;
 
 /* --------------------------------------------------- */
 
@@ -244,35 +230,6 @@ _udelay ( int n )
 /* --------------------------------------------------- */
 /* --------------------------------------------------- */
 
-void
-timer_hookup ( vfptr new )
-{
-	timer_hook = new;
-}
-
-#ifdef WANT_NET_TIMER
-void
-net_timer_hookup ( vfptr new )
-{
-	net_timer_hook = new;
-}
-#endif
-
-/* Count in ticks (milliseconds) */
-/* TCP timing uses this */
-int
-get_timer_count_t ( void )
-{
-	return timer_count_t;
-}
-
-/* Count in seconds */
-int
-get_timer_count_s ( void )
-{
-	return timer_count_s;
-}
-
 static int bogus_count = 0;
 
 void
@@ -299,7 +256,6 @@ post_spin ( int mask )
 	    ;
 }
 
-
 /* Note that with a 32769 Hz timer and a 1000 Hz tick rate,
  * the load value is -33 or something close.  This is pretty
  * doggone imprecise (we can do no better than 3 percent).
@@ -313,7 +269,7 @@ dmtimer_rate_set_i ( int rate )
 	unsigned long val;
 
 	val = 0xffffffff;
-	val -= timer_hz / rate;
+	val -= dmtimer_hz / rate;
 	// printf ( "Loading: %08x\n", val );
 
 	/* load the timer */
@@ -378,7 +334,6 @@ dmtimer_rate_set ( int hz )
 void
 dmtimer_int ( int xxx )
 {
-	static int subcount;
 	struct dmtimer *tmr = (struct dmtimer *) TIMER_BASE;
 
 	/* Abandon bogus interrupts */
@@ -418,39 +373,10 @@ dmtimer_int ( int xxx )
 	}
 #endif
 
-	++jiffies;
+	/* ----------------- **** --------------------- */
+	/* ----------------- **** --------------------- */
 
-	/* These counts are somewhat bogus,
-	 * but handy when first bringing up the timer
-	 * and interrupt system.
-	 *
-	 * We used to make then available as global variables,
-	 * but that was tacky.  Now we provide access to them
-	 * via function calls.
-	 */
-	++timer_count_t;
-
-	++subcount;
-	if ( (subcount % timer_rate) == 0 ) {
-	    ++timer_count_s;
-	}
-
-	if ( ! cur_thread )
-	    panic ( "timer, cur_thread" );
-
-	++cur_thread->prof;
-
-	thread_tick ();
-
-	if ( timer_hook ) {
-	    (*timer_hook) ();
-	}
-
-#ifdef WANT_NET_TIMER
-	if ( net_timer_hook ) {
-	    (*net_timer_hook) ();
-	}
-#endif
+	timer_tick ();
 
 	/* ACK the interrupt */
 	tmr->irq_stat = TIMER_OVF;
@@ -528,7 +454,7 @@ dmtimer_init ( int rate )
 	// printf ( " SIC == %08x\n", tmr->sic );
 	tmr->sic = SIC_POSTED;
 
-	timer_hz = dmtimer_checkrate ();
+	dmtimer_hz = dmtimer_checkrate ();
 
 	/* Stop the timer */
 	dmtimer_irqdis ();
@@ -539,19 +465,11 @@ dmtimer_init ( int rate )
 	/* will need something like this for timer 2 */
 	// prcm_timer1_mux ();
 
-	timer_count_t = 0;
-	timer_count_s = 0;
-
-	timer_hook = (vfptr) 0;
-#ifdef WANT_NET_TIMER
-	net_timer_hook = (vfptr) 0;
-#endif
-
 	// printf ( "Timer id: %08x\n", tmr->id );
 
 	irq_hookup ( TIMER_IRQ, dmtimer_int, 0 );
 
-	timer_rate = rate;
+	// timer_rate = rate;
 	dmtimer_rate_set_i ( rate );
 	dmtimer_irqena ();
 
@@ -579,34 +497,6 @@ dmtimer_test ( void )
 	}
 }
 #endif
-
-/* Called during Kyu startup */
-void
-timer_init ( int rate )
-{
-	/* XXX */
-	timer_probe ();
-
-	dmtimer_init ( rate );
-}
-
-/* Public entry point.
- */
-int
-timer_rate_get ( void )
-{
-	return timer_rate;
-}
-
-/* Public entry point.
- * Set a different timer rate
- */
-void
-timer_rate_set ( int rate )
-{
-	timer_rate = rate;
-	dmtimer_rate_set ( rate );
-}
 
 /* ------------------------------------------------------------------- */
 /* ------------------------------------------------------------------- */

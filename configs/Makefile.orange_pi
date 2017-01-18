@@ -15,16 +15,25 @@ include Makefile.inc
 # from below
 #    linux/linux-lib.o
 
-# For now, machine.o must come first since U-boot simply branches
-# to 80300000 to start this running.
+# machine.o must come first
 
-OBJS =  machine.o board.o net.o \
-    main.o version.o user.o tests.o \
-    console.o thread.o prf.o \
+OBJS =  machine.o \
+    board.o \
+    version.o \
+    timer.o \
+    main.o \
+    user.o \
+    tests.o \
+    console.o \
+    thread.o \
+    prf.o \
     symbols.o \
-    dlmalloc.o random.o \
+    dlmalloc.o \
+    random.o \
+    net.o \
     tcp_xinu.o \
-    kyulib.o lib.o
+    kyulib.o \
+    lib.o
 
 all: install dump sym tags
 

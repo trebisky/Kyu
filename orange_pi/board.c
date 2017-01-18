@@ -36,6 +36,18 @@ board_init ( void )
 	enable_irq ();
 }
 
+void
+board_timer_init ( int rate )
+{
+	op_timer_init ( rate );
+}
+
+void
+board_timer_rate_set ( int rate )
+{
+	op_timer_rate_set ( rate );
+}
+
 /* This gets called after the network is alive and well
  *  to allow things that need the network up to initialize.
  *  (a hook for the PRU on the BBB).

@@ -124,9 +124,9 @@ sys_init ( int xxx )
 	*/
 
 	console_init ();
-	// hardware_init ();
 	hardware_debug ();
 	board_init ();
+	timer_init ();
 
 	/* enable interrupts */
 	cpu_leave ();
