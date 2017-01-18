@@ -33,6 +33,18 @@ board_init ( void )
 	enable_irq ();
 }
 
+void
+board_timer_init ( int rate )
+{
+	intel_timer_init ( rate );
+}
+
+void
+board_timer_rate_set ( int rate )
+{
+	intel_timer_rate_set ( rate );
+}
+
 /* This gets called after the network is alive and well */
 void
 board_after_net ( void )

@@ -19,13 +19,13 @@
 #include "kyulib.h"
 #include "intel.h"
 
-extern struct thread *cur_thread;
-extern int thread_debug;
-
 void timer_int ( void );
 
+/*
 long in_interrupt;
 struct thread *in_newtp;
+struct thread *timer_wait;
+*/
 
 /* go at 100 Hz.
  * (we actually get 100.0067052 or so)
@@ -35,26 +35,11 @@ struct thread *in_newtp;
 #define TIMER_INT	0
 #define TIMER_CRYSTAL	1193180
 
-long timer_count_t = 0;
-long timer_count_s = 0;
-
-/* a kindness to the linux emulator.
- */
-volatile unsigned long jiffies;
-
-static vfptr timer_hook;
-static vfptr net_timer_hook;
-
-int timer_rate;
-
-struct thread *timer_wait;
-
 static void
-timer_rate_set ( int hz )
+intel_timer_rate_set ( int hz )
 {
 	int preload;
 
-	timer_rate = hz;
 	preload = TIMER_CRYSTAL / hz;
 
 	/* The 8253 is a poor little 16 bit counter,
@@ -72,10 +57,8 @@ timer_rate_set ( int hz )
 /* initialize the timer.
  */
 void
-timer_init ( void )
+intel_timer_init ( void )
 {
-	timer_hook = (vfptr) 0;
-	net_timer_hook = (vfptr) 0;
 	timer_wait = (struct thread *) 0;
 
 #ifdef notdef
@@ -85,7 +68,7 @@ timer_init ( void )
 	outb_p ( rate >> 8, 0x40 );
 #endif
 
-	timer_rate_set ( DEFAULT_TIMER_RATE );
+	intel_timer_rate_set ( DEFAULT_TIMER_RATE );
 
 	irq_hookup_t ( TIMER_INT, timer_int );
 
@@ -94,42 +77,11 @@ timer_init ( void )
 	pic_enable ( TIMER_INT );
 }
 
-/* Public entry point.
- */
-int
-tmr_rate_get ( void )
-{
-	return timer_rate;
-}
-
-/* Public entry point.
- * Set a different timer rate
- * XXX - really should use pic_enable/disable
- */
-void
-tmr_rate_set ( int hz )
-{
-	pic_disable ( TIMER_INT );
-	/*
-	cpu_enter ();
-	*/
-
-	timer_rate_set ( hz );
-
-	pic_enable ( TIMER_INT );
-	/*
-	cpu_leave ();
-	*/
-
-}
-
 /* field a timer interrupt.
  */
 void
 timer_int ( void )
 {
-	static int subcount;
-	struct thread *tp;
 
 #ifdef WANT_BENCH
 extern unsigned long long ts1;
@@ -141,24 +93,10 @@ extern unsigned long ts_dt;
 
 	outb ( OCW_EOI, PIC_1_EVEN );
 
-	++jiffies;
+	timer_tick ();
 
-	/* old baloney - really the count
-	 * would do (if we chose to export it).
-	 * My view is that accessing this externally
-	 * is tacky, and folks should make method calls
-	 * for timer facilities....
-	 */
-	++timer_count_t;
-	++subcount;
-	if ( (subcount % 100) == 0 ) {
-	    ++timer_count_s;
-	}
-
-	if ( ! cur_thread )
-	    panic ( "timer, cur_thread" );
-
-	++cur_thread->prof;
+#ifdef not_any_more
+	struct thread *tp;
 
 	in_interrupt = 1;
 
@@ -172,14 +110,6 @@ extern unsigned long ts_dt;
 		}
 	    	thr_unblock ( tp );
 	    }
-	}
-
-	if ( timer_hook ) {
-	    (*timer_hook) ();
-	}
-
-	if ( net_timer_hook ) {
-	    (*net_timer_hook) ();
 	}
 
 	/* -------------------------------------------
@@ -214,58 +144,7 @@ extern unsigned long ts_dt;
 	resume_i ( &cur_thread->iregs );
 	/* NOTREACHED */
 	panic ( "timer, resume" );
-}
-
-void
-tmr_hookup ( vfptr new )
-{
-	timer_hook = new;
-}
-
-void
-net_tmr_hookup ( vfptr new )
-{
-	net_timer_hook = new;
-}
-
-/* maintain a linked list of folks waiting on
- * timer delay activations.
- * In time-honored fashion, the list is kept in
- * sorted order, with the soon to be scheduled
- * entries at the front.  Each tick then just
- * needs to decrement the leading entry, and
- * when it becomes zero, one or more entries
- * get launched.
- *
- * Important - this must be called with
- * interrupts disabled !
- */
-void
-timer_add_wait ( struct thread *tp, int delay )
-{
-	struct thread *p, *lp;
-
-	p = timer_wait;
-
-	while ( p && p->delay <= delay ) {
-	    delay -= p->delay;
-	    lp = p;
-	    p = p->wnext;
-	}
-
-	if ( p )
-	    p->delay -= delay;
-
-	tp->delay = delay;
-	tp->wnext = p;
-
-	if ( p == timer_wait )
-	    timer_wait = tp;
-	else
-	    lp->wnext = tp;
-	/*
-	printf ( "Add wait: %d\n", delay );
-	*/
+#endif
 }
 
 /* THE END */
