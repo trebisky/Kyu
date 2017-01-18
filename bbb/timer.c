@@ -172,7 +172,7 @@ static volatile long timer_count_s;
 volatile unsigned long jiffies;
 
 static vfptr timer_hook;
-#ifdef NET_TIMER
+#ifdef WANT_NET_TIMER
 static vfptr net_timer_hook;
 #endif
 
@@ -250,7 +250,7 @@ timer_hookup ( vfptr new )
 	timer_hook = new;
 }
 
-#ifdef NET_TIMER
+#ifdef WANT_NET_TIMER
 void
 net_timer_hookup ( vfptr new )
 {
@@ -446,7 +446,7 @@ dmtimer_int ( int xxx )
 	    (*timer_hook) ();
 	}
 
-#ifdef NET_TIMER
+#ifdef WANT_NET_TIMER
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
@@ -543,7 +543,7 @@ dmtimer_init ( int rate )
 	timer_count_s = 0;
 
 	timer_hook = (vfptr) 0;
-#ifdef NET_TIMER
+#ifdef WANT_NET_TIMER
 	net_timer_hook = (vfptr) 0;
 #endif
 

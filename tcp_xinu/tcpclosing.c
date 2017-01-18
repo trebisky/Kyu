@@ -14,6 +14,7 @@ int32	tcpclosing(
 	/* If FIN is within range, schedule TCB expiration */
 
 	if (SEQ_CMP (tcbptr->tcb_suna, tcbptr->tcb_sfin) > 0) {
+		// printf ( "TWAIT from closing\n" );
 		tcptmset (TCP_MSL << 1, tcbptr, TCBC_EXPIRE);
 		tcbptr->tcb_state = TCB_TWAIT;
 	}

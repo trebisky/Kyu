@@ -16,6 +16,7 @@ void	tcptmset(
 	tcbref (tcbptr);
 
 	/* Set the event */
+	// printf ( "Set time event: %d ms\n", delay );
 
 	tmset (delay, Tcp.tcpcmdq, TCBCMD(tcbptr, message));
 	return;
@@ -31,10 +32,11 @@ void	tcptmdel(
 	)
 {
 	/* Delete the event */
+	// printf ( "Delete time event\n" );
+
 	if (tmdel (Tcp.tcpcmdq, TCBCMD(tcbptr, message)) == OK) {
 
 		/* Decrement the refernce count */
-
 		tcbunref (tcbptr);
 	}
 	return;

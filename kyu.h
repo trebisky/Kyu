@@ -15,7 +15,8 @@
  */
 
 #define MAX_THREADS	32
-#define MAX_SEM		64
+// #define MAX_SEM		64
+#define MAX_SEM		512
 #define MAX_CV		32
 
 /* Set nonzero only when bringing the system up
@@ -37,6 +38,9 @@
 #define WANT_NET
 #define WANT_USER
 #define WANT_SHELL
+
+/* Xinu needs the net timer */
+#define WANT_NET_TIMER
 #define WANT_TCP_XINU
 
 #include "board/board.h"

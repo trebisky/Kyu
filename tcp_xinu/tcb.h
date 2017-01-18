@@ -105,6 +105,12 @@ struct tcb {
 	int32		tcb_writers;
 };
 
-#define	Ntcp	5
+/* Increased this for Kyu 1-17-2017
+ * also had to bump NMQ up from 70 to 200
+ * as well as NSEM for Kyu from 64 to 512
+ * (these are generous increases, but seem just fine).
+ */
+// #define	Ntcp	5
+#define	Ntcp	100
 
 extern struct tcb tcbtab[Ntcp];		/* the table of TCBs 		*/

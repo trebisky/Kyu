@@ -128,9 +128,18 @@ test_xinu_tcp ( void )
 	(void) thr_new ( "xinu_tester", tcp_xinu_test, NULL, 30, 0 );
 }
 
+static void
+xinu_timer ( void )
+{
+	if ( tmnext && (--(*tmnext)) == 0 )
+	    tmfire ();
+}
+
 void
 tcp_xinu_init ( void )
 {
+	net_timer_hookup ( xinu_timer );
+
 	tcp_init ();
 }
 

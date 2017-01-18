@@ -18,6 +18,7 @@ int32	tcpfin2(
 
 	if (tcbptr->tcb_flags & TCBF_FINSEEN
 	    && SEQ_CMP(tcbptr->tcb_rnext, tcbptr->tcb_rfin) > 0) {
+		// printf ( "Twait from fin2\n" );
 		tcptmset (TCP_MSL << 1, tcbptr, TCBC_EXPIRE);
 		tcbptr->tcb_state = TCB_TWAIT;
 	}

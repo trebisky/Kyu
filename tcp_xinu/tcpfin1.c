@@ -34,6 +34,7 @@ int32	tcpfin1(
 		/* FIN was received and ours was ACKed, so the	*/
 		/*     connection is closed and TCB can expire	*/
 
+		// printf ( "Twait from fin1\n" );
 		tcptmset (TCP_MSL << 1, tcbptr, TCBC_EXPIRE);
 		tcbptr->tcb_state = TCB_TWAIT;
 	} else if (rfin)

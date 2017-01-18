@@ -1,6 +1,7 @@
 /* mq.h  -  constants and definitions for the TCP message queues	*/
 
-#define	NMQ	70			/* Number of queues		*/
+// #define	NMQ	70		/* Number of queues		*/
+#define	NMQ	200			/* Number of queues		*/
 
 /* State of a queue */
 
