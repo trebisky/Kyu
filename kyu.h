@@ -27,6 +27,12 @@
 
 #define STACK_SIZE	4096	/* bytes */
 
+/* There will be trouble if we change this,
+ * in particular, TCP timeouts expect the timer
+ * to tick once per millisecond.
+ */
+#define DEFAULT_TIMER_RATE	1000
+
 /*
 #define WANT_DELAY
 #define WANT_PCI

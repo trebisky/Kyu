@@ -126,7 +126,7 @@ sys_init ( int xxx )
 	console_init ();
 	hardware_debug ();
 	board_init ();
-	timer_init ();
+	timer_init ( DEFAULT_TIMER_RATE );
 
 	/* enable interrupts */
 	cpu_leave ();

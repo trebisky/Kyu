@@ -35,7 +35,7 @@ static vfptr net_timer_hook;
 
 /* XXX - needed by imported linux code.
  */
-volatile unsigned long jiffies;
+// volatile unsigned long jiffies;
 
 void
 timer_init ( int rate )
@@ -74,7 +74,7 @@ timer_tick ( void )
 {
 	static int subcount;
 
-	++jiffies;
+	// ++jiffies;
 
 	/* These counts are somewhat bogus,
 	 * but handy when first bringing up the timer

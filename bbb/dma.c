@@ -45,7 +45,7 @@ dma_probe ( void )
 void
 dma_init ( void )
 {
-	dma_probe ();
+	// dma_probe ();
 }
 
 /* THE END */
