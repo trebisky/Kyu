@@ -5,10 +5,14 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* board_x86.c
+ *
+ * board.c for the x86
+ *
  * Tom Trebisky  1/5/2017
  *
+ * XXX - eventually we will have a galileo directory with board.c
+ * and the x86 directory will have hardware.c that is common to
+ * various x86 targets.  For now this is a mess pending cleanup.
  */
 
 #include "kyu.h"

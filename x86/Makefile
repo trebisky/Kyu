@@ -9,7 +9,7 @@ include ../Makefile.inc
 
 # locore must be first
 OBJS =  locore.o \
-	board_x86.o \
+	board.o \
 	interrupts.o \
 	timer.o \
 	serial.o \

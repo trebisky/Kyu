@@ -7,7 +7,7 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
-OBJS =  board_orange_pi.o \
+OBJS =  board.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \

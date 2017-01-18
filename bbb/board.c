@@ -5,80 +5,79 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* board_bbb.c
+ *
+ * board.c for the BBB
+ *
  * Tom Trebisky  7/5/2017
  *
  */
 
 #include "kyu.h"
 #include "kyulib.h"
-#include "board.h"
+#include "board/board.h"
 
 #include "netbuf.h"
 
 void
 board_init ( void )
 {
-	// wdt_disable ();
+	wdt_disable ();
 
-	/* Turn on the green LED */
-	led_init ();
-	pwr_on ();
+	clocks_init ();
+	modules_init ();
 
-	gic_init ();
+	mux_init ();
+	intcon_init ();
+	cm_init ();
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	/* CPU interrupts on */
 	enable_irq ();
+
+	dma_init ();
+	gpio_init ();
+	i2c_init ();
+
+	adc_init ();
 }
 
-/* This gets called after the network is alive and well
- *  to allow things that need the network up to initialize.
- *  (a hook for the PRU on the BBB).
- */
+/* This gets called after the network is alive and well */
 void
 board_after_net ( void )
 {
+	pru_init ();
 }
 
-void
-reset_cpu ( void )
-{
-    main_reset ();
-}
-
-/* ---------------------------------- */
-
-/* Initialize the network device */
 int
 board_net_init ( void )
 {
-	return 0;
+	return cpsw_init ();
 }
 
-/* Bring the network device online */
 void
 board_net_activate ( void )
 {
+	cpsw_activate ();
 }
 
 void
 board_net_show ( void )
 {
+	cpsw_show ();
 }
 
 void
 get_board_net_addr ( char *addr )
 {
+	get_cpsw_addr ( addr );
 }
 
 void
 board_net_send ( struct netbuf *nbp )
 {
-	// cpsw_send ( nbp );
+	cpsw_send ( nbp );
 }
 
 /* THE END */
