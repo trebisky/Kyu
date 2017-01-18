@@ -1,0 +1,53 @@
+These are files from the old Skidoo project.
+
+January 18, 2017
+
+Skidoo ran on the x86 and was the predecessor to Kyu.
+I have always meant to get back to the x86, but just
+never have.  So this is a set of increasingly out of
+sync files from the x86 days and Skidoo that have been
+sequestered here.
+
+These have not been compiled in years and it is virtually
+certain that it will take serious work to get them going
+again.  Some observations:
+
+1) I will probably introduce support for the Galileo and
+    add a Galileo board directory at that time.
+    I expect that to be the next thing that happens
+    with this target branch.
+
+2) I expect this to become a board target that I will call
+    "legacy-pc" alongside Galileo.  The question will be
+    if I can even find legacy PC hardware to run this on.
+    The board I used had some kind of "pentium" processor
+    along with genuine PCI and ISA slots.  It had the
+    usual crop of peripherals including a real UART,
+    a parallel port, an 8254 timer chip and an 8259
+    interrupt controller. 
+
+3) I want to get a fairly modern PC and call it a board
+    target named "desktop-pc".  I expect a lot of the
+    legacy stuff will be gone (like the 8254 and 8259)
+    but I may be wrong.  I would like to support the
+    Intel ee1000 gigabit ethernet (since I have a pile
+    of those and they seem like nice devices).
+
+In many ways desktop PC's have become increasingly irrelevant
+and uninteresting for Kyu.  Kyu is all about hardware access
+and doing things with hardware peripherals.  That sort of
+thing has faded from the scene.  The "action" of that sort
+has migrated to ARM based single boards like the BBB, the
+Orange Pi, and the Raspberry Pi.  This is very much a good
+thing, but it means that the x86 branch of Kyu may never
+get any attention, except for old times sake.
+
+The Intel Galileo is a product that makes a faulty attempt
+to shoulder in among these ARM boards.  But it offers a
+clumsy x86 running at 400 Mhz alongside numerous ARM
+offerings running more than twice as fast at a better price.
+Some misinformed people think that some Intel magic will
+make the x86 perform better than expected, but my benchmarks
+indicate that it performs on a par with a 400 Mhz ARM,
+just as you would expect.  So this is all smoke and mirrors
+and the savvy buyer will go with the ARM.
