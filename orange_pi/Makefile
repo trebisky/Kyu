@@ -12,7 +12,7 @@ OBJS =  board.o \
 	gpio.o \
 	serial.o \
 	timer.o \
-	cpu.o
+	smp.o
 
 all: ../board.o
 

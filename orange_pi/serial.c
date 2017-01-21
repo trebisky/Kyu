@@ -1,7 +1,18 @@
-/* serial.c
- * super simple "driver" for the H3 uart.
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ *
+ * serial.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  12-22-2016
+ * Tom Trebisky  1/19/2017
+ *
+ * serial.c
+ * super simple "driver" for the H3 uart.
  */
 
 #define UART0_BASE	0x01C28000

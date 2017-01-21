@@ -1,6 +1,17 @@
-/* Driver for the H3 gpio
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ *
+ * gpio.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  12-22-2016
+ * Tom Trebisky  1/19/2017
+ *
+ * Driver for the H3 gpio
  */
 
 #define GPIO_A    0

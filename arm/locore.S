@@ -5,8 +5,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* locore.S
+ *
+ * locore.S
  *
  * Kyu project  5-12-2015  Tom Trebisky
  *
@@ -587,5 +587,44 @@ restore:
         msr     cpsr_cfsx, r1   /* Restore the CPSR                     */
         pop     {r1, r2}        /* Restore r1, r2                       */
         mov     pc, lr          /* Return to caller                     */
+
+/* ==================================================================== */
+/* ==================================================================== */
+/* ==================================================================== */
+
+/* Experimental section for Orange Pi multiple cores */
+
+/* We tried using this as a sentinel,
+ * but caching hides the results.
+ */
+	.globl statcore
+statcore:
+	.word	0xdeadbeef
+
+	.globl zcore
+zcore:
+	mov	r0, #3
+	ldr	r1, =0x01f01da4
+        str     r0, [r1]
+	bx	lr
+
+#define SENTINEL	0x4
+
+	.globl newcore
+newcore:
+	ldr	sp, =0x5f000000
+	bl	kyu_newcore
+
+	; mov	r0, #0
+        ; str     r0, statcore
+	; ldr	r0, =0x1234abcd
+	mov	r0, #0
+	; ldr	r1, =0x01f01da4
+	ldr	r1, =SENTINEL
+loopcore:
+	add	r0, #1
+        str     r0, [r1]
+        b      loopcore
+
 
 /* THE END */

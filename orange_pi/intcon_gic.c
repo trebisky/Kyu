@@ -1,9 +1,19 @@
-/* Driver for the H3 GIC
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ *
+ * intcon_gic.c for the Orange Pi PC and PC Plus
+ *
+ * Tom Trebisky  1/19/2017
+ *
+ * Driver for the H3 GIC
  *
  * The GIC is the ARM "Generic Interrupt Controller"
  * It has two sections, "cpu" and "dist"
- *
- * Tom Trebisky  1-4-2017
  */
 
 #define NUM_CONFIG	10

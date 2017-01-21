@@ -45,6 +45,8 @@
 #define WANT_USER
 #define WANT_SHELL
 
+#define WANT_SMP
+
 /* Xinu needs the net timer */
 #define WANT_NET_TIMER
 #define WANT_TCP_XINU
