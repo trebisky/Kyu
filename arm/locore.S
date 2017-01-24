@@ -16,6 +16,9 @@
  * It can switch, but watch out if you do!
  */
 
+@ Apparently the at-sign is the ARM comment character.
+@ on the x86 you use the pound sign.
+
 #define PSR_M_SUPER	0x13
 #define PSR_M_IRQ	0x12
 #define PSR_M_FIQ	0x11
@@ -26,19 +29,36 @@
 
 #define PSR_DEFAULT	PSR_M_SUPER
 
+#ifdef notdef
+PIG PIG PIG
+
+@ fails
+core_startup:
+        mrs     r0, cpsr                /* disable interrupts */
+        orr     r0, r0, #PSR_INT_DIS
+        msr     cpsr, r0
+
+        movw    sp, #0
+        movt    sp, #0x4fff
+        bl      core_main
+#endif
+
 /* For the time being, this is the first thing linked
  * and U-boot simply branches to a hard address 80300000.
  * So it had better find this code there !!
  * For some reason the compiler was reordering routines
  * compiled from main.c, this makes us immune to that.
  */
-	.globl uboot_startup
-uboot_startup:
-	.globl kyu_startup
-kyu_startup:
+@	.globl uboot_startup
+@uboot_startup:
+@	.globl kyu_startup
+@kyu_startup:
 	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
+@        movw    sp, #0
+@        movt    sp, #0x4fff
+@	bl	core_main	/* XXX */
 
 	movw	r0, #:lower16:vectors	/* set VBAR */
 	movt	r0, #:upper16:vectors
@@ -534,7 +554,8 @@ set_covr:
 	.globl enable_irq
 enable_irq:
 	mrs	r0, cpsr
-	bic	r0, r0, #0x80
+	; bic	r0, r0, #0x80
+	bic	r0, #0x80
 	msr	cpsr, r0
 	bx	lr
 
@@ -597,9 +618,9 @@ restore:
 /* We tried using this as a sentinel,
  * but caching hides the results.
  */
-	.globl statcore
-statcore:
-	.word	0xdeadbeef
+;	.globl statcore
+; statcore:
+; 	.word	0xdeadbeef
 
 	.globl zcore
 zcore:
@@ -626,5 +647,12 @@ loopcore:
         str     r0, [r1]
         b      loopcore
 
+        .globl oldcore
+oldcore:
+        mov     r0, #0
+        ldr     r1, =0x01f01da4
+loopcore2:
+        str     r0, [r1]
+        b      loopcore2
 
 /* THE END */

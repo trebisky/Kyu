@@ -62,82 +62,58 @@
  * This is probably a redundant address decode, but who knows.
  */
 
-#ifdef notyet
+void test_core ( void );
+
 typedef void (*vfptr) ( void );
 
+/* main_reset()
+ *
+ * This has nothing to do with multiple cores, but we are searching for a way
+ *  to have software reset the entire processor.  No luck yet.
+ * So far doing this just hangs the processor ...
+ */
 void
-launch ( vfptr who )
+main_reset ( void )
 {
-        (*who) ();
-}
+	unsigned long val;
 
-static vfptr bounce;
+#ifdef notdef
+        volatile unsigned long *reset;
+	int cpu = 0;
+	// There are two bits in this register, both asserted by writing zeros.
+	// This does not work
+        // reset = (unsigned long *) ( CPUCFG_BASE + 0x40 + cpu * 0x40);   /* reset */
+	// *reset = 0;
 
-void
-bounce_core ( void )
-{
-        (*bounce) ();
-}
+	// This does not work either
+	reset = CPU_SYS_RESET;
+	*reset = 0;
+
+	// nor does this
+	vfptr romstart = (vfptr) 0xffff0000;
+	(*romstart) ();
 #endif
+	val = *(unsigned long *) 0xffff0000;
+	printf ( "ROM at ffff0000 = %08x\n", val );
+
+	// printf ( "Sorry ...\n");
+
+	// test_core ();
+}
 
 /* These are in locore.S */
 extern void newcore ( void );
-extern long statcore;
-
-#ifdef notdef
-void
-// launch_core ( int cpu, vfptr who )
-launch_core ( int cpu )
-{
-        unsigned long *reset;
-        unsigned long *clamp;
-        unsigned long *enab;
-        unsigned long mask = 1 << cpu;
-        int i;
-	unsigned long val;
-
-        reset = (volatile unsigned long *) ( CPUCFG_BASE + 0x40 + cpu * 0x40);   /* reset */
-        clamp = (volatile unsigned long *) ( PRCM_BASE + 0x140 + cpu * 4);       /* power clamp */
-        enab = (volatile unsigned long *) ( PRCM_BASE + 0x10 + cpu * 4);         /* power clamp */
-
-        // bounce = who;
-
-        *ROM_START = (unsigned long) newcore;  /* in locore.S */
-
-        *reset = 0;                     /* put core into reset */
-
-        *GEN_CTRL &= ~mask;             /* reset L1 cache */
-
-        // *DBG_CTRL1 &= ~mask;            /* sun6i - disable external debug */
-        // *enab = 0xffffffff;
-        *enab = 0;
-
-        for (i = 0; i <= 8; i++)        /* sun6i - power clamp */
-            *clamp = 0xff >> i;
-
-        *POWER_OFF &= ~mask;            /* power on */
-
-        // delay_ms ( 2 );                 /* delay at least 1 ms */
-	thr_delay ( 2 );
-
-        *reset = 3;			/* take out of reset */
-        // *DBG_CTRL1 |= mask;             /* sun6i - reenable external debug */
-}
-#endif
 
 void
 launch_core ( int cpu )
 {
         volatile unsigned long *reset;
         unsigned long mask = 1 << cpu;
-	// unsigned long val;
 
         reset = (volatile unsigned long *) ( CPUCFG_BASE + (cpu+1) * 0x40);
 	// printf ( "-- reset = %08x\n", reset );
 
-	// printf ( "-- ROM = %08x\n", *ROM_START );
         *ROM_START = (unsigned long) newcore;  /* in locore.S */
-	// printf ( "-- ROM = %08x\n", *ROM_START );
 
         *reset = 0;                     /* put core into reset */
 
@@ -161,18 +137,23 @@ watch_core ( void )
 
 	printf ( "Sentinel addr: %08x\n", sent );
 
-	for ( i=0; i<11; i++ ) {
+	for ( i=0; i<5; i++ ) {
 	    thr_delay ( 1000 );
 	    printf ( "Core status: %08x\n", *sent );
 	}
 }
 
+/* This gets called by the test menu
+ *   (or something of the sort)
+ */
 void
 test_core ( void )
 {
-	unsigned long val;
+	printf ( "CPSR  = %08x\n", get_cpsr() );
+	printf ( "SCTRL = %08x\n", get_sctrl() );
 
 #ifdef notdef
+	unsigned long val;
 	val = *CPU_CLK_GATE;
 	printf ( "Gate register: %08x\n", val );
 	*CPU_CLK_GATE = 0x101;
@@ -180,37 +161,29 @@ test_core ( void )
 	printf ( "Gate register: %08x\n", val );
 #endif
 
+	*SENTINEL = 0xdeadbeef;
+
 	launch_core ( 1 );
 
 	watch_core ();
+
+	*ROM_START = 0;
 }
 
-/*
- * So far doing this just hangs the processor ...
+/* If all goes well, we will be running here,
+ * And indeed we are, this is the first C code
+ * run by a new core.
  */
-void
-main_reset ( void )
+
+/* Runs mighty slow without D cache enabled */
+static void
+delay_ms ( int msecs )
 {
-	int cpu = 0;
-        volatile unsigned long *reset;
+        volatile int count = 100000 * msecs;
 
-#ifdef notdef
-	// There are two bits in this register, both asserted by writing zeros.
-	// This does not work
-        // reset = (unsigned long *) ( CPUCFG_BASE + 0x40 + cpu * 0x40);   /* reset */
-	// *reset = 0;
-
-	// This does not work either
-	reset = CPU_SYS_RESET;
-	*reset = 0;
-#endif
-	printf ( "Sorry ...\n");
-
-	test_core ();
-
+        while ( count-- )
+            ;
 }
-
-/* If all goes well, we will be running here */
 
 void
 kyu_newcore ()
@@ -219,10 +192,22 @@ kyu_newcore ()
 	int val = 0;
 
 	sent = SENTINEL;
+	*sent = 0;
+
+	/* Makes a mess without synchronization */
+	printf ( "Running\n" );
 
 	for ( ;; ) {
 	    *sent = val++;
+	    delay_ms ( 1 );
+	    if ( val % 5 == 0 )
+		printf ( "Tick !!\n" );
+	    if ( *ROM_START == 0 )
+		break;
 	}
+
+	for ( ;; )
+	    ;
 }
 
 /* THE END */

@@ -146,6 +146,10 @@ static void test_adc ( int );
 static void test_fault2 ( int );
 #endif
 
+#ifdef BOARD_ORANGE_PI
+static void test_cores ( int );
+#endif
+
 static void test_blink ( int );
 
 /* Here is the IO test menu */
@@ -163,6 +167,11 @@ struct test io_test_list[] = {
 	test_adc,	"BBB adc test",		0,
 	test_fault2,	"data abort probe",	0,
 #endif
+
+#ifdef BOARD_ORANGE_PI
+	test_cores,	"Opi cores test",	0,
+#endif
+
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
 
@@ -2297,6 +2306,19 @@ test_fault2 ( int xxx )
 	prober ( (unsigned int) (p + 2) );
 }
 #endif
+
+#ifdef BOARD_ORANGE_PI
+void
+test_cores ( int xxx )
+{
+	/* official test */
+	test_core ();
+
+	/* the crazy business */
+	// check_core ();
+}
+#endif
+
 
 /* -------------------------------------------- */
 

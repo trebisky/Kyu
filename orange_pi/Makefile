@@ -12,6 +12,8 @@ OBJS =  board.o \
 	gpio.o \
 	serial.o \
 	timer.o \
+	spinlocks.o \
+	cores.o \
 	smp.o
 
 all: ../board.o

@@ -27,6 +27,7 @@ board_init ( void )
 	led_init ();
 	pwr_on ();
 
+	spinlocks_init ();
 	gic_init ();
 
 	serial_init ( CONSOLE_BAUD );

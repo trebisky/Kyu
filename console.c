@@ -256,7 +256,12 @@ putchar ( int ch )
 void
 console_puts ( char *buf )
 {
-#ifdef ARCH_ARM
+#ifdef BOARD_ORANGE_PI
+	spin_lock ( 3 );
+	serial_puts ( buf );
+	spin_unlock ( 3 );
+#endif
+#ifdef BOARD_BBB
 	serial_puts ( buf );
 #endif
 #ifdef ARCH_X86
