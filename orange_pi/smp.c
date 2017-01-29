@@ -135,12 +135,60 @@ watch_core ( void )
 
 	sent = SENTINEL;
 
+	printf ( "\n" );
 	printf ( "Sentinel addr: %08x\n", sent );
 
-	for ( i=0; i<5; i++ ) {
-	    thr_delay ( 1000 );
-	    printf ( "Core status: %08x\n", *sent );
+	for ( i=0; i<40; i++ ) {
+	    thr_delay ( 100 );
+	    // printf ( "Core status: %08x\n", *sent );
+	    if ( *sent == 0 ) {
+		printf ( "Core started !!\n" );
+		return;
+	    }
 	}
+	printf ( "** Core failed to start\n" );
+
+}
+
+/* Most of the time a core takes 30 counts to start */
+#define MAX_CORE	100
+
+int
+wait_core ( void )
+{
+	volatile unsigned long *sent;
+	int i;
+
+	sent = SENTINEL;
+
+	for ( i=0; i<MAX_CORE; i++ ) {
+	    if ( *sent == 0 ) {
+		// printf ( "Core started in %d\n", i );
+		return 1;
+	    }
+	}
+	return 0;
+}
+
+static void
+test_one ( int cpu )
+{
+	int stat;
+
+	*SENTINEL = 0xdeadbeef;
+
+	printf ( "Starting core %d ...\n", cpu );
+	launch_core ( cpu );
+
+	// watch_core ();
+	stat = wait_core ();
+	if ( stat )
+	    printf ( " Core %d verified to start\n", cpu );
+	else
+	    printf ( "** Core %d failed to start\n", cpu );
+
+
+	*ROM_START = 0;
 }
 
 /* This gets called by the test menu
@@ -161,13 +209,9 @@ test_core ( void )
 	printf ( "Gate register: %08x\n", val );
 #endif
 
-	*SENTINEL = 0xdeadbeef;
-
-	launch_core ( 1 );
-
-	watch_core ();
-
-	*ROM_START = 0;
+	test_one ( 1 );
+	test_one ( 2 );
+	test_one ( 3 );
 }
 
 /* If all goes well, we will be running here,
@@ -177,7 +221,7 @@ test_core ( void )
 
 /* Runs mighty slow without D cache enabled */
 static void
-delay_ms ( int msecs )
+delay_ms_cache ( int msecs )
 {
         volatile int count = 100000 * msecs;
 
@@ -185,18 +229,36 @@ delay_ms ( int msecs )
             ;
 }
 
+static void
+delay_ms ( int msecs )
+{
+	delay_ms_cache ( msecs );
+	// delay_ms_nocache ( msecs );
+}
+
 void
-kyu_newcore ()
+kyu_newcore ( int arg )
 {
 	volatile unsigned long *sent;
+	unsigned long sp;
 	int val = 0;
+	int cpu = 99;
 
 	sent = SENTINEL;
 	*sent = 0;
 
-	/* Makes a mess without synchronization */
-	printf ( "Running\n" );
+	/* Read processor affinity register */
+	asm volatile("mrc 15, 0, %0, cr0, cr0, 5" : "=r" (cpu) : : "cc");
+	cpu &= 0x3;
 
+	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
+
+	/* Makes a mess without synchronization */
+	printf ( "Core %d running with sp = %08x\n", cpu, sp );
+	printf ( "Core %d arg = %08x\n", cpu, arg );
+	// printf ( "Core %d running\n", cpu );
+
+#ifdef notdef
 	for ( ;; ) {
 	    *sent = val++;
 	    delay_ms ( 1 );
@@ -205,6 +267,10 @@ kyu_newcore ()
 	    if ( *ROM_START == 0 )
 		break;
 	}
+#endif
+
+	if ( cpu == 1 )
+	    gpio_blink_red ();
 
 	for ( ;; )
 	    ;

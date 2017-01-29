@@ -75,6 +75,14 @@ spinlocks_init ( void )
 	spinlocks_test ();
 }
 
+int
+spin_check ( int lock )
+{
+	struct spinlocks *sl = SPINLOCK_BASE;
+
+	return sl->status & (1<<lock);
+}
+
 void
 spin_lock ( int lock )
 {

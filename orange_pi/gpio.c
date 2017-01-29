@@ -164,6 +164,50 @@ status_off ( void )
 	gpio_output ( GPIO_A, 15, 0 );
 }
 
+/* A reasonable delay for blinking an LED
+ * (at least it is if the D cache is enabled)
+ */
+static void
+__delay_blink ( void )
+{
+        // volatile int count = 50000000;
+        volatile int count = 500000;
+
+	//printf ( "Start delay\n" );
+        while ( count-- )
+            ;
+	//printf ( "End delay\n" );
+}
+
+/* Blink red status light */
+void
+gpio_blink_red ( void )
+{
+        for ( ;; ) {
+	    //printf ( "Red on\n" );
+            status_on ();
+            __delay_blink ();
+
+	    // printf ( "Red off\n" );
+            status_off ();
+            __delay_blink ();
+        }
+}
+
+/* Blink green "power" light */
+void
+gpio_blink_green ( void )
+{
+        for ( ;; ) {
+            pwr_on ();
+            __delay_blink ();
+
+            pwr_off ();
+            __delay_blink ();
+        }
+}
+
+
 /* XXX XXX this CCM stuff doesn't belong here,
  *  but here it is for now.
  */

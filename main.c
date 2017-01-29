@@ -53,13 +53,13 @@ clear_bss ( void )
 void
 kern_startup ( void )
 {
+	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
+
 	hardware_init ();
 	console_initialize ();
 
-	/*
-	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
-	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
-	*/
+	// printf ( "Kyu starting with stack: %08x\n",  get_sp() );
+	// printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
 
 	//sanity ();
 	/* A sanity thing in case printf is broken */

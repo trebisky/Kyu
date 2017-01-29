@@ -554,7 +554,7 @@ set_covr:
 	.globl enable_irq
 enable_irq:
 	mrs	r0, cpsr
-	; bic	r0, r0, #0x80
+	@ bic	r0, r0, #0x80
 	bic	r0, #0x80
 	msr	cpsr, r0
 	bx	lr
@@ -615,12 +615,13 @@ restore:
 
 /* Experimental section for Orange Pi multiple cores */
 
+#ifdef notdef
 /* We tried using this as a sentinel,
  * but caching hides the results.
  */
-;	.globl statcore
-; statcore:
-; 	.word	0xdeadbeef
+@	.globl statcore
+@ statcore:
+@ 	.word	0xdeadbeef
 
 	.globl zcore
 zcore:
@@ -628,19 +629,34 @@ zcore:
 	ldr	r1, =0x01f01da4
         str     r0, [r1]
 	bx	lr
+#endif
 
 #define SENTINEL	0x4
 
+/* We realize that each core needs its own stack ...
+ *  1-28-2017
+ * Putting a stack at 0x7f00800 makes bad things happen
+ * Start each cpu with a 16K stack (very generous).
+ */
+	@ .align 3
 	.globl newcore
 newcore:
-	ldr	sp, =0x5f000000
+	/* Read processor affinity register */
+        mrc     p15, 0, r1, c0, c0, 5
+	and	r1, #3
+	lsl	r1, #14
+	ldr	r0, =0x6f004000
+	add	r0, r0, r1
+	add	sp, r0, #0
+
+	@ldr	sp, =0x6f008000
 	bl	kyu_newcore
 
-	; mov	r0, #0
-        ; str     r0, statcore
-	; ldr	r0, =0x1234abcd
+	@ mov	r0, #0
+        @ str     r0, statcore
+	@ ldr	r0, =0x1234abcd
 	mov	r0, #0
-	; ldr	r1, =0x01f01da4
+	@ ldr	r1, =0x01f01da4
 	ldr	r1, =SENTINEL
 loopcore:
 	add	r0, #1

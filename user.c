@@ -58,6 +58,7 @@ toms_debug ( void )
 {
 	unsigned long *mmubase;
 	unsigned long esp;
+	unsigned long xxx;
 
 	// show_bogus_timer ();
 
@@ -71,6 +72,22 @@ toms_debug ( void )
 	printf ( " SP = %08x\n", esp );
 
 	printf ( "SCTRL = %08x\n", get_sctrl() );
+
+	/* SCTRL */
+	asm volatile ("mrc p15, 0, %0, c1, c0, 0" : "=r"(xxx) );
+	printf ( "--SCTRL = %08x\n", xxx );
+
+	/* TTBCR */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 2" : "=r"(xxx) );
+	printf ( "--TTBCR = %08x\n", xxx );
+
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(xxx) );
+	printf ( "--TTBR0 = %08x\n", xxx );
+
+	/* TTBR1 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 1" : "=r"(xxx) );
+	printf ( "--TTBR1 = %08x\n", xxx );
 
 	mmubase = (unsigned long *) get_mmu ();
 	if ( ! mmubase )
