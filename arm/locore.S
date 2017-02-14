@@ -30,8 +30,6 @@
 #define PSR_DEFAULT	PSR_M_SUPER
 
 #ifdef notdef
-PIG PIG PIG
-
 @ fails
 core_startup:
         mrs     r0, cpsr                /* disable interrupts */
@@ -44,8 +42,13 @@ core_startup:
 #endif
 
 /* For the time being, this is the first thing linked
- * and U-boot simply branches to a hard address 80300000.
- * So it had better find this code there !!
+ * and U-boot simply branches to a hard address.
+ *  0x80300000 on the BBB
+ *  0x42000000 on the Orange Pi
+ *
+ * As long as locore.o is the first thing linked,
+ * we should be OK.
+ *
  * For some reason the compiler was reordering routines
  * compiled from main.c, this makes us immune to that.
  */
@@ -53,6 +56,7 @@ core_startup:
 @uboot_startup:
 @	.globl kyu_startup
 @kyu_startup:
+
 	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
@@ -114,8 +118,6 @@ sanity:
  */
 
 	.align  5
-@.globl _start
-@_start:
 .globl vectors
 vectors:
 	b	reset
@@ -227,6 +229,7 @@ resume_i:
 
 	ldmia	r0, {r0-pc}^
 
+#ifdef notdef
 OLDresume_i:
 	/* keep r0 till bitter end */
 	ldr	r1, [r0, #S_PSR]
@@ -246,6 +249,7 @@ OLDresume_i:
 	ldr	lr, [r0, #S_PC]
 	ldmia	r0, {r0-r12}
 	movs	pc, lr
+#endif
 
 /* This routine launches a thread from scratch.
  *  on the ARM it gets a pointer to an array of 4 items:
@@ -276,9 +280,6 @@ resume_c:
  *      interrupt level.
  */
 
-VERYOLDresume_j:
-	ldmia	r0, {r0-pc}
-
 	/* This is always called from supervisor level,
 	 * so we don't need to fuss with sp and lr.
 	 */
@@ -301,6 +302,7 @@ resume_j:
 
 	ldmia	r0, {r0-pc}^
 
+#ifdef notdef
 OLDresume_j:
 	/* keep r0 till the bitter end */
 	mrs     r1, cpsr
@@ -323,6 +325,10 @@ OLDresume_j:
 	ldr	lr, [r0, #S_PC]
 	ldmia	r0, {r0-r12}
 	movs	pc, lr
+
+VERYOLDresume_j:
+	ldmia	r0, {r0-pc}
+#endif
 
 /*
  * exception handlers
