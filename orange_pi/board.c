@@ -71,29 +71,32 @@ reset_cpu ( void )
 int
 board_net_init ( void )
 {
-	return 0;
+        return emac_init ();
 }
 
 /* Bring the network device online */
 void
 board_net_activate ( void )
 {
+        emac_activate ();
 }
 
 void
 board_net_show ( void )
 {
+        emac_show ();
 }
 
 void
 get_board_net_addr ( char *addr )
 {
+        get_emac_addr ( addr );
 }
 
 void
 board_net_send ( struct netbuf *nbp )
 {
-	// cpsw_send ( nbp );
+        emac_send ( nbp );
 }
 
 /* THE END */

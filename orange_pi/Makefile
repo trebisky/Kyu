@@ -11,6 +11,7 @@ OBJS =  board.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
+	emac.o \
 	timer.o \
 	spinlocks.o \
 	cores.o \

@@ -19,6 +19,6 @@
  */
 #define IRQ_UART0	32
 #define IRQ_TIMER0	50
-#define IRQ_ETHER	114
+#define IRQ_EMAC	114	/* Ethernet */
 
 /* THE END */
