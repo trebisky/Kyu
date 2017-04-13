@@ -72,7 +72,7 @@ spinlocks_init ( void )
 	lp = (volatile unsigned long *) (CCU_BASE + BUS_RESET_REG1);
 	*lp |= SPINLOCK_BIT;
 
-	spinlocks_test ();
+	// spinlocks_test ();
 }
 
 int

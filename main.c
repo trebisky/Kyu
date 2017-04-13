@@ -55,6 +55,9 @@ kern_startup ( void )
 {
 	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
 
+	/* XXX */
+	emac_probe ();
+
 	hardware_init ();
 	console_initialize ();
 
@@ -64,6 +67,7 @@ kern_startup ( void )
 	//sanity ();
 	/* A sanity thing in case printf is broken */
 	puts ( "Kyu starting" );
+
 
 	/* debug broken linux printf */
 #ifdef notdef

@@ -73,7 +73,8 @@ struct h3_timer {
  *  -- at 23897172 when we ask for 24M
  *  (note that this is off by .0045 percent, but in
  *   actual fact we are using the same crystal to run
- *   the CPU so this is meaningless.
+ *   the CPU so fretting over the precise value of these
+ *   calibrations is meaningless.
  */
 
 #define CLOCK_24M	24000000
