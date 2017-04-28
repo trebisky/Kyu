@@ -30,11 +30,21 @@
  *  1G of ram is at 40000000 to 7fffffff
  *
  *  U-boot lives at 4a000000 to 4a093xxx
- *  U-boot stack at 79f34axx
+ *  U-boot stack at 79f34axx  (when handed to us)
  *  Kyu loads to .. 42000000 to 4209dxxx (not any more)
  *  Kyu loads to .. 40000000 to 4009dxxx
  *  Kyu core stacks 6f004000 ...
  *  MMU base  ..... 7dff0059
+ *
+ * BBB addresses:
+ *
+ *  0.5G of ram is at 80000000 to 9fffffff
+ *
+ *  U-boot lives at 80800000 to 8088ebf4
+ *  U-boot stack at 9ef2a808  (when handed to us)
+ *  Kyu loads to .. 80300000 to 80382850 (not any more)
+ *  Kyu loads to .. 80000000 to 80082850
+ *  MMU base  ..... 9fff0000
  */
 
 /* For no particular reason, we allocate memory in 16K quanta */

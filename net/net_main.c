@@ -549,15 +549,21 @@ net_addr_get ( char *buf )
 /* buffer handling. */
 /* ----------------------------------------- */
 
+// #define NUM_NETBUF	128
+#define NUM_NETBUF	512
+
+#ifdef STATIC_NETBUF
+/* This is the original way we did this
+ * (prior to 4-27-2017)
+ */
 /* XXX simple static block of memory (2M for 512)
  * asking for 512 puts skidoo into a reboot loop
  * (maybe a bug in the bss zeroing code ...
 #define NUM_NETBUF	512
  * 2, 32, ... work OK.
  */
-#define NUM_NETBUF	128
-
 static char netbuf_buf[NUM_NETBUF * sizeof(struct netbuf)];
+#endif
 
 static struct netbuf *free;
 
@@ -568,7 +574,11 @@ netbuf_init ( void )
 	struct netbuf *end;
 	int count = 0;
 
+#ifdef STATIC_NETBUF
 	ap = (struct netbuf *) netbuf_buf;
+#else
+	ap = (struct netbuf *) ram_alloc ( NUM_NETBUF * sizeof(struct netbuf) );
+#endif
 	end = &ap[NUM_NETBUF];
 
 	free = (struct netbuf *) 0;

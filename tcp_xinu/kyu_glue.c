@@ -72,6 +72,14 @@ daytime_func ( int slot )
 	tcp_close ( slot );
 }
 
+/* This requires the daytime server running on port 13 someplace
+ * ( likely the boot host).
+ * To run this on fedora:
+ *  dnf install xinetd
+ *  edit /etc/xinetd/daytime-stream to enable
+ *  systemctl start  xinetd.service
+ */
+
 static void
 test_daytime ( void )
 {
@@ -84,6 +92,18 @@ test_daytime ( void )
 
 /* Original style passive connection */
 /* This stays around, blocked in tcp_recv() */
+/* Just use telnet to talk to this, once the connection is made
+ * the two strings "cat and dog" should be received.
+ *
+ * XXX
+ * This needs further debug, it works once,
+ * but that single time it works looks like so:
+ * Listening on port 1234 (slot 0)
+ * Waiting for connection
+ * Connection!! 1, 2
+ * Waiting for connection
+ * recv on port 1234 fails - maybe no more slots?
+ */
 
 static void
 test_server ( void )
@@ -103,7 +123,7 @@ test_server ( void )
 		/* Without this check, once we tie up all slots in
 		 * TWAIT, this will yield a runaway loop
 		 */
-		printf ( "recv on port %d fails - maybe no more slots?\n" );
+		printf ( "recv on port %d fails - maybe no more slots?\n", port );
 		break;
 	    }
 	    printf ( "Connection!! %d, %d\n", rv, cslot );

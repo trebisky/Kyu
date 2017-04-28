@@ -16,7 +16,7 @@ include Makefile.inc
 #    linux/linux-lib.o
 
 # For now, machine.o must come first since U-boot simply branches
-# to 80300000 to start this running.
+# to 80000000 to start this running.
 
 OBJS =  machine.o \
     board.o \
@@ -97,7 +97,7 @@ help:
 
 kyu:	kyu.lds
 
-#	$(LD) -g -Ttext 0x80300000 -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+#	$(LD) -g -Ttext 0x80000000 -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
 
 kyu: $(OBJS)
 	$(LD) -g -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
