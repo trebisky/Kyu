@@ -10,7 +10,7 @@ ENTRY(_begin)
 SECTIONS
 {
   /* Text and read-only data */
-  . = 0x42000000;
+  . = 0x40000000;
   .text : {
 	*(.text)
 	*(.text.unlikely)

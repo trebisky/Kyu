@@ -38,9 +38,9 @@ static long A[56] = {-1};		/* pseudo-random values */
 /* If we really wanted to make this work, we would
  * have to put the next two lines in a header file.
  * But I am not in a big lather about efficiency here.
+ */
 extern long *gb_fptr;		/* the next A value to be used */
 #define gb_next_rand() (*gb_fptr >= 0 ? *gb_fptr-- : gb_flip_cycle())
- */
 
 long *gb_fptr;		/* the next A value to be used */
 

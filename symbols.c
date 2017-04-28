@@ -280,6 +280,8 @@ shell_x ( char **arg, int narg )
 
 #include "hardware.h"
 
+extern char * stack_start;
+
 /* Do a stack traceback -- ARM specific
  */
 void
@@ -291,7 +293,8 @@ unroll_fp ( int *fp )
 	/* could also check is fp ever moves to lower addresses on stack and stop */
 	limit = 16;
 	while ( limit > 0 && fp ) {
-	    if ( fp[0] < THR_STACK_BASE ) {
+	    // if ( fp[0] < THR_STACK_BASE ) {
+	    if ( (unsigned long) fp[0] < (unsigned long) stack_start ) {
 		msg = mk_symaddr ( fp[0] );
 		printf ( "Called from %s -- %08x\n", msg, fp[0] );
 		fp = (int *) fp[-1];

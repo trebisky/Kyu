@@ -142,7 +142,7 @@ mmu_status ( void )
 void
 hardware_init ( void )
 {
-	mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
+	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 	enable_ccnt ( 0 );
 	enable_unaligned ();

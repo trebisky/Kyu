@@ -53,10 +53,16 @@ clear_bss ( void )
 void
 kern_startup ( void )
 {
+	unsigned long malloc_base;
+
 	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
 
-	/* XXX */
-	emac_probe ();
+	// emac_probe (); /* XXX */
+
+	board_hardware_init ();
+	malloc_base = ram_alloc ( MALLOC_SIZE );
+	mem_malloc_init ( malloc_base, MALLOC_SIZE );
+	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 	hardware_init ();
 	console_initialize ();

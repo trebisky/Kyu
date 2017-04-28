@@ -10,6 +10,7 @@ include ../Makefile.inc
 # locore must be first
 OBJS =  locore.o \
 	hardware.o \
+	ram.o \
 	interrupts.o \
 	cache_v7.o \
 	show_regs.o \

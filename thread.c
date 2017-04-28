@@ -61,6 +61,7 @@ static struct sem *sem_head;
  */
 static int thread_debug;
 
+char *stack_start;
 static char *stack_next;
 static int stack_limit;
 
@@ -226,9 +227,14 @@ thr_init ( void )
 
 	sem_init ();
 
-	/* XXX */
-	stack_next = (char *) THR_STACK_BASE;
+	stack_start = (char *) ram_alloc ( THR_STACK_LIMIT );
+	// printf ( "Stack Start at %08x\n", stack_start );
+#ifdef OLD_WAY
+	stack_start = (char *) THR_STACK_BASE;
+#endif
+	stack_next = stack_start;
 	stack_limit = THR_STACK_LIMIT;
+
 	stack_avail = (struct stack_list *) 0;
 
 	/* put a few structures on the available list.

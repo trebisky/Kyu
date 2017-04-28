@@ -25,6 +25,14 @@
 #include "netbuf.h"
 // #include "net.h"
 
+/* line size for this flavor of ARM */
+#define	ARM_DMA_ALIGN	64
+
+static void rx_list_show ( void );
+
+/* from linux/compiler_gcc.h in U-Boot */
+#define __aligned(x)            __attribute__((aligned(x)))
+
 struct emac {
 	volatile unsigned int ctl0;		/* 00 */
 	volatile unsigned int ctl1;		/* 04 */
@@ -34,12 +42,12 @@ struct emac {
 	volatile unsigned int tx_ctl1;		/* 14 */
 	int __pad0;				/* 18 --*/
 	volatile unsigned int tx_flow;		/* 1c */
-	volatile unsigned int tx_desc;		/* 20 */
+	volatile void * tx_desc;		/* 20 */
 	volatile unsigned int rx_ctl0;		/* 24 */
 	volatile unsigned int rx_ctl1;		/* 28 */
 	int __pad1;				/* 2c --*/
 	int __pad2;				/* 30 --*/
-	volatile unsigned int rx_desc;		/* 34 */
+	volatile void * rx_desc;		/* 34 */
 	volatile unsigned int rx_filt;		/* 38 */
 	int __pad3;				/* 3C --*/
 	volatile unsigned int rx_hash0;		/* 40 */
@@ -63,6 +71,90 @@ struct emac {
 };
 
 #define EMAC_BASE	((struct emac *) 0x01c30000)
+
+/* bits in the ctl0 register */
+
+#define	CTL_FULL_DUPLEX	0x0001
+#define	CTL_LOOPBACK	0x0002
+#define	CTL_SPEED_1000	0x0000
+#define	CTL_SPEED_100	0x000C
+#define	CTL_SPEED_10	0x0008
+
+/* bits in the int_ena and int_stat registers */
+#define INT_TX			0x0001
+#define INT_TX_DMA_STOP		0x0002
+#define INT_TX_BUF_AVAIL	0x0004
+#define INT_TX_TIMEOUT		0x0008
+#define INT_TX_UNDERFLOW	0x0010
+#define INT_TX_EARLY		0x0020
+
+#define INT_RX			0x0100
+#define INT_RX_NOBUF		0x0200
+#define INT_RX_DMA_STOP		0x0400
+#define INT_RX_TIMEOUT		0x0800
+#define INT_RX_OVERFLOW		0x1000
+#define INT_RX_EARLY		0x2000
+#define INT_RX_ALL	(INT_RX | INT_RX_NOBUF | INT_RX_DMA_STOP | INT_RX_TIMEOUT | INT_RX_OVERFLOW )
+
+#define	INT_MII			0x10000		/* only in status */
+
+/* bits in the Rx ctrl0 register */
+#define	RX_EN			0x80000000
+#define	RX_FRAME_LEN_CTL	0x40000000
+#define	RX_JUMBO		0x20000000
+#define	RX_STRIP_FCS		0x10000000
+#define	RX_CHECK_CRC		0x08000000
+
+#define	RX_PAUSE_MD		0x00020000
+#define	RX_FLOW_CTL_ENA		0x08010000
+
+/* bits in the Rx ctrl1 register */
+#define	RX_DMA_DIS		0x80000000
+#define	RX_DMA_ENA		0x40000000
+#define	RX_MD			0x00000002
+#define	RX_NO_FLUSH		0x00000001
+
+/* Bits in the Rx filter register */
+#define	RX_FILT_DIS		0x80000000
+#define	RX_DROP_BROAD		0x00020000
+#define	RX_ALL_MULTI		0x00010000
+
+/* ------------------------------------------------------------ */
+/* Descriptors */
+/* ------------------------------------------------------------ */
+
+struct emac_desc {
+	volatile unsigned long status;
+	long size;
+	char * buf;
+	struct emac_desc *next;
+}	__aligned(ARM_DMA_ALIGN);
+
+/* status bits */
+#define DS_CTL		0x80000000	/* set when available for DMA */
+#define DS_DS_FAIL	0x40000000	/* Rx DAF fail */
+#define DS_CLIP		0x00004000	/* Rx clipped (buffer too small) */
+#define DS_SA_FAIL	0x00002000	/* Rx SAF fail */
+#define DS_OVERFLOW	0x00000800	/* Rx overflow */
+#define DS_FIRST	0x00000200	/* Rx first in list */
+#define DS_LAST		0x00000100	/* Rx last in list */
+#define DS_HEADER_ERR	0x00000080	/* Rx header error */
+#define DS_COLLISION	0x00000040	/* Rx late collision in half duplex */
+#define DS_LENGTH_ERR	0x00000010	/* Rx length is wrong */
+#define DS_PHY_ERR	0x00000008	/* Rx error from Phy */
+#define DS_CRC_ERR	0x00000002	/* Rx error CRC wrong */
+#define DS_PAYLOAD_ERR	0x00000001	/* Rx error payload checksum or length wrong */
+
+#define DS_TX_HEADER_ERR	0x00010000	/* Tx header error */
+#define DS_TX_LENGTH_ERR	0x00004000	/* Tx length error */
+#define DS_TX_PAYLOAD		0x00001000	/* Tx payload checksum wrong */
+#define DS_CARRIER		0x00000400	/* Tx lost carrier */
+#define DS_COL1			0x00000200	/* Tx collision */
+#define DS_COL2			0x00000100	/* Tx too many collisions */
+/* collision count in these bits */
+#define DS_DEFER_ERR		0x00000004	/* Tx defer error (too many) */
+#define DS_UNDERFLOW		0x00000002	/* Tx fifo underflow */
+#define DS_DEFER		0x00000001	/* Tx defer this frame (half duplex) */
 
 /* ------------------------------------------------------------ */
 /* Syscon stuff */
@@ -110,6 +202,53 @@ syscon_setup ( void )
 /* PHY stuff */
 /* ------------------------------------------------------------ */
 
+/* Notes on emac phy  4-13-2017
+
+I have driven myself crazy trying to figure out how to work with the on chip
+Phy in the H3 chip.  The following summarizes the state of my understanding.
+
+---
+To read a register, I must perform two reads.  The first read gets the
+previous thing I tried to read.  Consider reading two registers A and B,
+what I see is this:
+
+    read A, get x
+    read A, get Aval
+    read A, get Aval ....
+    read B, get Aval
+    read B, get Bval
+    read B, get Bval ...
+
+So performing two reads and discarding the first response gives proper values.
+
+---
+Writes just do not seem to work, and I have tried various games with no luck.
+In particular I have tried to start autonegotiation, then polled the bit to
+indicate completion.  This never works, nothing completes (or even seems to
+start).
+
+---
+My thinking led me to a careful study of the emac code in U-boot.
+It seems to work after all, but my conclusion is that it works simply
+by accident.  I rebuilt U-boot sprinkling printf statements all through
+the emac and phy driver to see what is going on.  I see that the phy reads
+are giving the same "stale" values that I see.  Also the code in U-boot
+never polls to check completion on anything, but just starts autonegotiation,
+then dives in later assuming that it worked OK.
+
+So why does it work?  Partly luck, but also I believe
+that the Phy chip performs autonegotiation all by itself when it comes out
+of reset and that the result registers can be read and properly analyzed.
+
+---
+TODO - I am going to press on without fully initializing the Phy
+(since it seems impossible to do so).  I would like to do further
+experiments to see if experimenting with the clock divisor leads to
+different results.  Also I want to analyze the linux emac driver to
+see if it has a clever trick to make all of this work ... someday.
+
+ */
+
 /* Bits in the mii_cmd register */
 
 #define MII_BUSY	0x01
@@ -127,7 +266,19 @@ syscon_setup ( void )
 
 #define MII_DIV		MII_DIV_128
 
-/* Should this match PHY_ADDR above ?? */
+/* Make PHY_DEV match PHY_ADDR above.
+ *
+ * I get identical results setting this to 0 or 1.
+ * U-boot sets it to 1, so I will also.
+ * Code that does a phy_reset seems to set this to 0 though.
+ *
+ * This gives us the fast ethernet PHY built into the H3 chip.
+ * For Orange Pi variants that support 1G, we would need to
+ * address an external PHY, probably the Realtek RTL8211E.
+ * Note that setting device 0 or 1 gives the same results
+ *  other addresses (like 2 or 9) read all ones
+ */
+
 /* U-boot phy.c uses device address 1 */
 #define PHY_DEV		1
 
@@ -169,16 +320,8 @@ syscon_setup ( void )
 
 #define LPA_ADVERT              LPA_10HALF | LPA_10FULL | LPA_100HALF | LPA_100FULL
 
-/* At this point we always use device 0.
- * This gives us the fast ethernet PHY built into the H3 chip.
- * For Orange Pi variants that support 1G, we would need to
- * address an external PHY, probably the Realtek RTL8211E.
- * Note that setting device 0 or 1 gives the same results
- *  other addresses (like 2 or 9) read all ones
- *
- * XXX - maybe read/write need timeouts
- */
-
+#ifdef notdef
+/* ARM barrier stuff */
 #define ISB     asm volatile ("isb sy" : : : "memory")
 #define DSB     asm volatile ("dsb sy" : : : "memory")
 #define DMB     asm volatile ("dmb sy" : : : "memory")
@@ -186,9 +329,9 @@ syscon_setup ( void )
 #define isb()   ISB
 #define dsb()   DSB
 #define dmb()   DMB
+#endif
 
-/* Needs a timeout */
-/* XXX - could be inline */
+/* XXX - Needs a timeout.  */
 static void
 phy_spin ( void )
 {
@@ -202,80 +345,11 @@ phy_spin ( void )
 	// printf ( "phy_spin count = %d\n", tmo );
 }
 
-#ifdef notdef
-static int
-phy_readx ( int reg )
-{
-	struct emac *ep = EMAC_BASE;
-	int rv;
-	int i;
-
-	phy_spin ();
-	rv = ep->mii_data;	/* XXX - discard */
-
-	// ep->mii_cmd = (2 << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-	// ep->mii_cmd = (reg << MII_REG_SHIFT) | MII_BUSY;
-	dmb ();
-	ep->mii_cmd = (PHY_DEV << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-
-	phy_spin ();
-
-	for ( i=0; i<5; i++ ) {
-	    thr_delay ( 200 );	/* XXX */
-	    printf ( "phy_readx %2d of %02x gets = %04x\n", i+1, reg, ep->mii_data );
-	}
-
-#ifdef notdef
-	ep->mii_cmd = (PHY_DEV << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-
-	phy_spin ();
-
-	for ( i=0; i<5; i++ ) {
-	    thr_delay ( 200 );	/* XXX */
-	    printf ( "phy_readx %2d of %02x gets = %04x\n", i+1, reg, ep->mii_data );
-	}
-#endif
-
-
-	// return ep->mii_data;
-	rv = ep->mii_data;
-	dmb ();
-	return rv;
-}
-
-static int
-phy_readxx ( int reg )
-{
-	struct emac *ep = EMAC_BASE;
-	int rv;
-	int i;
-
-	phy_spin ();
-
-	// ep->mii_cmd = (2 << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-	// ep->mii_cmd = (reg << MII_REG_SHIFT) | MII_BUSY;
-	dmb ();
-	ep->mii_cmd = (PHY_DEV << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-
-	phy_spin ();
-
-	rv = ep->mii_data;
-	printf ( "phy_readxx of %02x gets = %04x\n", reg, rv );
-
-	/*
-	for ( i=0; i<5; i++ ) {
-	    thr_delay ( 200 );
-	    printf ( "phy_readx %2d of %02x gets = %04x\n", i+1, reg, ep->mii_data );
-	}
-	*/
-
-	// return ep->mii_data;
-	dmb ();
-	return rv;
-}
-#endif
-
-/* This has the odd problem, fixed below */
+#ifdef PHY_JUNK
+/* This has the odd problem,
+ * We use this for experiments, but the version below
+ * that does two reads gives correct behavior
+ */
 static int
 phy_read1 ( int reg )
 {
@@ -287,6 +361,33 @@ phy_read1 ( int reg )
 
 	return ep->mii_data;
 }
+
+/* Call early in Kyu and see what is up */
+void
+emac_probe ( void )
+{
+	// struct emac *ep = EMAC_BASE;
+
+	printf ( "READ1 Values from U-Boot:\n" );
+	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+
+	/*
+	printf ( "EARLY Values from U-Boot:\n" );
+	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+	printf ( "ADV   = %04x\n", phy_read ( PHY_ADV ) );
+	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+	*/
+}
+#endif
 
 /* This works, but why do we have to do it twice ??? XXX */
 static int
@@ -309,19 +410,18 @@ phy_read ( int reg )
 	phy_spin();
 	val = ep->mii_data;
 
-	printf ( "phy_read A called %d, %04x, %04x\n", reg, discard, cmd );
+	// printf ( "phy_read A called %d, %04x, %04x\n", reg, val, cmd );
 
 	phy_spin();
 	ep->mii_cmd = cmd;
 	phy_spin();
 	val = ep->mii_data;
 
-	printf ( "phy_read B called %d, %04x, %04x\n", reg, val, cmd );
+	// printf ( "phy_read B called %d, %04x, %04x\n", reg, val, cmd );
 
 	// return ep->mii_data;
 	return val;
 }
-
 
 static void
 phy_write ( int reg, int val )
@@ -344,13 +444,6 @@ phy_write ( int reg, int val )
 	return;
 }
 
-static void
-phy_show ( void )
-{
-        printf ( "PHY status BMCR: %04x, BMSR: %04x\n",
-	    phy_read ( PHY_BMCR ), phy_read ( PHY_BMSR ) );
-}
-
 #define DUPLEX_HALF             0x00
 #define DUPLEX_FULL             0x01
 
@@ -361,10 +454,16 @@ int link_speed;
 static void
 phy_set_link ( void )
 {
+	struct emac *ep = EMAC_BASE;
 	unsigned int val;
 
-	printf ( "ADV   = %04x\n", phy_read ( PHY_ADV ) );
-	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+	// printf ( "ADV   = %04x\n", phy_read ( PHY_ADV ) );
+	// printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+
+	/* XXX - usually this would be set if autonegotiation
+	 * worked or not.
+	 */
+	link_good = 1;
 
         link_speed = 10;
         link_duplex = DUPLEX_HALF;
@@ -377,16 +476,36 @@ phy_set_link ( void )
         if ( val & (LPA_100FULL | LPA_10FULL) )
             link_duplex = DUPLEX_FULL;
 
-	/*
 	if ( ! link_good ) {
             printf("link down (emac)\n");
 	    return;
 	}
-	*/
 
 	printf ( "link up (emac), speed %d, %s duplex\n",
                 link_speed, (link_duplex == DUPLEX_FULL) ? "full" : "half" );
 
+	val = 0;
+
+	if ( link_duplex == DUPLEX_FULL )
+	    val |= CTL_FULL_DUPLEX;
+
+	if ( link_speed == 1000 )
+	    val |= CTL_SPEED_1000;
+	else if ( link_speed == 10 )
+	    val |= CTL_SPEED_10;
+	else /* 100 */
+	    val |= CTL_SPEED_100;
+
+	ep->ctl0 = val;
+}
+
+#ifdef PHY_JUNK
+
+static void
+phy_show ( void )
+{
+        printf ( "PHY status BMCR: %04x, BMSR: %04x\n",
+	    phy_read ( PHY_BMCR ), phy_read ( PHY_BMSR ) );
 }
 
 static void
@@ -455,6 +574,7 @@ phy_aneg ( void )
 	link_good = 1;
 	phy_set_link ();
 }
+#endif
 
 #define RESET_TIMEOUT	50
 
@@ -474,41 +594,13 @@ phy_reset ( void )
         while ( tmo-- && (phy_read(PHY_BMCR) & BMCR_RESET ) )
             thr_delay ( 1 );
 
+	/* Clears in 1 millesecond (it is not clear that it ever starts) */
         printf ( "PHY reset cleared in %d milliseconds\n", (RESET_TIMEOUT-tmo) );
 
-	phy_show ();
+	// phy_show ();
 }
 
-#ifdef notdef
-static void sun8i_adjust_link(struct emac_eth_dev *priv,
-                              struct phy_device *phydev)
-{
-        u32 v;
-
-        v = readl(priv->mac_reg + EMAC_CTL0);
-
-        if (phydev->duplex)
-                v |= BIT(0);
-        else
-                v &= ~BIT(0);
-
-        v &= ~0x0C;
-
-        switch (phydev->speed) {
-        case 1000:
-                break;
-        case 100:
-                v |= BIT(2);
-                v |= BIT(3);
-                break;
-        case 10:
-                v |= BIT(3);
-                break;
-        }
-        writel(v, priv->mac_reg + EMAC_CTL0);
-}
-#endif
-
+/* Works fine */
 static void 
 phy_id ( void )
 {
@@ -518,73 +610,116 @@ phy_id ( void )
         id |= phy_read ( PHY_ID2 );
 
 	// returns 0x00441400
-	printf ( "PHY ID = %04x\n", id );
+	// printf ( "PHY ID = %04x\n", id );
 }
-
-#ifdef notdef
-static void
-phy_test1 ( void )
-{
-	phy_id ();
-	phy_id ();
-	phy_id ();
-	phy_reset ();
-	phy_id ();
-	phy_id ();
-	phy_id ();
-	phy_aneg ();
-	phy_id ();
-	phy_id ();
-	phy_id ();
-}
-
-static void
-phy_test2 ( void )
-{
-	phy_readxx ( PHY_BMCR );
-	phy_readxx ( PHY_BMSR );
-	phy_readxx ( PHY_ID1 );
-	phy_readxx ( PHY_ID2 );
-
-	phy_readxx ( PHY_BMCR );
-	phy_readxx ( PHY_BMCR );
-	phy_readxx ( PHY_BMCR );
-	phy_readxx ( PHY_BMCR );
-
-	phy_readxx ( PHY_BMSR );
-	phy_readxx ( PHY_BMSR );
-	phy_readxx ( PHY_BMSR );
-	phy_readxx ( PHY_BMSR );
-
-	phy_readxx ( PHY_ID1 );
-	phy_readxx ( PHY_ID1 );
-	phy_readxx ( PHY_ID1 );
-	phy_readxx ( PHY_ID1 );
-
-	phy_readxx ( PHY_ID2 );
-	phy_readxx ( PHY_ID2 );
-	phy_readxx ( PHY_ID2 );
-	phy_readxx ( PHY_ID2 );
-}
-#endif
 
 static void
 phy_init ( void )
 {
 	struct emac *ep = EMAC_BASE;
 
-	printf ( "Starting Phy Init\n" );
+	// printf ( "Starting Phy Init\n" );
 
+#ifdef notyet
 	ep->mii_cmd = 0x10;	/* perform reset */
 	/* delay ?? */
 	ep->mii_cmd = MII_DIV;  /* Set clock divisor */
+#endif
 
-	phy_id ();
+	/* We won't reset it and leave well enough alone for now.
+	 * We won't even try to start autonegotiation.
+	 */
 	// phy_reset ();
 	// phy_id ();
-	phy_aneg ();
+	// phy_aneg ();
 
-	printf ( "Finished with Phy Init\n" );
+	phy_set_link ();
+
+	// printf ( "Finished with Phy Init\n" );
+}
+
+/* ------------------------------------------------------------ */
+/* Interrupts */
+/* ------------------------------------------------------------ */
+
+static int int_count = 0;
+
+// #define INT_LIMIT	200
+#define INT_LIMIT	2
+
+static void
+emac_handler ( int junk )
+{
+	struct emac *ep = EMAC_BASE;
+
+	printf ( "emac interrupt %08x\n", ep->int_stat );
+	rx_list_show ();
+
+	int_count++;
+	if ( int_count >= INT_LIMIT ) {
+	    printf ( "emac ints killed (limit reached)\n" );
+	    ep->int_ena = 0;
+	}
+
+	/* Ack the IRQ in the emac */
+	/* experiment shows this to be necessary and correct */
+	ep->int_stat = ep->int_stat & 0xffff;
+}
+
+/* ------------------------------------------------------------ */
+/* Descriptors */
+/* ------------------------------------------------------------ */
+
+#define NUM_RX	10
+#define RX_SIZE	2048
+
+// static char rx_buffers[NUM_RX * RX_SIZE];
+static char rx_buffers[NUM_RX * RX_SIZE] __aligned(ARM_DMA_ALIGN);
+
+static struct emac_desc rx_desc[NUM_RX];
+
+static void *
+rx_list_init ( void )
+{
+	int i;
+	struct emac_desc *edp;
+	char *buf;
+
+	printf ( "Descriptor size: %d bytes\n", sizeof(struct emac_desc) );
+
+	buf = rx_buffers;
+	for ( i=0; i<NUM_RX; i++ ) {
+	    edp = &rx_desc[i];
+	    edp->status = DS_CTL;
+	    edp->size = RX_SIZE;
+	    // edp->size |= 0x01000000;
+	    edp->buf = buf;
+	    edp->next = &rx_desc[i+1];
+	    buf += RX_SIZE;
+	}
+
+	rx_desc[NUM_RX-1].next = &rx_desc[0];
+
+	flush_dcache_range ( (void *) rx_desc, &rx_desc[NUM_RX] );
+	rx_list_show ();
+
+	return (void *) rx_desc;
+}
+
+static void
+rx_list_show ( void )
+{
+	int i;
+	struct emac_desc *edp;
+	int len;
+
+	invalidate_dcache_range ( (void *) rx_desc, &rx_desc[NUM_RX] );
+
+	for ( i=0; i<NUM_RX; i++ ) {
+	    edp = &rx_desc[i];
+	    len = (edp->status >> 16) & 0x3fff;
+	    printf ( "Buf status %2d: %08x  %d/%d (%08x)\n", i, edp->status, len, edp->size, edp->buf );
+	}
 }
 
 /* ------------------------------------------------------------ */
@@ -605,6 +740,35 @@ show_sid ( void )
 	}
 }
 
+#ifdef notdef
+/* This doesn't give the same as we see Wireshark pick up */
+static void
+get_mac ( char *mac_addr )
+{
+	mac_addr[0] = 0x02;
+	mac_addr[1] = (sid[0] >>  0) & 0xff;
+	mac_addr[2] = (sid[3] >> 24) & 0xff;
+	mac_addr[3] = (sid[3] >> 16) & 0xff;
+	mac_addr[4] = (sid[3] >>  8) & 0xff;
+	mac_addr[5] = (sid[3] >>  0) & 0xff;
+}
+#endif
+
+/* Wireshark shows that my development board has the MAC address:
+ * 02:20:7f:9B:26:8c
+ * Just jamming these values will do for now ...
+ */
+static void
+get_mac ( char *x )
+{
+	x[0] = 0x02;
+	x[1] = 0x20;
+	x[2] = 0x7f;
+	x[3] = 0x9b;
+	x[4] = 0x26;
+	x[5] = 0x8c;
+}
+
 /* Interestingly the emac can accomodate 8 MAC addresses.
  * All but the first must have a bit set to indicate they
  *  are active.
@@ -618,15 +782,6 @@ set_mac ( char *mac_id )
 	ep->mac_addr[0].lo = mac_id[0] + (mac_id[1] << 8) +
 	    (mac_id[2] << 16) + (mac_id[3] << 24);
 }
-
-#ifdef notdef
-                        mac_addr[0] = (i << 4) | 0x02;
-                        mac_addr[1] = (sid[0] >>  0) & 0xff;
-                        mac_addr[2] = (sid[3] >> 24) & 0xff;
-                        mac_addr[3] = (sid[3] >> 16) & 0xff;
-                        mac_addr[4] = (sid[3] >>  8) & 0xff;
-                        mac_addr[5] = (sid[3] >>  0) & 0xff;
-#endif
 
 
 #define CTL1_SOFT_RESET		0x01
@@ -656,7 +811,7 @@ emac_reset ( void )
 /* Try to treat a register like ram */
 /* Seems to work just fine */
 static void
-bogus ( void )
+verify_regs ( void )
 {
 	struct emac *ep = EMAC_BASE;
 
@@ -668,58 +823,59 @@ bogus ( void )
 	ep->mac_addr[0].hi = 0;
 	printf ( "MAC test = %08x\n", ep->mac_addr[0].hi );
 
+	/* Verify structure */
 	ep = (struct emac *) 0;
 	printf ( "MII data = %08x\n", &ep->mii_data );
 	printf ( "MII cmd  = %08x\n", &ep->mii_cmd );
 }
 
-/* Call early in Kyu and see what is up */
-void
-emac_probe ( void )
-{
-	// struct emac *ep = EMAC_BASE;
-	printf ( "READ1 Values from U-Boot:\n" );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-
-	/*
-	printf ( "EARLY Values from U-Boot:\n" );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
-	printf ( "ADV   = %04x\n", phy_read ( PHY_ADV ) );
-	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
-	*/
-}
-
 int
 emac_init ( void )
 {
-	// struct emac *ep = (struct emac *) 0;
+	struct emac *ep = EMAC_BASE;
+	void *list;
+	char mac_buf[6];
 
 	// validate my structure layout
 	// printf ( "Shoud be 0xd0 == 0x%x\n", &ep->rgmii_status );
-
-	printf ( " *************************** Hello from the Emac driver\n" );
+	// verify_regs ();
 
 	/* We inherit clocks and such from U-boot, thus far anyway ... */
 	// ccu_emac ();
 
-	bogus ();
-	phy_uboot ();
-	// bogus ();
+	// phy_uboot ();
+	// verify_regs ();
 	//syscon_setup ();
-	//emac_reset ();
-	// bogus ();
-	phy_init ();
 	// show_sid ();
-	bogus ();
+
+	printf ( "Emac init\n" );
+	// printf ( " *************************** Hello from the Emac driver\n" );
+
+	emac_reset ();
+	get_mac ( mac_buf );
+	set_mac ( mac_buf );
+
+	phy_init ();			/* sets ctl0 */
+	ep->ctl1 = 0x08000000;		/* Burst len = 8 */
+
+	ep->rx_ctl1 |= RX_MD;
+
+	list = rx_list_init ();
+	ep->rx_desc = list;
+
+	irq_hookup ( IRQ_EMAC, emac_handler, 0 );
+
+	printf ( "emac rx_filt = %08x\n", ep->rx_filt );
+
+	ep->int_ena = INT_RX_ALL;
+
+	ep->rx_ctl1 = RX_DMA_ENA;
+	ep->rx_ctl0 = RX_EN;
+	ep->rx_filt = RX_FILT_DIS;
+
+	printf ( "emac rx_desc = %08x\n", ep->rx_desc );
+	printf ( "emac tx_desc = %08x\n", ep->tx_desc );
+
 
         return 0;
 }

@@ -18,6 +18,13 @@
 
 #include "netbuf.h"
 
+/* Called very early in initialization */
+void
+board_hardware_init ( void )
+{
+	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
+}
+
 void
 board_init ( void )
 {
