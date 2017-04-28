@@ -16,6 +16,8 @@
  * It can switch, but watch out if you do!
  */
 
+#include "board/board.h"
+
 @ Apparently the at-sign is the ARM comment character.
 @ on the x86 you use the pound sign.
 
@@ -621,6 +623,8 @@ restore:
 
 /* Experimental section for Orange Pi multiple cores */
 
+#ifdef BOARD_ORANGE_PI
+
 #ifdef notdef
 /* We tried using this as a sentinel,
  * but caching hides the results.
@@ -676,5 +680,7 @@ oldcore:
 loopcore2:
         str     r0, [r1]
         b      loopcore2
+
+#endif /* BOARD_ORANGE_PI */
 
 /* THE END */
