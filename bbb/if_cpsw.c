@@ -1640,7 +1640,7 @@ reap_one ( struct cpdma_desc *dp )
 	/* DMA puts the packet in memory behind the back of the cache, so we need to
 	 * invalidate any cache entries that would hide it.  This is the reason for
 	 * the 64 byte buffer alignment.
-	 * XXX - we could use len rather than PKTSIZE
+	 * XXX XXX - we should use len rather than PKTSIZE
 	 */
 	invalidate_dcache_range ( (unsigned long) buf, (unsigned long) &buf[PKTSIZE] );
 

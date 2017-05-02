@@ -14,6 +14,7 @@
 
 #include "kyu.h"
 #include "kyulib.h"
+#include "board/board.h"
 
 /* This is just a starting point for a low level
  * ram allocator.  The basic idea is that we find ourselves
@@ -101,7 +102,22 @@ ram_alloc ( long size )
 	return rv;
 }
 
+/* ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- */
+
 /* MMU stuff - this could someday go into a different file
+ *
+ * The ARM MMU has a lot of capability that we are not using here.
+ * It can have a two level page table and can deal with pages of various sizes.
+ * We deal with 1M "sections" as the ARM people call them.
+ * There are also two TTBR (translation table base) registers,
+ * we use only the first of these.
+ * Our table is build solely out of first level descriptors.
+ * If the two low bits are 00 accessing that address yields a fault.
+ *  all other bits in the descriptor are ignored.
+ * If the two low bits are 10, the descriptor maps a section.
+ * The values 01 and 11 map coarse and fine page tables and are not used here.
  */
 
 /* Introduced 7-17-2016 while playing with
@@ -109,17 +125,60 @@ ram_alloc ( long size )
  */
 #define MMU_SIZE (4*1024)
 
+#define MMU_MASK	0xfffff
+#define MMU_SHIFT	20
+
 static void
-mmu_scan ( unsigned long *mmubase )
+mmu_display ( unsigned long *mmu )
 {
 	int i;
+	int type = 0xff;
 
+	printf ( "MMU at %08x\n", mmu );
+	for ( i=0; i<16; i++ ) {
+	    printf ( "%4d: %08x: %08x\n", i, &mmu[i], mmu[i] );
+	}
+
+	printf ( " -- -- -- --\n" );
+
+	for ( i=0; i<MMU_SIZE; i++ ) {
+	    if ( (mmu[i] & MMU_MASK) == type )
+		continue;
+	    type = mmu[i] & MMU_MASK;
+	    printf ( "%4d: %08x: %08x\n", i, &mmu[i], mmu[i] );
+	}
+
+#ifdef notdef
 	/* There is a big zone (over RAM with 0x0c0e */
 	for ( i=0; i<MMU_SIZE; i++ ) {
-	    if ( (mmubase[i] & 0xffff) != 0x0c12 )
-		printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
+	    if ( (mmu[i] & 0xffff) != 0x0c12 )
+		printf ( "%4d: %08x: %08x\n", i, &mmu[i], mmu[i] );
 	}
+#endif
 }
+
+static void
+mmu_scan ( void )
+{
+	unsigned long *mmubase;
+
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	mmu_display ( mmubase );
+
+}
+
+#define	MMU_SEC		0x02	/* descriptor maps 1M section */
+#define	MMU_BUF		0x04	/* enable write buffering */
+#define	MMU_CACHE	0x08	/* enable caching */
+#define	MMU_XN		0x10	/* execute never, disallow execution from this address */
+
+/* other access bits differentiate user/kernel access */
+#define	MMU_RW		0x0c00	/* allow r/w access */
+#define	MMU_NONE	0x0000	/* allow no access */
+
+#define MMU_NOCACHE	(MMU_SEC | MMU_RW)
+#define MMU_DOCACHE	(MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW)
 
 /* We are curious as to just what the state of things
  * is as handed to us by U-boot.
@@ -143,6 +202,138 @@ mmu_status ( void )
 	    printf ( "I cache enabled\n" );
 }
 
+/* ARM v7 now has actual barrier instructions, but these work for
+ * older ARM (like v5) as well as v7.
+ * At some point U-boot used these since it compiled with -march=armv5
+ * but we compile Kyu with -marm -march=armv7-a
+ */
+#define CP15ISB asm volatile ("mcr     p15, 0, %0, c7, c5, 4" : : "r" (0))
+#define CP15DSB asm volatile ("mcr     p15, 0, %0, c7, c10, 4" : : "r" (0))
+#define CP15DMB asm volatile ("mcr     p15, 0, %0, c7, c10, 5" : : "r" (0))
+
+void
+invalidate_tlb ( void )
+{
+        /* Invalidate entire unified TLB */
+        asm volatile ("mcr p15, 0, %0, c8, c7, 0" : : "r" (0));
+        /* Invalidate entire data TLB */
+        asm volatile ("mcr p15, 0, %0, c8, c6, 0" : : "r" (0));
+        /* Invalidate entire instruction TLB */
+        asm volatile ("mcr p15, 0, %0, c8, c5, 0" : : "r" (0));
+
+        /* Barriers so we don't move on until this is complete */
+        CP15DSB;
+        CP15ISB;
+}
+
+void
+mmu_remap ( unsigned long va, unsigned long pa, int bits )
+{
+	unsigned long desc;
+	int index;
+	unsigned long *mmubase;
+	unsigned long reg = 0;
+
+	desc = pa & ~MMU_MASK;
+	desc |= bits;
+	index = va >> MMU_SHIFT;
+
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	mmubase[index] = desc;
+
+	printf ( "REMAP mmubase is %08x\n", mmubase );
+	printf ( "REMAP index for %08x is %d (%x) to --> %08x\n", va, index, index, &mmubase[index] );
+
+	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
+	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
+	invalidate_tlb ();
+}
+
+#define MMU_TICK	0x100000
+
+void
+mmu_setup ( unsigned long *mmu )
+{
+	unsigned long addr;
+	int i;
+	int size;
+	int start;
+
+	addr = 0;
+	for ( i=0; i<MMU_SIZE; i++ ) {
+	    mmu[i] = addr | MMU_SEC | MMU_XN | MMU_RW;
+	    addr += MMU_TICK;
+	}
+
+	size = BOARD_RAM_SIZE >> MMU_SHIFT;
+	addr = BOARD_RAM_START;
+	start = addr >> MMU_SHIFT;
+	for ( i=0; i<size; i++ ) {
+	    mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
+	    addr += MMU_TICK;
+	}
+}
+
+/* Run this in a thread since it tends to generate data aborts */
+void
+mmu_tester ( int xxx )
+{
+	unsigned long evil;
+	unsigned long *evilp;
+	unsigned long nice;
+	unsigned long *nicep;
+	unsigned long val;
+
+	/* XXX - these addresses are BBB specific
+	 */
+	evil = (unsigned long) 0x90000000;
+	evilp = (unsigned long *) evil;
+
+	nice = (unsigned long) 0x20000000;
+	nicep = (unsigned long *) evil;
+
+	/* This should work */
+	*evilp = 0xabcd;
+	printf ( "read from %08x: %08x\n", evil, *evilp );
+
+	flush_dcache_range ( evilp, &evilp[64] );
+
+	mmu_remap ( nice, evil, MMU_NOCACHE );
+
+	printf ( "read from %08x: %08x\n", nice, *nicep );
+
+#ifdef notdef
+	unsigned long *mmubase;
+
+	mmu_remap ( evil, evil, 0 );
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	invalidate_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
+	mmu_scan ();
+#endif
+
+#ifdef notdef
+	/* and this too gives a data abort */
+	mmu_remap ( evil, evil, MMU_SEC );
+
+	printf ( "Try to read at %08x\n", evil );
+	val = * (unsigned long *) evil;
+	printf ( "read from %08x: %08x\n", evil, val );
+#endif
+
+#ifdef notdef
+	mmu_remap ( evil, evil, 0 );
+
+	/* after the above remapping, this gives us
+	 * a data abort also.
+	 */
+	printf ( "Try to read at %08x\n", evil );
+	val = * (unsigned long *) evil;
+	printf ( "read from %08x: %08x\n", evil, val );
+#endif
+
+}
+
 /* On the BBB this yields:
  *      SP = 8049ffd0
  * --SCTRL = 00c5187d
@@ -158,6 +349,7 @@ mmu_show ( void )
 	unsigned long pu_base;
 	unsigned long esp;
 	unsigned long val;
+	unsigned long *new_mmu;
 
 #ifdef notdef
 	/* We know this works */
@@ -203,9 +395,15 @@ mmu_show ( void )
 	    printf ( "Protection unit base = %08x\n", pu_base );
 
 	if ( mmubase ) {
-	    // mmu_scan ( mmubase );
-	    // printf ( "mmu checking done\n" );
+	    mmu_scan ();
+	    printf ( "mmu checking done\n" );
 	}
+
+	new_mmu = (unsigned long *) ram_alloc ( MMU_SIZE * sizeof(unsigned long) );
+	mmu_setup ( new_mmu );
+	mmu_display ( new_mmu );
+
+	(void) thr_new ( "mmu", mmu_tester, (void *) 0, 3, 0 );
 }
 
 /* THE END */
