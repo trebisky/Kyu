@@ -446,6 +446,7 @@ set_vbar:
 	mcr 	p15, 0, r0, c12, c0, 0
 	bx	lr
 
+#ifdef notdef
 /* SCTRL - System Control*/
 	.globl get_sctrl
 get_sctrl:
@@ -456,6 +457,7 @@ get_sctrl:
 set_sctrl:
 	mcr 	p15, 0, r0, c1, c0, 0
 	bx	lr
+#endif
 
 /* ASCTRL - Auxiliary System Control*/
 	.globl get_asctrl
@@ -468,6 +470,7 @@ set_asctrl:
 	mcr 	p15, 0, r0, c1, c0, 1
 	bx	lr
 
+#ifdef notdef
 /* MMU table base */
 	.globl get_mmu
 get_mmu:
@@ -489,6 +492,7 @@ get_prot:
 set_prot:
 	mcr 	p15, 0, r0, c6, c0, 0
 	bx	lr
+#endif
 
 
 /* The cycle count register is a 32 bit register

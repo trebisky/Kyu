@@ -4,6 +4,15 @@
 
 #include <kyu_glue.h>
 
+// #define TCP_DEBUG
+
+#ifdef TCP_DEBUG
+#define kyu_printf(fmt ...)	printf ( fmt )
+#else
+#define kyu_printf(fmt ...)
+#endif
+
+
 #include <ether.h>
 #include <net.h>
 #include <ip.h>

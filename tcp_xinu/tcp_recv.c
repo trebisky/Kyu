@@ -19,10 +19,11 @@ int32	tcp_recv(
 	char *		end;		/* addr of the ring buffer until data has to be copied */
 
 	if((slot < 0) || (slot >= Ntcp)) {
+		kyu_printf ( "TCP recv bad slot %d\n", slot );
 		return SYSERR;
 	}
 
-	// KYU printf ( "TCP recv called for slot %d, len = %d\n", slot, len );
+	kyu_printf ( "TCP recv called for slot %d, len = %d\n", slot, len );
 
 	/* Obtain pointer to the TCB for the pseudo device */
 
@@ -34,6 +35,7 @@ int32	tcp_recv(
 
 	if (tcbptr->tcb_state == TCB_FREE) {
 		signal (Tcp.tcpmutex);
+		kyu_printf ( "TCP recv state free\n");
 		return SYSERR;
 	}
 
@@ -42,7 +44,7 @@ int32	tcp_recv(
 	wait (tcbptr->tcb_mutex);
 	signal (Tcp.tcpmutex);
 
-	// KYU printf ( "TCP recv -- have TCB mutex\n" );
+	kyu_printf ( "TCP recv -- have TCB mutex\n" );
 
 	tcbref (tcbptr);
 
@@ -54,18 +56,19 @@ int32	tcp_recv(
 
 		while (tcbptr->tcb_qlen == 0
 				&& tcbptr->tcb_state != TCB_CLOSED) {
-			// KYU printf ( "TCP recv - waiting in listen on port %d\n", tcbptr->tcb_lport );
+			kyu_printf ( "TCP recv - waiting in listen on port %d\n", tcbptr->tcb_lport );
 			tcbptr->tcb_readers++;
 			signal (tcbptr->tcb_mutex);
 			wait (tcbptr->tcb_rblock);
-			// KYU printf ( "TCP recv - waiting for tcb mutex, port %d\n", tcbptr->tcb_lport );
+			kyu_printf ( "TCP recv - waiting for tcb mutex, port %d\n", tcbptr->tcb_lport );
 			wait (tcbptr->tcb_mutex);
-			// KYU printf ( "TCP recv - awakened!!! listening on port %d\n", tcbptr->tcb_lport );
+			kyu_printf ( "TCP recv - awakened!!! listening on port %d\n", tcbptr->tcb_lport );
 		}
 
 		/* Recheck state to see why we resumed */
 
 		if (tcbptr->tcb_state == TCB_CLOSED) {
+			kyu_printf ( "TCP recv state closed\n");
 			child = SYSERR;
 		} else {
 			tcbptr->tcb_qlen--;
@@ -74,6 +77,7 @@ int32	tcp_recv(
 		tcbunref (tcbptr);
 		signal (tcbptr->tcb_mutex);
 		if (child == SYSERR){
+			kyu_printf ( "TCP recv child mqrecv error\n");
 			return SYSERR;
 		} else {
 			*(int *)data = child;

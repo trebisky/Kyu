@@ -21,6 +21,8 @@ int32	tcp_close(
 
 	ptcb = &tcbtab[slot];
 
+	kyu_printf ( "tcp close called on slot %d (state = %d)\n", slot, ptcb->tcb_state );
+
 	/* Obtain exclusive access and insure connection is open */
 
 	wait (ptcb->tcb_mutex);

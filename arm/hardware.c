@@ -112,30 +112,6 @@ enable_unaligned ( void )
 	asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (scr) : "cc");
 }
 
-/* We are curious as to just what the state of things
- * is as handed to us by U-boot.
- */
-void
-mmu_status ( void )
-{
-	int scr;
-	int mmu_base;
-
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
-
-	if ( scr & 0x01 )
-	    printf ( "MMU enabled\n" );
-	if ( scr & 0x02 )
-	    printf ( "A alignment enabled\n" );
-	if ( scr & 0x04 )
-	    printf ( "D cache enabled\n" );
-	if ( scr & 0x1000 )
-	    printf ( "I cache enabled\n" );
-
-	asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r" (mmu_base) : : "cc");
-	printf ( "MMU base: %08x\n", mmu_base );
-}
-
 /* The following are "standard" entry points for all hardware */
 /* hardware_init() should not expect printf to work */
 
@@ -146,24 +122,6 @@ hardware_init ( void )
 
 	enable_ccnt ( 0 );
 	enable_unaligned ();
-}
-
-/* This gets called once printf is working */
-void
-hardware_debug ( void )
-{
-	int scr;
-
-	mmu_status ();
-
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
-	printf ( "Found SCTRL = %08x\n", scr );
-
-	enable_unaligned ();
-
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
-	printf ( "Now SCTRL = %08x\n", scr );
-
 }
 
 int

@@ -32,6 +32,14 @@ dots2ip ( char *s )
 	return ntohl ( nip );
 }
 
+/* This requires a daytime server running on port 13 someplace
+ * ( likely the boot host).
+ * To run this on fedora:
+ *  dnf install xinetd
+ *  edit /etc/xinetd/daytime-stream to enable
+ *  systemctl start  xinetd.service
+ */
+
 /* Test - active connection to Daytime server */
 /* Sometimes this just locks up in SYNSENT ??!! */
 
@@ -56,8 +64,7 @@ test_client ( void )
 	tcp_close ( slot );
 }
 
-/* New style passive connection with listener callback */
-/* Note that this just sets up callbacks and evaporates */
+/* Callback function to handle the following */
 
 static void
 daytime_func ( int slot )
@@ -72,12 +79,10 @@ daytime_func ( int slot )
 	tcp_close ( slot );
 }
 
-/* This requires the daytime server running on port 13 someplace
- * ( likely the boot host).
- * To run this on fedora:
- *  dnf install xinetd
- *  edit /etc/xinetd/daytime-stream to enable
- *  systemctl start  xinetd.service
+/* New style passive connection with listener callback */
+/* Note that this just sets up a callback and evaporates */
+/* So traffic is just handled by the network thread and we
+ *  have no thread associated with this server.
  */
 
 static void
@@ -106,7 +111,7 @@ test_daytime ( void )
  */
 
 static void
-test_server ( void )
+test_server ( int bogus )
 {
 	int lslot;
 	int cslot;
@@ -114,10 +119,10 @@ test_server ( void )
 	int port = 1234;
 
 	lslot = tcp_register ( 0, port, 0 );
-	printf ( "Listening on port %d (slot %d)\n", port, lslot );
+	printf ( "Server listening on port %d (slot %d)\n", port, lslot );
 
 	for ( ;; ) {
-	    printf ( "Waiting for connection\n" );
+	    printf ( "Waiting for connection on port %d\n", port );
 	    rv = tcp_recv ( lslot, (char *) &cslot, 4 );
 	    if ( rv < 0 ) {
 		/* Without this check, once we tie up all slots in
@@ -126,26 +131,45 @@ test_server ( void )
 		printf ( "recv on port %d fails - maybe no more slots?\n", port );
 		break;
 	    }
-	    printf ( "Connection!! %d, %d\n", rv, cslot );
+	    printf ( "Connection on port %d!! rv= %d, slot= %d\n", port, rv, cslot );
 	    tcp_send ( cslot, "dog\n", 4 );
 	    tcp_send ( cslot, "cat\n", 4 );
 	    tcp_close ( cslot );
 	}
+	printf ( "Server on port %d exiting !!\n", port );
 }
 
 static void
-tcp_xinu_test ( int bogus )
+launch_classic_server ( void )
 {
-	test_client ();
-
-	test_daytime ();
-	test_server ();
+	(void) thr_new ( "xinu_tester", test_server, NULL, 30, 0 );
 }
+
+static int servers_running = 0;
 
 void
 test_xinu_tcp ( void )
 {
-	(void) thr_new ( "xinu_tester", tcp_xinu_test, NULL, 30, 0 );
+	/* Test an active client to port 13 */
+	// XXX test_client ();
+
+	if ( ! servers_running ) {
+	    servers_running = 1;
+
+	    test_daytime ();
+
+	    /* This needs to run in a thread */
+	    launch_classic_server ();
+
+	    thr_delay ( 10 );
+
+	    /* Start a new style server on port 13 */
+	    /* No thread needed */
+	    /* BUG - if we run this alongside the classic,
+	     * the classic fails */
+	    // test_daytime ();
+
+	}
 }
 
 static void
@@ -175,6 +199,9 @@ ip_ntoh ( struct netpacket *pktptr )
         pktptr->net_ipdst = ntohl(pktptr->net_ipdst);
 }
 
+/* This is where packets arrive, sent to us
+ * from net/net_ip.c
+ */
 void
 tcp_xinu_rcv ( struct netbuf *nbp )
 {

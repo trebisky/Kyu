@@ -134,12 +134,14 @@ sys_init ( int xxx )
 	*/
 
 	console_init ();
-	hardware_debug ();
+	// hardware_debug ();
 	board_init ();
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	/* enable interrupts */
 	cpu_leave ();
+
+	mmu_show ();
 
 	gb_init_rand ( 0x163389 );
 

@@ -101,4 +101,111 @@ ram_alloc ( long size )
 	return rv;
 }
 
+/* MMU stuff - this could someday go into a different file
+ */
+
+/* Introduced 7-17-2016 while playing with
+ * ARM timers and the ARM mmu
+ */
+#define MMU_SIZE (4*1024)
+
+static void
+mmu_scan ( unsigned long *mmubase )
+{
+	int i;
+
+	/* There is a big zone (over RAM with 0x0c0e */
+	for ( i=0; i<MMU_SIZE; i++ ) {
+	    if ( (mmubase[i] & 0xffff) != 0x0c12 )
+		printf ( "%4d: %08x: %08x\n", i, &mmubase[i], mmubase[i] );
+	}
+}
+
+/* We are curious as to just what the state of things
+ * is as handed to us by U-boot.
+ */
+void
+mmu_status ( void )
+{
+	int scr;
+	int mmu_base;
+
+	/* SCTRL */
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
+
+	if ( scr & 0x01 )
+	    printf ( "MMU enabled\n" );
+	if ( scr & 0x02 )
+	    printf ( "A alignment enabled\n" );
+	if ( scr & 0x04 )
+	    printf ( "D cache enabled\n" );
+	if ( scr & 0x1000 )
+	    printf ( "I cache enabled\n" );
+}
+
+/* On the BBB this yields:
+ *      SP = 8049ffd0
+ * --SCTRL = 00c5187d
+ * --TTBCR = 00000000
+ * --TTBR0 = 9fff0000
+ * --TTBR1 = 00000000
+ * MMU base = 9fff0000
+ */
+void
+mmu_show ( void )
+{
+	unsigned long *mmubase;
+	unsigned long pu_base;
+	unsigned long esp;
+	unsigned long val;
+
+#ifdef notdef
+	/* We know this works */
+	esp = get_sp();
+	printf ( " SP = %08x\n", esp );
+	esp = 0xBADBAD;
+
+	/* was in locore.S */
+	mmubase = (unsigned long *) get_mmu ();
+#endif
+
+	/* This works just fine !! */
+	asm volatile ("add %0, sp, #0\n" :"=r"(esp));
+	printf ( " SP = %08x\n", esp );
+
+	/* SCTRL */
+	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
+	printf ( "SCTRL = %08x\n", val );
+
+	/* TTBCR */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 2" : "=r"(val) );
+	printf ( "--TTBCR = %08x\n", val );
+
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	printf ( "--TTBR0 = %08x\n", mmubase );
+
+	/* TTBR1 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 1" : "=r"(val) );
+	printf ( "--TTBR1 = %08x\n", val );
+
+	if ( ! mmubase )
+	    printf ( "MMU not initialized !\n" );
+	else
+	    printf ( "MMU base = %08x\n", mmubase );
+
+	mmu_status ();
+
+	/* protection unit base */
+	asm volatile ("mrc p15, 0, %0, c6, c0, 0" : "=r"(pu_base) );
+
+	if ( pu_base )
+	    printf ( "Protection unit base = %08x\n", pu_base );
+
+	if ( mmubase ) {
+	    // mmu_scan ( mmubase );
+	    // printf ( "mmu checking done\n" );
+	}
+}
+
 /* THE END */
