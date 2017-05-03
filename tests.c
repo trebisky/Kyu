@@ -150,6 +150,7 @@ static void test_fault2 ( int );
 static void test_cores ( int );
 #endif
 
+static void test_clear ( int );
 static void test_blink ( int );
 
 /* Here is the IO test menu */
@@ -174,6 +175,7 @@ struct test io_test_list[] = {
 
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
+	test_clear,	"clear memory test",	0,
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2371,6 +2373,31 @@ led_norm ( void )
 }
 
 #endif
+
+static void
+test_clear ( int arg )
+{
+	unsigned long *start;
+	unsigned long size;
+	unsigned long *p;
+	int i;
+
+	start = (unsigned long *) ram_next ();
+	size = ram_size ();
+
+	printf ( "Clearing ram, %d bytes from %08x\n", size, start );
+	size /= sizeof(unsigned long);
+
+	p = start;
+	for ( i=0; i<size; i++ )
+	    *p++ = 0;
+
+	p = start;
+	for ( i=0; i<size; i++ )
+	    *p++ = 0xdeadbeef;
+
+	printf ( "Done clearning ram\n" );
+}
 
 static struct thread *blink_tp;
 

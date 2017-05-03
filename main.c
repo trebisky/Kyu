@@ -141,6 +141,7 @@ sys_init ( int xxx )
 	/* enable interrupts */
 	cpu_leave ();
 
+	mmu_initialize ();
 	mmu_show ();
 
 	gb_init_rand ( 0x163389 );
@@ -183,6 +184,8 @@ sys_init ( int xxx )
 #ifdef notyet
 	init_pcmcia_ds ();
 #endif
+
+	ram_show ();
 
 	/* This is a nice idea, but doesn't always work
 	 */

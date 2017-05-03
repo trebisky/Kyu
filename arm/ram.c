@@ -52,6 +52,10 @@
 #define RAM_QUANTA	16*1024		/* 0 - 0x3fff */
 #define Q_SHIFT		14
 
+#define MEG	(1024*1024)
+
+void mmu_nocache ( unsigned long );
+
 unsigned long ram_alloc ( long );
 
 extern char _end;
@@ -68,38 +72,96 @@ ram_init ( unsigned long start, unsigned long size )
 
 	next_ram = start;
 	last_ram = start + size;
+	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
 
 	kernel_end = (unsigned long) &_end;
+	printf ( "Kyu size: %d bytes\n", kernel_end - start );
+
+	if ( (kernel_end % RAM_QUANTA) != 0 )
+	    kernel_end = ram_round ( kernel_end );
+
 	if ( kernel_end < next_ram )
 	    panic ( "Kernel lost before ram" );
 	if ( kernel_end > last_ram )
 	    panic ( "Kernel lost after ram" );
+	next_ram = kernel_end;
 
 	// printf ( "Ram start: %08x\n", next_ram );
 	// printf ( "Ram end: %08x\n", last_ram );
-	printf ( "Kyu end: %08x\n", kernel_end );
-	next_ram = ram_round ( kernel_end );
-	printf ( "Ram start: %08x\n", next_ram );
+	printf ( "Ram alloc start: %08x\n", next_ram );
 
-	kernel_end = ram_alloc ( 55*1024 );
-	printf ( "Ram next: %08x\n", next_ram );
-
+	// this was an early test
+	// kernel_end = ram_alloc ( 55*1024 );
+	// printf ( "Ram next: %08x\n", next_ram );
 }
 
 /* We never ever expect to free anything we allocate
  *  using this facility
  */
 unsigned long
-ram_alloc ( long size )
+ram_alloc ( long arg )
 {
 	unsigned long rv;
+	unsigned long size;
 
-	size = ram_round ( size );
+	size = arg;
+	if ( (size % RAM_QUANTA) != 0 )
+	    size = ram_round ( size );
+
 	if ( next_ram + size >= last_ram )
 	    panic ( "ran outa ram" );
 	rv = next_ram;
 	next_ram += size;
+
+	printf ( "ram_alloc: %d (%d) bytes -- %08x\n", size, arg, rv );
 	return rv;
+}
+
+unsigned long
+ram_section ( int arg )
+{
+	unsigned long count;
+
+	count = arg * MEG;
+
+	if ( next_ram + count >= last_ram )
+	    panic ( "ran outa ram sections" );
+
+	last_ram -= count;
+	printf ( "ram_section: %d (%d) bytes -- %08x\n", count, arg, last_ram );
+	return last_ram;
+}
+
+unsigned long
+ram_section_nocache ( int arg )
+{
+	unsigned long rv;
+
+	rv = ram_section ( arg );
+	mmu_nocache ( rv );
+	return rv;
+}
+
+unsigned long
+ram_next ( void )
+{
+	return next_ram;
+}
+
+unsigned long
+ram_size ( void )
+{
+	return last_ram - next_ram;
+}
+
+#define MEG	(1024*1024)
+void
+ram_show ( void )
+{
+	int size;
+
+	size = (last_ram - next_ram) / MEG;
+	printf ( "RAM %dM+ available starting at %08x\n", size, next_ram );
 }
 
 /* ------------------------------------------------------------------- */
@@ -250,7 +312,18 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 	invalidate_tlb ();
 }
 
-#define MMU_TICK	0x100000
+/* special call for tranparent mapped section */
+void
+mmu_nocache ( unsigned long addr )
+{
+	char *caddr = (char *) addr;
+
+	mmu_remap ( addr, addr, MMU_NOCACHE );
+	invalidate_dcache_range ( addr, &caddr[MEG] );
+}
+
+// #define MMU_TICK	0x100000
+#define MMU_TICK	MEG
 
 void
 mmu_setup ( unsigned long *mmu )
@@ -273,6 +346,22 @@ mmu_setup ( unsigned long *mmu )
 	    mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
 	    addr += MMU_TICK;
 	}
+}
+
+/* Call this to set up our very own MMU */
+void
+mmu_initialize ( void )
+{
+	unsigned long *new_mmu;
+
+	new_mmu = (unsigned long *) ram_alloc ( MMU_SIZE * sizeof(unsigned long) );
+	mmu_setup ( new_mmu );
+	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
+	// mmu_display ( new_mmu );
+
+	/* TTBR0 */
+	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_mmu) );
+	invalidate_tlb ();
 }
 
 /* Run this in a thread since it tends to generate data aborts */
@@ -349,7 +438,6 @@ mmu_show ( void )
 	unsigned long pu_base;
 	unsigned long esp;
 	unsigned long val;
-	unsigned long *new_mmu;
 
 #ifdef notdef
 	/* We know this works */
@@ -398,10 +486,6 @@ mmu_show ( void )
 	    mmu_scan ();
 	    printf ( "mmu checking done\n" );
 	}
-
-	new_mmu = (unsigned long *) ram_alloc ( MMU_SIZE * sizeof(unsigned long) );
-	mmu_setup ( new_mmu );
-	mmu_display ( new_mmu );
 
 	(void) thr_new ( "mmu", mmu_tester, (void *) 0, 3, 0 );
 }
