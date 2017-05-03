@@ -24,6 +24,10 @@
 // #define ROM_START       ((volatile unsigned long *) 0x01f01da4)
 #define ROM_START        ((volatile unsigned long *) (CPUCFG_BASE + 0x1A4))
 
+/* We don't need these, but want to play with them */
+#define PRIVA        ((volatile unsigned long *) (CPUCFG_BASE + 0x1A8))
+#define PRIVB        ((volatile unsigned long *) (CPUCFG_BASE + 0x1AC))
+
 #define GEN_CTRL        ((volatile unsigned long *) (CPUCFG_BASE + 0x184))
 
 // #define DBG_CTRL1       ((unsigned long *) (CPUCFG_BASE + 0x1e4))
@@ -191,14 +195,38 @@ test_one ( int cpu )
 	*ROM_START = 0;
 }
 
+void
+test_reg ( volatile unsigned long *reg )
+{
+	unsigned long val;
+
+	printf ( "Test REG, read %08x as %08x\n", reg, *reg );
+	*reg = val = 0;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
+	*reg = val = 0xdeadbeef;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
+	*reg = val = 0;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
+}
+
 /* This gets called by the test menu
  *   (or something of the sort)
  */
 void
 test_core ( void )
 {
+	int reg;
+
+	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
+	printf ( "CPSR  = %08x\n", reg );
+	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
+	printf ( "CPSR  = %08x\n", reg );
 	printf ( "CPSR  = %08x\n", get_cpsr() );
-	printf ( "SCTRL = %08x\n", get_sctrl() );
+	printf ( "CPSR  = %08x\n", get_cpsr() );
+
+	/* SCTRL */
+        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (reg) : : "cc");
+	printf ( "SCTRL = %08x\n", reg );
 
 #ifdef notdef
 	unsigned long val;
@@ -212,6 +240,10 @@ test_core ( void )
 	test_one ( 1 );
 	test_one ( 2 );
 	test_one ( 3 );
+
+	test_reg ( ROM_START );
+	test_reg ( PRIVA );
+	test_reg ( PRIVB );
 }
 
 /* If all goes well, we will be running here,

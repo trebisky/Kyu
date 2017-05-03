@@ -354,6 +354,7 @@ mmu_initialize ( void )
 {
 	unsigned long *new_mmu;
 
+	printf ( "Initializing and relocating MMU\n" );
 	new_mmu = (unsigned long *) ram_alloc ( MMU_SIZE * sizeof(unsigned long) );
 	mmu_setup ( new_mmu );
 	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
