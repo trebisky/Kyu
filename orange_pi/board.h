@@ -20,6 +20,9 @@
 #define ARCH_ARM
 
 #define NUM_INTS	157
+#define NUM_CORES	4
+
+#define CORE_STACK_SIZE		16*1024
 
 /* XXX - This is 1G of RAM as I have on my PC and PC plus boards.
  * There are H3 based boards with 1/2 G (the Lite and One)

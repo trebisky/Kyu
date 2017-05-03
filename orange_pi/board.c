@@ -18,11 +18,15 @@
 
 #include "netbuf.h"
 
+unsigned long core_stacks;
+
 /* Called very early in initialization */
 void
 board_hardware_init ( void )
 {
 	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
+	core_stacks = ram_alloc ( NUM_CORES * CORE_STACK_SIZE );
+	printf ( "Core stacks at %08x\n", core_stacks );
 }
 
 void

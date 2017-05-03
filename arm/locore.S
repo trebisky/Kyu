@@ -31,22 +31,10 @@
 
 #define PSR_DEFAULT	PSR_M_SUPER
 
-#ifdef notdef
-@ fails
-core_startup:
-        mrs     r0, cpsr                /* disable interrupts */
-        orr     r0, r0, #PSR_INT_DIS
-        msr     cpsr, r0
-
-        movw    sp, #0
-        movt    sp, #0x4fff
-        bl      core_main
-#endif
-
 /* For the time being, this is the first thing linked
  * and U-boot simply branches to a hard address.
- *  0x80300000 on the BBB
- *  0x42000000 on the Orange Pi
+ *  0x80000000 on the BBB
+ *  0x40000000 on the Orange Pi
  *
  * As long as locore.o is the first thing linked,
  * we should be OK.
@@ -630,6 +618,18 @@ restore:
 #ifdef BOARD_ORANGE_PI
 
 #ifdef notdef
+@ fails
+core_startup:
+        mrs     r0, cpsr                /* disable interrupts */
+        orr     r0, r0, #PSR_INT_DIS
+        msr     cpsr, r0
+
+        movw    sp, #0
+        movt    sp, #0x4fff
+        bl      core_main
+#endif
+
+#ifdef notdef
 /* We tried using this as a sentinel,
  * but caching hides the results.
  */
@@ -647,14 +647,41 @@ zcore:
 
 #define SENTINEL	0x4
 
+	.globl newcore
+newcore:
+	/* Read processor affinity register */
+        mrc     p15, 0, r0, c0, c0, 5
+	and	r0, #3
+	lsl	r0, #14
+	ldr	r2, =core_stacks
+	ldr	r2, [r2]
+	add	sp, r2, r0
+
+	/* pass core number in r0 as argument */
+        mrc     p15, 0, r0, c0, c0, 5
+	and	r0, #3
+
+	bl	kyu_newcore
+
+@ If we return, we will spin here rapidly
+@ incrementing the sentinel location.
+@ note that there is special static ram at addr 0
+
+	mov	r0, #0
+	ldr	r1, =SENTINEL
+loopcore:
+	add	r0, #1
+        str     r0, [r1]
+        b      loopcore
+
 /* We realize that each core needs its own stack ...
  *  1-28-2017
  * Putting a stack at 0x7f00800 makes bad things happen
  * Start each cpu with a 16K stack (very generous).
  */
 	@ .align 3
-	.globl newcore
-newcore:
+	.globl newcoreX
+newcoreX:
 	/* Read processor affinity register */
         mrc     p15, 0, r1, c0, c0, 5
 	and	r1, #3
@@ -672,10 +699,10 @@ newcore:
 	mov	r0, #0
 	@ ldr	r1, =0x01f01da4
 	ldr	r1, =SENTINEL
-loopcore:
+loopcoreX:
 	add	r0, #1
         str     r0, [r1]
-        b      loopcore
+        b      loopcoreX
 
         .globl oldcore
 oldcore:

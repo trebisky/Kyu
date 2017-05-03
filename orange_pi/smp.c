@@ -209,6 +209,8 @@ test_reg ( volatile unsigned long *reg )
 	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
 }
 
+extern unsigned long core_stacks;
+
 /* This gets called by the test menu
  *   (or something of the sort)
  */
@@ -244,6 +246,8 @@ test_core ( void )
 	test_reg ( ROM_START );
 	test_reg ( PRIVA );
 	test_reg ( PRIVB );
+
+	printf ( "Address of core stacks: %08x\n", core_stacks );
 }
 
 /* If all goes well, we will be running here,
@@ -268,8 +272,9 @@ delay_ms ( int msecs )
 	// delay_ms_nocache ( msecs );
 }
 
+/* This is the first C code a new core runs */
 void
-kyu_newcore ( int arg )
+kyu_newcore ( int core )
 {
 	volatile unsigned long *sent;
 	unsigned long sp;
@@ -287,7 +292,7 @@ kyu_newcore ( int arg )
 
 	/* Makes a mess without synchronization */
 	printf ( "Core %d running with sp = %08x\n", cpu, sp );
-	printf ( "Core %d arg = %08x\n", cpu, arg );
+	printf ( "Core %d core (arg) = %08x\n", cpu, core );
 	// printf ( "Core %d running\n", cpu );
 
 #ifdef notdef
