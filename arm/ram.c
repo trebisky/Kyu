@@ -484,7 +484,7 @@ mmu_show ( void )
 	    printf ( "Protection unit base = %08x\n", pu_base );
 
 	if ( mmubase ) {
-	    mmu_scan ();
+	    // mmu_scan ();
 	    printf ( "mmu checking done\n" );
 	}
 

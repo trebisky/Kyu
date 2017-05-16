@@ -283,8 +283,8 @@ console_puts ( char *buf )
  * for debugging, and should be removed in
  * production version.
  */
-void
-panic ( char *msg )
+static void
+kyu_panic ( char *msg, int spin )
 {
 	if ( msg )
 	    printf ( "PANIC: %s\n", msg );
@@ -295,7 +295,29 @@ panic ( char *msg )
 	panic_debug ();
 #endif
 
+	if ( spin )
+	    for ( ;; )
+		;
+
 	thr_block ( FAULT );
+}
+
+/* These two calls allow some probably useless attempt
+ * to differentiate between a panic that might just allow
+ * the current thread to be suspended, and a panic that
+ * indicates a hopeless situation where the processor
+ * should just halt (or spin).
+ */
+void
+panic ( char *msg )
+{
+	kyu_panic ( msg, 0 );
+}
+
+void
+panic_spin ( char *msg )
+{
+	kyu_panic ( msg, 1 );
 }
 
 /* temporary debugging panic
@@ -385,7 +407,7 @@ panic_debug ( void )
 }
 #endif
 
-/* This is specific to the BBB due to the RAM range test,
+/* This is specific to the ARM due to the RAM range test,
  * but it avoids a bunch of annoying data aborts.
  */
 static void *
@@ -402,9 +424,55 @@ arm_address_fix ( unsigned int addr )
 	return (void *) addr;
 }
 
+static int
+mem_prod ( unsigned long *addr, int val )
+{
+	*addr = val;
+	if ( *addr == val )
+	    return 1;
+	printf ( "Fail at %08x, %08x (found: %08x)\n", addr, val, *addr );
+	return 0;
+}
+
+#define MTAG(x)	(0xabcd0000 | (unsigned long) (x))
+
+/* Scan a range of memory up to where it fails to
+ * act like ram.
+ */
+void
+mem_test ( unsigned long *start, unsigned long *end )
+{
+	unsigned long *p;
+
+	for ( p = start; p < end; p++ ) {
+	    if ( ! mem_prod ( p, 0 ) ) return;
+	    if ( ! mem_prod ( p, 0xffffffff ) ) return;
+	    if ( ! mem_prod ( p, 0xabcd1234 ) ) return;
+	    if ( ! mem_prod ( p, ~0xabcd1234 ) ) return;
+	    *p = MTAG(p);
+	}
+	printf ( "Range all OK\n" );
+}
+
+void
+mem_verify ( unsigned long *start, unsigned long *end )
+{
+	unsigned long *p;
+	int val;
+	int limit = 0;
+
+	for ( p = start; p < end; p++ ) {
+	    val = MTAG(p);
+	    if ( *p != val )
+		printf ( "Fail at %08x, %08x (found: %08x)\n", p, val, *p );
+	}
+}
+
+
 /* Shared by code in tests.c
  * Data aborts just waste time and cause frustration
- * when debugging.
+ * when debugging, so we ensure addresses are in ram,
+ * Unless type is 'i'.
  */
 void
 mem_dumper ( int type, char *a_start, char *a_lines )
@@ -418,20 +486,27 @@ mem_dumper ( int type, char *a_start, char *a_lines )
 	else
 	    addr = hextoi ( a_start );
 
-	start = arm_address_fix ( addr );
 	lines = atoi ( a_lines );
 
-	// printf ( "DUMP at %08x\n", start );
-	if ( ! start ) {
-	    printf ( "Start address not in RAM\n" );
-	    return;
-	}
+	if ( type == 'i' ) {
+	    /* bypass ram range checks */
+	    start = (void *) (addr & ~0xf);
+	    type = 'l';
+	} else {
+	    start = arm_address_fix ( addr );
 
-	/* check end address too */
-	addr = (unsigned int) start + 16 * lines - 1;
-	if ( ! valid_ram_address ( addr ) ) {
-	    printf ( "End address not in RAM\n" );
-	    return;
+	    // printf ( "DUMP at %08x\n", start );
+	    if ( ! start ) {
+		printf ( "Start address not in RAM\n" );
+		return;
+	    }
+
+	    /* check end address too */
+	    addr = (unsigned int) start + 16 * lines - 1;
+	    if ( ! valid_ram_address ( addr ) ) {
+		printf ( "End address not in RAM\n" );
+		return;
+	    }
 	}
 
 	if ( type == 'b' )

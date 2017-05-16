@@ -43,6 +43,52 @@ clear_bss ( void )
 }
 #endif
 
+#ifdef notdef
+float v1 = 2.0;
+float v2 = 3.0;
+float fvar;
+
+void
+arm_float ( void )
+{
+	fvar = v1 / v2;
+}
+#endif
+
+static int
+sqrt_i ( int arg )
+{
+	float farg = arg;
+	float root;
+
+	asm volatile ("vsqrt.f32 %0, %1" : "=w" (root) : "w" (farg) );
+
+	return 10000 * root;
+}
+
+static int
+sqrt_d ( int arg )
+{
+	double farg = arg;
+	double root;
+
+	asm volatile ("vsqrt.f64 %0, %1" : "=w" (root) : "w" (farg) );
+
+	return 10000 * root;
+}
+
+void
+arm_float ( void )
+{
+	int val;
+	int num = 2;
+
+	val = sqrt_i ( num );
+	printf ( "Square root of %d is %d\n", num, val );
+	val = sqrt_d ( num );
+	printf ( "Square root of %d is %d\n", num, val );
+}
+
 /* This is the first bit of C code that runs in 32 bit mode.
  * (on the x86, it runs on the arm too, but diffent addresses).
  * it runs with a provisional stack at 0x90000 (so it will
@@ -54,8 +100,17 @@ void
 kern_startup ( void )
 {
 	unsigned long malloc_base;
+	int sp;
 
-	printf ( "Kyu starting with stack: %08x\n",  get_sp() );
+#ifdef notdef
+	// ensure core stack pointer valid
+	// this works !!
+	preinit_core ();
+	test_core ();
+#endif
+
+	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
+	printf ( "Kyu starting with stack: %08x\n",  sp );
 
 	// emac_probe (); /* XXX */
 
@@ -66,6 +121,12 @@ kern_startup ( void )
 
 	hardware_init ();
 	console_initialize ();
+
+	/* XXX -- floating point hijinks */
+	fp_enable ();
+	arm_float ();
+
+	// test_core ();  works here
 
 	// printf ( "Kyu starting with stack: %08x\n",  get_sp() );
 	// printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
@@ -114,6 +175,11 @@ kern_startup ( void )
 void
 sys_init ( int xxx )
 {
+	// works here, but two changes needed.
+	// must use _udelay() not thr_delay()
+	// printf in core is not synchronized, so avoid
+	// test_core ();
+
 	/*
 	printf ( "Sys thread starting with stack: %08x\n",  get_sp() );
 	printf ( "Sys thread starting with cpsr: %08x\n",  get_cpsr() );
@@ -140,6 +206,8 @@ sys_init ( int xxx )
 
 	/* enable interrupts */
 	cpu_leave ();
+
+	// test_core (); works here
 
 	mmu_initialize ();
 	mmu_show ();
@@ -194,6 +262,8 @@ sys_init ( int xxx )
 	printf ( "Sys thread finished with stack: %08x\n",  get_sp() );
 	printf ( "Sys thread finished with cpsr: %08x\n",  get_cpsr() );
 	*/
+
+	// test_core (); works here
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 }

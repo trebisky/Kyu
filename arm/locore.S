@@ -42,17 +42,18 @@
  * For some reason the compiler was reordering routines
  * compiled from main.c, this makes us immune to that.
  */
-@	.globl uboot_startup
-@uboot_startup:
-@	.globl kyu_startup
-@kyu_startup:
+
+/* Providing this symbol here is really unnecessary, but it gives us
+ * place to tell the linker to use as a start address in the ELF file.
+ * The only purpose this serves is to keep the linker quiet, but
+ * that is worth something.
+ */
+	.globl asm_startup
+asm_startup:
 
 	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
-@        movw    sp, #0
-@        movt    sp, #0x4fff
-@	bl	core_main	/* XXX */
 
 	movw	r0, #:lower16:vectors	/* set VBAR */
 	movt	r0, #:upper16:vectors
@@ -60,7 +61,9 @@
 
 	bl	clear_bss
 	bl	kern_startup
-	bx	lr
+@	bl	test_core
+xspin:	b	xspin
+@	bx	lr
 
 clear_bss:
 	movw	r3, #:lower16:__bss_start__
@@ -74,6 +77,8 @@ loop:	cmp	r3, r2
 	bcc	loop
 	bx	lr
 
+#ifdef notdef
+#endif
 xdelay:
 	mov	r0, #0xFFFFFF
 dloop:	sub	r0, #1
@@ -608,6 +613,20 @@ restore:
         msr     cpsr_cfsx, r1   /* Restore the CPSR                     */
         pop     {r1, r2}        /* Restore r1, r2                       */
         mov     pc, lr          /* Return to caller                     */
+
+#define FLOATING_POINT
+#ifdef FLOATING_POINT
+	.globl fp_enable
+fp_enable:
+	mrc	p15, 0, r0, c1, c0, 2
+	orr	r0, r0, #0x300000 @ single precision
+	orr	r0, r0, #0xC00000 @ double precision
+	mcr	p15, 0, r0, c1, c0, 2
+	isb
+	mov	r0, #0x40000000
+	fmxr	fpexc,r0
+	mov	pc, lr
+#endif
 
 /* ==================================================================== */
 /* ==================================================================== */

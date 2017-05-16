@@ -17,6 +17,7 @@
 #include "cpu.h"
 #include "board/board.h"
 
+extern struct thread silly_thread;
 extern struct thread *cur_thread;
 
 static vfptr data_abort_hook;
@@ -49,9 +50,17 @@ evil_exception ( char *msg, int code )
 {
 	int pc;
 
-	printf ( "%s in thread %s\n", msg, cur_thread->name );
+	if ( cur_thread == &silly_thread ) {
+	    printf ( "%s in Kyu early initialization !!\n", msg );
+	    show_thread_regs ( cur_thread, 64 );
+	    printf ( "Processor halted (spinning)\n" );
+	    spin ();
+	}
 
-	show_thread_regs ( cur_thread );
+	printf ( "%s in thread %s\n", msg, cur_thread->name );
+	show_thread_regs ( cur_thread, 0 );
+
+	// printf ( "cur_thread = %08x\n", cur_thread );
 
 #define ARM_FP	11
 #define ARM_PC	15
@@ -229,9 +238,9 @@ void do_irq ( void )
 	printf ( "\n" );
 	printf ("Interrupt debug, sp = %08x\n", get_sp() );
 
-	show_thread_regs ( cur_thread );
+	show_thread_regs ( cur_thread, 0 );
 	printf ( "\n" );
-	show_stack ( get_sp () );
+	show_stack ( get_sp (), 0 );
 	spin ();
 #endif
 
@@ -251,7 +260,7 @@ void do_irq ( void )
 	     * This is pretty severe - XXX
 	     */
 	    printf ("Unknown interrupt request: %d\n", nint );
-	    show_thread_regs ( cur_thread );
+	    show_thread_regs ( cur_thread, 0 );
 	    spin ();
 	}
 

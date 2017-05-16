@@ -38,7 +38,26 @@ static int threads_running;
 
 static enum console_mode first_console = INITIAL_CONSOLE;
 
-struct thread *cur_thread;
+/* This "silly_thread" business is here to allow exceptions
+ * that happen early in Kyu initialization to be properly
+ * handled.  The assembly language code expects there to be
+ * something valid where cur_thread is pointing so it can
+ * dump registers there.  On the Orange Pi, a null pointer
+ * actually points to some special SRAM, but on the BBB a
+ * null pointer reference yields a fault (as it should) and
+ * the processor mysteriously hangs.
+ *
+ * On the Orange Pi, we have SRAM at address 0,
+ * so when we try floating point instructions without
+ * the VFP unit initialized, we get an exception, but
+ * it happily accepts the cur_thread pointer set to 0
+ * On the BBB, this gets a data abort and the processor hangs.
+ *
+ * This does waste a tiny bit of memory when we complete
+ * initialization and abandon this structure.
+ */
+struct thread silly_thread;
+struct thread *cur_thread = & silly_thread;
 
 /* list of thread structures to recycle
  */
@@ -1429,7 +1448,7 @@ thr_suspend ( int why )
 	}
 
 	if ( ! in_newtp )
-	    panic ( "thr_suspend can find no ready thread" );
+	    panic_spin ( "thr_suspend can find no ready thread" );
 
 	finish_interrupt ();
 }
@@ -1640,7 +1659,7 @@ resched ( int options )
 	 * stack).
 	 */
 	if ( ! cur_thread )
-	    panic ( "resched, invalid current thread" );
+	    panic_spin ( "resched, invalid current thread" );
 
 	cpu_enter ();		/* XXX XXX */
 

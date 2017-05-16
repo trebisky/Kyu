@@ -725,6 +725,34 @@ tester ( void )
 
 #endif
 
+/* On the Orange Pi there is SRAM at 0-0xffff.
+ * also supposed to be at 0x44000 to 0x4Bfff (I see this)
+ * also supposed to be at 0x10000 to 0x1afff, but not for me.
+ */
+
+	    if ( **wp == 'l' ) {
+		printf ( "Memory test\n" );
+		mem_verify ( 0x0, 0x10000 );
+	    }
+
+	    if ( **wp == 'm' ) {
+		/* Orange Pi SRAM A1 */
+		printf ( "Memory test 0 to 0x10000\n" );
+		mem_test ( 0x0, 0x10000 );
+		/* Orange Pi SRAM A2 */
+		printf ( "Memory test 0x44000 to 0x4C000\n" );
+		mem_test ( 0x44000, 0x4c000 );
+		/* Orange Pi SRAM C */
+		printf ( "Memory test 0x10000 to 0x20000\n" );
+		mem_test ( 0x10000, 0x20000 );
+	    }
+
+	    /* Dump without ram safety check */
+	    if ( wp[0][0] == 'd' && wp[0][1] == 'i' && nw == 3 ) {
+		mem_dumper ( 'i', wp[1], wp[2] );
+		continue;
+	    }
+
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
 		mem_dumper ( 'b', wp[1], wp[2] );
 		continue;

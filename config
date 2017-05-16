@@ -35,6 +35,9 @@ system "ln -s #{target} board"
 system "rm -f Makefile"
 system "ln -s configs/Makefile.#{target} Makefile"
 
+system "rm -f Makefile.inc"
+system "ln -s configs/Makefile.inc.#{target} Makefile.inc"
+
 system "rm -f kyu.lds"
 system "ln -s configs/#{target}.lds kyu.lds"
 

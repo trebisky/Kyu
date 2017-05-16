@@ -26,9 +26,8 @@
 // #include "net.h"
 
 /* line size for this flavor of ARM */
+/* XXX should be in some header file */
 #define	ARM_DMA_ALIGN	64
-
-static void rx_list_show ( void );
 
 /* from linux/compiler_gcc.h in U-Boot */
 #define __aligned(x)            __attribute__((aligned(x)))
@@ -647,13 +646,15 @@ static int int_count = 0;
 // #define INT_LIMIT	200
 #define INT_LIMIT	2
 
+static void rx_list_show ( struct emac_desc * );
+
 static void
 emac_handler ( int junk )
 {
 	struct emac *ep = EMAC_BASE;
 
 	printf ( "emac interrupt %08x\n", ep->int_stat );
-	rx_list_show ();
+	rx_list_show ( (struct emac_desc *) ep->rx_desc );
 
 	int_count++;
 	if ( int_count >= INT_LIMIT ) {
@@ -673,21 +674,48 @@ emac_handler ( int junk )
 #define NUM_RX	10
 #define RX_SIZE	2048
 
+#ifdef notdef
 // static char rx_buffers[NUM_RX * RX_SIZE];
 static char rx_buffers[NUM_RX * RX_SIZE] __aligned(ARM_DMA_ALIGN);
 
 static struct emac_desc rx_desc[NUM_RX];
+#endif
 
-static void *
+static void
+rx_list_show ( struct emac_desc *desc )
+{
+	int i;
+	struct emac_desc *edp;
+	int len;
+
+	// invalidate_dcache_range ( (void *) desc, &desc[NUM_RX] );
+
+	for ( i=0; i<NUM_RX; i++ ) {
+	    edp = &desc[i];
+	    len = (edp->status >> 16) & 0x3fff;
+	    printf ( "Buf status %2d: %08x  %d/%d (%08x)\n", i, edp->status, len, edp->size, edp->buf );
+	}
+}
+
+static struct emac_desc *
 rx_list_init ( void )
 {
 	int i;
 	struct emac_desc *edp;
 	char *buf;
+	struct emac_desc *rx_desc;
+	char *mem;
 
 	printf ( "Descriptor size: %d bytes\n", sizeof(struct emac_desc) );
 
-	buf = rx_buffers;
+	/* This gives us a full megabyte of memory with
+	 * caching disabled.
+	 */
+	mem = (char *) ram_section_nocache ( 1 );
+	// buf = rx_buffers;
+	buf = mem;
+	rx_desc = (struct emac_desc *) (mem + NUM_RX * RX_SIZE);
+
 	for ( i=0; i<NUM_RX; i++ ) {
 	    edp = &rx_desc[i];
 	    edp->status = DS_CTL;
@@ -700,26 +728,10 @@ rx_list_init ( void )
 
 	rx_desc[NUM_RX-1].next = &rx_desc[0];
 
-	flush_dcache_range ( (void *) rx_desc, &rx_desc[NUM_RX] );
-	rx_list_show ();
+	// flush_dcache_range ( (void *) rx_desc, &rx_desc[NUM_RX] );
+	rx_list_show ( rx_desc );
 
-	return (void *) rx_desc;
-}
-
-static void
-rx_list_show ( void )
-{
-	int i;
-	struct emac_desc *edp;
-	int len;
-
-	invalidate_dcache_range ( (void *) rx_desc, &rx_desc[NUM_RX] );
-
-	for ( i=0; i<NUM_RX; i++ ) {
-	    edp = &rx_desc[i];
-	    len = (edp->status >> 16) & 0x3fff;
-	    printf ( "Buf status %2d: %08x  %d/%d (%08x)\n", i, edp->status, len, edp->size, edp->buf );
-	}
+	return rx_desc;
 }
 
 /* ------------------------------------------------------------ */
@@ -860,8 +872,7 @@ emac_init ( void )
 
 	ep->rx_ctl1 |= RX_MD;
 
-	list = rx_list_init ();
-	ep->rx_desc = list;
+	ep->rx_desc = rx_list_init ();
 
 	irq_hookup ( IRQ_EMAC, emac_handler, 0 );
 

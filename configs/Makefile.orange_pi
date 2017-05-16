@@ -40,6 +40,8 @@ all: install dump sym tags
 ver:
 	@echo $(GCCVERSION)
 	@echo $(ABI)
+	$(CC) --version
+	$(CC) --target-help
 
 dump: kyu.dump
 
@@ -97,7 +99,7 @@ help:
 kyu:	kyu.lds
 
 kyu: $(OBJS)
-	$(LD) -g -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+	$(LD) -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
 
 kyu.bin: kyu
 	$(BIN) kyu kyu.bin

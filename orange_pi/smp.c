@@ -70,6 +70,8 @@ void test_core ( void );
 
 typedef void (*vfptr) ( void );
 
+extern unsigned long core_stacks;
+
 /* main_reset()
  *
  * This has nothing to do with multiple cores, but we are searching for a way
@@ -105,7 +107,16 @@ main_reset ( void )
 	// test_core ();
 }
 
-/* These are in locore.S */
+/* screwball entry point to allow core testing
+ * early in Kyu initialization.
+ */
+void
+preinit_core ( void )
+{
+	core_stacks = 0x50000000;
+}
+
+/* This is in locore.S */
 extern void newcore ( void );
 
 void
@@ -123,7 +134,8 @@ launch_core ( int cpu )
 
         *GEN_CTRL &= ~mask;             /* reset L1 cache */
         *POWER_OFF &= ~mask;            /* power on */
-	thr_delay ( 2 );
+	// thr_delay ( 2 );
+	_udelay ( 2000 );
 
         *reset = 3;			/* take out of reset */
 }
@@ -131,6 +143,7 @@ launch_core ( int cpu )
 // #define SENTINEL	ROM_START
 #define SENTINEL	(volatile unsigned long *) 4
 
+#ifdef notdef
 void
 watch_core ( void )
 {
@@ -153,6 +166,7 @@ watch_core ( void )
 	printf ( "** Core failed to start\n" );
 
 }
+#endif
 
 /* Most of the time a core takes 30 counts to start */
 #define MAX_CORE	100
@@ -209,8 +223,6 @@ test_reg ( volatile unsigned long *reg )
 	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
 }
 
-extern unsigned long core_stacks;
-
 /* This gets called by the test menu
  *   (or something of the sort)
  */
@@ -219,6 +231,7 @@ test_core ( void )
 {
 	int reg;
 
+#ifdef notdef
 	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
 	printf ( "CPSR  = %08x\n", reg );
 	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
@@ -229,6 +242,7 @@ test_core ( void )
 	/* SCTRL */
         asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (reg) : : "cc");
 	printf ( "SCTRL = %08x\n", reg );
+#endif
 
 #ifdef notdef
 	unsigned long val;
@@ -239,15 +253,17 @@ test_core ( void )
 	printf ( "Gate register: %08x\n", val );
 #endif
 
+	printf ( "Address of core stacks: %08x\n", core_stacks );
 	test_one ( 1 );
 	test_one ( 2 );
 	test_one ( 3 );
 
+	/*
 	test_reg ( ROM_START );
 	test_reg ( PRIVA );
 	test_reg ( PRIVB );
+	*/
 
-	printf ( "Address of core stacks: %08x\n", core_stacks );
 }
 
 /* If all goes well, we will be running here,
@@ -272,6 +288,8 @@ delay_ms ( int msecs )
 	// delay_ms_nocache ( msecs );
 }
 
+#define CORE_QUIET
+
 /* This is the first C code a new core runs */
 void
 kyu_newcore ( int core )
@@ -290,10 +308,12 @@ kyu_newcore ( int core )
 
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 
+#ifndef CORE_QUIET
 	/* Makes a mess without synchronization */
 	printf ( "Core %d running with sp = %08x\n", cpu, sp );
 	printf ( "Core %d core (arg) = %08x\n", cpu, core );
 	// printf ( "Core %d running\n", cpu );
+#endif
 
 #ifdef notdef
 	for ( ;; ) {

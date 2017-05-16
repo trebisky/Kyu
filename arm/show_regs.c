@@ -155,15 +155,15 @@ show_regs (struct arm_regs *regs)
 		thumb_mode (regs) ? " (T)" : "");
 }
 
-void
-show_stack ( unsigned long sp )
+static void
+show_stack ( unsigned long sp, int max )
 {
 	unsigned long start;
 	unsigned long end;
 	int num;
 
 	start = sp & ~0xf;
-	end = (sp & ~0xfff) + 0x1000;
+	end = (sp & ~0xfff) + 1024;
 
 	num = (end-start)/sizeof(long);
 
@@ -172,12 +172,15 @@ show_stack ( unsigned long sp )
 	if ( num > (0x1000/sizeof(long)) )
 	    num = 0x1000/sizeof(long);
 
+	if ( max > 0 && num > max )
+	    num = max;
+
 	printf ( "\n" );
 	dump_ln ( (void *) start, num );
 }
 
 void
-show_thread_regs ( struct thread *tp )
+show_thread_regs ( struct thread *tp, int stack_len )
 {
 	struct arm_regs *regs;
 
@@ -185,7 +188,7 @@ show_thread_regs ( struct thread *tp )
 
 	printf ( "\n" );
 	show_regs ( regs );
-	show_stack ( (unsigned long) regs->ARM_sp );
+	show_stack ( (unsigned long) regs->ARM_sp, stack_len );
 }
 
 void
@@ -196,7 +199,7 @@ show_my_regs ( void )
 	get_regs ( &ar );
 	printf ( "\n" );
 	show_regs ( &ar );
-	show_stack ( (unsigned long) ar.ARM_sp );
+	show_stack ( (unsigned long) ar.ARM_sp, 0 );
 }
 
 /* THE END */
