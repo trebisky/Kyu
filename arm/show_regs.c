@@ -155,6 +155,10 @@ show_regs (struct arm_regs *regs)
 		thumb_mode (regs) ? " (T)" : "");
 }
 
+#define DUMP_BYTES	512
+// #define LONG_LIMIT	1024
+#define LONG_LIMIT	256
+
 static void
 show_stack ( unsigned long sp, int max )
 {
@@ -163,14 +167,14 @@ show_stack ( unsigned long sp, int max )
 	int num;
 
 	start = sp & ~0xf;
-	end = (sp & ~0xfff) + 1024;
+	end = (sp & ~0xfff) + DUMP_BYTES;
 
 	num = (end-start)/sizeof(long);
 
 	if ( num < 0 ) num = 4;
 
-	if ( num > (0x1000/sizeof(long)) )
-	    num = 0x1000/sizeof(long);
+	if ( num > LONG_LIMIT )
+	    num = LONG_LIMIT;
 
 	if ( max > 0 && num > max )
 	    num = max;

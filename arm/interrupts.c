@@ -22,6 +22,38 @@ extern struct thread *cur_thread;
 
 static vfptr data_abort_hook;
 
+/* Call this when you want to trigger some kind of fault.
+ * Amazingly, ANY address on the Orange Pi is readable.
+ *
+ * We use this to verify that our exception handling code works.
+ */
+void
+fail ( void )
+{
+        puts ( "Preparing to fail ...\n" );
+
+        /* This don't work !!
+        long *p = (long *) 0xa0000000;
+        *p = 0;
+         */
+
+        // this is a handy thing gcc provides.
+        // it yields an undefined instruction trap.
+        //__builtin_trap ();
+
+        // this yields an undefined instruction.
+        // this is supposed to be an ARM
+        // permanently undefined instruction encoding.
+        //    0xf7fXaXXX
+        asm volatile (".word 0xf7f0a000\n");
+
+        // We can use this to test the fault routine
+        // trap_ui ();
+
+        /* We better not see this message */
+        puts ( "All done failing (should not see this)\n" );
+}
+
 /* mark the offending thread and abandon it.
  *
  * For a data abort (which is far and away the common

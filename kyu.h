@@ -40,6 +40,7 @@
 #define WANT_SLAB
 #define WANT_BENCH
 #define WANT_USER
+#define WANT_FLOAT
 */
 #define WANT_NET
 #define WANT_USER

@@ -190,11 +190,17 @@ ram_show ( void )
 #define MMU_MASK	0xfffff
 #define MMU_SHIFT	20
 
+/* Mask for TTBR0 */
+#define MMU_BASE_MASK 0x3fff
+
 static void
-mmu_display ( unsigned long *mmu )
+mmu_display ( unsigned long ttbr )
 {
 	int i;
 	int type = 0xff;
+	unsigned long *mmu;
+
+	mmu = (unsigned long *) (ttbr & ~MMU_BASE_MASK);
 
 	printf ( "MMU at %08x\n", mmu );
 	for ( i=0; i<16; i++ ) {
@@ -220,9 +226,22 @@ mmu_display ( unsigned long *mmu )
 }
 
 static void
-mmu_scan ( void )
+mmu_base ( char *msg )
 {
-	unsigned long *mmubase;
+	unsigned long ttbr;
+
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(ttbr) );
+
+	printf ( "%s TTBR0 = %08x\n", msg, ttbr );
+}
+
+void
+mmu_scan ( char *msg )
+{
+	unsigned long mmubase;
+
+	mmu_base ( msg );
 
 	/* TTBR0 */
 	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
@@ -230,6 +249,9 @@ mmu_scan ( void )
 
 }
 
+/* Oddly enough, U-Boot sets the XN bit for all of RAM and we had no problems ...
+ * But we don't do that.
+ */
 #define	MMU_SEC		0x02	/* descriptor maps 1M section */
 #define	MMU_BUF		0x04	/* enable write buffering */
 #define	MMU_CACHE	0x08	/* enable caching */
@@ -348,21 +370,75 @@ mmu_setup ( unsigned long *mmu )
 	}
 }
 
+#define SCTRL_MMU_ENABLE		0x1
+#define SCTRL_ALIGN_CHECK_ENABLE	0x2
+#define SCTRL_DCACHE_ENABLE		0x4
+
+static void
+mmu_off ( void )
+{
+	int val;
+
+	/* SCTRL */
+        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
+
+	val &= ~SCTRL_MMU_ENABLE;
+
+        asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (val) : "cc");
+}
+
+static void
+mmu_on ( void )
+{
+	int val;
+
+	/* SCTRL */
+        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
+
+	val |= SCTRL_MMU_ENABLE;
+
+        asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (val) : "cc");
+}
+
+/* magic - copied from U-Boot setup */
+#define TTBR_BITS	0x59
+
 /* Call this to set up our very own MMU */
 void
 mmu_initialize ( void )
 {
 	unsigned long *new_mmu;
+	unsigned long new_ttbr;
 
 	printf ( "Initializing and relocating MMU\n" );
-	new_mmu = (unsigned long *) ram_alloc ( MMU_SIZE * sizeof(unsigned long) );
-	mmu_setup ( new_mmu );
-	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
-	// mmu_display ( new_mmu );
 
-	/* TTBR0 */
-	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_mmu) );
+	/* The mmu table needs to be on a 16K boundary, so we allocate twice
+	 * the memory we need and select a properly aligned section.
+	 * This wastes 16K, but what do we care?
+	 */
+	new_ttbr = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) ) & ~MMU_BASE_MASK;
+	new_mmu = (unsigned long *) new_ttbr;
+
+	mmu_setup ( new_mmu );
+
+	cpu_enter();
+	// mmu_off();
+	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
+	printf ( "cache flushed\n" );
+	// mmu_display ( (unsigned long) new_mmu );
+
 	invalidate_tlb ();
+	printf ( "tlb done\n" );
+
+	new_ttbr |= TTBR_BITS;
+	/* TTBR0 */
+	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
+
+	printf ( "mmu set\n" );
+	// mmu_on();
+	cpu_leave();
+
+	printf ( "XXX - done Initializing and relocating MMU\n" );
 }
 
 /* Run this in a thread since it tends to generate data aborts */
@@ -375,15 +451,27 @@ mmu_tester ( int xxx )
 	unsigned long *nicep;
 	unsigned long val;
 
+	printf ( "Start MMU tester\n" );
+
+/* The idea is to fiddle with the MMU to map a 1M chunk
+ * of RAM into some unused place in the address map and
+ * then verify that the mapping worked.
+ */
+
+#ifdef BOARD_ORANGE_PI
+	evil = (unsigned long) 0x50000000;
+	nice = (unsigned long) 0x20000000;
+#else
 	/* XXX - these addresses are BBB specific
 	 */
 	evil = (unsigned long) 0x90000000;
-	evilp = (unsigned long *) evil;
-
 	nice = (unsigned long) 0x20000000;
+#endif
+
+	evilp = (unsigned long *) evil;
 	nicep = (unsigned long *) evil;
 
-	/* This should work */
+	/* This should work regardless of mmu mapping */
 	*evilp = 0xabcd;
 	printf ( "read from %08x: %08x\n", evil, *evilp );
 
@@ -399,7 +487,7 @@ mmu_tester ( int xxx )
 	mmu_remap ( evil, evil, 0 );
 	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
 	invalidate_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
-	mmu_scan ();
+	mmu_scan ( "Before remapping\n" );
 #endif
 
 #ifdef notdef
@@ -421,6 +509,8 @@ mmu_tester ( int xxx )
 	val = * (unsigned long *) evil;
 	printf ( "read from %08x: %08x\n", evil, val );
 #endif
+
+	printf ( "Finished with MMU tester\n" );
 
 }
 
@@ -484,11 +574,52 @@ mmu_show ( void )
 	    printf ( "Protection unit base = %08x\n", pu_base );
 
 	if ( mmubase ) {
-	    // mmu_scan ();
+	    mmu_scan ( "Setup by Kyu: " );
 	    printf ( "mmu checking done\n" );
 	}
 
+	// Currently fails badly on the Orange Pi
 	(void) thr_new ( "mmu", mmu_tester, (void *) 0, 3, 0 );
+
+	printf ( "mmu_show done\n" );
 }
+
+#ifdef notdef
+/* Investigate odd ram issues on OPi */
+static void
+mmu_poke ( int meg )
+{
+	unsigned int addr;
+	unsigned long val;
+
+	addr = meg * MEG + BOARD_RAM_START;
+	printf ( "MMU poke %d %08x\n", meg, addr );
+	val = *((unsigned long *) addr );
+	printf ( "MMU poke got: %08x\n", val );
+}
+
+/* trying to figure out issues before I understood
+ * mmu table alignment requirements.
+ */
+void
+mmu_debug ( void )
+{
+	mmu_poke ( 0 );
+	mmu_poke ( 4 );
+	mmu_poke ( 0 );
+	mmu_poke ( 4 );
+
+	/* odd */
+	mmu_poke ( 2 );
+
+	/* Fail */
+	mmu_poke ( 1 );
+	mmu_poke ( 3 );
+	mmu_poke ( 5 );
+	mmu_poke ( 6 );
+	mmu_poke ( 8 );
+	mmu_poke ( 7 );
+}
+#endif
 
 /* THE END */

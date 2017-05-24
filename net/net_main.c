@@ -574,6 +574,13 @@ netbuf_init ( void )
 	struct netbuf *end;
 	int count = 0;
 
+	/*
+	printf ( "In netbuf_init ()\n" );
+	// This allows other threads to run
+	thr_delay ( 50 );
+	printf ( "In netbuf_init () 2\n" );
+	*/
+
 #ifdef STATIC_NETBUF
 	ap = (struct netbuf *) netbuf_buf;
 #else

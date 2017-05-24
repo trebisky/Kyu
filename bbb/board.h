@@ -24,7 +24,7 @@
  */
 #define NUM_INTS	128
 
-/* The BBB has 1/2G of RAM
+/* The BBB has 1/2 G of RAM
  */
 #define BOARD_RAM_SIZE	0x20000000
 #define BOARD_RAM_START	0x80000000

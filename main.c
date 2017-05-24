@@ -43,18 +43,7 @@ clear_bss ( void )
 }
 #endif
 
-#ifdef notdef
-float v1 = 2.0;
-float v2 = 3.0;
-float fvar;
-
-void
-arm_float ( void )
-{
-	fvar = v1 / v2;
-}
-#endif
-
+#ifdef WANT_FLOAT
 static int
 sqrt_i ( int arg )
 {
@@ -88,13 +77,34 @@ arm_float ( void )
 	val = sqrt_d ( num );
 	printf ( "Square root of %d is %d\n", num, val );
 }
+#endif
+
+// #define TRY_IDIV
+#ifdef TRY_IDIV
+/* probe ARM signed and unsigned division.
+ * with -mcpu=cortex-a8 this will not even compile, I get:
+ *   "selected processor does not support `sdiv r3,r3,r2' in ARM mode"
+ * with -mcpu=cortex-a7 (on the Orange Pi), it compiles and runs fine.
+ */
+void
+arm_idiv ( void )
+{
+	int ans;
+	int val = 33;
+	int div = 3;
+
+	asm volatile ("sdiv %0, %1, %2" : "=r" (ans) : "r" (val), "r" (div) );
+	asm volatile ("udiv %0, %1, %2" : "=r" (ans) : "r" (val), "r" (div) );
+
+	printf ( "Sdiv = %d\n", ans );
+}
+#endif
 
 /* This is the first bit of C code that runs in 32 bit mode.
- * (on the x86, it runs on the arm too, but diffent addresses).
- * it runs with a provisional stack at 0x90000 (so it will
- * be down in 0x8ffe0 or so while this runs).  We abandon
- * this is soon as we can and do the rest of the initialization
- * from the sys_init thread.
+ *
+ * It runs with whatever stack we inherit from U-boot.
+ * We abandon this as soon as we can (namely when this routine exits).
+ * We then do the rest of the initialization in the sys_init thread.
  */
 void
 kern_startup ( void )
@@ -112,6 +122,8 @@ kern_startup ( void )
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	printf ( "Kyu starting with stack: %08x\n",  sp );
 
+	// fail ();
+
 	// emac_probe (); /* XXX */
 
 	board_hardware_init ();
@@ -122,9 +134,12 @@ kern_startup ( void )
 	hardware_init ();
 	console_initialize ();
 
+#ifdef WANT_FLOAT
 	/* XXX -- floating point hijinks */
 	fp_enable ();
 	arm_float ();
+	// arm_idiv ();
+#endif
 
 	// test_core ();  works here
 
@@ -209,8 +224,16 @@ sys_init ( int xxx )
 
 	// test_core (); works here
 
+	/* display the MMU setup handed us by U-Boot */
+	mmu_scan ( "From U-Boot " );
+
+	// Want this XXX XXX
+	// Giving us trouble on the Orange Pi 5/22/2017
 	mmu_initialize ();
+
+	// fail ();
 	mmu_show ();
+	// mmu_debug ();
 
 	gb_init_rand ( 0x163389 );
 
@@ -233,9 +256,12 @@ sys_init ( int xxx )
 	isapnp_init ();
 #endif
 
+printf ( "BEFORE net\n" );
+
 #ifdef WANT_NET
 	net_init ();
 #endif
+printf ( "AFTER net\n" );
 
 /* These things must be after net_init() because
  * they will try to do tftp.
@@ -243,6 +269,7 @@ sys_init ( int xxx )
 #ifdef WANT_SHELL
 	shell_init ();
 #endif
+printf ( "AFTER shell\n" );
 
 	/* allow initialization of things that
 	 * require the network to be alive.
