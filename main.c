@@ -222,18 +222,12 @@ sys_init ( int xxx )
 	/* enable interrupts */
 	cpu_leave ();
 
-	// test_core (); works here
-
 	/* display the MMU setup handed us by U-Boot */
-	mmu_scan ( "From U-Boot " );
+	// mmu_scan ( "From U-Boot " );
 
-	// Want this XXX XXX
-	// Giving us trouble on the Orange Pi 5/22/2017
+	/* Does this belong here ?? XXX */
 	mmu_initialize ();
-
-	// fail ();
-	mmu_show ();
-	// mmu_debug ();
+	// mmu_show ();
 
 	gb_init_rand ( 0x163389 );
 
@@ -256,12 +250,9 @@ sys_init ( int xxx )
 	isapnp_init ();
 #endif
 
-printf ( "BEFORE net\n" );
-
 #ifdef WANT_NET
 	net_init ();
 #endif
-printf ( "AFTER net\n" );
 
 /* These things must be after net_init() because
  * they will try to do tftp.
@@ -269,7 +260,6 @@ printf ( "AFTER net\n" );
 #ifdef WANT_SHELL
 	shell_init ();
 #endif
-printf ( "AFTER shell\n" );
 
 	/* allow initialization of things that
 	 * require the network to be alive.

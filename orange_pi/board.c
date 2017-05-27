@@ -82,15 +82,15 @@ reset_cpu ( void )
 int
 board_net_init ( void )
 {
-        // return emac_init ();
-        return 0;
+        return emac_init ();
+        // return 0;
 }
 
 /* Bring the network device online */
 void
 board_net_activate ( void )
 {
-        // emac_activate ();
+        emac_activate ();
 }
 
 void

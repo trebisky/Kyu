@@ -279,6 +279,7 @@ slow_net ( int xxx )
 {
 	arp_tick ();
 	dns_tick ();
+	emac_poll ();	/* XXX XXX */
 }
 
 #ifdef notdef

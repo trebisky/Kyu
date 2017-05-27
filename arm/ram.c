@@ -322,12 +322,16 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 	desc |= bits;
 	index = va >> MMU_SHIFT;
 
+	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
+	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
+	invalidate_tlb ();
+
 	/* TTBR0 */
 	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
 	mmubase[index] = desc;
 
-	printf ( "REMAP mmubase is %08x\n", mmubase );
-	printf ( "REMAP index for %08x is %d (%x) to --> %08x\n", va, index, index, &mmubase[index] );
+	// printf ( "REMAP mmubase is %08x\n", mmubase );
+	// printf ( "REMAP index for %08x is %d (%x) to --> %08x\n", va, index, index, &mmubase[index] );
 
 	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
 	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
@@ -400,21 +404,58 @@ mmu_on ( void )
         asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (val) : "cc");
 }
 
-/* magic - copied from U-Boot setup */
-#define TTBR_BITS	0x59
+/* The low 7 bits in the TTBR0 register are described on page B4-1731
+ * of the ARM v7-A and v7-R Architecture Reference Manual
+ */
 
-/* Call this to set up our very own MMU */
+/* Inner Region bits */
+#define MMU_INNER_NOCACHE	0
+#define MMU_INNER_WT		1
+#define MMU_INNER_WBWA		0x40
+#define MMU_INNER_WBNOWA	0x41
+
+/* Outer Region bits */
+#define MMU_OUTER_NOCACHE	0
+#define MMU_OUTER_WT		0x08
+#define MMU_OUTER_WBWA		0x10
+#define MMU_OUTER_WBNOWA	0x18
+
+/* Although we note that the U-Boot setup for the Orange Pi did set
+ * the cacheability bits for the page tables, we just say the heck
+ * with it, and set them zero like the BBB, it certainly works just fine.
+ */
+
+#ifdef BOARD_ORANGE_PI
+/* copied from U-Boot setup */
+// #define TTBR_BITS	0x59
+// #define TTBR_BITS	(MMU_INNER_WBNOWA | MMU_OUTER_WBNOWA) 
+#define TTBR_BITS	0x00
+#else
+/* on the BBB, U-Boot sets zero for these bits.
+ * if I set 0x59 like the Orange Pi, it reads back 0x19
+ * and seems to work just fine.
+ * So it seems the Arm-A8 in the BBB has no inner region and
+ * the low bit (0x01) simply indicates the mmu table is cacheable.
+ */
+#define TTBR_BITS	0x00
+#endif
+
+/* U-boot sets the TTBCR = 0  (the reset value)
+ * for both the BBB and the Orange Pi.
+ */
+
+/* Call this to set up our very own MMU tables */
 void
 mmu_initialize ( void )
 {
 	unsigned long *new_mmu;
 	unsigned long new_ttbr;
 
-	printf ( "Initializing and relocating MMU\n" );
+	// printf ( "Initializing and relocating MMU\n" );
 
 	/* The mmu table needs to be on a 16K boundary, so we allocate twice
 	 * the memory we need and select a properly aligned section.
-	 * This wastes 16K, but what do we care?
+	 * This wastes 16K, but we have memory to burn.
 	 */
 	new_ttbr = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) ) & ~MMU_BASE_MASK;
 	new_mmu = (unsigned long *) new_ttbr;
@@ -424,24 +465,23 @@ mmu_initialize ( void )
 	cpu_enter();
 	// mmu_off();
 	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
-	printf ( "cache flushed\n" );
+	// printf ( "cache flushed\n" );
 	// mmu_display ( (unsigned long) new_mmu );
 
 	invalidate_tlb ();
-	printf ( "tlb done\n" );
 
 	new_ttbr |= TTBR_BITS;
 	/* TTBR0 */
 	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
 
-	printf ( "mmu set\n" );
 	// mmu_on();
 	cpu_leave();
-
-	printf ( "XXX - done Initializing and relocating MMU\n" );
 }
 
 /* Run this in a thread since it tends to generate data aborts */
+/* Do not include in a production system since it just grabs
+ * addresses and remaps them in curious ways.
+ */
 void
 mmu_tester ( int xxx )
 {
@@ -578,8 +618,10 @@ mmu_show ( void )
 	    printf ( "mmu checking done\n" );
 	}
 
-	// Currently fails badly on the Orange Pi
-	(void) thr_new ( "mmu", mmu_tester, (void *) 0, 3, 0 );
+	/* This just grabs random page addesses and fiddles
+	 * with them, so should not be part of a production system.
+	 */
+	// (void) thr_new ( "mmu", mmu_tester, (void *) 0, 3, 0 );
 
 	printf ( "mmu_show done\n" );
 }
