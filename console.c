@@ -252,14 +252,23 @@ putchar ( int ch )
 
 /* Only used by printf()/vprintf() (probably)
  * Unlike real puts() does not add newline
+ *
+ * Note that if we do printf from interrupt level
+ * using the orange pi spinlock can hang the system.
+ * This was kind of an experiment during orange pi
+ * multicore testing.
  */
 void
 console_puts ( char *buf )
 {
 #ifdef BOARD_ORANGE_PI
+#ifdef WANT_PUTS_LOCK
 	spin_lock ( 3 );
+#endif
 	serial_puts ( buf );
+#ifdef WANT_PUTS_LOCK
 	spin_unlock ( 3 );
+#endif
 #endif
 #ifdef BOARD_BBB
 	serial_puts ( buf );

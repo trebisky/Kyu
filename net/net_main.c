@@ -119,6 +119,12 @@ net_running ( void )
  * Note that net_dots() produces network byte order.
  */
 
+/* This sets up static values for things that we would really
+ * like to get via DHCP.  This lets things run with static values
+ * while we are bringing up new hardware and don't have DHCP working
+ * yet.  Once DHCP is working, it will override these static values.
+ */
+
 static void
 host_info_init ( void )
 {
@@ -126,7 +132,8 @@ host_info_init ( void )
 	net_addr_get ( host_info.our_mac );
 	init_ephem_port ();
 
-	(void) net_dots ( "192.168.0.11", &host_info.my_ip );
+	// (void) net_dots ( "192.168.0.11", &host_info.my_ip );	/* bbb */
+	(void) net_dots ( "192.168.0.61", &host_info.my_ip );		/* orange_pi */
 	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
 	host_info.net_mask = htonl ( 0xffffff00 );
 

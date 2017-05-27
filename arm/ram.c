@@ -117,6 +117,7 @@ ram_alloc ( long arg )
 	return rv;
 }
 
+/* Allocate some number of 1M sections */
 unsigned long
 ram_section ( int arg )
 {
@@ -132,6 +133,9 @@ ram_section ( int arg )
 	return last_ram;
 }
 
+/* Allocate some number of 1M sections
+ *  with caching turned off.
+ */
 unsigned long
 ram_section_nocache ( int arg )
 {

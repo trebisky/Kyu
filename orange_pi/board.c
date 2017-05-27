@@ -83,7 +83,6 @@ int
 board_net_init ( void )
 {
         return emac_init ();
-        // return 0;
 }
 
 /* Bring the network device online */

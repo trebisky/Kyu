@@ -33,7 +33,7 @@
  */
 #define DEFAULT_TIMER_RATE	1000
 
-/*
+#ifdef notdef
 #define WANT_DELAY
 #define WANT_PCI
 #define WANT_NET
@@ -41,7 +41,9 @@
 #define WANT_BENCH
 #define WANT_USER
 #define WANT_FLOAT
-*/
+#define WANT_PUTS_LOCK		/* orange pi experimental */
+#endif
+
 #define WANT_NET
 #define WANT_USER
 #define WANT_SHELL
