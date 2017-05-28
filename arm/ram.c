@@ -461,7 +461,8 @@ mmu_initialize ( void )
 	 * the memory we need and select a properly aligned section.
 	 * This wastes 16K, but we have memory to burn.
 	 */
-	new_ttbr = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) ) & ~MMU_BASE_MASK;
+	new_ttbr = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) );
+	new_ttbr += MMU_SIZE * sizeof(unsigned long) & ~MMU_BASE_MASK;
 	new_mmu = (unsigned long *) new_ttbr;
 
 	mmu_setup ( new_mmu );

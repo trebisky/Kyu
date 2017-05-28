@@ -1780,7 +1780,13 @@ cpsw_show ( void )
 	printf ( "Transmit INT count: %d\n", tx_int_count );
 }
 
-/* Note that we do the transmission right out of the netbuf */
+/* Note that we do the transmission right out of the netbuf.
+ * XXX - this plays pretty fast and loose, but has worked
+ * fine so far, I think by sheer luck.  We put the netbuf back
+ * on the free list while using it!   This guarantees a race,
+ * and if we allocate the buffer before the transmit is done,
+ * we will have disaster.  XXX XXX
+ */
 void
 cpsw_send ( struct netbuf *nbp )
 {
