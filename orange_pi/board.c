@@ -110,4 +110,10 @@ board_net_send ( struct netbuf *nbp )
         emac_send ( nbp );
 }
 
+void
+board_net_debug ( void )
+{
+	emac_debug ();
+}
+
 /* THE END */

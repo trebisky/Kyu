@@ -14,7 +14,7 @@ OBJS =  board.o \
 	cm.o prcm.o \
 	i2c.o i2c_hw.o iic.o i2c_demos.o \
 	serial.o \
-	if_cpsw.o \
+	cpsw.o \
 	spi.o pru.o adc.o
 
 all: ../board.o
@@ -28,8 +28,8 @@ i2c_hw.o:	omap_ints.h
 i2c.o:	i2c.h
 iic.o:	i2c.h
 
-#if_cpsw.e:	if_cpsw.c
-#	$(CC) -E if_cpsw.c >if_cpsw.e
+#cpsw.e:	cpsw.c
+#	$(CC) -E cpsw.c >cpsw.e
 
 clean:
 	rm -f *.o

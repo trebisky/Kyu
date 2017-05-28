@@ -286,7 +286,6 @@ slow_net ( int xxx )
 {
 	arp_tick ();
 	dns_tick ();
-	emac_poll ();	/* XXX XXX */
 }
 
 #ifdef notdef
@@ -421,19 +420,15 @@ net_handle ( struct netbuf *nbp )
 
 	nbp->ilen = nbp->elen - sizeof ( struct eth_hdr );
 
-	/*
-	printf ( "net_handle: %d, %d\n", nbp->elen, nbp->ilen );
-	*/
+	// printf ( "net_handle: %d, %d\n", nbp->elen, nbp->ilen );
 
 	ehp = nbp->eptr;
 
 	++total_count;
 
 	if ( ehp->type == ETH_ARP_SWAP ) {
-	    /*
-	    printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
-	    printf ( "(ARP)\n" );
-	    */
+	    // printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
+	    // printf ( "(ARP)\n" );
 	    arp_rcv ( nbp );
 	    return;
 	}
@@ -443,29 +438,21 @@ net_handle ( struct netbuf *nbp )
 	 * windows machines on the network.
 	 */
 	if ( not_our_mac ( nbp ) ) {
-	    /*
 	    printf ( "Rejected, dest: %s\n", ether2str(ehp->dst) );
-	    */
 	    netbuf_free ( nbp );
 	    return;
 	}
 
 	if ( ehp->type == ETH_IP_SWAP ) {
-	    /*
-	    printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
-	    printf ( "(IP)\n" );
-	    */
-	    /*
-	    dump_buf ( nbp->eptr, nbp->elen );
-	    */
+	    // printf ("net_handle: type = %04x len = %d ", ehp->type, nbp->elen );
+	    // printf ( "(IP)\n" );
+	    // dump_buf ( nbp->eptr, nbp->elen );
 	    ip_rcv ( nbp );
 	    return;
 	}
 
 	++oddball_count;
-	/*
 	printf (" oddball packet: %04x len = %d\n", ehp->type, nbp->elen );
-	*/
 	netbuf_free ( nbp );
 }
 

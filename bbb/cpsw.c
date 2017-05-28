@@ -1810,8 +1810,9 @@ cpsw_send ( struct netbuf *nbp )
 }
 
 /* Called when everything seems up and running from shell */
+/* Also called via "n 12" */
 void
-show_cpsw_debug ( void )
+cpsw_debug ( void )
 {
 	struct wr_regs *wrp = (struct wr_regs *) WR_BASE;
 	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;

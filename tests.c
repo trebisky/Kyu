@@ -200,6 +200,7 @@ static void test_dns ( int );
 static void test_arp ( int );
 void test_tftp ( int );
 static void test_udp ( int );
+static void test_netdebug ( int );
 
 void
 test_tcp ( int xxx )
@@ -219,13 +220,14 @@ struct test net_test_list[] = {
 	test_netarp,	"ARP ping",		0,
 	test_bootp,	"test BOOTP",		0,
 	test_dhcp,	"test DHCP",		0,
-	test_netping,	"Net ping",		0,
+	test_netping,	"Net ping (ICMP)",	0,
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
 	test_arp,	"8 gratu arp",		8,
 	test_tftp,	"Test TFTP",		0,
 	test_udp,	"Test UDP",		0,
 	test_tcp,	"Test TCP",		1,
+	test_netdebug,	"Debug interface",	0,
 	0,		0,			0
 };
 #endif
@@ -3045,6 +3047,14 @@ kb_test_5 ( void )
 /* --------------- network tests ------------------ */
 
 #ifdef WANT_NET
+
+/* Hook for board specific network statistics
+ */
+static void
+test_netdebug ( int test )
+{
+	board_net_debug ();
+}
 
 static void
 test_netshow ( int test )

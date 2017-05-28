@@ -681,6 +681,9 @@ phy_init ( void )
 #define TX_SIZE		2048
 #define RX_ETH_SIZE	2044
 
+#define NUM_RX_UBOOT	32
+#define UBOOT_PKTSIZE	2048
+
 #ifdef notdef
 // static char rx_buffers[NUM_RX * RX_SIZE];
 static char rx_buffers[NUM_RX * RX_SIZE] __aligned(ARM_DMA_ALIGN);
@@ -804,12 +807,13 @@ static int tx_count = 0;
 #define ONE_LINE
 
 static void
-emac_show_packet ( struct netbuf *nbp )
+emac_show_packet ( int tag, int i_dma, struct netbuf *nbp )
 {
 #ifdef ONE_LINE
-        printf ( "packet %d, %d bytes", rx_count, nbp->elen );
-        printf ( " ether src: %s ## dst: %s", ether2str(nbp->eptr->src),
-	    ether2str(nbp->eptr->dst) );
+        printf ( "%cRx packet %d (i_dma= %d), %d bytes", tag, rx_count, i_dma, nbp->elen );
+        printf ( " ether src: %s", ether2str(nbp->eptr->src) );
+        printf ( " ## dst: %s", ether2str(nbp->eptr->dst) );
+
         if ( nbp->eptr->type == ETH_ARP_SWAP )
             printf ( " (ARP)" );
         else if ( nbp->eptr->type == ETH_IP_SWAP ) {
@@ -825,10 +829,9 @@ emac_show_packet ( struct netbuf *nbp )
 	    printf ( " ether type: %04x", nbp->eptr->type );
 	printf ( "\n" );
 #else
-        printf ( "emac packet %d, %d bytes, ether type: %04x\n", rx_count, nbp->elen, nbp->eptr->type );
-
-        printf ( "ether src: %s ## dst: %s\n", ether2str(nbp->eptr->src),
-	    ether2str(nbp->eptr->dst) );
+        printf ( "emac packet %d, %d bytes, ether type: %04x", rx_count, nbp->elen, nbp->eptr->type );
+        printf ( " ether src: %s", ether2str(nbp->eptr->src) );
+        printf ( " ## dst: %s\n", ether2str(nbp->eptr->dst) );
 
         if ( nbp->eptr->type == ETH_ARP_SWAP ) {
             printf ( "ARP packet\n" );
@@ -843,10 +846,10 @@ emac_show_packet ( struct netbuf *nbp )
 #endif
 }
 
+/* Wrap a received packet in a static netbuf, just for purposes of
+ * display
+ */
 static struct netbuf dump_netbuf;
-
-#define NUM_RX_UBOOT	32
-#define UBOOT_PKTSIZE	2048
 
 static void
 kyu_receive ( char *buf, int len )
@@ -873,7 +876,7 @@ kyu_receive ( char *buf, int len )
 
         // net_rcv ( nbp );
 
-	emac_show_packet ( nbp );
+	emac_show_packet ( ' ',0, nbp );
 	// netbuf_free ( nbp );
 }
 
@@ -882,10 +885,13 @@ rx_handler ( int stat )
 {
 	struct netbuf *nbp;
 	int len;
+	int tag = ' ';
 
 	invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 
 	while ( ! (cur_rx_dma->status & DS_ACTIVE) ) {
+	    int i_dma = (cur_rx_dma - rx_list);
+
 	    rx_count++;
 	    len = (cur_rx_dma->status >> 16) & 0x3fff;
 
@@ -897,6 +903,10 @@ rx_handler ( int stat )
 
 	    nbp->elen = len;
 	    memcpy ( (char *) nbp->eptr, cur_rx_dma->buf, len );
+
+	    /* XXX */
+	    emac_show_packet ( tag, i_dma, nbp );
+	    tag = '*';
 
 	    cur_rx_dma->status = DS_ACTIVE;
 	    flush_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -1485,15 +1495,27 @@ emac_activate ( void )
 	emac_enable ();
 }
 
+/* Displayed at start of "n 1" command output */
 void
 emac_show ( void )
 {
 	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
 	printf ( "Emac rx_count: %d\n", rx_count );
 	printf ( "Emac tx_count: %d\n", tx_count );
+}
 
-	// rx_list_show ( rx_list, NUM_RX_UBOOT );
-	// tx_list_show ( tx_list, NUM_TX );
+/* Displayed as "n x" command output.
+ *  more details than the above.
+ */
+void
+emac_debug ( void )
+{
+	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
+	printf ( "Emac rx_count: %d\n", rx_count );
+	printf ( "Emac tx_count: %d\n", tx_count );
+
+	rx_list_show ( rx_list, NUM_RX_UBOOT );
+	tx_list_show ( tx_list, NUM_TX );
 }
 
 void

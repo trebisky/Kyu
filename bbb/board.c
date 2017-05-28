@@ -100,4 +100,10 @@ board_net_send ( struct netbuf *nbp )
 	cpsw_send ( nbp );
 }
 
+void
+board_net_debug ( void )
+{
+	cpsw_debug ();
+}
+
 /* THE END */

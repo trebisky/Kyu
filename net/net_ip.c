@@ -18,6 +18,8 @@
 #include "netbuf.h"
 #include "arch/cpu.h"
 
+#define DEBUG_THIS
+
 extern struct host_info host_info;
 
 void
@@ -48,16 +50,36 @@ ip_rcv ( struct netbuf *nbp )
 
 	/* XXX - verify that it is addressed to us, or to a broadcast */
 
-	/*
-	printf ( "IP packet: Source: %s", ip2strl ( ipp->src ) );
+#ifdef DEBUG_THIS
+
+	printf ( " IP packet: Source: %s", ip2strl ( ipp->src ) );
 	printf ( "   " );
 	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
+	if ( ipp->proto == IPPROTO_ICMP )
+	    printf ( " ICMP" );
+	else if ( ipp->proto == IPPROTO_UDP ) {
+	    struct udp_hdr {
+		unsigned short  sport;
+		unsigned short  dport;
+		/* - */
+		unsigned short len;
+		unsigned short sum;
+	    } *udp;
+
+	    udp = (struct udp_hdr *) nbp->pptr;
+	    printf ( " UDP src/dst = %d/%d", ntohs(udp->sport), ntohs(udp->dport) );
+	    printf ( " size = %d", nbp->plen );
+
+	} else if ( ipp->proto == IPPROTO_TCP )
+	    printf ( " TCP" );
+	else
+	    printf ( "Proto: %d", ipp->proto );
 	printf ( "\n" );
-	*/
+#endif
 
 	if ( ipp->proto == IPPROTO_ICMP ) {
-	    /*
 	    printf ( "ip_rcv: ilen, plen, len = %d %d %d\n", nbp->ilen, nbp->plen, ntohs(ipp->len) );
+	    /*
 	    dump_buf ( nbp->iptr, nbp->ilen );
 	    */
 	    icmp_rcv ( nbp );
