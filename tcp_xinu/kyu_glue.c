@@ -151,13 +151,15 @@ void
 test_xinu_tcp ( void )
 {
 	/* Test an active client to port 13 */
-	// XXX test_client ();
+	test_client ();
 
 	if ( ! servers_running ) {
 	    servers_running = 1;
 
+	    /* This starts a daytime server on port 13 */
 	    test_daytime ();
 
+	    /* This starts a server on port 1234 */
 	    /* This needs to run in a thread */
 	    launch_classic_server ();
 

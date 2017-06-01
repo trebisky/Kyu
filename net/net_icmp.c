@@ -43,6 +43,9 @@ icmp_arp_evil ( struct netbuf *nbp )
     	arp_save_icmp ( nbp->eptr->src, nbp->iptr->src );
 }
 
+static int wait_for_seq = 0;
+static int wait_for_id;
+
 void
 icmp_rcv ( struct netbuf *nbp )
 {
@@ -81,6 +84,13 @@ icmp_rcv ( struct netbuf *nbp )
 	    /* XXX - special, do NOT free the netbuf,
 	     * as it is being recycled to handle the reply.
 	     */
+	} else if ( icp->type == TY_ECHO_REPLY ) {
+	    printf ( "ICMP echo reply: code = %d, id/seq = %d/%d\n", icp->code, icp->id, icp->seq );
+	    printf ( " BOGUS: %s is alive\n", ip2strl(nbp->iptr->src) );
+	    if ( wait_for_seq && wait_for_seq == icp->seq && wait_for_id == icp->id ) {
+		printf ( " %s is alive\n", ip2strl(nbp->iptr->src) );
+		wait_for_seq = 0;
+	    }
 	} else {
 	    netbuf_free ( nbp );
 	}
@@ -101,6 +111,8 @@ icmp_reply ( struct netbuf *nbp, int len )
 }
 
 static int icmp_id = 1;
+
+#define BOGUS_SEQ	0x12ab
 
 void
 icmp_ping ( unsigned long target_ip )
@@ -128,6 +140,8 @@ icmp_ping ( unsigned long target_ip )
 
 	icp = (struct icmp_hdr *) nbp->pptr;
 
+	icp->seq = BOGUS_SEQ;
+
 	icp->type = TY_ECHO_REQ;
 	icp->code = 0;
 	icp->id = icmp_id++;
@@ -138,10 +152,15 @@ icmp_ping ( unsigned long target_ip )
 	ip_send ( nbp, target_ip );
 }
 
-/* Argument in host order */
+/* Argument in host order.
+ * This fires off the echo packet.
+ */
 void
 ping ( unsigned long arg )
 {
+	wait_for_seq = BOGUS_SEQ;
+	wait_for_id = icmp_id;
+
     	icmp_ping ( htonl(arg) );
 }
 

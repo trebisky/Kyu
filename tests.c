@@ -195,7 +195,7 @@ static void test_netshow ( int );
 static void test_netarp ( int );
 static void test_bootp ( int );
 static void test_dhcp ( int );
-static void test_netping ( int );
+static void test_icmp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
 void test_tftp ( int );
@@ -220,7 +220,7 @@ struct test net_test_list[] = {
 	test_netarp,	"ARP ping",		0,
 	test_bootp,	"test BOOTP",		0,
 	test_dhcp,	"test DHCP",		0,
-	test_netping,	"Net ping (ICMP)",	0,
+	test_icmp,	"Test ICMP",		0,
 	test_dns,	"Test DNS",		0,
 	test_arp,	"one gratu arp",	1,
 	test_arp,	"8 gratu arp",		8,
@@ -3071,7 +3071,7 @@ test_netarp ( int test )
 }
 
 static void
-test_netping ( int test )
+test_icmp ( int test )
 {
 	ping ( test_ip );
 }
