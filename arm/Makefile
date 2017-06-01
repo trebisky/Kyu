@@ -12,6 +12,7 @@ OBJS =  locore.o \
 	hardware.o \
 	ram.o \
 	interrupts.o \
+	cache.o \
 	cache_v7.o \
 	show_regs.o \
 	eabi_stubs.o

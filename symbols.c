@@ -208,11 +208,13 @@ shell_init ( void )
 	    return;
 	}
 
+#ifdef WANT_SYMBOLS
 	sym_buf = malloc ( SYM_SIZE );
 	count = tftp_fetch ( sym_file, sym_buf, SYM_SIZE );
 	printf ( "fetched symbol table: %d bytes\n", count );
 	parse_table (count);
 	free ( sym_buf );
+#endif
 }
 
 /* --------------- */

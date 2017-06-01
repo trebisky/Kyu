@@ -22,6 +22,7 @@
 void
 board_hardware_init ( void )
 {
+	cache_init ();
 	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
 }
 

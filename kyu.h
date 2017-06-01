@@ -44,6 +44,9 @@
 #define WANT_PUTS_LOCK		/* orange pi experimental */
 #endif
 
+#define WANT_HOST_DHCP
+#define WANT_SYMBOLS
+
 #define WANT_NET
 #define WANT_USER
 #define WANT_SHELL

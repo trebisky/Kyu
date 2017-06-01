@@ -30,6 +30,16 @@
 /* from linux/compiler_gcc.h in U-Boot */
 #define __aligned(x)            __attribute__((aligned(x)))
 
+#define EMAC_NOCACHE
+
+#ifdef EMAC_NOCACHE
+#define emac_cache_flush(a,b)
+#define emac_cache_invalidate(a,b)
+#else
+#define emac_cache_flush(a,b )		flush_dcache_range ( a, b )
+#define emac_cache_invalidate(a,b)	invalidate_dcache_range ( a, b )
+#endif
+
 void emac_show ( void );
 
 /* ..... */
@@ -81,13 +91,19 @@ struct emac {
 
 #define EMAC_BASE	((struct emac *) 0x01c30000)
 
-/* bits in the ctl0 register */
+/* -- bits in the ctl0 register */
 
 #define	CTL_FULL_DUPLEX	0x0001
 #define	CTL_LOOPBACK	0x0002
 #define	CTL_SPEED_1000	0x0000
 #define	CTL_SPEED_100	0x000C
 #define	CTL_SPEED_10	0x0008
+
+/* -- bits in the ctl1 register */
+
+#define CTL1_SOFT_RESET		0x01
+#define CTL1_RX_TX		0x02		/* Rx DMA has prio over Tx when set */
+#define CTL1_BURST_8		0x08000000;	/* DMA burst len = 8 (29:24)  */
 
 /* bits in the int_ena and int_stat registers */
 #define INT_TX			0x0001
@@ -97,6 +113,7 @@ struct emac {
 #define INT_TX_UNDERFLOW	0x0010
 #define INT_TX_EARLY		0x0020
 #define INT_TX_ALL	(INT_TX | INT_TX_BUF_AVAIL | INT_TX_DMA_STOP | INT_TX_TIMEOUT | INT_TX_UNDERFLOW )
+#define INT_TX_MASK		0x00ff
 
 #define INT_RX			0x0100
 #define INT_RX_NOBUF		0x0200
@@ -105,6 +122,7 @@ struct emac {
 #define INT_RX_OVERFLOW		0x1000
 #define INT_RX_EARLY		0x2000
 #define INT_RX_ALL	(INT_RX | INT_RX_NOBUF | INT_RX_DMA_STOP | INT_RX_TIMEOUT | INT_RX_OVERFLOW )
+#define INT_RX_MASK		0xff00
 
 #define	INT_MII			0x10000		/* only in status */
 
@@ -666,8 +684,14 @@ phy_init ( void )
 /* Descriptors */
 /* ------------------------------------------------------------ */
 
-#define NUM_RX	10
-#define NUM_TX	32
+/* The linux driver allocates 256 descriptors for each
+#define NUM_RX	256
+#define NUM_TX	256
+ */
+
+/* For debug this is handy and fits on one screen */
+#define NUM_RX	16
+#define NUM_TX	16
 
 /* There are notes in the U-Boot driver that setting the value 2048
  * causes weird behavior and something less like 2044 should be used
@@ -681,8 +705,10 @@ phy_init ( void )
 #define TX_SIZE		2048
 #define RX_ETH_SIZE	2044
 
+/*
 #define NUM_RX_UBOOT	32
 #define UBOOT_PKTSIZE	2048
+*/
 
 #ifdef notdef
 // static char rx_buffers[NUM_RX * RX_SIZE];
@@ -691,19 +717,28 @@ static char rx_buffers[NUM_RX * RX_SIZE] __aligned(ARM_DMA_ALIGN);
 static struct emac_desc rx_desc[NUM_RX];
 #endif
 
+static struct emac_desc *rx_list;
+static struct emac_desc *tx_list;
+static struct emac_desc *cur_rx_dma;
+static struct emac_desc *cur_tx_dma;
+
 static void
 rx_list_show ( struct emac_desc *desc, int num )
 {
-	int i;
 	struct emac_desc *edp;
 	int len;
+	int i;
 
-	invalidate_dcache_range ( (void *) desc, &desc[num] );
+	// invalidate_dcache_range ( (void *) desc, &desc[num] );
+	emac_cache_invalidate ( (void *) desc, &desc[num] );
 
 	for ( i=0; i<num; i++ ) {
 	    edp = &desc[i];
 	    len = (edp->status >> 16) & 0x3fff;
-	    printf ( "Buf %d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+	    if ( edp == cur_rx_dma )
+		printf ( "* Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+	    else
+		printf ( "  Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
 	}
 }
 
@@ -714,48 +749,97 @@ tx_list_show ( struct emac_desc *desc, int num )
 	int len;
 	int i;
 
-	invalidate_dcache_range ( (void *) desc, &desc[num] );
+	// invalidate_dcache_range ( (void *) desc, &desc[num] );
+	emac_cache_invalidate ( (void *) desc, &desc[num] );
 
 	for ( i=0; i<num; i++ ) {
 	    edp = &desc[i];
-	    printf ( "Buf %d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+	    if ( edp == cur_tx_dma )
+		printf ( "* Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+	    else
+		printf ( "  Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	}
 }
+
+/* We have 32 * 2k for Rx bufs (64K)
+ * We have 32 * 2k for Tx bufs (64K)
+ * and we have 64 * 64 bytes for descriptors (4K)
+ * This is 128 + 4 = 132K, fits handily in 1M
+ */
+static char *nocache;
 
 static struct emac_desc *
 rx_list_init ( void )
 {
-	int i;
 	struct emac_desc *edp;
 	char *buf;
 	struct emac_desc *desc;
-	char *mem;
 
 	// printf ( "Descriptor size: %d bytes\n", sizeof(struct emac_desc) );
 
+	/*
+	mem = ram_alloc ( (NUM_RX+1) * sizeof(struct emac_desc) );
+	mem = (mem + sizeof(struct emac_desc)) & ~ARM_DMA_ALIGN;
+	desc = (struct emac_desc *) mem;
+
+	mem = ram_alloc ( NUM_RX * RX_SIZE + ARM_DMA_ALIGN );
+	mem = (mem + ARM_DMA_ALIGN) & ~ARM_DMA_ALIGN;
+	buf = (char *) mem;
+	*/
+
+#ifdef EMAC_NOCACHE
 	/* This gives us a full megabyte of memory with
 	 * caching disabled.
 	 */
-	mem = (char *) ram_section_nocache ( 1 );
-	// buf = rx_buffers;
-	buf = mem;
-	desc = (struct emac_desc *) (mem + NUM_RX * RX_SIZE);
+	// buf = (char *) ram_section_nocache ( 1 );
+	buf = nocache;
+	nocache += NUM_RX * RX_SIZE;
+	desc = (struct emac_desc *) nocache;
+	nocache += NUM_RX * sizeof(struct emac_desc);
+#else
+	/* We can depend on ram_alloc to give us dma aligned addresses */
+	desc = (struct emac_desc *) ram_alloc ( NUM_RX * sizeof(struct emac_desc) );
+	buf = (char *) ram_alloc ( NUM_RX * RX_SIZE );
+#endif
 
-	for ( i=0; i<NUM_RX; i++ ) {
-	    edp = &desc[i];
+	for ( edp = desc; edp < &desc[NUM_RX]; edp ++ ) {
 	    edp->status = DS_ACTIVE;
 	    edp->size = RX_ETH_SIZE;
 	    edp->buf = buf;
-	    edp->next = &desc[i+1];
+	    edp->next = &edp[1];
 	    buf += RX_SIZE;
 	}
 
 	desc[NUM_RX-1].next = &desc[0];
 
-	// flush_dcache_range ( (void *) desc, &desc[NUM_RX] );
+	// emac_cache_flush ( (void *) desc, &desc[NUM_RX] );
 	// rx_list_show ( desc, NUM_RX );
 
 	return desc;
+}
+
+static void
+reset_rx_list ( struct emac_desc *list, int num )
+{
+	struct emac_desc *edp;
+
+	list->status = DS_ACTIVE;
+	for ( edp = list->next; edp != list; edp = edp->next )
+	    edp->status = DS_ACTIVE;
+
+/* Doing this will trigger a bug in the emac silicon.
+ * with the size field set to 2048, it will run through all
+ * of the available buffers putting nothing in any of them.
+ */
+#ifdef notdef
+	/* XXX */
+	list->size = 2048;
+	for ( edp = list->next; edp != list; edp = edp->next )
+	    edp->size = 2048;
+#endif
+
+	// flush_dcache_range ( (void *) list, &list[num] );
+	emac_cache_flush ( (void *) list, &list[num] );
 }
 
 static struct emac_desc *
@@ -764,41 +848,79 @@ tx_list_init ( void )
 	int i;
 	struct emac_desc *edp;
 	struct emac_desc *desc;
-	unsigned long mem;
+	// unsigned long mem;
 	char *buf;
 
-	mem = ram_alloc ( (NUM_TX+1) * sizeof(struct emac_desc) );
-	mem = (mem + sizeof(struct emac_desc)) & ~ARM_DMA_ALIGN;
-	desc = (struct emac_desc *) mem;
+#ifdef EMAC_NOCACHE
+	// buf = (char *) ram_section_nocache ( 1 );
+	buf = nocache;
+	nocache += NUM_TX * TX_SIZE;
+	desc = (struct emac_desc *) nocache;
+	nocache += NUM_TX * sizeof(struct emac_desc);
+#else
+	/* We can depend on ram_alloc to give us dma aligned addresses */
+	desc = (struct emac_desc *) ram_alloc ( NUM_TX * sizeof(struct emac_desc) );
+	buf = (char *) ram_alloc ( NUM_TX * TX_SIZE );
+#endif
 
-	mem = ram_alloc ( NUM_TX * TX_SIZE + ARM_DMA_ALIGN );
-	mem = (mem + ARM_DMA_ALIGN) & ~ARM_DMA_ALIGN;
-	buf = (char *) mem;
-
-	for ( i=0; i<NUM_TX; i++ ) {
-	    edp = &desc[i];
-	    edp->next = &desc[i+1];
-	    edp->status = DS_ACTIVE + 0xab;
+	for ( edp = desc; edp < &desc[NUM_TX]; edp ++ ) {
+	    edp->status = DS_ACTIVE;
 	    edp->size = 0;
 	    edp->buf = buf;
+	    edp->next = &edp[1];
 	    buf += TX_SIZE;
 	}
 
 	desc[NUM_TX-1].next = &desc[0];
 
-	flush_dcache_range ( (void *) desc, &desc[NUM_TX] );
+	// flush_dcache_range ( (void *) desc, &desc[NUM_TX] );
+	emac_cache_flush ( (void *) desc, &desc[NUM_TX] );
 
 	return desc;
+}
+
+static void
+init_rings ( void )
+{
+	struct emac *ep = EMAC_BASE;
+	void *desc;
+
+#ifdef EMAC_NOCACHE
+	/* This gives us a full megabyte of memory with
+	 * caching disabled.
+	 */
+	nocache = (char *) ram_section_nocache ( 1 );
+#endif
+
+#ifdef USE_UBOOT_RX
+	/* Find the list that U-Boot left for us */
+	desc = (void *) ep->rx_desc;
+	reset_rx_list ( desc, NUM_RX_UBOOT );
+#else
+	desc = rx_list_init ();
+#endif
+	rx_list = desc;
+
+	/* Reload the dma pointer register.
+	 * This causes the dma list pointer to get reset. 
+	 */
+	ep->rx_desc = desc;
+	cur_rx_dma = desc;
+
+	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
+
+	/* Now set up the Tx list */
+	desc = tx_list_init ();
+	tx_list = desc;
+
+	ep->tx_desc = desc;
+	cur_tx_dma = desc;
 }
 
 /* ------------------------------------------------------------ */
 /* Interrupts */
 /* ------------------------------------------------------------ */
 
-static struct emac_desc *rx_list;
-static struct emac_desc *tx_list;
-static struct emac_desc *cur_rx_dma;
-static struct emac_desc *cur_tx_dma;
 static int rx_count = 0;
 static int tx_count = 0;
 
@@ -846,6 +968,7 @@ emac_show_packet ( int tag, int i_dma, struct netbuf *nbp )
 #endif
 }
 
+#ifdef notdef
 /* Wrap a received packet in a static netbuf, just for purposes of
  * display
  */
@@ -856,7 +979,8 @@ kyu_receive ( char *buf, int len )
 {
 	struct netbuf *nbp;
 
-	invalidate_dcache_range ( (unsigned long) buf, (unsigned long) &buf[UBOOT_PKTSIZE] );
+	// invalidate_dcache_range ( (unsigned long) buf, (unsigned long) &buf[UBOOT_PKTSIZE] );
+	emac_cache_invalidate ( (unsigned long) buf, (unsigned long) &buf[UBOOT_PKTSIZE] );
 
         // nbp = netbuf_alloc ();
         // nbp = netbuf_alloc_i ();
@@ -879,6 +1003,17 @@ kyu_receive ( char *buf, int len )
 	emac_show_packet ( ' ',0, nbp );
 	// netbuf_free ( nbp );
 }
+#endif
+
+#ifdef notdef
+struct emac_desc {
+	unsigned long status;	/* status */
+	long size;		/* st */
+	char * buf;		/* buf_addr */
+	struct emac_desc *next;	/* next */
+}	__aligned(ARM_DMA_ALIGN);
+#endif
+
 
 static void
 rx_handler ( int stat )
@@ -887,7 +1022,8 @@ rx_handler ( int stat )
 	int len;
 	int tag = ' ';
 
-	invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+	// invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+	emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 
 	while ( ! (cur_rx_dma->status & DS_ACTIVE) ) {
 	    int i_dma = (cur_rx_dma - rx_list);
@@ -901,20 +1037,23 @@ rx_handler ( int stat )
 	    if ( ! nbp )
 		return;     /* drop packet */
 
-	    nbp->elen = len;
-	    memcpy ( (char *) nbp->eptr, cur_rx_dma->buf, len );
+	    nbp->elen = len - 4;
+	    memcpy ( (char *) nbp->eptr, cur_rx_dma->buf, len - 4 );
 
-	    /* XXX */
-	    emac_show_packet ( tag, i_dma, nbp );
-	    tag = '*';
+	    // emac_show_packet ( tag, i_dma, nbp );
+	    // tag = '*';
 
 	    cur_rx_dma->status = DS_ACTIVE;
-	    flush_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+
+	    // flush_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+	    emac_cache_flush ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 
 	    net_rcv ( nbp );
 
 	    cur_rx_dma = cur_rx_dma->next;
-	    invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+
+	    // invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
+	    emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	}
 }
 
@@ -960,6 +1099,9 @@ rx_handler ( int stat )
 }
 #endif
 
+/* Since we do nothing here, it is best to simply not enable any sort
+ * of TX interrupts.
+ */
 static void
 tx_handler ( int stat )
 {
@@ -982,18 +1124,30 @@ static int first_int = 1;
  *  no telling what the 0x40000000 bit is.
  *  we expect the 0x100 (RX_INT).
  *  eventually we also expect 0x001 (TX_INT).
+ *
+ * With transmit interrupts enabled we often enter this routine
+ * with a status like 0x25 (TX and TX_BUF), but by the time
+ * we exit the RX interrupt is asserted.
+ * We need to avoid clearing that RX interrupt if we have not
+ * processed it.
  */
 static void
 emac_handler ( int junk )
 {
 	struct emac *ep = EMAC_BASE;
 	int stat;
+	int statx;
+	int stat2;
 
 	int_count++;
 
 	stat = ep->int_stat;
 
-	// printf ( "emac interrupt %08x\n", stat );
+	// printf ( "emac interrupt --   status:%08x\n", stat );
+
+	statx = stat & INT_RX_MASK;
+	if ( statx && statx != INT_RX )
+	    printf ( " *** unexpected emac Rx int status: %08x\n", stat );
 
 	if ( stat & INT_RX_ALL ) {
 	    ++rx_int_count;
@@ -1010,9 +1164,14 @@ emac_handler ( int junk )
 	    first_int = 0;
 	}
 
+	stat2 = ep->int_stat;
+	// if ( stat2 != stat )
+	//     printf ( "emac interrupt --  xstatus: %08x --> %08x\n", stat, stat2 );
+
 	/* Ack the IRQ in the emac */
 	/* experiment shows this to be necessary and correct */
-	ep->int_stat = ep->int_stat & 0xffff;
+	// ep->int_stat = ep->int_stat & 0xffff; (bad)
+	ep->int_stat &= stat;
 }
 
 /* ------------------------------------------------------------ */
@@ -1076,8 +1235,6 @@ set_mac ( char *mac_id )
 	    (mac_id[2] << 16) + (mac_id[3] << 24);
 }
 
-
-#define CTL1_SOFT_RESET		0x01
 
 #define SOFT_RESET_TIMEOUT	500
 
@@ -1150,7 +1307,7 @@ emac_init_raw ( void )
 
 	phy_init ();			/* sets ctl0 */
 
-	ep->ctl1 = 0x08000000;		/* Burst len = 8 */
+	ep->ctl1 = CTL1_BURST_8;
 
 	ep->rx_ctl1 |= RX_MD;
 
@@ -1182,29 +1339,6 @@ emac_init_raw ( void )
 	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
 
         return 1;
-}
-
-static void
-reset_rx_list ( struct emac_desc *list, int num )
-{
-	struct emac_desc *edp;
-
-	list->status = DS_ACTIVE;
-	for ( edp = list->next; edp != list; edp = edp->next )
-	    edp->status = DS_ACTIVE;
-
-/* Doing this will trigger a bug in the emac silicon.
- * with the size field set to 2048, it will run through all
- * of the available buffers putting nothing in any of them.
- */
-#ifdef notdef
-	/* XXX */
-	list->size = 2048;
-	for ( edp = list->next; edp != list; edp = edp->next )
-	    edp->size = 2048;
-#endif
-
-	flush_dcache_range ( (void *) list, &list[num] );
 }
 
 static char emac_mac[ETH_ADDR_SIZE];
@@ -1244,7 +1378,6 @@ emac_init_uboot ( void )
 {
 	struct emac *ep = EMAC_BASE;
 	int i;
-	void *desc;
 
 	printf ( "emac rx_desc = %08x\n", ep->rx_desc );
 	printf ( "emac tx_desc = %08x\n", ep->tx_desc );
@@ -1280,26 +1413,9 @@ emac_init_uboot ( void )
 	/* Set up interrupts */
 	irq_hookup ( IRQ_EMAC, emac_handler, 0 );
 
-	/* Find the list that U-Boot left for us */
-	desc = (void *) ep->rx_desc;
-	rx_list = desc;
+	init_rings ();
 
-	reset_rx_list ( desc, NUM_RX_UBOOT );
-
-	/* Reload the dma pointer register.
-	 * This causes the dma list pointer to get reset. 
-	 */
-	ep->rx_desc = desc;
-	cur_rx_dma = desc;
-
-	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
-
-	/* Now set up the Tx list */
-	desc = tx_list_init ();
-	tx_list = desc;
-
-	ep->tx_desc = desc;
-	cur_tx_dma = desc;
+	/* the "activate" entry point really kicks things off */
 
 	return 1;
 }
@@ -1351,7 +1467,8 @@ emac_enable ( void )
 	struct emac *ep = EMAC_BASE;
 
 	/* Enable interrupts */
-	ep->int_ena = INT_RX_ALL | INT_TX_ALL;
+	// ep->int_ena = INT_RX_ALL | INT_TX_ALL;
+	ep->int_ena = INT_RX_ALL;
 
 	rx_start ();
 	tx_start ();
@@ -1510,12 +1627,21 @@ emac_show ( void )
 void
 emac_debug ( void )
 {
-	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
-	printf ( "Emac rx_count: %d\n", rx_count );
-	printf ( "Emac tx_count: %d\n", tx_count );
+	struct emac *ep = EMAC_BASE;
 
-	rx_list_show ( rx_list, NUM_RX_UBOOT );
+	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
+	printf ( "Emac rx_count / tx_count: %d / %d\n", rx_count, tx_count );
+
+	printf ( " Tx list\n" );
 	tx_list_show ( tx_list, NUM_TX );
+
+	printf ( " Rx list\n" );
+	rx_list_show ( rx_list, NUM_RX );
+
+	printf ( "emac RX CTL0 = %08x\n", ep->rx_ctl0 );
+	printf ( "emac RX CTL1 = %08x\n", ep->rx_ctl1 );
+	printf ( "emac TX CTL0 = %08x\n", ep->tx_ctl0 );
+	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
 }
 
 void
@@ -1549,7 +1675,9 @@ emac_send ( struct netbuf *nbp )
         // dump_buf ( nbp->eptr, len );
 
 	memcpy ( cur_tx_dma->buf, (char *) nbp->eptr, len );
-	flush_dcache_range ( (unsigned long ) cur_tx_dma->buf, (unsigned long) cur_tx_dma->buf + len );
+
+	// flush_dcache_range ( (unsigned long ) cur_tx_dma->buf, (unsigned long) cur_tx_dma->buf + len );
+	emac_cache_flush ( (unsigned long ) cur_tx_dma->buf, (unsigned long) cur_tx_dma->buf + len );
 
 	/* ARP packets are small (42 bytes) and may get rejected unless padded.
 	 */
@@ -1563,7 +1691,8 @@ emac_send ( struct netbuf *nbp )
 	cur_tx_dma->size = len | DS_TX_SEND;
 	cur_tx_dma->status = DS_ACTIVE;
 
-	flush_dcache_range ( (void *) cur_tx_dma, &cur_tx_dma[1] );
+	// flush_dcache_range ( (void *) cur_tx_dma, &cur_tx_dma[1] );
+	emac_cache_flush ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 
 	cur_tx_dma = cur_tx_dma->next;
 

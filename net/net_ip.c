@@ -18,8 +18,6 @@
 #include "netbuf.h"
 #include "arch/cpu.h"
 
-#define DEBUG_THIS
-
 extern struct host_info host_info;
 
 void
@@ -48,7 +46,7 @@ ip_rcv ( struct netbuf *nbp )
 	nbp->pptr = (char *) nbp->iptr + sizeof(struct ip_hdr);
 	nbp->plen = nbp->ilen - sizeof(struct ip_hdr);
 
-	/* XXX - verify that it is addressed to us, or to a broadcast */
+// #define DEBUG_THIS
 
 #ifdef DEBUG_THIS
 
@@ -77,11 +75,11 @@ ip_rcv ( struct netbuf *nbp )
 	printf ( "\n" );
 #endif
 
+	/* XXX - should verify that it is addressed to us, or to a broadcast */
+
 	if ( ipp->proto == IPPROTO_ICMP ) {
-	    printf ( "ip_rcv: ilen, plen, len = %d %d %d\n", nbp->ilen, nbp->plen, ntohs(ipp->len) );
-	    /*
-	    dump_buf ( nbp->iptr, nbp->ilen );
-	    */
+	    // printf ( "ip_rcv: ilen, plen, len = %d %d %d (ICMP)\n", nbp->ilen, nbp->plen, ntohs(ipp->len) );
+	    // dump_buf ( nbp->iptr, nbp->ilen );
 	    icmp_rcv ( nbp );
 	    /* Don't free the net_buf here */
 	} else if ( ipp->proto == IPPROTO_UDP ) {

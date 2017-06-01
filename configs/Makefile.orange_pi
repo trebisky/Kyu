@@ -86,6 +86,7 @@ version.c:	FORCE
 install: kyu.bin kyu.sym
 	cp kyu.bin /var/lib/tftpboot/orange.bin
 	cp kyu.sym /var/lib/tftpboot/kyu.sym
+	ls -l /var/lib/tftpboot/kyu.sym
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump

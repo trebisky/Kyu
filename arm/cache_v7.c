@@ -223,6 +223,7 @@ static void v7_dcache_clean_inval_range(u32 start, u32 stop, u32 line_len)
 	/* Align start to cache line boundary */
 	start &= ~(line_len - 1);
 	for (mva = start; mva < stop; mva = mva + line_len) {
+		// KYU printf ( "-------- Invalidate %d at %08x\n", line_len, mva );
 		/* DCCIMVAC - Clean & Invalidate data cache by MVA to PoC */
 		asm volatile ("mcr p15, 0, %0, c7, c14, 1" : : "r" (mva));
 	}

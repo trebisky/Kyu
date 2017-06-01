@@ -24,6 +24,7 @@ unsigned long core_stacks;
 void
 board_hardware_init ( void )
 {
+	cache_init ();
 	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
 	core_stacks = ram_alloc ( NUM_CORES * CORE_STACK_SIZE );
 	printf ( "Core stacks at %08x\n", core_stacks );

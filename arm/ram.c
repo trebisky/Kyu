@@ -48,8 +48,11 @@
  *  MMU base  ..... 9fff0000
  */
 
-/* For no particular reason, we allocate memory in 16K quanta */
-#define RAM_QUANTA	16*1024		/* 0 - 0x3fff */
+/* For no particular reason, we allocate memory in 16K quanta.
+ * Note that this guarantees that memory blocks are
+ * aligned as per the 64 byte ARM cache line size.
+ */
+#define RAM_QUANTA	(16*1024)		/* 0 - 0x3fff */
 #define Q_SHIFT		14
 
 #define MEG	(1024*1024)
@@ -63,32 +66,46 @@ extern char _end;
 static unsigned long next_ram;
 static unsigned long last_ram;
 
-#define ram_round(x)	(((x) >> Q_SHIFT)+1)<<Q_SHIFT;
+static unsigned long cache_line_mask;
+
+#define ram_round(x)	( (((x) >> Q_SHIFT)+1)<<Q_SHIFT )
 
 void
 ram_init ( unsigned long start, unsigned long size )
 {
 	unsigned long kernel_end;
 
+	cache_line_mask = get_cache_line_size() - 1;
+
 	next_ram = start;
 	last_ram = start + size;
 	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
 
 	kernel_end = (unsigned long) &_end;
-	printf ( "Kyu size: %d bytes\n", kernel_end - start );
+	printf ( "Kyu image size: %d bytes\n", kernel_end - start );
 
+	printf ( "kernel end: %08x\n", kernel_end );
+	// printf ( "Quanta kernel end: %08x\n", RAM_QUANTA );
+	// printf ( "Modulo kernel end: %08x\n", kernel_end % RAM_QUANTA );
 	if ( (kernel_end % RAM_QUANTA) != 0 )
 	    kernel_end = ram_round ( kernel_end );
+	// printf ( "Nice kernel end: %08x\n", kernel_end );
+	// printf ( "Round kernel end: %08x\n", ram_round(kernel_end) );
 
 	if ( kernel_end < next_ram )
 	    panic ( "Kernel lost before ram" );
 	if ( kernel_end > last_ram )
 	    panic ( "Kernel lost after ram" );
+
 	next_ram = kernel_end;
+
+	/* Now be sure this is cache aligned */
 
 	// printf ( "Ram start: %08x\n", next_ram );
 	// printf ( "Ram end: %08x\n", last_ram );
 	printf ( "Ram alloc start: %08x\n", next_ram );
+	if ( next_ram & cache_line_mask )
+	    panic_spin ( "Invalid cache alignment in ram_init\n" );
 
 	// this was an early test
 	// kernel_end = ram_alloc ( 55*1024 );
@@ -114,6 +131,10 @@ ram_alloc ( long arg )
 	next_ram += size;
 
 	printf ( "ram_alloc: %d (%d) bytes -- %08x\n", size, arg, rv );
+
+	if ( rv & cache_line_mask )
+	    panic_spin ( "Invalid cache alignment in ram_alloc\n" );
+
 	return rv;
 }
 

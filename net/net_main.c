@@ -153,8 +153,7 @@ host_info_init ( void )
 	// (void ) net_dots ( "10.0.0.0", &my_net );
 #endif
 
-#define USE_DHCP
-#ifdef USE_DHCP
+#ifdef WANT_HOST_DHCP
 	/* The idea here is to start with the static info above,
 	 *  then let DHCP overwrite any or all of it.
 	 */
@@ -433,12 +432,12 @@ net_handle ( struct netbuf *nbp )
 	    return;
 	}
 
-	/* XXX - probably do not want to reject all of this ultimately
-	 * but for now it helps with debugging, especially with chatty
+	/* We see this both on the BBB and Orange Pi.
+	 * It certainly helps with debugging, especially with chatty
 	 * windows machines on the network.
 	 */
 	if ( not_our_mac ( nbp ) ) {
-	    printf ( "Rejected, dest: %s\n", ether2str(ehp->dst) );
+	    // printf ( "Rejected, dest: %s\n", ether2str(ehp->dst) );
 	    netbuf_free ( nbp );
 	    return;
 	}
