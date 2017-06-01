@@ -85,8 +85,8 @@ icmp_rcv ( struct netbuf *nbp )
 	     * as it is being recycled to handle the reply.
 	     */
 	} else if ( icp->type == TY_ECHO_REPLY ) {
-	    printf ( "ICMP echo reply: code = %d, id/seq = %d/%d\n", icp->code, icp->id, icp->seq );
-	    printf ( " BOGUS: %s is alive\n", ip2strl(nbp->iptr->src) );
+	    // printf ( "ICMP echo reply: code = %d, id/seq = %d/%d\n", icp->code, icp->id, icp->seq );
+	    // printf ( " BOGUS: %s is alive\n", ip2strl(nbp->iptr->src) );
 	    if ( wait_for_seq && wait_for_seq == icp->seq && wait_for_id == icp->id ) {
 		printf ( " %s is alive\n", ip2strl(nbp->iptr->src) );
 		wait_for_seq = 0;
