@@ -201,6 +201,8 @@ static void test_arp ( int );
 void test_tftp ( int );
 static void test_udp ( int );
 static void test_netdebug ( int );
+static void test_udp_echo ( int );
+static void test_tcp_echo ( int );
 
 void
 test_tcp ( int xxx )
@@ -227,6 +229,8 @@ struct test net_test_list[] = {
 	test_tftp,	"Test TFTP",		0,
 	test_udp,	"Test UDP",		0,
 	test_tcp,	"Test TCP",		1,
+	test_udp_echo,	"Endless UDP echo",	0,
+	test_tcp_echo,	"Endless TCP echo",	0,
 	test_netdebug,	"Debug interface",	0,
 	0,		0,			0
 };
@@ -3095,6 +3099,12 @@ test_dns ( int test )
 }
 
 static void
+test_tcp_echo ( int test )
+{
+	tcp_echo_test();
+}
+
+static void
 test_arp ( int count )
 {
 	int i;
@@ -3203,6 +3213,48 @@ test_udp ( int xxx )
 	thr_delay ( 100 );
 
 	printf ( "%d responses to %d messages\n", udp_echo_count, ECHO_COUNT );
+}
+
+#define ENDLESS_SIZE	1024
+static char endless_buf[ENDLESS_SIZE];
+static int endless_count;
+static int endless_port;
+static unsigned long endless_ip;
+
+/* Test this against the compiled C program in tools/udpecho.c
+ * run that as ./udpecho 6789
+ */
+#define EECHO_PORT	6789
+
+static void
+endless_rcv ( struct netbuf *nbp )
+{
+	++endless_count;
+	udp_send ( endless_ip, endless_port, EECHO_PORT, endless_buf, ENDLESS_SIZE );
+	if ( endless_count < 5 )
+	    printf ( "First UDP echo seen\n" );
+	if ( (endless_count % 1000) == 0 )
+	    printf ( "%5d UDP echos\n", endless_count );
+}
+
+/* Endless echo of UDP packets */
+static void
+test_udp_echo ( int test )
+{
+	memset ( endless_buf, 0xaa, ENDLESS_SIZE );
+	endless_count = 0;
+
+	endless_port = get_ephem_port ();
+	(void) net_dots ( UTEST_SERVER, &endless_ip );
+
+	udp_hookup ( endless_port, endless_rcv );
+
+	printf ( "Endless UDP test from our port %d\n", endless_port );
+
+	/* Kick things off with first message */
+	udp_send ( endless_ip, endless_port, EECHO_PORT, endless_buf, ENDLESS_SIZE );
+
+	/* No thread needed, the rest happens via interrupts */
 }
 
 #endif	/* WANT_NET */

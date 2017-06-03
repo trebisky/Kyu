@@ -174,6 +174,13 @@ test_xinu_tcp ( void )
 	}
 }
 
+void
+tcp_echo_test ( void )
+{
+	/* Your ad here */
+	printf ( "Not ready yet\n" );
+}
+
 static void
 xinu_timer ( void )
 {

@@ -5,18 +5,15 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_main.c
+ *
+ * net_main.c
  * T. Trebisky  3-24-2005
  * T. Trebisky  6-1-2015
  */
 
-/* TODO _
- * send an icmp "ping"
- * check arp response for same IP on Grat arp.
- * send an arp request.
- * send a UDP packet.
- * Use netbuf fully and properly.
+/* Some notes on testing.
+ * Wireshark is very helpful
+ * Use a capture filter like "host 192.168.0.61"
  */
 
 #include "kyu.h"
