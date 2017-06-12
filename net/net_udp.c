@@ -157,6 +157,8 @@ udp_rcv ( struct netbuf *nbp )
 
 	port = ntohs(udp->dport);
 
+	pkt_dispatch ();
+
 	// printf ( "UDP receive for port %d\n", port );
 	// udp_showl ();
 

@@ -1,13 +1,22 @@
 /* 
  * udptest.c
  *
- * This implements a "ping pong" test where two machines send UDP packets
- * back and forth.   This registers itself as a server on a specific port
- * to avoid having to open up a range of ports on the firewall
- * (or disabling the firewall to run the test).
+ * This implements a UDP server that listens on port 6789 and replies
+ *  back to whatever host/port sends it messages.
  *
- * 8-2-2016 from:
- *  https://www.cs.cmu.edu/afs/cs/academic/class/15213-f99/www/class26/udpserver.c
+ * This can be used to implement a "ping pong" test where two machines send
+ *   UDP packets back and forth.
+ *
+ * One one machine just run "udptest".
+ *  This will start a server that listens on port 6789
+ *  This can be used for Kyu to test against.
+ *
+ * If you want to test between two linux machines, the "-s" switch
+ *  is useful.  One one machine just run "udptest", then run "udptest -s" on the other.
+ *
+ * If it amuses you, you can poke at this with netcat.  Use something like:
+ *
+ *   echo -n "hello" | nc -4u host 6789
  */
 
 #include <stdio.h>
@@ -20,7 +29,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+/* We listen on this and echo back to whatever host/port we heard from */
 int server_port = 6789;
+
+/* The following is only used to send the start packet */
 char *server_host = "192.168.0.24";
 
 void error ( char * );
@@ -42,6 +54,8 @@ int main ( int argc, char **argv )
     struct sockaddr_in peer_addr;
     int sockfd;
     int send_start = 0;
+    int verbose = 0;
+    unsigned long packet_num;
 
     argc--;
     argv++;
@@ -50,6 +64,8 @@ int main ( int argc, char **argv )
 	    usage ();
 	if ( strcmp ( *argv, "-s" ) == 0 )
 	    send_start = 1;
+	else if ( strcmp ( *argv, "-v" ) == 0 )
+	    verbose = 1;
 	else
 	    usage ();
     }
@@ -75,6 +91,8 @@ int main ( int argc, char **argv )
 	if ( (count % 1000) == 0 )
 	    printf ( "%7d packets echoed\n", count );
 
+	packet_num = * (unsigned long *) buf;
+
 
 	if ( first ) {
 	    char peer[32];
@@ -88,6 +106,8 @@ int main ( int argc, char **argv )
 	n = sendto(sockfd, buf, n, 0, (struct sockaddr *) &peer_addr, len);
 	if (n < 0) 
 	    error("ERROR in sendto");
+
+	printf ( "Responded to %d\n", packet_num );
     }
   /* NOTREACHED */
 }

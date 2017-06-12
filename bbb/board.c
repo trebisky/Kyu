@@ -39,7 +39,8 @@ board_init ( void )
 	cm_init ();
 
 	serial_init ( CONSOLE_BAUD );
-	// board_timer_init ( DEFAULT_TIMER_RATE );
+
+	timer_init ( DEFAULT_TIMER_RATE );
 
 	/* CPU interrupts on */
 	enable_irq ();
@@ -51,6 +52,7 @@ board_init ( void )
 	adc_init ();
 }
 
+/* Called by timer_init () */
 void
 board_timer_init ( int rate )
 {

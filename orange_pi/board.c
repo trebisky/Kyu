@@ -49,6 +49,7 @@ board_init ( void )
 	enable_irq ();
 }
 
+/* Called by timer_init () */
 void
 board_timer_init ( int rate )
 {

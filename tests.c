@@ -59,6 +59,9 @@ void read_ports ( int, int );
 
 #endif
 
+void pkt_arm ( void );
+void pkt_arrive ( void );
+
 static void test_cv1 ( int );
 
 /* First automatic test follows ... */
@@ -3052,14 +3055,6 @@ kb_test_5 ( void )
 
 #ifdef WANT_NET
 
-/* Hook for board specific network statistics
- */
-static void
-test_netdebug ( int test )
-{
-	board_net_debug ();
-}
-
 static void
 test_netshow ( int test )
 {
@@ -3109,8 +3104,11 @@ test_arp ( int count )
 {
 	int i;
 
+	pkt_arm ();
+
 	for ( i=0; i < count; i++ ) {
-	    thr_delay ( 10 );
+	    // thr_delay ( 10 );
+	    pkt_arrive ();
 	    arp_announce ();
 	}
 }
@@ -3215,34 +3213,176 @@ test_udp ( int xxx )
 	printf ( "%d responses to %d messages\n", udp_echo_count, ECHO_COUNT );
 }
 
+/* ---------------------------------------------------------- */
+/* ---------------------------------------------------------- */
+
+static struct {
+	int arrive;
+	int dispatch;
+	int seen;
+	int reply;
+	int send;
+	int finish;
+} pk;
+
+static int pk_limit = 0;
+
+void pkt_arrive ()
+{
+	pk.arrive = 0;
+	pk.dispatch = -1;
+	pk.seen = -1;
+	pk.reply = -1;
+	pk.send = -1;
+	pk.finish = -1;
+
+	reset_ccnt ();
+}
+
+void pkt_dispatch ()
+{
+	pk.dispatch = get_ccnt ();
+}
+
+void pkt_seen ()
+{
+	pk.seen = get_ccnt ();
+}
+
+void pkt_reply ()
+{
+	pk.reply = get_ccnt ();
+}
+
+void pkt_send ()
+{
+	pk.send = get_ccnt ();
+}
+
+// Called at interrupt level */
+void pkt_finish ()
+{
+	pk.finish = get_ccnt ();
+
+	if ( pk_limit == 0 )
+	    return;
+	pk_limit--;
+
+	printf ( "arrive: %d\n", pk.arrive );
+	printf ( "dispatch: %d\n", pk.dispatch );
+	printf ( "seen: %d\n", pk.seen );
+	printf ( "reply: %d\n", pk.reply );
+	printf ( "send: %d\n", pk.send );
+	printf ( "finish: %d\n", pk.finish );
+}
+
+void pkt_arm ()
+{
+	pk_limit = 5;
+}
+
 #define ENDLESS_SIZE	1024
 static char endless_buf[ENDLESS_SIZE];
 static int endless_count;
 static int endless_port;
 static unsigned long endless_ip;
 
+unsigned long last_endless = 0;
+
 /* Test this against the compiled C program in tools/udpecho.c
  * run that as ./udpecho 6789
  */
 #define EECHO_PORT	6789
 
+/* This is where all the action is when this gets going */
 static void
 endless_rcv ( struct netbuf *nbp )
 {
+	pkt_seen ();
+
+	last_endless = * (unsigned long *) endless_buf;
+	if ( last_endless != endless_count )
+	    printf ( "Endless count out of sequence: %d %d\n", endless_count, last_endless );
+
 	++endless_count;
+	* (unsigned long *) endless_buf = endless_count;
+
+	pkt_reply ();
+
 	udp_send ( endless_ip, endless_port, EECHO_PORT, endless_buf, ENDLESS_SIZE );
-	if ( endless_count < 5 )
+
+	if ( endless_count < 2 )
 	    printf ( "First UDP echo seen\n" );
-	if ( (endless_count % 1000) == 0 )
+	if ( (endless_count % 1000) == 0 ) {
 	    printf ( "%5d UDP echos\n", endless_count );
+#ifdef BOARD_ORANGE_PI
+	    // emac_show_last ( 0 );
+#endif
+	}
 }
 
-/* Endless echo of UDP packets */
+/* Currently it takes 10 seconds to send 4000 exchanges,
+ * i.e. 2.5 milliseconds per exchange.
+ * So, we wait 3 milliseconds and then get concerned.
+ * Suprisingly, this seems to work just fine.
+ */
+void
+endless_watch ( int xxx )
+{
+	int count;
+	int tmo = 0;
+
+	while ( endless_count < 2 && tmo++ < 10 )
+	    thr_delay ( 1 );
+
+	if ( tmo > 8 ) {
+	    printf ( "Never started\n" );
+	    return;
+	}
+	printf ( "Watcher started\n" );
+
+	for ( ;; ) {
+	    count = endless_count;
+	    // thr_delay ( 3 );
+	    thr_delay ( 6 );
+	    if ( count == endless_count )
+		break;
+	}
+	printf ( "Stalled at %d\n", count );
+#ifdef BOARD_ORANGE_PI
+	capture_last ( 0 );
+#endif
+}
+
+static void
+check_clock ( void )
+{
+	int val;
+	int i;
+
+	for ( i=0; i< 10; i++ ) {
+	    reset_ccnt ();
+	    thr_delay ( 1000 );
+	    val = get_ccnt ();
+	    printf ( "CCNT for 1 sec: %d\n", val );
+	}
+}
+
+/* Endless echo of UDP packets
+ * Call this to start the test.
+ */
 static void
 test_udp_echo ( int test )
 {
+
+	check_clock ();
+	pkt_arm ();
+
+	last_endless = 0;
 	memset ( endless_buf, 0xaa, ENDLESS_SIZE );
-	endless_count = 0;
+	endless_count = 1;
+
+	* (unsigned long *) endless_buf = endless_count;
 
 	endless_port = get_ephem_port ();
 	(void) net_dots ( UTEST_SERVER, &endless_ip );
@@ -3251,10 +3391,26 @@ test_udp_echo ( int test )
 
 	printf ( "Endless UDP test from our port %d\n", endless_port );
 
+#ifdef BOARD_ORANGE_PI
+	capture_last ( 1 );
+#endif
+
 	/* Kick things off with first message */
 	udp_send ( endless_ip, endless_port, EECHO_PORT, endless_buf, ENDLESS_SIZE );
 
+	(void) safe_thr_new ( "watcher", endless_watch, NULL, 24, 0 );
+
 	/* No thread needed, the rest happens via interrupts */
+}
+
+/* Hook for board specific network statistics
+ */
+static void
+test_netdebug ( int test )
+{
+	board_net_debug ();
+
+	printf ( "last endless count = %d\n", last_endless );
 }
 
 #endif	/* WANT_NET */
