@@ -31,5 +31,5 @@ zprune
 board
 arch
 kyu.lds
-Makefile
-Makefile.inc
+./Makefile
+./Makefile.inc

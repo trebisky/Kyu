@@ -228,8 +228,7 @@ sys_init ( int xxx )
 	/* display the MMU setup handed us by U-Boot */
 	// mmu_scan ( "From U-Boot " );
 
-	/* Does this belong here ?? XXX */
-	mmu_initialize ();
+	/* This displays MMU setup and runs some tests */
 	// mmu_show ();
 
 	gb_init_rand ( 0x163389 );

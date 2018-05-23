@@ -9,8 +9,9 @@
  * ram.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  4/20/2017
- *
  */
+
+/* XXX - TODO - split this into mmu.c and ram.c */
 
 #include "kyu.h"
 #include "kyulib.h"
@@ -58,24 +59,87 @@
 #define MEG	(1024*1024)
 
 void mmu_nocache ( unsigned long );
+void mmu_invalid ( unsigned long );
+
+static void mmu_initialize ( unsigned long, unsigned long );
 
 unsigned long ram_alloc ( long );
 
 extern char _end;
 
+static unsigned long ram_start;
+static unsigned long ram_endp;	/* end + 1 */
+
 static unsigned long next_ram;
 static unsigned long last_ram;
 
+static int cache_line_size;
 static unsigned long cache_line_mask;
 
 #define ram_round(x)	( (((x) >> Q_SHIFT)+1)<<Q_SHIFT )
+
+static int ram_sizes[] = { 2048, 1024, 512, 256 };
+
+/* This was introduced for the NanoPi Neo
+ *  6-14-2017
+ * Prior to this I worked only with the Orange Pi PC, with 1024M
+ * But the NanoPi may have 512M (or 256M), which is also true of
+ *  other Orange Pi variants.
+ * Note that on my Orange Pi PC plus, I have 1024M of ram, but it
+ * gets duplicated into the upper part of the address space.
+ * I try to watch for that.
+ * XXX - it would not be a bad idea to have the mmu unmap that.
+ */
+static unsigned long
+ram_probe ( unsigned long start )
+{
+	unsigned long save;
+	unsigned long flip = 0xabcd1234;
+	unsigned long *p;
+	unsigned long *p2;
+	int i;
+
+	for ( i=0; i< sizeof(ram_sizes) / sizeof(unsigned long); i++ ) {
+	    p = (unsigned long *) (start + (ram_sizes[i]-1)*MEG );
+	    p2 = (unsigned long *) (start + (ram_sizes[i]/2-1)*MEG );
+	    // printf ( "Poke at %d %08x\n", ram_sizes[i], p );
+	    // dump_l ( p, 2 );
+	    save = *p;
+	    *p = flip;
+	    // dump_l ( p, 2 );
+	    // flush_dcache_range ( p, &p[cache_line_size] );
+	    // invalidate_dcache_range ( p, &p[cache_line_size] );
+	    if ( *p == flip && *p2 != flip ) {
+		*p = save;
+		return ram_sizes[i] * MEG;
+	    }
+	    *p = save;
+	}
+
+	/* This should not happen */
+	printf ( " *** Ram size wacky\n" );
+	// return 1024 * MEG;
+	// return 512 * MEG;
+	return 256 * MEG;
+}
 
 void
 ram_init ( unsigned long start, unsigned long size )
 {
 	unsigned long kernel_end;
 
-	cache_line_mask = get_cache_line_size() - 1;
+	cache_line_size = get_cache_line_size();
+	cache_line_mask = cache_line_size - 1;
+
+	if ( size <= 0 ) {
+	    printf ( "Probing for amount of ram\n" );
+	    size = ram_probe ( start );
+	} else {
+	    printf ( "Configured with %d M of ram\n", size );
+	}
+
+	ram_start = start;
+	ram_endp = start + size;
 
 	next_ram = start;
 	last_ram = start + size;
@@ -107,9 +171,23 @@ ram_init ( unsigned long start, unsigned long size )
 	if ( next_ram & cache_line_mask )
 	    panic_spin ( "Invalid cache alignment in ram_init\n" );
 
+	mmu_initialize ( start, size );
+
 	// this was an early test
 	// kernel_end = ram_alloc ( 55*1024 );
 	// printf ( "Ram next: %08x\n", next_ram );
+}
+
+int
+valid_ram_address ( unsigned long addr )
+{
+        if ( addr < ram_start )
+            return 0;
+
+        if ( addr >= ram_endp )
+            return 0;
+
+        return 1;
 }
 
 /* We never ever expect to free anything we allocate
@@ -289,6 +367,9 @@ mmu_scan ( char *msg )
 #define MMU_NOCACHE	(MMU_SEC | MMU_RW)
 #define MMU_DOCACHE	(MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW)
 
+/* Use this to black out a page so it gives data aborts */
+#define	MMU_INVALID	0
+
 /* We are curious as to just what the state of things
  * is as handed to us by U-boot.
  */
@@ -347,12 +428,16 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 	desc |= bits;
 	index = va >> MMU_SHIFT;
 
+	/* TTBR0 */
+	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+
+	printf ( "mmu_remap, mmubase = %08x\n", mmubase );
+	printf ( "mmu_remap, index, bits = %d, %08x\n", index, bits );
+
 	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
 	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
 	invalidate_tlb ();
 
-	/* TTBR0 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
 	mmubase[index] = desc;
 
 	// printf ( "REMAP mmubase is %08x\n", mmubase );
@@ -363,7 +448,10 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 	invalidate_tlb ();
 }
 
-/* special call for tranparent mapped section */
+/* Make a section uncacheable.
+ * This is useful for areas that hold DMA buffers and
+ * control structures (as needed by certain network devices).
+ */
 void
 mmu_nocache ( unsigned long addr )
 {
@@ -373,30 +461,63 @@ mmu_nocache ( unsigned long addr )
 	invalidate_dcache_range ( addr, &caddr[MEG] );
 }
 
+/* make a section invalid so that accesses to it
+ * yield data aborts.
+ */
+void
+mmu_invalid ( unsigned long addr )
+{
+	char *caddr = (char *) addr;
+
+	mmu_remap ( addr, addr, MMU_INVALID );
+	invalidate_dcache_range ( addr, &caddr[MEG] );
+}
+
 // #define MMU_TICK	0x100000
 #define MMU_TICK	MEG
 
-void
-mmu_setup ( unsigned long *mmu )
+static void
+mmu_setup ( unsigned long *mmu, unsigned long ram_start, unsigned long ram_size )
 {
 	unsigned long addr;
 	int i;
 	int size;
 	int start;
 
+	/* First make everything transparent and uncacheable */
 	addr = 0;
 	for ( i=0; i<MMU_SIZE; i++ ) {
 	    mmu[i] = addr | MMU_SEC | MMU_XN | MMU_RW;
 	    addr += MMU_TICK;
 	}
 
-	size = BOARD_RAM_SIZE >> MMU_SHIFT;
-	addr = BOARD_RAM_START;
+	/* This is primarily for the Orange Pi that aliases existing
+	 * ram all through a 2G address space, we make accesses to those
+	 * addresses invalid here, then open up those that actually exist
+	 * in the loop below.
+	 */
+	size = BOARD_RAM_MAX >> MMU_SHIFT;
+	addr = ram_start;
 	start = addr >> MMU_SHIFT;
+
+	for ( i=0; i<size; i++ ) {
+	    mmu[start+i] = addr | MMU_INVALID;
+	    addr += MMU_TICK;
+	}
+
+	size = ram_size >> MMU_SHIFT;
+	addr = ram_start;
+	start = addr >> MMU_SHIFT;
+
+	/* Redo the ram addresses so they are cacheable */
 	for ( i=0; i<size; i++ ) {
 	    mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
 	    addr += MMU_TICK;
 	}
+
+	/* And for the Orange Pi, make accesses to address 0 cause faults
+	 */
+	mmu[0] = MMU_INVALID;
 }
 
 #define SCTRL_MMU_ENABLE		0x1
@@ -470,8 +591,8 @@ mmu_on ( void )
  */
 
 /* Call this to set up our very own MMU tables */
-void
-mmu_initialize ( void )
+static void
+mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 {
 	unsigned long *new_mmu;
 	unsigned long new_ttbr;
@@ -486,7 +607,7 @@ mmu_initialize ( void )
 	new_ttbr += MMU_SIZE * sizeof(unsigned long) & ~MMU_BASE_MASK;
 	new_mmu = (unsigned long *) new_ttbr;
 
-	mmu_setup ( new_mmu );
+	mmu_setup ( new_mmu, ram_start, ram_size );
 
 	cpu_enter();
 	// mmu_off();
@@ -502,6 +623,8 @@ mmu_initialize ( void )
 
 	// mmu_on();
 	cpu_leave();
+
+	printf ( "New MMU at: %08x\n", new_ttbr );
 }
 
 /* Run this in a thread since it tends to generate data aborts */
@@ -527,9 +650,7 @@ mmu_tester ( int xxx )
 #ifdef BOARD_ORANGE_PI
 	evil = (unsigned long) 0x50000000;
 	nice = (unsigned long) 0x20000000;
-#else
-	/* XXX - these addresses are BBB specific
-	 */
+#else	/* BBB */
 	evil = (unsigned long) 0x90000000;
 	nice = (unsigned long) 0x20000000;
 #endif
@@ -545,7 +666,12 @@ mmu_tester ( int xxx )
 
 	mmu_remap ( nice, evil, MMU_NOCACHE );
 
+	/* This is the one that matters */
 	printf ( "read from %08x: %08x\n", nice, *nicep );
+	if ( *nicep == *evilp )
+	    printf ( "-- that looks good\n" );
+	else 
+	    printf ( " ??? I don't like that !!\n" );
 
 #ifdef notdef
 	unsigned long *mmubase;
@@ -556,25 +682,19 @@ mmu_tester ( int xxx )
 	mmu_scan ( "Before remapping\n" );
 #endif
 
-#ifdef notdef
-	/* and this too gives a data abort */
+	/* We wish this would give a data abort, but it doesn't */
 	mmu_remap ( evil, evil, MMU_SEC );
 
 	printf ( "Try to read at %08x\n", evil );
 	val = * (unsigned long *) evil;
 	printf ( "read from %08x: %08x\n", evil, val );
-#endif
 
-#ifdef notdef
+	/* This indeed gives us data aborts */
 	mmu_remap ( evil, evil, 0 );
 
-	/* after the above remapping, this gives us
-	 * a data abort also.
-	 */
 	printf ( "Try to read at %08x\n", evil );
 	val = * (unsigned long *) evil;
 	printf ( "read from %08x: %08x\n", evil, val );
-#endif
 
 	printf ( "Finished with MMU tester\n" );
 
@@ -601,9 +721,6 @@ mmu_show ( void )
 	esp = get_sp();
 	printf ( " SP = %08x\n", esp );
 	esp = 0xBADBAD;
-
-	/* was in locore.S */
-	mmubase = (unsigned long *) get_mmu ();
 #endif
 
 	/* This works just fine !! */

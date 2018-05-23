@@ -20,6 +20,8 @@
 
 unsigned long core_stacks;
 
+static void mmu_initialize ( unsigned long, unsigned long );
+
 /* Called very early in initialization */
 void
 board_hardware_init ( void )

@@ -2391,6 +2391,7 @@ int led_state = 0;
 static void
 led_blinker ( int xx )
 {
+	printf ( "Blink: %d\n", led_state );
 	if ( led_state ) {
 	    pwr_on ();
 	    status_off ();

@@ -1580,7 +1580,7 @@ emac_init_new ( void )
 
 	// for ( i=0; i<8; i++ ) {
 	for ( i=0; i<1; i++ ) {
-	    printf ( "MAC addr from U-Bot %d: %08x %08x\n", 
+	    printf ( "MAC addr from U-Boot %d: %08x %08x\n", 
 		i, ep->mac_addr[i].hi, ep->mac_addr[i].lo );
 	}
 

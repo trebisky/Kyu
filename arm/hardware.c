@@ -118,20 +118,8 @@ enable_unaligned ( void )
 void
 hardware_init ( void )
 {
-	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
-
 	enable_ccnt ( 0 );
 	enable_unaligned ();
-}
-
-int
-valid_ram_address ( unsigned long addr )
-{
-	if ( addr < BOARD_RAM_START )
-	    return 0;
-	if ( addr > BOARD_RAM_END )
-	    return 0;
-	return 1;
 }
 
 /* THE END */

@@ -114,6 +114,9 @@ gpio_input ( int gpio, int pin )
 	return (gp->data >> pin) & 1;
 }
 
+/* We only support the H3 for now,
+ *   the code for the H5 is parked here for a rainy day.
+ */
 #define CHIP_H3
 
 void
@@ -131,37 +134,45 @@ uart_gpio_init ( void )
 #endif
 }
 
+#ifdef BOARD_NANOPI_NEO
+#define POWER_PIN	10
+#define STATUS_PIN	10	/* Nano Pi Neo */
+#else
+#define POWER_PIN	10
+#define STATUS_PIN	15	/* Orange Pi */
+#endif
+
 void
 led_init ( void )
 {
-	gpio_config ( GPIO_L, 10, GPIO_OUTPUT );
-	gpio_config ( GPIO_A, 15, GPIO_OUTPUT );
+	gpio_config ( GPIO_L, POWER_PIN, GPIO_OUTPUT );
+	gpio_config ( GPIO_A, STATUS_PIN, GPIO_OUTPUT );
 }
 
 /* This is the green LED */
 void
 pwr_on ( void )
 {
-	gpio_output ( GPIO_L, 10, 1 );
+	gpio_output ( GPIO_L, POWER_PIN, 1 );
 }
 
 void
 pwr_off ( void )
 {
-	gpio_output ( GPIO_L, 10, 0 );
+	gpio_output ( GPIO_L, POWER_PIN, 0 );
 }
 
 /* This is the red LED */
 void
 status_on ( void )
 {
-	gpio_output ( GPIO_A, 15, 1 );
+	gpio_output ( GPIO_A, STATUS_PIN, 1 );
 }
 
 void
 status_off ( void )
 {
-	gpio_output ( GPIO_A, 15, 0 );
+	gpio_output ( GPIO_A, STATUS_PIN, 0 );
 }
 
 /* A reasonable delay for blinking an LED

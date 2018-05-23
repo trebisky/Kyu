@@ -77,12 +77,18 @@ fail ( void )
 
 char *mk_symaddr(int);
 
+static int in_evil = 0;
+
 void
 evil_exception ( char *msg, int code )
 {
 	int pc;
 
 	if ( cur_thread == &silly_thread ) {
+	    if ( in_evil )
+		spin ();
+	    in_evil = 1;
+
 	    printf ( "%s in Kyu early initialization !!\n", msg );
 	    show_thread_regs ( cur_thread, 64 );
 	    printf ( "Processor halted (spinning)\n" );
