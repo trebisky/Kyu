@@ -380,8 +380,11 @@ void *kmem_cache_free ( kmem_cache_t *cache, void * addr )
 }
 #endif
 
-/* Allow 5 queues for now (1 for keyboard, and 2
- * for each of the two serial ports)
+/* Allow 5 queues for now.
+ * 1 for x86 keyboard
+ * 2 for each of two x86 serial ports (in and out)
+ * So far has only been used in x86 days.
+ *
  * XXX - someday should add dynamic allocator both for
  * the control structure and the buffer itself.
  * We never expect to free these resources (maybe someday

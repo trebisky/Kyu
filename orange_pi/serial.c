@@ -10,12 +10,22 @@
  *
  * Tom Trebisky  12-22-2016
  * Tom Trebisky  1/19/2017
+ * Tom Trebisky  5/28/2018
  *
  * serial.c
  * super simple "driver" for the H3 uart.
  */
 
+/* The H3 chip has 5 uarts, the first 4,
+ * then a "special" number 5 that we so far ignore.
+ */
 #define UART0_BASE	0x01C28000
+#define UART1_BASE	0x01C28400
+#define UART2_BASE	0x01C28800
+#define UART3_BASE	0x01C28C00
+
+#define UART_R_BASE	0x01F02800	/* special */
+
 #define UART_BASE	((struct h3_uart *) UART0_BASE)
 
 struct h3_uart {
@@ -26,6 +36,14 @@ struct h3_uart {
 	volatile unsigned int mcr;	/* 10 - modem control */
 	volatile unsigned int lsr;	/* 14 - line status */
 	volatile unsigned int msr;	/* 18 - modem status */
+};
+
+static struct h3_uart * uart_base[] = {
+    (struct h3_uart *) UART0_BASE,
+    (struct h3_uart *) UART1_BASE,
+    (struct h3_uart *) UART2_BASE,
+    (struct h3_uart *) UART3_BASE,
+    (struct h3_uart *) UART_R_BASE
 };
 
 #define divisor_msb	ier
@@ -65,17 +83,18 @@ struct h3_uart {
 /* 8 bits, no parity, 1 stop bit */
 #define LCR_SETUP	LCR_DATA_8
 
-void uart_gpio_init ( void );
-void uart_clock_init ( void );
+void uart_gpio_init ( int );
+void uart_clock_init ( int );
 
 /* XXX - Ignores baud rate argument */
 void
-serial_init ( int baud )
+uart_init ( int uart, int baud )
 {
-	struct h3_uart *up = UART_BASE;
+	// struct h3_uart *up = UART_BASE;
+	struct h3_uart *up = uart_base[uart];
 
-	uart_gpio_init();
-	uart_clock_init();
+	uart_gpio_init ( uart );
+	uart_clock_init ( uart );
 
 	up->ier = 0;
 	up->lcr = LCR_DLAB;
@@ -89,48 +108,68 @@ serial_init ( int baud )
 }
 
 void
-serial_putc ( char c )
+uart_putc ( int uart, char c )
 {
-	struct h3_uart *up = UART_BASE;
+	// struct h3_uart *up = UART_BASE;
+	struct h3_uart *up = uart_base[uart];
 
 	while ( !(up->lsr & TX_READY) )
 	    ;
 	up->data = c;
 
 	if ( c == '\n' )
-	    serial_putc ( '\r' );
+	    uart_putc ( uart, '\r' );
 }
 
 void
-serial_puts ( char *s )
+uart_puts ( int uart, char *s )
 {
 	while ( *s ) {
 	    if (*s == '\n')
-		serial_putc('\r');
-	    serial_putc(*s++);
+		uart_putc ( uart, '\r' );
+	    uart_putc ( uart, *s++ );
 	}
 }
 
-#ifdef notdef
-void
-serial_check ( int num )
-{
-	struct h3_uart *up = UART_BASE;
-
-	printf ( " Uart: lsr/ier/iir %02x %02x %02x  %d\n", up->lsr, up->ier, up->iir, num );
-}
-#endif
-
 int
-serial_getc ( void )
+uart_getc ( int uart )
 {
-	struct h3_uart *up = UART_BASE;
+	// struct h3_uart *up = UART_BASE;
+	struct h3_uart *up = uart_base[uart];
 
 	while ( ! (up->lsr & RX_READY) )
 	    ;
 	return up->data;
 }
 
+/* These are the "standard" entry points used for the Kyu console */
+
+void
+serial_init ( int baud )
+{
+	uart_init ( 0, baud );
+}
+
+void
+serial_putc ( char c )
+{
+	uart_putc ( 0, c );
+}
+
+void
+serial_puts ( char *s )
+{
+	uart_puts ( 0, s );
+}
+
+int
+serial_getc ( void )
+{
+	return uart_getc ( 0 );
+}
+
+
+#ifdef notdef
 int
 serial_rx_status ( void )
 {
@@ -146,5 +185,15 @@ serial_read ( void )
 
 	return up->data;
 }
+
+void
+serial_check ( int num )
+{
+	struct h3_uart *up = UART_BASE;
+
+	printf ( " Uart: lsr/ier/iir %02x %02x %02x  %d\n", up->lsr, up->ier, up->iir, num );
+}
+#endif
+
 
 /* THE END */

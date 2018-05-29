@@ -56,6 +56,9 @@ static struct h3_gpio * gpio_base[] = {
 #define GPIO_INPUT        (0)
 #define GPIO_OUTPUT       (1)
 #define H3_GPA_UART0      (2)
+#define H3_GPA_UART1      (2)
+#define H3_GPA_UART2      (2)
+#define H3_GPA_UART3      (3)
 #define H5_GPA_UART0      (2)
 #define GPIO_DISABLE      (7)
 
@@ -120,12 +123,26 @@ gpio_input ( int gpio, int pin )
 #define CHIP_H3
 
 void
-uart_gpio_init ( void )
+uart_gpio_init ( int uart )
 {
 #ifdef CHIP_H3
-	gpio_config ( GPIO_A, 4, H3_GPA_UART0 );
-	gpio_config ( GPIO_A, 5, H3_GPA_UART0 );
-	gpio_pull ( GPIO_A, 5, GPIO_PULL_UP );
+	if ( uart == 0 ) {
+	    gpio_config ( GPIO_A, 4, H3_GPA_UART0 );
+	    gpio_config ( GPIO_A, 5, H3_GPA_UART0 );
+	    gpio_pull ( GPIO_A, 5, GPIO_PULL_UP );
+	} else if ( uart == 1 ) {
+	    gpio_config ( GPIO_G, 6, H3_GPA_UART1 );
+	    gpio_config ( GPIO_G, 7, H3_GPA_UART1 );
+	    gpio_pull ( GPIO_G, 7, GPIO_PULL_UP );
+	} else if ( uart == 2 ) {
+	    gpio_config ( GPIO_A, 0, H3_GPA_UART2 );
+	    gpio_config ( GPIO_A, 1, H3_GPA_UART2 );
+	    gpio_pull ( GPIO_A, 1, GPIO_PULL_UP );
+	} else if ( uart == 3 ) {
+	    gpio_config ( GPIO_A, 13, H3_GPA_UART3 );
+	    gpio_config ( GPIO_A, 14, H3_GPA_UART3 );
+	    gpio_pull ( GPIO_A, 14, GPIO_PULL_UP );
+	}
 
 #else	/* H5 */
 	gpio_config ( GPIO_A, 4, SUN50I_H5_GPA_UART0 );
@@ -242,10 +259,21 @@ gpio_blink_green ( void )
  * true bare metal would need this.
  */
 void
-uart_clock_init ( void )
+uart_clock_init ( int uart )
 {
-	*CCM_GATE |= GATE_UART0;
-	*CCM_RESET4 |= RESET4_UART0;
+	if ( uart == 0 ) {
+	    *CCM_GATE |= GATE_UART0;
+	    *CCM_RESET4 |= RESET4_UART0;
+	} else if ( uart == 1 ) {
+	    *CCM_GATE |= GATE_UART1;
+	    *CCM_RESET4 |= RESET4_UART1;
+	} else if ( uart == 2 ) {
+	    *CCM_GATE |= GATE_UART2;
+	    *CCM_RESET4 |= RESET4_UART2;
+	} else if ( uart == 3 ) {
+	    *CCM_GATE |= GATE_UART3;
+	    *CCM_RESET4 |= RESET4_UART3;
+	}
 }
 
 /* THE END */
