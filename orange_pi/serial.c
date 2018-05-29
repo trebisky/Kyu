@@ -107,6 +107,7 @@ uart_init ( int uart, int baud )
 	up->ier = IE_RDA | IE_TXE;
 }
 
+// Polling loops like this could use a timeout maybe.
 void
 uart_putc ( int uart, char c )
 {
@@ -131,6 +132,7 @@ uart_puts ( int uart, char *s )
 	}
 }
 
+// Polling loops like this could use a timeout maybe.
 int
 uart_getc ( int uart )
 {

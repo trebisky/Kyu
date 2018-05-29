@@ -245,15 +245,15 @@ gpio_blink_green ( void )
 #define CCM_GATE	((unsigned long *) 0x01c2006c)
 #define CCM_RESET4	((unsigned long *) 0x01c202d8)
 
-#define GATE_UART0	0x0001000
-#define GATE_UART1	0x0002000
-#define GATE_UART2	0x0004000
-#define GATE_UART3	0x0008000
+#define GATE_UART0	0x00010000
+#define GATE_UART1	0x00020000
+#define GATE_UART2	0x00040000
+#define GATE_UART3	0x00080000
 
-#define RESET4_UART0	0x0001000
-#define RESET4_UART1	0x0002000
-#define RESET4_UART2	0x0004000
-#define RESET4_UART3	0x0008000
+#define RESET4_UART0	0x00010000
+#define RESET4_UART1	0x00020000
+#define RESET4_UART2	0x00040000
+#define RESET4_UART3	0x00080000
 
 /* This is probably set up for us by U-boot,
  * true bare metal would need this.

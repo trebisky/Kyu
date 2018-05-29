@@ -155,6 +155,7 @@ static void test_cores ( int );
 
 static void test_clear ( int );
 static void test_blink ( int );
+static void test_uart ( int );
 
 /* Here is the IO test menu */
 
@@ -179,6 +180,7 @@ struct test io_test_list[] = {
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
 	test_clear,	"clear memory test",	0,
+	test_uart,	"uart test",		0,
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2411,6 +2413,22 @@ led_norm ( void )
 }
 
 #endif
+
+#define UART1	1
+
+static void
+test_uart ( int arg )
+{
+	uart_init ( UART1, 115200 );
+
+	for ( ;; ) {
+	    printf ( "." );
+	    uart_putc ( UART1, 'a' );
+	    uart_putc ( UART1, 'b' );
+	    uart_putc ( UART1, 'c' );
+	    //thr_delay ( 100 );
+	}
+}
 
 static void
 test_clear ( int arg )
