@@ -38,7 +38,7 @@ board_init ( void )
 	// wdt_disable ();
 
 	/* Turn on the green LED */
-	led_init ();
+	gpio_led_init ();
 	pwr_on ();
 
 	spinlocks_init ();

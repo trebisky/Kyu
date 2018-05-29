@@ -15,6 +15,7 @@
  * These are described in the datasheet in chapter 4-22 as "port controllers"
  */
 
+#ifdef notdef
 #define GPIO_A    0
 #define GPIO_B    1	/* unpopulated */
 #define GPIO_C    2
@@ -27,6 +28,7 @@
 #define GPIO_I    8	/* unpopulated */
 
 #define GPIO_J    9	/* R_PIO */
+#endif
 
 #include "gpio.h"
 
@@ -61,11 +63,8 @@ static struct h3_gpio * gpio_base[] = {
 /* GPIO pin function config (0-7) */
 #define GPIO_INPUT        (0)
 #define GPIO_OUTPUT       (1)
-#define H3_GPA_UART0      (2)
-#define H3_GPA_UART1      (2)
-#define H3_GPA_UART2      (2)
-#define H3_GPA_UART3      (3)
-#define H5_GPA_UART0      (2)
+#define GPIO_F2           (2)
+#define GPIO_F3           (3)
 #define GPIO_DISABLE      (7)
 
 /* GPIO pin pull-up/down config (0-3)*/
@@ -77,13 +76,18 @@ static struct h3_gpio * gpio_base[] = {
 /* There are 4 config registers,
  * each with 8 fields of 4 bits.
  */
-void
-gpio_config ( int gpio, int pin, int val )
+static void
+gpio_config ( int bit, int val )
 {
-	struct h3_gpio *gp = gpio_base[gpio];
-	int reg = pin / 8;
-	int shift = (pin & 0x7) * 4;
-	int tmp;
+	int gpio = bit / 32;
+	int pin = bit % 32;
+
+	struct h3_gpio *gp;
+	int reg, shift, tmp;
+
+	gp = gpio_base[gpio];
+	reg = pin / 8;
+	shift = (pin & 0x7) * 4;
 
 	tmp = gp->config[reg] & ~(0xf << shift);
 	gp->config[reg] = tmp | (val << shift);
@@ -92,19 +96,24 @@ gpio_config ( int gpio, int pin, int val )
 /* There are two pull registers,
  * each with 16 fields of 2 bits.
  */
-void
-gpio_pull ( int gpio, int pin, int val )
+static void
+gpio_pull ( int bit, int val )
 {
-	struct h3_gpio *gp = gpio_base[gpio];
-	int reg = pin / 16;
-	int shift = (pin & 0xf) * 2;
-	int tmp;
+	int gpio = bit / 32;
+	int pin = bit % 32;
+
+	struct h3_gpio *gp;
+	int reg, shift, tmp;
+
+	gp = gpio_base[gpio];
+	reg = pin / 16;
+	shift = (pin & 0xf) * 2;
 
 	tmp = gp->pull[reg] & ~(0x3 << shift);
 	gp->pull[reg] = tmp | (val << shift);
 }
 
-void
+static void
 gpio_output ( int gpio, int pin, int val )
 {
 	struct h3_gpio *gp = gpio_base[gpio];
@@ -115,7 +124,7 @@ gpio_output ( int gpio, int pin, int val )
 	    gp->data &= ~(1 << pin);
 }
 
-int
+static int
 gpio_input ( int gpio, int pin )
 {
 	struct h3_gpio *gp = gpio_base[gpio];
@@ -133,69 +142,135 @@ uart_gpio_init ( int uart )
 {
 #ifdef CHIP_H3
 	if ( uart == 0 ) {
-	    gpio_config ( GPIO_A, 4, H3_GPA_UART0 );
-	    gpio_config ( GPIO_A, 5, H3_GPA_UART0 );
-	    gpio_pull ( GPIO_A, 5, GPIO_PULL_UP );
+	    gpio_config ( GPIO_A_4, GPIO_F2 );
+	    gpio_config ( GPIO_A_5, GPIO_F2 );
+	    gpio_pull ( GPIO_A_5, GPIO_PULL_UP );
 	} else if ( uart == 1 ) {
-	    gpio_config ( GPIO_G, 6, H3_GPA_UART1 );
-	    gpio_config ( GPIO_G, 7, H3_GPA_UART1 );
-	    gpio_pull ( GPIO_G, 7, GPIO_PULL_UP );
+	    gpio_config ( GPIO_G_6, GPIO_F2 );
+	    gpio_config ( GPIO_G_7, GPIO_F2 );
+	    gpio_pull ( GPIO_G_7, GPIO_PULL_UP );
 	} else if ( uart == 2 ) {
-	    gpio_config ( GPIO_A, 0, H3_GPA_UART2 );
-	    gpio_config ( GPIO_A, 1, H3_GPA_UART2 );
-	    gpio_pull ( GPIO_A, 1, GPIO_PULL_UP );
+	    gpio_config ( GPIO_A_0, GPIO_F2 );
+	    gpio_config ( GPIO_A_1, GPIO_F2 );
+	    gpio_pull ( GPIO_A_1, GPIO_PULL_UP );
 	} else if ( uart == 3 ) {
-	    gpio_config ( GPIO_A, 13, H3_GPA_UART3 );
-	    gpio_config ( GPIO_A, 14, H3_GPA_UART3 );
-	    gpio_pull ( GPIO_A, 14, GPIO_PULL_UP );
+	    gpio_config ( GPIO_A_13, GPIO_F3 );
+	    gpio_config ( GPIO_A_14, GPIO_F3 );
+	    gpio_pull ( GPIO_A_14, GPIO_PULL_UP );
 	}
 
 #else	/* H5 */
-	gpio_config ( GPIO_A, 4, SUN50I_H5_GPA_UART0 );
-	gpio_config ( GPIO_A, 5, SUN50I_H5_GPA_UART0 );
-	gpio_pull ( GPIO_A, 5, GPIO_PULL_UP );
+	gpio_config ( GPIO_A_4, GPIO_F2 );
+	gpio_config ( GPIO_A_5, GPIO_F2 );
+	gpio_pull ( GPIO_A_5, GPIO_PULL_UP );
 #endif
 }
 
-#ifdef BOARD_NANOPI_NEO
-#define POWER_PIN	10
-#define STATUS_PIN	10	/* Nano Pi Neo */
-#else
-#define POWER_PIN	10
-#define STATUS_PIN	15	/* Orange Pi */
-#endif
+/* -------------------------------------------------- */
+/* -------------------------------------------------- */
+/* These are "standard" API routines that
+ * conform to what was done for the BBB gpio.c
+ */
 
 void
-led_init ( void )
+gpio_clear_bit ( int bit )
 {
-	gpio_config ( GPIO_J, POWER_PIN, GPIO_OUTPUT );
-	gpio_config ( GPIO_A, STATUS_PIN, GPIO_OUTPUT );
+	gpio_output ( bit/32, bit%32, 0 );
 }
+
+void
+gpio_set_bit ( int bit )
+{
+	gpio_output ( bit/32, bit%32, 1 );
+}
+
+int
+gpio_read_bit ( int bit )
+{
+	return gpio_input ( bit/32, bit%32 );
+}
+
+void
+gpio_out_init ( int bit )
+{
+	gpio_config ( bit, GPIO_OUTPUT );
+}
+
+void
+gpio_in_init ( int bit )
+{
+	gpio_config ( bit, GPIO_INPUT );
+}
+
+/* These are used by the i2c driver to flip the line around.
+ * On the BBB we had an output enable control to do this.
+ * On the Orange Pi, they are identical to the in/out_init
+ * routines above, but not yet tested.
+ */
+void
+gpio_dir_out ( int bit )
+{
+	gpio_config ( bit, GPIO_OUTPUT );
+}
+
+void
+gpio_dir_in ( int bit )
+{
+	gpio_config ( bit, GPIO_INPUT );
+}
+
+
+/* -------------------------------------------------- */
+/* -------------------------------------------------- */
+/* LED support */
+
+/* Called from board.c */
+void
+gpio_led_init ( void )
+{
+	gpio_out_init ( POWER_LED );
+	gpio_out_init ( STATUS_LED );
+}
+
+/* not implemented for Orange Pi */
+// void gpio_init ( void ) {}
 
 /* This is the green LED */
 void
 pwr_on ( void )
 {
-	gpio_output ( GPIO_J, POWER_PIN, 1 );
+	// gpio_output ( GPIO_J, POWER_PIN, 1 );
+	gpio_set_bit ( POWER_LED );
 }
 
 void
 pwr_off ( void )
 {
-	gpio_output ( GPIO_J, POWER_PIN, 0 );
+	// gpio_output ( GPIO_J, POWER_PIN, 0 );
+	gpio_set_bit ( POWER_LED );
 }
 
 /* This is the red LED */
 void
 status_on ( void )
 {
-	gpio_output ( GPIO_A, STATUS_PIN, 1 );
+	// gpio_output ( GPIO_A, STATUS_PIN, 1 );
+#ifdef BOARD_NANOPI_NEO
+	gpio_set_bit ( STATUS_LED_NEO );
+#else
+	gpio_set_bit ( STATUS_LED );
+#endif
 }
 
 void
 status_off ( void )
 {
-	gpio_output ( GPIO_A, STATUS_PIN, 0 );
+	// gpio_output ( GPIO_A, STATUS_PIN, 0 );
+#ifdef BOARD_NANOPI_NEO
+	gpio_clear_bit ( STATUS_LED_NEO );
+#else
+	gpio_clear_bit ( STATUS_LED );
+#endif
 }
 
 /* A reasonable delay for blinking an LED
@@ -240,6 +315,36 @@ gpio_blink_green ( void )
             __delay_blink ();
         }
 }
+
+/* -------------------------------------------------- */
+/* -------------------------------------------------- */
+
+/* Test 3 - from bbb/gpio.c
+ *
+ * Cute light blinking
+ *  use gpio routines and timer interrupts
+ */
+#define TEST3_DELAY	100
+void
+gpio_test3 ( void )
+{
+        for ( ;; ) {
+            gpio_clear_bit ( STATUS_LED );
+            thr_delay ( TEST3_DELAY );
+            gpio_set_bit ( STATUS_LED );
+            thr_delay ( TEST3_DELAY );
+        }
+}
+
+/* Called from tests.c */
+void
+gpio_test ( void )
+{
+	gpio_test3 ();
+}
+
+/* -------------------------------------------------- */
+/* -------------------------------------------------- */
 
 
 /* XXX XXX this CCM stuff doesn't belong here,

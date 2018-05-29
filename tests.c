@@ -142,9 +142,9 @@ static void test_wait ( int );
 static void test_unroll ( int );
 static void test_fault ( int );
 static void test_zdiv ( int );
+static void test_gpio ( int );
 
 #ifdef BOARD_BBB
-static void test_gpio ( int );
 static void test_adc ( int );
 static void test_fault2 ( int );
 #endif
@@ -167,8 +167,9 @@ struct test io_test_list[] = {
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
+	test_gpio,	"GPIO test",	0,
+
 #ifdef BOARD_BBB
-	test_gpio,	"BBB gpio test",	0,
 	test_adc,	"BBB adc test",		0,
 	test_fault2,	"data abort probe",	0,
 #endif
@@ -2472,9 +2473,10 @@ test_blink ( int arg )
 
 /* -------------------------------------------- */
 
-#ifdef BOARD_BBB
-/* Test gpio on BBB */
+/* Test gpio on BBB or Orange Pi */
 static void test_gpio ( int count ) { gpio_test (); }
+
+#ifdef BOARD_BBB
 
 /* Test adc on BBB */
 static void test_adc ( int count ) { adc_test (); }

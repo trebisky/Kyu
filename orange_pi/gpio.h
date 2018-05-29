@@ -255,6 +255,7 @@
 #define GPIO_J_31	319
 
 /* They call this a "power" LED, but that is misleading */
+/* Power is green, Status is red */
 #define POWER_LED	GPIO_J_10
 #define STATUS_LED	GPIO_A_15
 #define STATUS_LED_NEO	GPIO_A_10

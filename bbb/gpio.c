@@ -198,6 +198,8 @@ gpio_iic_init ( int bit )
 
 /* --------------------- */
 
+/* This is only for the BBB, supports a silly test */
+/* The BBB has 4 LED, hence the loop */
 void
 gpio_led_set ( int val )
 {
