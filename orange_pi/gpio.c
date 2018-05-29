@@ -12,18 +12,23 @@
  * Tom Trebisky  1/19/2017
  *
  * Driver for the H3 gpio
+ * These are described in the datasheet in chapter 4-22 as "port controllers"
  */
 
 #define GPIO_A    0
-#define GPIO_B    1
+#define GPIO_B    1	/* unpopulated */
 #define GPIO_C    2
 #define GPIO_D    3
 #define GPIO_E    4
 #define GPIO_F    5
 #define GPIO_G    6
-#define GPIO_H    7
-#define GPIO_I    8
-#define GPIO_L    9	/* R_PIO */
+
+#define GPIO_H    7	/* unpopulated */
+#define GPIO_I    8	/* unpopulated */
+
+#define GPIO_J    9	/* R_PIO */
+
+#include "gpio.h"
 
 struct h3_gpio {
 	volatile unsigned long config[4];
@@ -44,13 +49,14 @@ static struct h3_gpio * gpio_base[] = {
     (struct h3_gpio *) 0x01C20890,		/* GPIO_E */
     (struct h3_gpio *) 0x01C208B4,		/* GPIO_F */
     (struct h3_gpio *) 0x01C208D8,		/* GPIO_G */
+
     (struct h3_gpio *) 0x01C208FC,		/* GPIO_H */
     (struct h3_gpio *) 0x01C20920,		/* GPIO_I */
 
-    (struct h3_gpio *) 0x01F02c00,		/* GPIO_L */
+    (struct h3_gpio *) 0x01F02c00,		/* GPIO_J (R_PIO) */
 };
 
-/* Only A, G, and R can interrupt */
+/* Only A, G, and J (J = R_PIO) can interrupt */
 
 /* GPIO pin function config (0-7) */
 #define GPIO_INPUT        (0)
@@ -162,7 +168,7 @@ uart_gpio_init ( int uart )
 void
 led_init ( void )
 {
-	gpio_config ( GPIO_L, POWER_PIN, GPIO_OUTPUT );
+	gpio_config ( GPIO_J, POWER_PIN, GPIO_OUTPUT );
 	gpio_config ( GPIO_A, STATUS_PIN, GPIO_OUTPUT );
 }
 
@@ -170,13 +176,13 @@ led_init ( void )
 void
 pwr_on ( void )
 {
-	gpio_output ( GPIO_L, POWER_PIN, 1 );
+	gpio_output ( GPIO_J, POWER_PIN, 1 );
 }
 
 void
 pwr_off ( void )
 {
-	gpio_output ( GPIO_L, POWER_PIN, 0 );
+	gpio_output ( GPIO_J, POWER_PIN, 0 );
 }
 
 /* This is the red LED */

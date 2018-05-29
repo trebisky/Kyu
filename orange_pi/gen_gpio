@@ -1,0 +1,9 @@
+#!/bin/ruby
+
+start = 9 * 32
+
+32.times { |i|
+    bit = start + i
+    puts "#define GPIO_L_#{i}\t#{bit}"
+}
+

@@ -2414,19 +2414,19 @@ led_norm ( void )
 
 #endif
 
-#define UART1	1
+#define X_UART	3
 
 static void
 test_uart ( int arg )
 {
-	uart_init ( UART1, 115200 );
+	uart_init ( X_UART, 115200 );
 
 	for ( ;; ) {
 	    printf ( "." );
-	    uart_putc ( UART1, 'a' );
-	    uart_putc ( UART1, 'b' );
-	    uart_putc ( UART1, 'c' );
-	    //thr_delay ( 100 );
+	    uart_putc ( X_UART, 'a' );
+	    uart_putc ( X_UART, 'b' );
+	    uart_putc ( X_UART, 'c' );
+	    thr_delay ( 100 );
 	}
 }
 

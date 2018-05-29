@@ -14,10 +14,21 @@
  *
  * serial.c
  * super simple "driver" for the H3 uart.
+ *
+ * These are supposedly 16450/16550 compatible and could use standard drivers.
  */
 
-/* The H3 chip has 5 uarts, the first 4,
+/* The H3 chip has 5 uarts, the first 4 are on handy IO pins on the Orange Pi.
  * then a "special" number 5 that we so far ignore.
+ * The "uart_" entry points in this driver are the general use ones.
+ * The "serial_" entry points at the end support the Kyu console.
+ *
+ * Uart 0 has a special 3 pin header of its own.
+ * Uart 1 is on pins 38 and 40 (Tx,Rx) of the 40 pin IO connector (PG6, PG7)
+ * Uart 2 is on pins 13 and 11 (Tx,Rx) of the 40 pin IO connector (PA0, PA1)
+ * Uart 3 is on pins  8 and 10 (Tx,Rx) of the 40 pin IO connector (PA13, PA14)
+ *
+ * All of these were tested with just 3 wires (Tx,Rx,Gnd) on 5-29-2018
  */
 #define UART0_BASE	0x01C28000
 #define UART1_BASE	0x01C28400
@@ -25,8 +36,6 @@
 #define UART3_BASE	0x01C28C00
 
 #define UART_R_BASE	0x01F02800	/* special */
-
-#define UART_BASE	((struct h3_uart *) UART0_BASE)
 
 struct h3_uart {
 	volatile unsigned int data;	/* 00 - Rx/Tx data */
@@ -90,7 +99,6 @@ void uart_clock_init ( int );
 void
 uart_init ( int uart, int baud )
 {
-	// struct h3_uart *up = UART_BASE;
 	struct h3_uart *up = uart_base[uart];
 
 	uart_gpio_init ( uart );
@@ -111,7 +119,6 @@ uart_init ( int uart, int baud )
 void
 uart_putc ( int uart, char c )
 {
-	// struct h3_uart *up = UART_BASE;
 	struct h3_uart *up = uart_base[uart];
 
 	while ( !(up->lsr & TX_READY) )
@@ -136,7 +143,6 @@ uart_puts ( int uart, char *s )
 int
 uart_getc ( int uart )
 {
-	// struct h3_uart *up = UART_BASE;
 	struct h3_uart *up = uart_base[uart];
 
 	while ( ! (up->lsr & RX_READY) )
@@ -172,6 +178,10 @@ serial_getc ( void )
 
 
 #ifdef notdef
+
+/* OLD */
+#define UART_BASE	((struct h3_uart *) UART0_BASE)
+
 int
 serial_rx_status ( void )
 {
