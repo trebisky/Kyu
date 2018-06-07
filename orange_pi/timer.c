@@ -241,6 +241,24 @@ wd_restart ( void )
 	hp->wd_ctrl = WD_KEY | WD_RESTART;
 }
 
+/* Called from test shell
+ * Test will last 2 seconds
+ * Test fails if we get reset.
+ */
+void
+wd_test ( void )
+{
+	int i;
+
+	wd_start ();
+	for ( i=0; i< 500; i++ ) {
+	    thr_delay ( 10 );
+	    wd_restart ();
+	}
+	wd_stop ();
+	printf ( "Done\n" );
+}
+
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 /* The following have been crudely calibrated (on the BBB)
