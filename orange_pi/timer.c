@@ -29,6 +29,19 @@ struct h3_timer {
 	volatile unsigned int t1_ctrl;		/* 20 */
 	volatile unsigned int t1_ival;		/* 24 */
 	volatile unsigned int t1_cval;		/* 28 */
+	int __pad3[21];
+	volatile unsigned int avs_cnt_ctl;	/* 80 */
+	volatile unsigned int avs_cnt0;		/* 84 */
+	volatile unsigned int avs_cnt1;		/* 88 */
+	volatile unsigned int avs_cnt_div;	/* 8c */
+	int __pad4[4];
+	volatile unsigned int wd_irq_ena;	/* a0 */
+	volatile unsigned int wd_irq_stat;	/* a4 */
+	int __pad5[2];
+	volatile unsigned int wd_ctrl;		/* b0 */
+	volatile unsigned int wd_cfg;		/* b4 */
+	volatile unsigned int wd_mode;		/* b8 */
+
 };
 
 #define TIMER_BASE	( (struct h3_timer *) 0x01c20c00)
@@ -102,7 +115,7 @@ timer_start ( int hz )
  * Set a different timer rate
  */
 void
-op_timer_rate_set ( int hz )
+opi_timer_rate_set ( int hz )
 {
 	struct h3_timer *hp = TIMER_BASE;
 
@@ -147,6 +160,85 @@ timer_ack ( void )
 	struct h3_timer *hp = TIMER_BASE;
 
 	hp->irq_status = IE_T0;
+}
+
+/* H3 watchdog.
+ * Note that there is another watchdog, not part of the timer module,
+ * called the "trusted watchdog" that we have had no urge to play with.
+ */
+
+#define WD_RESET	1	/* Reset whole system */
+#define WD_IRQ		2	/* Generate interrupt */
+
+#define WD_HALF		0x00	/* 0.5 second */
+#define WD_1		0x10	/* 1 second */
+#define WD_2		0x20	/* 2 second */
+#define WD_3		0x30	/* 3 second */
+#define WD_4		0x40	/* 4 second */
+#define WD_5		0x50	/* 5 second */
+#define WD_6		0x60	/* 6 second */
+#define WD_8		0x70	/* 8 second */
+#define WD_10		0x80	/* 10 second */
+#define WD_12		0x90	/* 12 second */
+#define WD_14		0xA0	/* 14 second */
+#define WD_16		0xB0	/* 16 second */
+
+#define WD_RUN		1
+
+#define WD_KEY		(0xA57 << 1)
+#define WD_RESTART	1
+
+/* initialize the Watchdog.
+ * We set up the shortest possible interval since we
+ * simply want to use the watchdog to generate a system reset.
+ * This was suggested by  Arjan van Vught  and works great.
+ * Implemented 6-7-2018
+ */
+void
+wd_init ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	// printf ( "Watchdog: %08x\n", &hp->wd_mode );
+
+	hp->wd_irq_ena = 0;
+	hp->wd_cfg = WD_RESET;
+	hp->wd_mode = WD_HALF;
+}
+
+void
+wd_stop ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->wd_mode &= ~WD_RUN;
+}
+
+void
+wd_start ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->wd_mode |= WD_RUN;
+}
+
+void
+system_reset ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->wd_mode |= WD_RUN;
+}
+
+/* If we were using this as a true watchdog, this would be what we
+ * would need to call regularly to keep it off our back.
+ */
+void
+wd_restart ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->wd_ctrl = WD_KEY | WD_RESTART;
 }
 
 /* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -199,7 +291,7 @@ timer_handler ( int junk )
 
 /* Called during Kyu startup */
 void
-op_timer_init ( int rate )
+opi_timer_init ( int rate )
 {
 	irq_hookup ( IRQ_TIMER0, timer_handler, 0 );
 

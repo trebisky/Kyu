@@ -40,6 +40,7 @@ board_init ( void )
 	/* Turn on the green LED */
 	gpio_led_init ();
 	pwr_on ();
+	wd_init ();
 
 	spinlocks_init ();
 	gic_init ();
@@ -55,13 +56,13 @@ board_init ( void )
 void
 board_timer_init ( int rate )
 {
-	op_timer_init ( rate );
+	opi_timer_init ( rate );
 }
 
 void
 board_timer_rate_set ( int rate )
 {
-	op_timer_rate_set ( rate );
+	opi_timer_rate_set ( rate );
 }
 
 /* This gets called after the network is alive and well
@@ -76,8 +77,7 @@ board_after_net ( void )
 void
 reset_cpu ( void )
 {
-	/* not working yet */
-	main_reset ();
+	system_reset ();
 }
 
 /* ---------------------------------- */

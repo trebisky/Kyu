@@ -59,6 +59,8 @@ void read_ports ( int, int );
 
 #endif
 
+static void check_clock ( void );
+
 void pkt_arm ( void );
 void pkt_arrive ( void );
 
@@ -143,6 +145,7 @@ static void test_unroll ( int );
 static void test_fault ( int );
 static void test_zdiv ( int );
 static void test_gpio ( int );
+static void test_clock ( int );
 
 #ifdef BOARD_BBB
 static void test_adc ( int );
@@ -167,7 +170,8 @@ struct test io_test_list[] = {
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
-	test_gpio,	"GPIO test",	0,
+	test_gpio,	"GPIO test",		0,
+	test_clock,	"CPU clock test",	0,
 
 #ifdef BOARD_BBB
 	test_adc,	"BBB adc test",		0,
@@ -2472,6 +2476,10 @@ test_blink ( int arg )
 }
 
 /* -------------------------------------------- */
+
+static void test_clock ( int count ) {
+	check_clock ();
+}
 
 /* Test gpio on BBB or Orange Pi */
 static void test_gpio ( int count ) { gpio_test (); }

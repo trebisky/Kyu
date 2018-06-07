@@ -319,12 +319,31 @@ gpio_blink_green ( void )
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 
-/* Test 3 - from bbb/gpio.c
+#define TEST3_DELAY	100
+
+/* Test 2 - 
  *
- * Cute light blinking
+ * Simple light blinking - external LED
  *  use gpio routines and timer interrupts
  */
-#define TEST3_DELAY	100
+void
+gpio_test2 ( void )
+{
+	gpio_out_init ( GPIO_A_6 );
+
+        for ( ;; ) {
+            gpio_clear_bit ( GPIO_A_6 );
+            thr_delay ( TEST3_DELAY );
+            gpio_set_bit ( GPIO_A_6 );
+            thr_delay ( TEST3_DELAY );
+        }
+}
+
+/* Test 3 - from bbb/gpio.c
+ *
+ * Simple light blinking
+ *  use gpio routines and timer interrupts
+ */
 void
 gpio_test3 ( void )
 {
@@ -340,7 +359,8 @@ gpio_test3 ( void )
 void
 gpio_test ( void )
 {
-	gpio_test3 ();
+	// gpio_test3 ();
+	gpio_test2 ();
 }
 
 /* -------------------------------------------------- */

@@ -260,36 +260,42 @@
 #define STATUS_LED	GPIO_A_15
 #define STATUS_LED_NEO	GPIO_A_10
 
-/* Aliases for GPIO pins on the 40 pin header.
+/* Aliases for GPIO pins on the Orange Pi 40 pin header.
  * (28 of them)
  */
-#define GPIO_PIN_13	GPIO_A_0
-#define GPIO_PIN_11	GPIO_A_1
-#define GPIO_PIN_22	GPIO_A_2
-#define GPIO_PIN_15	GPIO_A_3
-#define GPIO_PIN_7	GPIO_A_6
-#define GPIO_PIN_29	GPIO_A_7
-#define GPIO_PIN_31	GPIO_A_8
-#define GPIO_PIN_33	GPIO_A_9
-#define GPIO_PIN_35	GPIO_A_10
-#define GPIO_PIN_5	GPIO_A_11
-#define GPIO_PIN_3	GPIO_A_12
-#define GPIO_PIN_8	GPIO_A_13
-#define GPIO_PIN_10	GPIO_A_14
-#define GPIO_PIN_28	GPIO_A_18
-#define GPIO_PIN_27	GPIO_A_19
-#define GPIO_PIN_37	GPIO_A_20
-#define GPIO_PIN_26	GPIO_A_21
-#define GPIO_PIN_19	GPIO_C_0
-#define GPIO_PIN_21	GPIO_C_1
-#define GPIO_PIN_23	GPIO_C_2
-#define GPIO_PIN_24	GPIO_C_3
-#define GPIO_PIN_16	GPIO_C_4
-#define GPIO_PIN_18	GPIO_C_7
-#define GPIO_PIN_12	GPIO_D_14
-#define GPIO_PIN_38	GPIO_G_6
-#define GPIO_PIN_40	GPIO_G_7
-#define GPIO_PIN_32	GPIO_G_8
-#define GPIO_PIN_36	GPIO_G_9
+#define OPI_PIN_13	GPIO_A_0
+#define OPI_PIN_11	GPIO_A_1
+#define OPI_PIN_22	GPIO_A_2
+#define OPI_PIN_15	GPIO_A_3
+#define OPI_PIN_7	GPIO_A_6
+#define OPI_PIN_29	GPIO_A_7
+#define OPI_PIN_31	GPIO_A_8
+#define OPI_PIN_33	GPIO_A_9
+#define OPI_PIN_35	GPIO_A_10
+#define OPI_PIN_5	GPIO_A_11
+#define OPI_PIN_3	GPIO_A_12
+#define OPI_PIN_8	GPIO_A_13
+#define OPI_PIN_10	GPIO_A_14
+#define OPI_PIN_28	GPIO_A_18
+#define OPI_PIN_27	GPIO_A_19
+#define OPI_PIN_37	GPIO_A_20
+#define OPI_PIN_26	GPIO_A_21
+#define OPI_PIN_19	GPIO_C_0
+#define OPI_PIN_21	GPIO_C_1
+#define OPI_PIN_23	GPIO_C_2
+#define OPI_PIN_24	GPIO_C_3
+#define OPI_PIN_16	GPIO_C_4
+#define OPI_PIN_18	GPIO_C_7
+#define OPI_PIN_12	GPIO_D_14
+#define OPI_PIN_38	GPIO_G_6
+#define OPI_PIN_40	GPIO_G_7
+#define OPI_PIN_32	GPIO_G_8
+#define OPI_PIN_36	GPIO_G_9
+
+/* Aliases for GPIO pins on the Nano Pi NEO
+ * The schematic shows CON1 as the dual rows of 24 pins
+ *  and CON2 as the single row of 12 pins.
+ * In each case, pin 1 is away from the ethernet jack.
+ */
 
 /* THE END */

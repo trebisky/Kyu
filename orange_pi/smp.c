@@ -72,6 +72,12 @@ typedef void (*vfptr) ( void );
 
 extern unsigned long core_stacks;
 
+#ifdef does_not_work
+
+/* See system_reset in timer.c which uses the watchdog to
+ * reset the processor.
+ */
+
 /* main_reset()
  *
  * This has nothing to do with multiple cores, but we are searching for a way
@@ -106,6 +112,7 @@ main_reset ( void )
 
 	// test_core ();
 }
+#endif
 
 /* screwball entry point to allow core testing
  * early in Kyu initialization.
