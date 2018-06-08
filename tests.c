@@ -145,7 +145,6 @@ static void test_unroll ( int );
 static void test_fault ( int );
 static void test_zdiv ( int );
 static void test_gpio ( int );
-static void test_wdog ( int );
 static void test_clock ( int );
 
 #ifdef BOARD_BBB
@@ -154,12 +153,13 @@ static void test_fault2 ( int );
 #endif
 
 #ifdef BOARD_ORANGE_PI
+static void test_wdog ( int );
 static void test_cores ( int );
+static void test_uart ( int );
 #endif
 
 static void test_clear ( int );
 static void test_blink ( int );
-static void test_uart ( int );
 
 /* Here is the IO test menu */
 
@@ -172,7 +172,6 @@ struct test io_test_list[] = {
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
 	test_gpio,	"GPIO test",		0,
-	test_wdog,	"Watchdog test",	0,
 	test_clock,	"CPU clock test",	0,
 
 #ifdef BOARD_BBB
@@ -181,13 +180,14 @@ struct test io_test_list[] = {
 #endif
 
 #ifdef BOARD_ORANGE_PI
+	test_wdog,	"Watchdog test",	0,
 	test_cores,	"Opi cores test",	0,
+	test_uart,	"uart test",		0,
 #endif
 
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
 	test_clear,	"clear memory test",	0,
-	test_uart,	"uart test",		0,
 
 #ifdef ARCH_X86
 	test_cv,	"cv lockup test",	0,
@@ -2421,6 +2421,7 @@ led_norm ( void )
 
 #endif
 
+#ifdef BOARD_ORANGE_PI
 #define X_UART	3
 
 static void
@@ -2436,6 +2437,7 @@ test_uart ( int arg )
 	    thr_delay ( 100 );
 	}
 }
+#endif
 
 static void
 test_clear ( int arg )
@@ -2486,8 +2488,10 @@ static void test_clock ( int count ) {
 /* Test gpio on BBB or Orange Pi */
 static void test_gpio ( int count ) { gpio_test (); }
 
-/* Test gpio on BBB or Orange Pi */
+#ifdef BOARD_ORANGE_PI
+/* Test watchdog on Orange Pi */
 static void test_wdog ( int count ) { wd_test (); }
+#endif
 
 #ifdef BOARD_BBB
 
@@ -3395,11 +3399,15 @@ check_clock ( void )
 {
 	int vals[NVALS];
 	int i;
+	int secs;
+	int delay = 100;
 
-	printf ( "Collecting data for %d seconds\n", NVALS );
+	secs = NVALS * delay / 1000;
+
+	printf ( "Collecting data for %d seconds\n", secs );
 	for ( i=0; i< NVALS; i++ ) {
 	    reset_ccnt ();
-	    thr_delay ( 1000 );
+	    thr_delay ( delay );
 	    vals[i] = get_ccnt ();
 	}
 
@@ -3414,7 +3422,7 @@ static void
 test_udp_echo ( int test )
 {
 
-	check_clock ();
+	// check_clock ();
 	pkt_arm ();
 
 	last_endless = 0;
