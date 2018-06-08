@@ -3388,18 +3388,23 @@ endless_watch ( int xxx )
 #endif
 }
 
+#define NVALS 20
+
 static void
 check_clock ( void )
 {
-	int val;
+	int vals[NVALS];
 	int i;
 
-	for ( i=0; i< 10; i++ ) {
+	printf ( "Collecting data for %d seconds\n", NVALS );
+	for ( i=0; i< NVALS; i++ ) {
 	    reset_ccnt ();
 	    thr_delay ( 1000 );
-	    val = get_ccnt ();
-	    printf ( "CCNT for 1 sec: %d\n", val );
+	    vals[i] = get_ccnt ();
 	}
+
+	for ( i=0; i< NVALS; i++ )
+	    printf ( "CCNT for 1 sec: %d\n", vals[i] );
 }
 
 /* Endless echo of UDP packets

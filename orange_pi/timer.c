@@ -8,6 +8,10 @@
  */
 
 /* This is a driver for the H3 Allwinner timer module.
+ * It includes two timers and the watchdog.
+ * It also has the AVS (audio/video sync) timer,
+ *  which might be useful for something, but
+ *  I'm not sure what.
  *
  * Tom Trebisky  1-6-2017
  */
