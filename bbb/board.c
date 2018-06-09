@@ -18,6 +18,54 @@
 
 #include "netbuf.h"
 
+static unsigned int cpu_clock;
+static int cpu_clock_mhz;
+static int delay_factor = 5000;
+
+void
+delay_ns ( int ns_delay )
+{
+        volatile unsigned int count;
+
+        count = ns_delay * 1000 / delay_factor;
+        while ( count -- )
+            ;
+}
+
+#define CALIB_MICROSECONDS      10
+
+/* This uses the CCNT register to adjust the delay_factor to get more
+ * precise timings.  But it doesn't work all that well.
+ * We end up trimming the 5000 value to 5200 or so.
+ * In other words, we divide the ns delay by 5.
+ */
+static void
+delay_calib ( void )
+{
+        int ticks;
+        int want = CALIB_MICROSECONDS * cpu_clock_mhz;
+
+        reset_ccnt ();
+        delay_ns ( 1000 * CALIB_MICROSECONDS );
+        ticks = get_ccnt ();
+        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
+
+        delay_factor *= ticks;
+        delay_factor /= want;
+
+        reset_ccnt ();
+        delay_ns ( 1000 * CALIB_MICROSECONDS );
+        ticks = get_ccnt ();
+        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
+
+        /* This reports a value of about 53 ticks */
+        want = 0;
+        reset_ccnt ();
+        delay_ns ( 0 );
+        ticks = get_ccnt ();
+        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
+}
+
 /* Called very early in initialization */
 void
 board_hardware_init ( void )
@@ -30,6 +78,11 @@ void
 board_init ( void )
 {
 	wdt_disable ();
+
+	// cpu_clock = get_cpu_clock ();
+	cpu_clock = 1000 * 1000 * 1000;
+        cpu_clock_mhz = cpu_clock / 1000 / 1000;
+        printf ( "CPU clock %d Mhz (?? XXX)\n", cpu_clock_mhz );
 
 	clocks_init ();
 	modules_init ();

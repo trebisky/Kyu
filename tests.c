@@ -3267,14 +3267,18 @@ static int pk_limit = 0;
 
 void pkt_arrive ()
 {
-	pk.arrive = 0;
+	// We cannot all be using the ccnt and resetting it !!
+	// This yielded some hard to debug issues with other parts
+	// of the system using this for timing.  A basic lesson here.
+	// reset_ccnt ();
+	// pk.arrive = 0;
+	pk.arrive = get_ccnt ();
 	pk.dispatch = -1;
 	pk.seen = -1;
 	pk.reply = -1;
 	pk.send = -1;
 	pk.finish = -1;
 
-	reset_ccnt ();
 }
 
 void pkt_dispatch ()
@@ -3392,6 +3396,44 @@ endless_watch ( int xxx )
 #endif
 }
 
+#ifdef notdef
+#define NVALS 100
+
+static void
+check_clock_DETAIL ( void )
+{
+	unsigned int vals[NVALS];
+	int secs;
+	int delay = 100;
+	unsigned int last;
+	int count;
+	int i;
+
+	secs = NVALS * delay / 1000;
+
+	printf ( "Collecting data for %d seconds\n", secs );
+	last = get_ccnt ();
+
+	for ( i=0; i< NVALS; i++ ) {
+	    // reset_ccnt ();
+	    thr_delay ( delay );
+	    vals[i] = get_ccnt ();
+	}
+
+	for ( i=0; i< NVALS; i++ ) {
+	    count = vals[i] - last;
+	    last = vals[i];
+	    printf ( "CCNT for 1 interval: %d %d\n", vals[i], count );
+	}
+}
+#endif
+
+/* 6-8-2018 -- this is actually quite bogus.
+ * It would be fine if we were the only thing in the system
+ * using the CCNT register for timing, but we aren't and only
+ * one "thing" can use this at a time.
+ */
+
 #define NVALS 20
 
 static void
@@ -3400,7 +3442,7 @@ check_clock ( void )
 	int vals[NVALS];
 	int i;
 	int secs;
-	int delay = 100;
+	int delay = 1000;
 
 	secs = NVALS * delay / 1000;
 

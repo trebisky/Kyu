@@ -34,8 +34,7 @@
  * it before using it to time something.
  *
  * This was helpful:
- * http://stackoverflow.com/questions/3247373/
- *   how-to-measure-program-execution-time-in-arm-cortex-a8-processor
+ * http://stackoverflow.com/questions/3247373/how-to-measure-program-execution-time-in-arm-cortex-a8-processor
  */
 #define PMCR_ENABLE	0x01	/* enable all counters */
 #define PMCR_RESET	0x02	/* reset all counters */
@@ -50,6 +49,31 @@
 #define CENA_CTR2	0x00000004
 #define CENA_CTR1	0x00000002
 #define CENA_CTR0	0x00000001
+
+static inline unsigned int get_cc (void)
+{
+    unsigned int value;
+
+    // Read CCNT Register
+    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r"(value));
+    return value;
+}
+
+#ifdef notdef
+/* The cycle count register is a 32 bit register
+ * This is for a Cortex A8 arm chip.
+ */
+        .globl get_ccnt
+get_ccnt:
+        mrc     p15, 0, r0, c9, c13, 0
+        bx      lr
+
+        .globl set_ccnt
+set_ccnt:
+        mcr     p15, 0, r0, c9, c13, 0
+        bx      lr
+#endif
+
 
 void
 enable_ccnt ( int div64 )
@@ -72,15 +96,19 @@ enable_ccnt ( int div64 )
 void
 reset_ccnt ( void )
 {
-	/*
-	set_cdis ( CENA_CCNT );
+	// set_cdis ( CENA_CCNT );
 	set_pmcr ( get_pmcr() | PMCR_CC_RESET );
-	set_cena ( CENA_CCNT );
-	*/
-	set_pmcr ( get_pmcr() | PMCR_CC_RESET );
+	// set_cena ( CENA_CCNT );
 }
 
-/* delays with nanosecond resolution.
+#ifdef notdef
+/* XXX - danger !!
+ * This works great, but is NOT thread safe
+ * by any means !!!!!
+ * Also note that it assumes the processor clock
+ * is running at 1 Ghz.
+ *
+ * delays with nanosecond resolution.
  * callers may also want to disable interrupts.
  * Also, beware of the compiler optimizing this away.
  * There is about 60 ns extra delay (call overhead).
@@ -94,6 +122,7 @@ delay_ns ( int delay )
 	while ( get_ccnt() < delay )
 	    ;
 }
+#endif
 
 /* All v7 arm chips (so both the Cortex A7 and A8)
  * have a bit to allow unaligned accesses
