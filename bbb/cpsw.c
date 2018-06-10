@@ -390,7 +390,7 @@ mdio_init ( void )
 	struct mdio_regs *mp = (struct mdio_regs *) MDIO_BASE;
 
 	mp->control = CTL_ENABLE | MDIO_DIV;
-	udelay(1000);
+	delay_us (1000);
 }
 
 /* Neither of these spin wait routines does anything clever
@@ -407,7 +407,8 @@ mdio_access_wait ( void )
 	    rv = mp->access0;
 	    if ( ! (rv & ACCESS_GO) )
 		break;
-	    udelay ( 10 );
+	    // udelay ( 10 );
+	    delay_us (10);
 	}
 	return rv;	/* XXX */
 }
@@ -421,7 +422,8 @@ mdio_idle_wait ( void )
 	while ( tmo-- ) {
 	    if ( mp->control & CTL_IDLE )
 		return;
-	    udelay ( 10 );
+	    // udelay ( 10 );
+	    delay_us (10);
 	}
 }
 

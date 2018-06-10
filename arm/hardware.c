@@ -108,6 +108,12 @@ reset_ccnt ( void )
  * Also note that it assumes the processor clock
  * is running at 1 Ghz.
  *
+ * I now have delay functions in board/board.c
+ *  that are specific to each target board
+ *  (since there are board specific ways to fing
+ *   out the CPU clock rate, which may vary and
+ *   be set by PLL unique to each board.
+ *
  * delays with nanosecond resolution.
  * callers may also want to disable interrupts.
  * Also, beware of the compiler optimizing this away.

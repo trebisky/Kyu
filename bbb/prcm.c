@@ -188,7 +188,7 @@ struct cm_wakeup {
 void
 module_enable ( char *msg, volatile unsigned int *mp, int verbose )
 {
-	int timeout = 1000000;
+	int timeout = 1000000;	/* 1 second */
 
 	if ( verbose ) {
 	    printf ( "Enabling %s\n", msg );
@@ -203,7 +203,8 @@ module_enable ( char *msg, volatile unsigned int *mp, int verbose )
 	while ( timeout-- ) {
 	    if ( (*mp & MODULE_IDLE_STATUS) == MODULE_IDLE_RUN )
 		break;
-	    delay_ns ( 1000 );	/* XXX */
+	    // delay_ns ( 1000 );	/* XXX */
+	    delay_us ( 1 );	/* XXX */
 	}
 
 	if ( verbose )
@@ -241,6 +242,7 @@ module_run ( volatile unsigned int *mp )
 	    if ( (*mp & MODULE_STBY_STATUS) == 0 )
 		break;
 	    delay_ns ( 1000 );	/* XXX */
+	    delay_us ( 1 );	/* XXX */
 	}
 
 	printf ( "STandby clk = %08x\n", *mp );

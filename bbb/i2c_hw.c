@@ -654,7 +654,8 @@ i2c_try1 ( void )
 	for ( ;; ) {
 	    if ( i2c_start () )
 		break;
-	    delay_ns ( 200 * 1000 );
+	    // delay_ns ( 200 * 1000 );
+	    delay_us ( 200 );
 	    count++;
 	}
 	printf ( "Stopped after %d\n", count );
@@ -678,7 +679,7 @@ i2c_try2 ( void )
 	for ( ;; ) {
 	    if ( i2c_send ( buf, BUFS ) )
 		break;
-	    // delay_ns ( 200 * 1000 );
+	    // delay_us ( 200 );
 	    printf ( "IRQ status R: %08x\n", base->irqstatus_raw );
 	    if ( i2c_irq_waitclr ( IRQ_BB ) )
 		break;

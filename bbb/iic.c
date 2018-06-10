@@ -60,7 +60,7 @@ int iic_recv ( int, unsigned char *, int );
 #define ICACHE_FLASH_ATTR
 typedef unsigned char uint8;
 
-#define os_delay_us(x)	delay_ns ( 1000 * (x) )
+#define os_delay_us(x)	delay_us ( (x) )
 #endif
 
 /* -------------------------------------------------- */

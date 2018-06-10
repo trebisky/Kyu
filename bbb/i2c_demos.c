@@ -20,7 +20,7 @@
 #include "gpio.h"
 #define os_printf	printf
 #define ICACHE_FLASH_ATTR
-#define os_delay_us(x)	delay_ns ( 1000 * (x) )
+#define os_delay_us(x)	delay_us ( (x) )
 #endif
 
 #define  BMP_ADDR 0x77
@@ -891,7 +891,7 @@ dac_fast ( struct i2c *ip )
 	    dac_val += 16;
 	    if ( dac_val > 4096 ) dac_val = 0;
 	    dac_write ( ip, dac_val);
-	    // delay_ns ( 1000 );
+	    // os_delay_us ( 1 );
 	}
 }
 

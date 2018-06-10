@@ -18,8 +18,77 @@
 
 #include "netbuf.h"
 
+#ifdef NOTSAFE
+// works OK, but assumes 1Ghz cpu clock
+// and is not thread safe.
+void
+delay_ns ( int delay )
+{
+        reset_ccnt ();
+        while ( get_ccnt() < delay )
+            ;
+}
+#endif
+
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
+
+// This is for the standard 1000 Mhz CPU clock
+// This value can be adjusted at run time if
+//  we change the CPU clock frequency.
+// 249 gives 1001.4 ns
+// 248 gives 997.4 ns
+static int us_delay_count = 249;
+
+/* These are good for ballpark timings,
+ * and are calibrated by trial and error
+ */
+void
+delay_us ( int delay )
+{
+        volatile unsigned int count;
+
+        count = delay * us_delay_count;
+        while ( count -- )
+            ;
+}
+
+// 1003 gives 0.999 ms
+void
+delay_ms ( int delay )
+{
+	unsigned int n;
+
+	for ( n=delay; n; n-- )
+	    delay_us ( 1003 );
+}
+
+static void
+delay_calib ( void )
+{
+        int ticks;
+	int i;
+
+	for ( i=0; i< 10; i++ ) {
+	    reset_ccnt ();
+	    delay_us ( 10 );
+	    ticks = get_ccnt ();
+	    printf ( "US Delay ticks = %d\n", ticks/10 );
+	}
+
+	for ( i=0; i< 10; i++ ) {
+	    reset_ccnt ();
+	    delay_ms ( 10 );
+	    ticks = get_ccnt ();
+	    printf ( "MS Delay ticks = %d\n", ticks/10 );
+	}
+}
+
+#ifdef notdef
+/* This code is from an ill-fated and perhaps overly
+ * complicated effort to dynamically calibrate the
+ * delay at run time.
+ */
 static int delay_factor = 5000;
 
 void
@@ -40,10 +109,13 @@ delay_ns ( int ns_delay )
  * In other words, we divide the ns delay by 5.
  */
 static void
-delay_calib ( void )
+delay_calib_dynamic ( void )
 {
         int ticks;
         int want = CALIB_MICROSECONDS * cpu_clock_mhz;
+	volatile unsigned long long pork;
+
+	printf ("Pork size: %d\n", sizeof(pork) );
 
         reset_ccnt ();
         delay_ns ( 1000 * CALIB_MICROSECONDS );
@@ -65,6 +137,7 @@ delay_calib ( void )
         ticks = get_ccnt ();
         printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 }
+#endif
 
 /* Called very early in initialization */
 void
@@ -82,7 +155,7 @@ board_init ( void )
 	// cpu_clock = get_cpu_clock ();
 	cpu_clock = 1000 * 1000 * 1000;
         cpu_clock_mhz = cpu_clock / 1000 / 1000;
-        printf ( "CPU clock %d Mhz (?? XXX)\n", cpu_clock_mhz );
+        printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
 
 	clocks_init ();
 	modules_init ();
@@ -94,6 +167,8 @@ board_init ( void )
 	serial_init ( CONSOLE_BAUD );
 
 	timer_init ( DEFAULT_TIMER_RATE );
+
+	delay_calib ();
 
 	/* CPU interrupts on */
 	enable_irq ();

@@ -293,7 +293,8 @@ gpio_test1 ( void )
 	    p->clear_data = led_bits[i];
 	    i = (i+1) % 4;
 	    p->set_data = led_bits[i];
-	    delay10 ();
+	    // delay10 ();
+	    delay_ms ( 100 );
 	}
 }
 
@@ -378,7 +379,7 @@ gpio_test4 ( void )
  * and connect to ground on P9 pin 1
  */
 
-#define HALF_SEC	500000000
+#define HALF_SEC	500
 
 #define TEST5_BIT	GPIO_2_2
 
@@ -390,9 +391,9 @@ gpio_test5 ( void )
 	// printf ( "Ticking\n" );
 
 	for ( ;; ) {
-	    delay_ns ( HALF_SEC );
+	    delay_ms ( HALF_SEC );
 	    gpio_clear_bit ( TEST5_BIT );
-	    delay_ns ( HALF_SEC );
+	    delay_ms ( HALF_SEC );
 	    gpio_set_bit ( TEST5_BIT );
 	    // printf ( "Tick\n" );
 	}
@@ -411,7 +412,7 @@ gpio_test6 ( void )
 	printf ( "bit: %d\n", TEST6_BIT );
 
 	for ( ;; ) {
-	    delay_ns ( HALF_SEC );
+	    delay_ms ( HALF_SEC );
 	    val = gpio_read_bit ( TEST6_BIT );
 	    printf ( "Read: %08x\n", val );
 	}
@@ -427,7 +428,7 @@ Low : 463
 */
 #define TEST7_BIT	GPIO_2_2
 
-#define MILLI_SEC	1000000
+#define MILLI_SEC	1000
 void
 gpio_test7 ( void )
 {
@@ -441,7 +442,7 @@ gpio_test7 ( void )
 
 	for ( ;; ) {
 	    count++;
-	    delay_ns ( MILLI_SEC );
+	    delay_us ( MILLI_SEC );
 	    nval = gpio_read_bit ( TEST7_BIT );
 	    if ( val != nval ) {
 		if ( val )
@@ -519,7 +520,8 @@ gpio_test_ccnt ( void )
 	*/
 
 	for ( i=0; i < 5; i++ ) {
-	    delay_ns ( 2000000 - 50 );
+	    // delay_ns ( 2000000 - 50 );
+	    delay_us ( 2000 );
 	    val = get_ccnt ();
 	    printf ( "CCNT = %d %08x\n", val, val );
 	}

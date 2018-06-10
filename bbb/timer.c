@@ -191,6 +191,7 @@ timer_xxx ( void )
 /* --------------------------------------------------- */
 /* --------------------------------------------------- */
 
+#ifdef notdef
 /* The following have been crudely calibrated
  * by guessing and using a stopwatch.
  */
@@ -226,6 +227,7 @@ _udelay ( int n )
     while ( x-- > 0 )
 	;
 }
+#endif
 
 /* --------------------------------------------------- */
 /* --------------------------------------------------- */
@@ -413,13 +415,13 @@ dmtimer_checkrate ( void )
 
 	post_spin ( POST_COUNT );
 	printf ( "COUNT = %d\n", tmr->count );
-	delay_ns ( 1000 );
+	delay_us ( 1 );
 	post_spin ( POST_COUNT );
 	printf ( "COUNT = %d\n", tmr->count );
-	delay_ns ( 1000 );
+	delay_us ( 1 );
 	post_spin ( POST_COUNT );
 	printf ( "COUNT = %d\n", tmr->count );
-	delay_ns ( 1000 );
+	delay_us ( 1 );
 	post_spin ( POST_COUNT );
 	printf ( "COUNT = %d\n", tmr->count );
 #endif
@@ -431,7 +433,7 @@ dmtimer_checkrate ( void )
 	tmr->ctrl = CTRL_START;
 
 	v1 = tmr->count;
-	    delay_ns ( 1000 * 1000 * 1000 );
+	    delay_us ( 1000 * 1000 );
 	v2 = tmr->count;
 
 	// stop the timer
@@ -440,7 +442,7 @@ dmtimer_checkrate ( void )
 
 	// printf ( "CCNT = %d\n", get_ccnt() );
 	// printf ( "Checkrate: %d %d -- %d\n", v1, v2, v2-v1 );
-	printf ( "32K timer running at %d Hz\n", v2-v1 );
+	printf ( "32K timer running at ~%d Hz\n", v2-v1 );
 
 	return v2-v1;
 }
@@ -492,8 +494,7 @@ dmtimer_test ( void )
 	    printf ( "Timer: %08x %08x\n", val, st );
 	    if ( st )
 		tmr->irq_stat = TIMER_OVF;
-	    delay10 ();
-	    delay10 ();
+	    delay_ms ( 200);
 	}
 }
 #endif

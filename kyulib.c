@@ -35,6 +35,7 @@ int sprintf(char *buf, const char *fmt, ...) {}
 int vsnprintf(char *buf, int size, const char *fmt, va_list args) {}
 #endif
 
+#ifdef notdef
 /* Argument in microseconds.
  * silly to try to make this "fast"
  * XXX - this could be more clever.
@@ -50,6 +51,7 @@ udelay ( int count )
 	else
 	    _udelay ( count );
 }
+#endif
 
 int
 hextoi ( char *s )
