@@ -516,8 +516,9 @@ mmu_setup ( unsigned long *mmu, unsigned long ram_start, unsigned long ram_size 
 	}
 
 	/* And for the Orange Pi, make accesses to address 0 cause faults
+	 * (This kills the multicore code, so commented out 6-12-2018)
 	 */
-	mmu[0] = MMU_INVALID;
+	// mmu[0] = MMU_INVALID;
 }
 
 #define SCTRL_MMU_ENABLE		0x1
