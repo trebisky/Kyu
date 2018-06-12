@@ -15,8 +15,7 @@ OBJS =  locore.o \
 	armv7_cache.o \
 	cache.o \
 	cache_v7.o \
-	paging.o \
-	mmu.o \
+	xinu_mmu.o \
 	show_regs.o \
 	eabi_stubs.o
 
