@@ -24,6 +24,99 @@ static void mmu_initialize ( unsigned long, unsigned long );
 
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
+
+// This is for the standard 1008 Mhz CPU clock
+// This value can be adjusted at run time if
+//  we change the CPU clock frequency.
+// 200 gives 1006 (we want 1008)
+// 201 gives 1011 (we want 1008)
+
+// The Nano Pi NEO comes out of U-Boot running at 408 Mhz
+// This is good given that it runs hot even at 408,
+// and would certainly need a heat sink to run faster.
+// With the delay adjustment done in delay_calib(),
+// I get the following timings:
+//  US Delay ticks = 411
+//  MS Delay ticks = 406261
+// These are within 1 percent, so I leave them be.
+
+// Note also that these are with the D cache enabled.
+// The delays will be MUCH longer if the D cache
+//  is not enabled.
+
+#define CPU_CLOCK_STD	1008
+#define DELAY_COUNT_STD	201
+static int us_delay_count = DELAY_COUNT_STD;
+
+/* These are good for ballpark timings,
+ * and are calibrated by trial and error
+ */
+void
+delay_us ( int delay )
+{
+        volatile unsigned int count;
+
+        count = delay * us_delay_count;
+        while ( count -- )
+            ;
+}
+
+// 1003 gives 1.000 ms
+void
+delay_ms ( int delay )
+{
+	unsigned int n;
+
+	for ( n=delay; n; n-- )
+	    delay_us ( 1003 );
+}
+
+static void
+delay_calib ( void )
+{
+        int ticks;
+	int i;
+
+	if ( cpu_clock_mhz != CPU_CLOCK_STD ) {
+	    us_delay_count *= cpu_clock_mhz;
+	    us_delay_count /= CPU_CLOCK_STD;
+	}
+
+#ifdef notdef
+	// if ( cpu_clock_mhz == CPU_CLOCK_STD ) return;
+
+	for ( i=0; i< 10; i++ ) {
+	    reset_ccnt ();
+	    delay_us ( 10 );
+	    ticks = get_ccnt ();
+	    printf ( "US Delay ticks = %d\n", ticks/10 );
+	}
+
+	for ( i=0; i< 10; i++ ) {
+	    reset_ccnt ();
+	    delay_ms ( 10 );
+	    ticks = get_ccnt ();
+	    printf ( "MS Delay ticks = %d\n", ticks/10 );
+	}
+#endif
+}
+
+#ifdef NOTSAFE
+// works OK, but assumes 1Ghz cpu clock
+// and far worse, is not thread safe.
+void
+delay_ns ( int delay )
+{
+        reset_ccnt ();
+        while ( get_ccnt() < delay )
+            ;
+}
+#endif
+
+#ifdef notdef
+/* I abandoned this overly complex scheme of dynamically
+ * calibrating the delay loops.
+ */
 static int delay_factor = 5000;
 
 void
@@ -69,6 +162,7 @@ delay_calib ( void )
 	ticks = get_ccnt ();
 	printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 }
+#endif
 
 /* Called very early in initialization */
 void

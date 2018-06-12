@@ -18,18 +18,6 @@
 
 #include "netbuf.h"
 
-#ifdef NOTSAFE
-// works OK, but assumes 1Ghz cpu clock
-// and is not thread safe.
-void
-delay_ns ( int delay )
-{
-        reset_ccnt ();
-        while ( get_ccnt() < delay )
-            ;
-}
-#endif
-
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
 
@@ -84,58 +72,15 @@ delay_calib ( void )
 	}
 }
 
-#ifdef notdef
-/* This code is from an ill-fated and perhaps overly
- * complicated effort to dynamically calibrate the
- * delay at run time.
- */
-static int delay_factor = 5000;
-
+#ifdef NOTSAFE
+// works OK, but assumes 1Ghz cpu clock
+// and is not thread safe.
 void
-delay_ns ( int ns_delay )
+delay_ns ( int delay )
 {
-        volatile unsigned int count;
-
-        count = ns_delay * 1000 / delay_factor;
-        while ( count -- )
+        reset_ccnt ();
+        while ( get_ccnt() < delay )
             ;
-}
-
-#define CALIB_MICROSECONDS      10
-
-/* This uses the CCNT register to adjust the delay_factor to get more
- * precise timings.  But it doesn't work all that well.
- * We end up trimming the 5000 value to 5200 or so.
- * In other words, we divide the ns delay by 5.
- */
-static void
-delay_calib_dynamic ( void )
-{
-        int ticks;
-        int want = CALIB_MICROSECONDS * cpu_clock_mhz;
-	volatile unsigned long long pork;
-
-	printf ("Pork size: %d\n", sizeof(pork) );
-
-        reset_ccnt ();
-        delay_ns ( 1000 * CALIB_MICROSECONDS );
-        ticks = get_ccnt ();
-        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
-
-        delay_factor *= ticks;
-        delay_factor /= want;
-
-        reset_ccnt ();
-        delay_ns ( 1000 * CALIB_MICROSECONDS );
-        ticks = get_ccnt ();
-        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
-
-        /* This reports a value of about 53 ticks */
-        want = 0;
-        reset_ccnt ();
-        delay_ns ( 0 );
-        ticks = get_ccnt ();
-        printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 }
 #endif
 
@@ -168,7 +113,7 @@ board_init ( void )
 
 	timer_init ( DEFAULT_TIMER_RATE );
 
-	delay_calib ();
+	// delay_calib ();
 
 	/* CPU interrupts on */
 	enable_irq ();
