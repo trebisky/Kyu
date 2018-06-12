@@ -5,9 +5,13 @@
 
 $ident = "";
 $vernum = "";
+$board = "";
 
 $user = `whoami`;
 chomp $user;
+
+$board = `readlink board`;
+chomp $board;
 
 # Command line arguments, -v and -i
 while ( $_ = $ARGV[0] ) {
@@ -20,6 +24,7 @@ while ( $_ = $ARGV[0] ) {
 
 $ident = "kyu_version" if ( $ident eq "" );
 $vernum = "0.0" if ( $vernum eq "" );
+$board = "VME" if ( $board eq "" );
 
 $date = `date`;
 chomp $date;
@@ -30,10 +35,8 @@ print <<EOF;
 
 EOF
 
-#char *mount_version = "version 1.12, Compiled: Sun Jan 20 16:31:52 MST 2002";
-
 print "char \*$ident";
-print " = \"version $vernum, Compiled by $user: $date\"\;\n";
+print " = \"version $vernum for $board, Compiled by $user: $date\"\;\n";
 
 print <<EOF;
 

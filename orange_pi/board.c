@@ -20,7 +20,7 @@
 
 unsigned long core_stacks;
 
-static void mmu_initialize ( unsigned long, unsigned long );
+// static void mmu_initialize ( unsigned long, unsigned long );
 
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;

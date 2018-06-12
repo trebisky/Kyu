@@ -4,7 +4,8 @@
 
 # Here is where you set the Kyu version number.
 # 0.7.1 introduces Orange Pi
-VERSION = 0.7.1
+# 0.7.5 introduces Multicore stuff from Marco/Xinu
+VERSION = 0.7.5
 
 INCS = -I. -Iarm
 

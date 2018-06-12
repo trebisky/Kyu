@@ -12,8 +12,11 @@ OBJS =  locore.o \
 	hardware.o \
 	ram.o \
 	interrupts.o \
+	armv7_cache.o \
 	cache.o \
 	cache_v7.o \
+	paging.o \
+	mmu.o \
 	show_regs.o \
 	eabi_stubs.o
 

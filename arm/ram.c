@@ -610,6 +610,7 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 	mmu_setup ( new_mmu, ram_start, ram_size );
 
 	cpu_enter();
+
 	// mmu_off();
 	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
 	// printf ( "cache flushed\n" );
@@ -618,10 +619,12 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 	invalidate_tlb ();
 
 	new_ttbr |= TTBR_BITS;
+
 	/* TTBR0 */
 	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
 
 	// mmu_on();
+
 	cpu_leave();
 
 	printf ( "New MMU at: %08x\n", new_ttbr );
