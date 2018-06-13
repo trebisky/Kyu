@@ -6,9 +6,9 @@
  */
 
 #define	PDE_PTSEC	0x00000002 	/* Page Table Entry is 1 MB Section */
-#define	PDE_B		0x00000004  /* Bufferable */
+#define	PDE_B		0x00000004      /* Bufferable */
 #define	PDE_C		0x00000008	/* Cacheable */
-#define	PDE_XN		0x00000010  /* Execute Never */
+#define	PDE_XN		0x00000010      /* Execute Never */
 #define	PDE_DOM		0x000001E0	/* Domain Bits */
 #define	PDE_S		0x00010000	/* Shareable */
 #define	PDE_NG		0x00020000	/* Not Global */
@@ -52,7 +52,7 @@ paging_init (void)
 
 	// NOTE: U-boot starts us up in secure mode, so we
 	//       have to create according secure mode descriptors
-	//       without the NS flag beeing set.
+	//       without the NS flag being set.
 
 	/* First, initialize PDEs for device memory	*/
 	/* AP[2:0] = 0b011 for full access		*/

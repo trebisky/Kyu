@@ -41,6 +41,39 @@
 /* Mask for TTBR0 */
 #define MMU_BASE_MASK 0x3fff
 
+#define	PDE_PTSEC	0x00000002 	/* Page Table Entry is 1 MB Section */
+#define	PDE_B		0x00000004      /* Bufferable */
+#define	PDE_C		0x00000008	/* Cacheable */
+#define	PDE_XN		0x00000010      /* Execute Never */
+#define	PDE_DOM		0x000001E0	/* Domain Bits */
+#define	PDE_S		0x00010000	/* Shareable */
+#define	PDE_NG		0x00020000	/* Not Global */
+#define	PDE_NS		0x00080000	/* Non-Secure */
+#define	PDE_BASEADDR	0xFFF00000
+
+/* Access Permissions */
+#define	PDE_AP		0x00008C00	/* Access Permission Bits */
+#define	PDE_AP0		0x00000000
+#define	PDE_AP1		0x00000400
+#define	PDE_AP2		0x00000800
+#define	PDE_AP3		0x00000C00	/* Full Access */
+#define	PDE_AP4		0x00008000
+#define	PDE_AP5		0x00008400
+#define	PDE_AP6		0x00008800
+#define	PDE_AP7		0x00008C00
+
+/* Memory Region Attributes */
+#define	PDE_TEX		0x00007000
+#define	PDE_TEX0	0x00000000
+#define	PDE_TEX1	0x00001000
+#define	PDE_TEX2	0x00002000
+#define	PDE_TEX3	0x00003000
+#define	PDE_TEX4	0x00004000
+#define	PDE_TEX5	0x00005000
+#define	PDE_TEX6	0x00006000
+#define	PDE_TEX7	0x00007000
+
+
 static void
 mmu_display ( unsigned long ttbr )
 {
@@ -264,6 +297,10 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 	 * (This kills the multicore code, so commented out 6-12-2018)
 	 */
 	// mmu[0] = MMU_INVALID;
+
+	asm volatile ( "isb" );
+	asm volatile ( "dsb" );
+	asm volatile ( "dmb" );
 }
 
 #define SCTRL_MMU_ENABLE		0x1
@@ -299,18 +336,19 @@ mmu_on ( void )
 /* The low 7 bits in the TTBR0 register are described on page B4-1731
  * of the ARM v7-A and v7-R Architecture Reference Manual
  */
+#define TTBR_SHAREABLE		2	/* shareable, cacheable */
 
 /* Inner Region bits */
-#define MMU_INNER_NOCACHE	0
-#define MMU_INNER_WT		1
-#define MMU_INNER_WBWA		0x40
-#define MMU_INNER_WBNOWA	0x41
+#define TTBR_INNER_NOCACHE	0
+#define TTBR_INNER_WT		1
+#define TTBR_INNER_WBWA		0x40
+#define TTBR_INNER_WBNOWA	0x41
 
 /* Outer Region bits */
-#define MMU_OUTER_NOCACHE	0
-#define MMU_OUTER_WT		0x08
-#define MMU_OUTER_WBWA		0x10
-#define MMU_OUTER_WBNOWA	0x18
+#define TTBR_OUTER_NOCACHE	0
+#define TTBR_OUTER_WT		8
+#define TTBR_OUTER_WBWA		0x10
+#define TTBR_OUTER_WBNOWA	0x18
 
 /* Although we note that the U-Boot setup for the Orange Pi did set
  * the cacheability bits for the page tables, we just say the heck
@@ -320,7 +358,7 @@ mmu_on ( void )
 #ifdef BOARD_ORANGE_PI
 /* copied from U-Boot setup */
 // #define TTBR_BITS	0x59
-// #define TTBR_BITS	(MMU_INNER_WBNOWA | MMU_OUTER_WBNOWA) 
+// #define TTBR_BITS	(TTBR_INNER_WBNOWA | TTBR_OUTER_WBNOWA) 
 #define TTBR_BITS	0x00
 #else
 /* on the BBB, U-Boot sets zero for these bits.
@@ -329,7 +367,8 @@ mmu_on ( void )
  * So it seems the Arm-A8 in the BBB has no inner region and
  * the low bit (0x01) simply indicates the mmu table is cacheable.
  */
-#define TTBR_BITS	0x00
+// #define TTBR_BITS	0x00
+#define TTBR_BITS	(TTBR_SHAREABLE|TTBR_INNER_WT|TTBR_OUTER_WT)
 #endif
 
 /* U-boot sets the TTBCR = 0  (the reset value)
@@ -349,13 +388,25 @@ mmu_set_ttbr ( void )
 {
 	unsigned int new_ttbr;
 
+	// TTBCR = 0
+	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( 0 ) );
+
 	new_ttbr = (unsigned int) page_table;
 	new_ttbr |= TTBR_BITS;
 
 	/* TTBR0 */
-	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
-}
+	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
 
+	/* TTBR1 - also, "just in case" */
+	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" (new_ttbr) );
+
+	// set DACR to manager level for all domains
+	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( 0xffffffff ) );
+
+	asm volatile ( "isb" );
+	asm volatile ( "dsb" );
+	asm volatile ( "dmb" );
+}
 
 /* Call this to set up our very own MMU tables */
 void
@@ -577,5 +628,109 @@ mmu_debug ( void )
 	mmu_poke ( 7 );
 }
 #endif
+
+/*
+XXX - Xinu follows ...
+*/
+
+static int xinu_page_table[4096];
+
+void
+paging_init (void)
+{
+
+	int	i;		/* Loop counter			*/
+
+	// NOTE: U-boot starts us up in secure mode, so we
+	//       have to create according secure mode descriptors
+	//       without the NS flag being set.
+
+	/* First, initialize PDEs for device memory	*/
+	/* AP[2:0] = 0b011 for full access		*/
+	/* TEX[2:0] = 0b000 and B = 1, C = 0 for	*/
+	/*		shareable dev. mem.		*/
+	/* S = 1 for shareable				*/
+	/* NS = 0 for secure mode			*/
+
+	for(i = 0; i < 1024; i++) { //TODO changed from 2048
+
+		xinu_page_table[i] = ( PDE_PTSEC	|
+						PDE_B		|
+						PDE_AP3		|
+						PDE_TEX0	|
+						PDE_S		|
+						PDE_XN		|
+						(i << 20) );
+	}
+
+	/* Now, initialize normal memory		*/
+	/* AP[2:0] = 0b011 for full access		*/
+	/* TEX[2:0] = 0b101 B = 1, C = 1 for write back	*/
+	/*	write alloc. outer & inner caches	*/
+	/* S = 1 for shareable				*/
+	/* NS = 0 for secure mode mem.		*/
+
+	for(i = 1024; i < 4096; i++) {
+
+		xinu_page_table[i] = ( PDE_PTSEC	|
+						PDE_B		|
+						PDE_C		|
+						PDE_AP3		|
+						PDE_TEX5	|
+//						PDE_S		|	// this will make ldrex/strex data abort
+						(i << 20) );
+	}
+
+	asm volatile ("isb\ndsb\ndmb\n");
+}
+
+/*------------------------------------------------------------------------
+ * mmu_set_ttbr  -  Set the Translation Table Base Register
+ *------------------------------------------------------------------------
+ */
+void
+mmu_set_ttbr_XINU ( void )
+// mmu_set_ttbr ( void *base )
+{
+	unsigned int *base = xinu_page_table;
+
+	asm volatile (
+
+			/* We want to use TTBR0 only, 16KB page table */
+
+			"ldr	r0, =0x00000000\n"
+
+			/* Write the value into TTBCR */
+
+			"mcr	p15, 0, r0, c2, c0, 2\n"
+
+			/* Load the base address in r0 */
+
+			"mov	r0, %0\n"
+
+			/* Set table walk attributes */
+
+			"orr	r0, #0x00000002\n" /* shareable cacheable */
+			"orr	r0, #0x00000008\n" /* outer write-back write-allocate */
+			"orr	r0, #0x00000001\n" /* inner write-back write-allocate */
+
+			/* Write the new TTBR0 */
+
+			"mcr	p15, 0, r0, c2, c0, 0\n"
+
+			/* Write the new TTBR1 (just in case) */
+
+			"mcr	p15, 0, r0, c2, c0, 1\n"
+
+			/* Perform memory synchronization */
+			"isb\n"
+			"dsb\n"
+			"dmb\n"
+
+			:		/* Output	*/
+			: "r" (base)	/* Input	*/
+			: "r0"		/* Clobber	*/
+		);
+}
 
 /* THE END */

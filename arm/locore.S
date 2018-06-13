@@ -200,13 +200,14 @@ start_core:
 @	isb
 
 	// set DACR to manager level for all domains
-	ldr r0, =0xffffffff
-	bl mmu_set_dacr
+@	ldr r0, =0xffffffff
+@	bl mmu_set_dacr
 
 	// invalidate TLB and enable the MMU
 	mov r0, #1
 	mcr p15, 0, r0, c8, c7, 0
 	isb
+
 	mrc p15,0,r0,c1,c0,0
 	orr r0,r0,#1
 	mcr p15,0,r0,c1,c0,0
@@ -221,6 +222,7 @@ start_core:
 	mcr	p15, 0, r0, c1, c0, 0
 
 	// jump to C code
+	// find out what core is starting
 	mrc p15, 0, r11, c0, c0, 5
 	and r11, r11, #0x03
 	cmp r11, #0
@@ -235,6 +237,7 @@ start_core:
 
 	bl	kyu_newcore
 
+// should never return here
 yspin:	b	yspin
 	bx lr
 
