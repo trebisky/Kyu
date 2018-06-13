@@ -72,48 +72,6 @@ typedef void (*vfptr) ( void );
 
 extern unsigned long core_stacks;
 
-#ifdef does_not_work
-
-/* See system_reset in timer.c which uses the watchdog to
- * reset the processor.
- */
-
-/* main_reset()
- *
- * This has nothing to do with multiple cores, but we are searching for a way
- *  to have software reset the entire processor.  No luck yet.
- * So far doing this just hangs the processor ...
- */
-void
-main_reset ( void )
-{
-	unsigned long val;
-
-#ifdef notdef
-        volatile unsigned long *reset;
-	int cpu = 0;
-	// There are two bits in this register, both asserted by writing zeros.
-	// This does not work
-        // reset = (unsigned long *) ( CPUCFG_BASE + 0x40 + cpu * 0x40);   /* reset */
-	// *reset = 0;
-
-	// This does not work either
-	reset = CPU_SYS_RESET;
-	*reset = 0;
-
-	// nor does this
-	vfptr romstart = (vfptr) 0xffff0000;
-	(*romstart) ();
-#endif
-	val = *(unsigned long *) 0xffff0000;
-	printf ( "ROM at ffff0000 = %08x\n", val );
-
-	// printf ( "Sorry ...\n");
-
-	// test_core ();
-}
-#endif
-
 /* screwball entry point to allow core testing
  * early in Kyu initialization.
  */
@@ -142,7 +100,7 @@ launch_core ( int cpu )
         *GEN_CTRL &= ~mask;             /* reset L1 cache */
         *POWER_OFF &= ~mask;            /* power on */
 	// thr_delay ( 2 );
-	_udelay ( 2000 );
+	delay_ms ( 2 );
 
         *reset = 3;			/* take out of reset */
 }
@@ -230,6 +188,27 @@ test_reg ( volatile unsigned long *reg )
 	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
 }
 
+void
+run_blink ( int a, int b )
+{
+	b -= 3*a;
+
+        for ( ;; ) {
+            status_on ();
+            delay_ms ( a );
+
+            status_off ();
+            delay_ms ( a );
+
+            status_on ();
+            delay_ms ( a );
+
+            status_off ();
+
+	    delay_ms ( b );
+        }
+}
+
 /* This gets called by the test menu
  *   (or something of the sort)
  */
@@ -265,6 +244,9 @@ test_core ( void )
 	test_one ( 2 );
 	test_one ( 3 );
 
+	// This yields proper timing
+	// run_blink ( 100, 2000 );
+
 	/*
 	test_reg ( ROM_START );
 	test_reg ( PRIVA );
@@ -273,11 +255,7 @@ test_core ( void )
 
 }
 
-/* If all goes well, we will be running here,
- * And indeed we are, this is the first C code
- * run by a new core.
- */
-
+#ifdef notdef
 /* Runs mighty slow without D cache enabled */
 static void
 delay_ms_cache ( int msecs )
@@ -294,6 +272,12 @@ delay_ms ( int msecs )
 	delay_ms_cache ( msecs );
 	// delay_ms_nocache ( msecs );
 }
+#endif
+
+/* If all goes well, we will be running here,
+ * And indeed we are, this is the first C code
+ * run by a new core.
+ */
 
 #define CORE_QUIET
 
@@ -306,13 +290,17 @@ kyu_newcore ( int core )
 	int val = 0;
 	int cpu = 99;
 
+	/* Clear flag to indicate we are running */
 	sent = SENTINEL;
 	*sent = 0;
 
+#ifdef notdef
 	/* Read processor affinity register */
 	asm volatile("mrc 15, 0, %0, cr0, cr0, 5" : "=r" (cpu) : : "cc");
 	cpu &= 0x3;
+#endif
 
+	/* Get the value of sp */
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 
 #ifndef CORE_QUIET
@@ -333,11 +321,22 @@ kyu_newcore ( int core )
 	}
 #endif
 
-	if ( cpu == 1 )
-	    gpio_blink_red ();
+	if ( core != 1 ) {
+	    // spin
+	    for ( ;; )
+		;
+	}
 
-	for ( ;; )
-	    ;
+	printf ( "Core %d blinking\n", core );
+
+	/* Blink red status light */
+	// gpio_blink_red ();
+
+	/* This runs MUCH too slow, taking 21 seconds,
+	 * when it should take 0.2 (100x too slow)
+	 * No doubt the D cache is not enabled.
+	 */
+	run_blink ( 10, 200 );
 }
 
 /* THE END */
