@@ -222,9 +222,9 @@ mmu_invalid ( unsigned long addr )
 #define MMU_TICK	MEG
 
 static void
-mmu_setup ( unsigned long *mmu, unsigned long ram_start, unsigned long ram_size )
+mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 {
-	unsigned long addr;
+	unsigned int addr;
 	int i;
 	int size;
 	int start;
@@ -336,22 +336,47 @@ mmu_on ( void )
  * for both the BBB and the Orange Pi.
  */
 
+/* I used to dynamically allocate this, but now we just let
+ * the linker stick it in the data segment.
+ */
+/* page table must be on 16K boundary */
+static unsigned int page_table[MMU_SIZE] __attribute__ ((aligned (16384)));
+
+/* Called by each core when it starts up.
+ */
+void
+mmu_set_ttbr ( void )
+{
+	unsigned int new_ttbr;
+
+	new_ttbr = (unsigned int) page_table;
+	new_ttbr |= TTBR_BITS;
+
+	/* TTBR0 */
+	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
+}
+
+
 /* Call this to set up our very own MMU tables */
 void
 mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 {
-	unsigned long *new_mmu;
-	unsigned long new_ttbr;
+	unsigned int *new_mmu;
 
 	// printf ( "Initializing and relocating MMU\n" );
+
+#ifdef notdef
+	unsigned int base;
 
 	/* The mmu table needs to be on a 16K boundary, so we allocate twice
 	 * the memory we need and select a properly aligned section.
 	 * This wastes 16K, but we have memory to burn.
 	 */
-	new_ttbr = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) );
-	new_ttbr += MMU_SIZE * sizeof(unsigned long) & ~MMU_BASE_MASK;
-	new_mmu = (unsigned long *) new_ttbr;
+	base = ram_alloc ( 2*MMU_SIZE * sizeof(unsigned long) );
+	base += MMU_SIZE * sizeof(unsigned long) & ~MMU_BASE_MASK;
+	new_mmu = (unsigned int *) base;
+#endif
+	new_mmu = page_table;
 
 	mmu_setup ( new_mmu, ram_start, ram_size );
 
@@ -364,16 +389,13 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 
 	invalidate_tlb ();
 
-	new_ttbr |= TTBR_BITS;
-
-	/* TTBR0 */
-	asm volatile ("mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
+	mmu_set_ttbr ();
 
 	// mmu_on();
 
 	cpu_leave();
 
-	printf ( "New MMU at: %08x\n", new_ttbr );
+	printf ( "New MMU at: %08x\n", new_mmu );
 }
 
 /* Run this in a thread since it tends to generate data aborts */

@@ -37,10 +37,8 @@
 #define	PDE_TEX6	0x00006000
 #define	PDE_TEX7	0x00007000
 
-/* page table, defined in locore.S
- * (mostly to ensure proper alignment)
- */
-extern	unsigned int	page_table[];
+/* page table must be on 16K boundary */
+static unsigned int xinu_page_table[4096] __attribute__ ((aligned (16384)));
 
 /*------------------------------------------------------------------------
  * paging_init  -  Initialize Page Tables
@@ -65,7 +63,7 @@ paging_init (void)
 
 	for(i = 0; i < 1024; i++) { //TODO changed from 2048
 
-		page_table[i] = ( PDE_PTSEC	|
+		xinu_page_table[i] = ( PDE_PTSEC	|
 						PDE_B		|
 						PDE_AP3		|
 						PDE_TEX0	|
@@ -83,7 +81,7 @@ paging_init (void)
 
 	for(i = 1024; i < 4096; i++) {
 
-		page_table[i] = ( PDE_PTSEC	|
+		xinu_page_table[i] = ( PDE_PTSEC	|
 						PDE_B		|
 						PDE_C		|
 						PDE_AP3		|
@@ -101,8 +99,11 @@ paging_init (void)
  *------------------------------------------------------------------------
  */
 void
-mmu_set_ttbr ( void *base )
+mmu_set_ttbr_XINU ( void )
+// mmu_set_ttbr ( void *base )
 {
+	unsigned int *base = xinu_page_table;
+
 	asm volatile (
 
 			/* We want to use TTBR0 only, 16KB page table */

@@ -71,8 +71,10 @@ primary_start:
 
 	bl	clear_bss
 	dsb
-	bl	paging_init	// Xinu multicore
-	dsb
+
+@	bl	paging_init_XINU	// Xinu multicore
+@	dsb
+
 	bl	kern_startup
 @	bl	test_core
 xspin:	b	xspin
@@ -192,10 +194,10 @@ start_core:
 	isb
 
 	// set page table address in TTBR0/TTBR1
-	ldr r0, =page_table
-	dsb
-	bl mmu_set_ttbr
-	isb
+	// ldr r0, =page_table
+	// dsb
+@	bl mmu_set_ttbr_XINU
+@	isb
 
 	// set DACR to manager level for all domains
 	ldr r0, =0xffffffff
@@ -237,6 +239,7 @@ yspin:	b	yspin
 	bx lr
 
 #ifdef XINU_STARTUP
+
 #include <armv7a.h>
 
 #define CPSR_MODE_USER			0x10
@@ -258,7 +261,7 @@ yspin:	b	yspin
  */
 .globl start
 start:
-	b start_core
+	b start_core_XINU
 
 /*------------------------------------------------------------------------
  * secondary_start  -  entry point for secondary cores
@@ -266,13 +269,13 @@ start:
  */
 .globl	secondary_start
 secondary_start:
-	b start_core
+	b start_core_XINU
 
 /*------------------------------------------------------------------------
  * start_core  -  core initialization
  *------------------------------------------------------------------------
  */
-start_core:
+start_core_XINU:
 	// first switch to SVR mode and disable interrupts
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
 	msr cpsr, r0
@@ -1135,6 +1138,7 @@ fp_enable:
 	mov	pc, lr
 #endif
 
+#ifdef notdef
 /*------------------------------------------------------------------------
  * As per Xinu and Marco -- we declare the page_table
  *  here so we can conveniently force alignment.
@@ -1146,6 +1150,7 @@ fp_enable:
         .globl page_table
 page_table:
         .space  (0x1000 * 4)
+#endif
 
 /* ==================================================================== */
 /* ==================================================================== */
