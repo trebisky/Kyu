@@ -338,7 +338,8 @@ kyu_newcore ( int core )
 	 * when it should take 0.2 (100x too slow)
 	 * No doubt the D cache is not enabled.
 	 */
-	run_blink ( 10, 200 );
+	// run_blink ( 10, 200 );
+	run_blink ( 100, 2000 );
 }
 
 /* THE END */

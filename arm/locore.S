@@ -214,10 +214,12 @@ primary_start_NEW:
         orr     r0, #CTLR_D_CACHE
 	write_SCTLR ( r0 )
 
-        read_MPID ( r11 )
-        and     r11, r11, #0x03
-        cmp     r11, #0
+        read_MPID ( r0 )
+        and     r0, r0, #0x03
+        cmp     r0, #0
         beq     2f
+	    // r0 holds core number,
+	    // which becomes argument to kyu_newcore
 	    bl	kyu_newcore
 1:	    b	1b
 2:
