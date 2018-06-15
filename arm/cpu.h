@@ -121,25 +121,27 @@ typedef unsigned long __u32;
  * Above all, this makes code more readable and less error prone.
  */
 
+#define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
+#define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
+#define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
+#define set_DACR(val)	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
+
+/* Note that macros of this "get_XXX" type do not allow expressions like
+ * var = get_XXX();
+ * For that, we need inline functions, and we give them distinct names,
+ *  such as r_XXX() to avoid collision with these macros.
+ */
+#define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
+
 static inline unsigned int
-get_CCNT ( void )
+r_CCNT ( void )
 {
-    unsigned int value;
+    unsigned int rv;
 
     // Read CCNT Register
-    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (value) );
-    return value;
+    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (rv) );
+    return rv;
 }
 
-static inline void
-set_CCNT ( unsigned int val )
-{
-    asm volatile ("mcr p15, 0, %0, c9, c13, 0": : "r" (val) );
-}
-
-#define set_TTBR0(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
-#define set_TTBR1(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
-#define set_TTBCR(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
-#define set_DACR(val)  asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
 
 /* THE END */

@@ -33,7 +33,6 @@
  * It looks to me like generic ARM v7 code.
  */
 
-
 .text
 
 .globl	armv7_dcache_wbinv_all

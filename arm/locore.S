@@ -64,6 +64,17 @@
 #define read_VBAR(reg)		MRC p15, 0, reg, c12, c0, 0
 #define write_VBAR(reg)		MCR p15, 0, reg, c12, c0, 0
 
+/* multiprocessor ID register (processor affinity register) */
+#define read_MPID(reg)		MRC p15, 0, reg, c0, c0, 5
+
+/* c7 is a bunch of cache specific operations */
+// invalidate I cache
+#define write_I_INV(reg)	MCR p15, 0, reg, c7, c5, 0
+
+/* c8 is a bunch of tlb specific operations */
+// invalidate both I and D cache
+#define write_TLB_INV(reg)	MCR p15, 0, reg, c8, c7, 0
+
 #define CTLR_MMU		1
 #define CTLR_ALIGN		2
 #define CTLR_D_CACHE		4
@@ -127,28 +138,6 @@ primary_start_NEW:
 	bl	clear_bss
 	dsb
 
-	// if enabled, flush D cache
-	// (this needs to be done before disabling the MMU)
-	// mrc     p15, 0, r0, c1, c0, 0
-	read_SCTLR ( r0 )
-	and     r0, r0, #(1 << 2)
-	cmp     r0, #0
-	beq     1f
-	    bl armv7_dcache_wbinv_all
-1:
-
-	// disable I cache, D cache and MMU
-        // (we want to set up everything from scratch)
-	// XXX - disabling MMU causes crash
-	read_SCTLR ( r0 )
-@@        bic     r0, #CTLR_I_CACHE
-@@        bic     r0, #CTLR_D_CACHE
-@        bic     r0, #CTLR_MMU
-	write_SCTLR ( r0 )
-        isb
-
-        @bl     go_red  // OK
-
         // enable SMP -- near as I can tell this sets
 	// the IBE bit, which enables invalidate all
 	// instructions.
@@ -158,8 +147,62 @@ primary_start_NEW:
         bic     r0, r0, #0x040
 	write_ACTLR ( r0 )
 
+	// if enabled, flush D cache
+	// (this needs to be done before disabling the MMU)
+	read_SCTLR ( r0 )
+	and     r0, r0, #CTLR_D_CACHE
+	cmp     r0, #0
+	beq     1f
+	    bl armv7_dcache_wbinv_all
+1:
+
+	// disable I cache, D cache and MMU
+        // (we want to set up everything from scratch)
+	read_SCTLR ( r0 )
+        bic     r0, #CTLR_I_CACHE
+        bic     r0, #CTLR_D_CACHE
+        bic     r0, #CTLR_MMU
+	write_SCTLR ( r0 )
+        isb
+
+        @bl     go_red  // OK
+
 	// This sets up the page table
 	bl	board_mmu_init
+
+	// invalidate I cache
+	mov	r1, #0x0
+	// mcr p15, 0, r1, c7, c5, 0
+	write_I_INV ( r1 )
+
+	// Reenable I cache
+	// (it works without MMU enabled)
+	mov	r1, #CTLR_I_CACHE
+	write_SCTLR ( r1 )
+	isb
+
+	bl	mmu_set_ttbr
+
+	// invalidate TLB for both I and D
+	mov r0, #1
+	write_TLB_INV ( r0 )
+	isb
+	dsb
+
+	// enable MMU
+	read_SCTLR ( r0 )
+        orr     r0, #CTLR_MMU
+	write_SCTLR ( r0 )
+	isb
+	dsb
+
+	// invalidate and enable D cache
+	// MMU must be enabled for this to work
+	bl armv7_dcache_l1inv_all
+
+	read_SCTLR ( r0 )
+        orr     r0, #CTLR_D_CACHE
+	write_SCTLR ( r0 )
 
 	// start Kyu
 	bl	kyu_startup
@@ -254,7 +297,8 @@ start_core:
 
 	// setup stack for this core (Kyu method)
 	// Read processor affinity register
-        mrc     p15, 0, r0, c0, c0, 5
+        // mrc     p15, 0, r0, c0, c0, 5
+	read_MPID ( r0 )
 	and	r0, #3
 
 @	lsl	r0, #14
@@ -268,7 +312,8 @@ start_core:
 
 	// core 0 has to inititialize
 	// some shared data
-	mrc	p15, 0, r11, c0, c0, 5
+	// mrc	p15, 0, r11, c0, c0, 5
+	read_MPID ( r11 )
 	and	r11, r11, #0x03
 	cmp	r11, #0
 	bne	2f
@@ -318,7 +363,8 @@ start_core:
 
 	// invalidate TLB
 	mov r0, #1
-	mcr p15, 0, r0, c8, c7, 0
+	// mcr p15, 0, r0, c8, c7, 0
+	write_TLB_INV ( r0 )
 	isb
 	bl	go_red	// OK
 
@@ -339,7 +385,8 @@ start_core:
 
 	// jump to C code
 	// find out what core is starting
-	mrc p15, 0, r11, c0, c0, 5
+	// mrc p15, 0, r11, c0, c0, 5
+	read_MPID ( r11 )
 	and r11, r11, #0x03
 	cmp r11, #0
 	bne 3f
@@ -348,7 +395,8 @@ start_core:
 3:
 	// other cores
 	/* pass core number in r0 as argument */
-        mrc     p15, 0, r0, c0, c0, 5
+        // mrc     p15, 0, r0, c0, c0, 5
+	read_MPID ( r0 )
 	and	r0, #3
 
 	bl	kyu_newcore

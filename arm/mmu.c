@@ -282,15 +282,19 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 
 	new_mmu = page_table;
 
+	// This just loads values into the page table
+	// in ram, but does not try to enable anything.
 	mmu_setup ( new_mmu, ram_start, ram_size );
 
-	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
+	// We now call this with the D cache disabled
+	// and it was flushed before disabling it.
+	// flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
 
 	// mmu_display ( (unsigned int) new_mmu );
 
-	invalidate_tlb ();
-
-	mmu_set_ttbr ();
+	// We do all this in locore.S now
+	// invalidate_tlb ();
+	// mmu_set_ttbr ();
 }
 
 /* Call this to set up our very own MMU tables */
