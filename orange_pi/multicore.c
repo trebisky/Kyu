@@ -285,7 +285,7 @@ delay_ms ( int msecs )
 
 /* This is the first C code a new core runs */
 void
-kyu_newcore ( int core )
+run_newcore ( int core )
 {
 	volatile unsigned long *sent;
 	unsigned long sp;

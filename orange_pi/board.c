@@ -190,6 +190,13 @@ board_mmu_init ( void )
 	mmu_initialize ( ram_start, ram_size );
 }
 
+/* Comes here when a new core starts up */
+void
+board_core_startup ( int core )
+{
+	run_newcore ( core );
+}
+
 /* Called early, but not as early as the above.
  */
 void

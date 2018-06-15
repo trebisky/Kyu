@@ -16,7 +16,7 @@ OBJS =  board.o \
 	spinlocks.o \
 	cores.o \
 	ccu.o \
-	smp.o
+	multicore.o
 
 all: ../board.o
 

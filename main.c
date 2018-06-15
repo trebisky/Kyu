@@ -104,9 +104,9 @@ arm_idiv ( void )
  * they come here instead of kyu_startup() below.
  */
 void
-kyu_newcore ( void )
+kyu_newcore ( int core )
 {
-	board_core_startup ();
+	board_core_startup ( core );
 }
 
 /* This is the first bit of C code that runs in 32 bit mode.
