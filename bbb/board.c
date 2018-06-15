@@ -84,7 +84,9 @@ delay_ns ( int delay )
 }
 #endif
 
-/* Called very early in initialization */
+/* Called very early in initialization.
+ *  (now from locore.S to set up MMU)
+ */
 void
 board_hardware_init ( void )
 {

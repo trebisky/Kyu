@@ -11,8 +11,6 @@
  * Tom Trebisky  4/20/2017
  */
 
-/* XXX - TODO - split this into mmu.c and ram.c */
-
 #include "kyu.h"
 #include "kyulib.h"
 #include "board/board.h"

@@ -82,7 +82,8 @@ preinit_core ( void )
 }
 
 /* This is in locore.S */
-extern void newcore ( void );
+// extern void newcore ( void );
+extern void secondary_start ( void );
 
 void
 launch_core ( int cpu )
@@ -93,7 +94,8 @@ launch_core ( int cpu )
         reset = (volatile unsigned long *) ( CPUCFG_BASE + (cpu+1) * 0x40);
 	// printf ( "-- reset = %08x\n", reset );
 
-        *ROM_START = (unsigned long) newcore;  /* in locore.S */
+        //*ROM_START = (unsigned long) newcore;  /* in locore.S */
+        *ROM_START = (unsigned long) secondary_start;  /* in locore.S */
 
         *reset = 0;                     /* put core into reset */
 

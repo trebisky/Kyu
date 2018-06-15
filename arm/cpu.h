@@ -105,4 +105,41 @@ typedef unsigned long __u32;
 #define __constant_ntohs(x) ___constant_swab16((__force __be16)(x))
 */
 
+#ifdef notdef
+/* ARM v7 now has actual barrier instructions, but these work for
+ * older ARM (like v5) as well as v7.
+ * At some point U-boot used these since it compiled with -march=armv5
+ * but we compile Kyu with -marm -march=armv7-a
+ */
+#define CP15ISB asm volatile ("mcr     p15, 0, %0, c7, c5, 4" : : "r" (0))
+#define CP15DSB asm volatile ("mcr     p15, 0, %0, c7, c10, 4" : : "r" (0))
+#define CP15DMB asm volatile ("mcr     p15, 0, %0, c7, c10, 5" : : "r" (0))
+#endif
+
+/* Added 6-14-2018
+ * A collection of inline assembly for ARM control register access
+ * Above all, this makes code more readable and less error prone.
+ */
+
+static inline unsigned int
+get_CCNT ( void )
+{
+    unsigned int value;
+
+    // Read CCNT Register
+    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (value) );
+    return value;
+}
+
+static inline void
+set_CCNT ( unsigned int val )
+{
+    asm volatile ("mcr p15, 0, %0, c9, c13, 0": : "r" (val) );
+}
+
+#define set_TTBR0(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
+#define set_TTBR1(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
+#define set_TTBCR(val) asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
+#define set_DACR(val)  asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
+
 /* THE END */

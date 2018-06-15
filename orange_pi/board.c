@@ -18,8 +18,6 @@
 
 #include "netbuf.h"
 
-unsigned long core_stacks;
-
 // static void mmu_initialize ( unsigned long, unsigned long );
 
 static unsigned int cpu_clock;
@@ -164,13 +162,32 @@ delay_calib ( void )
 }
 #endif
 
-/* Called very early in initialization */
+/* Let the compiler find a place for this so
+ * that we can use this as early as possible during
+ * initialization.
+ * Aligned for no particular reason.
+ */
+static char stack_area[NUM_CORES*CORE_STACK_SIZE] __attribute__ ((aligned (256)));
+
+char *core_stacks = stack_area;
+
+/* Called very early in initialization
+ *  (now from locore.S to set up MMU)
+ */
 void
 board_hardware_init ( void )
 {
+	unsigned int sp;
+
+	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
+        printf ( "board_hardware_init - sp: %08x\n",  sp );
+        printf ( "board_hardware_init - cpsr: %08x\n",  get_cpsr() );
+
 	cache_init ();
 	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
+	/*
 	core_stacks = ram_alloc ( NUM_CORES * CORE_STACK_SIZE );
+	*/
 	printf ( "Core stacks at %08x\n", core_stacks );
 }
 

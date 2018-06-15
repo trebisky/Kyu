@@ -31,7 +31,47 @@
 
 #define PSR_DEFAULT	PSR_M_SUPER
 
-/* For the time being, this is the first thing linked
+#define CPSR_MODE_USER			0x10
+#define CPSR_MODE_FIQ			0x11
+#define CPSR_MODE_IRQ			0x12
+#define CPSR_MODE_SVR			0x13
+#define CPSR_MODE_ABORT			0x17
+#define CPSR_MODE_HYP			0x1A
+#define CPSR_MODE_UNDEFINED		0x1B
+#define CPSR_MODE_SYSTEM		0x1F
+
+#define CPSR_IRQ_INHIBIT		0x80
+#define CPSR_FIQ_INHIBIT		0x40
+
+/* In an effort to make this code more readable,
+ * I am introducing these get/set macros for the
+ * various ARM control registers.
+ */
+
+/* ARM system control register */
+#define read_SCTLR(reg)		MRC p15, 0, reg, c1, c0, 0
+#define write_SCTLR(reg)	MCR p15, 0, reg, c1, c0, 0
+
+/* apparently this is an alternate way of doing the above, not tested */
+#define read_SCTLR_alt(reg)	MRS reg, SCTLR_EL1
+#define write_SCTLR_alt(reg)	MSR SCTLR_EL1, reg
+
+/* Auxiliary control register */
+#define read_ACTLR(reg)		MRC p15, 0, reg, c1, c0, 1
+#define write_ACTLR(reg)	MCR p15, 0, reg, c1, c0, 1
+
+/* vector base address register */
+#define read_VBAR(reg)		MRC p15, 0, reg, c12, c0, 0
+#define write_VBAR(reg)		MCR p15, 0, reg, c12, c0, 0
+
+#define CTLR_MMU		1
+#define CTLR_ALIGN		2
+#define CTLR_D_CACHE		4
+#define CTLR_I_CACHE		0x1000
+
+/* ----------------------------------
+
+/* For the time being, this file is the first thing linked
  * and U-boot simply branches to a hard address.
  *  0x80000000 on the BBB
  *  0x40000000 on the Orange Pi
@@ -44,14 +84,14 @@
  */
 
 /* Providing this symbol here is really unnecessary, but it gives us
- * place to tell the linker to use as a start address in the ELF file.
+ * a way to tell the linker to use as a start address in the ELF file.
  * The only purpose this serves is to keep the linker quiet, but
- * that is worth something.
+ * that is worth something, perhaps.
  */
 	.globl asm_startup
 asm_startup:
 
-	b primary_start
+	b primary_start_NEW
 
 /* Secondary cores will start up here.
  */
@@ -59,8 +99,78 @@ asm_startup:
 secondary_start:
 	b xinu_core
 
+/* This is the 6-14-2018 hack on the standard Kyu startup */
+
+primary_start_NEW:
+	// switch to SVR mode and disable interrupts
+	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
+	msr cpsr, r0
+
+	// set the spsr to a known value
+	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
+	msr spsr_cxsf, r0
+	mrs r0, spsr
+
+	// clear this bit to
+	// allow unaligned data access
+	read_SCTLR ( r0 )
+	bic      r0, r0, #CTLR_ALIGN
+	write_SCTLR ( r0 )
+
+	movw	r0, #:lower16:vectors	/* set VBAR */
+	movt	r0, #:upper16:vectors
+	// mcr 	p15, 0, r0, c12, c0, 0
+	write_VBAR ( r0 )
+
+	bl	setup_stacks_kyu
+
+	bl	clear_bss
+	dsb
+
+	// if enabled, flush D cache
+	// (this needs to be done before disabling the MMU)
+	// mrc     p15, 0, r0, c1, c0, 0
+	read_SCTLR ( r0 )
+	and     r0, r0, #(1 << 2)
+	cmp     r0, #0
+	beq     1f
+	    bl armv7_dcache_wbinv_all
+1:
+
+	// disable I cache, D cache and MMU
+        // (we want to set up everything from scratch)
+	// XXX - disabling MMU causes crash
+	read_SCTLR ( r0 )
+@@        bic     r0, #CTLR_I_CACHE
+@@        bic     r0, #CTLR_D_CACHE
+@        bic     r0, #CTLR_MMU
+	write_SCTLR ( r0 )
+        isb
+
+        @bl     go_red  // OK
+
+        // enable SMP -- near as I can tell this sets
+	// the IBE bit, which enables invalidate all
+	// instructions.
+	//
+        // (this needs to be done before the MMU is enabled)
+        // mrc     p15, 0, r0, c1, c0, 1
+	read_ACTLR ( r0 )
+        bic     r0, r0, #0x040
+        // mcr     p15, 0, r0, c1, c0, 1
+	write_ACTLR ( r0 )
+
+	// This sets up the page table
+	bl	board_hardware_init
+
+	// start Kyu
+	bl	kyu_startup
+
+// spin if we return
+1:	b	1b
+
 /* This is the old standard Kyu startup */
-primary_start:
+primary_start_OLD:
 	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
@@ -75,10 +185,12 @@ primary_start:
 @	bl	paging_init_XINU	// Xinu multicore
 @	dsb
 
-	bl	kern_startup
+	bl	kyu_startup
+
 @	bl	test_core
-xspin:	b	xspin
-@	bx	lr
+
+// spin if we return
+1:	b	1b
 
 clear_bss:
 	movw	r3, #:lower16:__bss_start__
@@ -91,17 +203,6 @@ loop:	cmp	r3, r2
 	addcc	r3, r3, #4
 	bcc	loop
 	bx	lr
-
-#define CPSR_MODE_USER			0x10
-#define CPSR_MODE_FIQ			0x11
-#define CPSR_MODE_IRQ			0x12
-#define CPSR_MODE_SVR			0x13
-#define CPSR_MODE_ABORT			0x17
-#define CPSR_MODE_HYP			0x1A
-#define CPSR_MODE_UNDEFINED		0x1B
-#define CPSR_MODE_SYSTEM		0x1F
-#define CPSR_IRQ_INHIBIT		0x80
-#define CPSR_FIQ_INHIBIT		0x40
 
 xinu_core:
 start_core:
@@ -119,6 +220,10 @@ start_core:
 	bic      r0, r0, #2
 	mcr      p15, 0, r0, c1, c0, 0
 
+	movw	r0, #:lower16:vectors	/* set VBAR */
+	movt	r0, #:upper16:vectors
+	mcr 	p15, 0, r0, c12, c0, 0
+
 	// if enabled, flush D cache
 	// (this needs to be done before disabling the MMU)
 	mrc     p15, 0, r0, c1, c0, 0
@@ -128,39 +233,47 @@ start_core:
 		bl armv7_dcache_wbinv_all
 
 1:
+	/* XXX ok */
 	// disable I cache, D cache and MMU
 	// (we want to set up everything from scratch)
-	mrc p15, 0, r0, c1, c0, 0
-	bic r0, #0x00001000		// I cache
-	bic r0, #0x00000004		// D cache
-	bic r0, #0x00000001		// MMU
-	mcr p15, 0, r0, c1, c0, 0
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, #0x00001000		// I cache
+	bic	r0, #0x00000004		// D cache
+	bic	r0, #0x00000001		// MMU
+	mcr	p15, 0, r0, c1, c0, 0
 	isb
+	@bl	go_red	// OK
 
 	// enable SMP
 	// (this needs to be done before the MMU is enabled)
-	mrc p15, 0, r0, c1, c0, 1
-	bic r0, r0, #0x040
-	mcr p15, 0, r0, c1, c0, 1
+	mrc	p15, 0, r0, c1, c0, 1
+	bic	r0, r0, #0x040
+	mcr	p15, 0, r0, c1, c0, 1
 
 	// set up stacks for all modes of this core (Xinu method)
 	// bl setup_stacks
+	@bl	go_red	// OK
 
 	// setup stack for this core (Kyu method)
 	// Read processor affinity register
         mrc     p15, 0, r0, c0, c0, 5
 	and	r0, #3
-	lsl	r0, #14
-	ldr	r2, =core_stacks
-	ldr	r2, [r2]
-	add	sp, r2, r0
+
+@	lsl	r0, #14
+@	ldr	r2, =core_stacks
+@	ldr	r2, [r2]
+@	add	sp, r2, r0
+
+	bl	setup_stacks_kyu
+
+	@bl	go_red	// OK
 
 	// core 0 has to inititialize
 	// some shared data
-	mrc p15, 0, r11, c0, c0, 5
-	and r11, r11, #0x03
-	cmp r11, #0
-	bne 2f
+	mrc	p15, 0, r11, c0, c0, 5
+	and	r11, r11, #0x03
+	cmp	r11, #0
+	bne	2f
 		/// zero BSS
 @		ldr	r0, =edata
 @		ldr	r1, =end
@@ -179,6 +292,7 @@ start_core:
 	// set exception vector
 @	ldr r0, =exp_vector
 @	bl evec_set_addr
+	@bl	go_red	// OK
 
 	// as per Kyu main core
 	movw	r0, #:lower16:vectors	/* set VBAR */
@@ -202,17 +316,21 @@ start_core:
 	// set DACR to manager level for all domains
 @	ldr r0, =0xffffffff
 @	bl mmu_set_dacr
+	@bl	go_red	// OK
 
-	// invalidate TLB and enable the MMU
+	// invalidate TLB
 	mov r0, #1
 	mcr p15, 0, r0, c8, c7, 0
 	isb
+	bl	go_red	// OK
 
+	// enable the MMU
 	mrc p15,0,r0,c1,c0,0
 	orr r0,r0,#1
 	mcr p15,0,r0,c1,c0,0
 	isb
 	dsb
+	bl	go_red	// FAILS
 
 	// invalidate and enable the D cache
 	// (it needs an enabled MMU to work)
@@ -228,7 +346,7 @@ start_core:
 	cmp r11, #0
 	bne 3f
 		// start core0
-		bl	kern_startup
+		bl	kyu_startup
 3:
 	// other cores
 	/* pass core number in r0 as argument */
@@ -239,6 +357,71 @@ start_core:
 
 // should never return here
 yspin:	b	yspin
+	bx lr
+
+#ifdef notdef
+/* Moved 6-14-2018.
+ * to orange_pi/board.h
+ */
+#define STACK_PER_CORE    STACK_PER_MODE * 6
+#define STACK_TOTAL       STACK_PER_CORE * 4
+
+#define SVR_STACK         STACK_PER_MODE
+#define IRQ_STACK         STACK_PER_MODE * 1
+#define FIQ_STACK         STACK_PER_MODE * 2
+#define SYSTEM_STACK      STACK_PER_MODE * 3
+#define ABORT_STACK       STACK_PER_MODE * 4
+#define UNDEFINED_STACK   STACK_PER_MODE * 5
+#endif
+
+setup_stacks_kyu:
+	// fetch core number into r11
+	mrc p15, 0, r11, c0, c0, 5
+	and r11, r11, #0x03
+	
+	// calc offset for this core
+	ldr r2,=STACK_PER_CORE
+	mul r0, r2, r11
+
+	// ldr r1,=STACK_ADDR
+	// sub r4, r1, r0
+	ldr	r1, =core_stacks
+	ldr	r1, [r1]
+	add	r4, r1, r0
+
+	// stacks start at end of region
+	add r4, r4, r2
+
+	// switch to interrupt mode, set sp
+	mov r0, #(CPSR_MODE_IRQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #IRQ_STACK
+
+	// switch to fiq mode, set sp
+	mov r0, #(CPSR_MODE_FIQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #FIQ_STACK
+
+	// switch to undefined exception mode, set sp
+	mov r0, #(CPSR_MODE_UNDEFINED | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #UNDEFINED_STACK
+
+	// switch to data abort exception mode, set sp
+	mov r0, #(CPSR_MODE_ABORT | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #ABORT_STACK
+
+	// switch to user mode, set sp
+	mov r0, #(CPSR_MODE_SYSTEM | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #SYSTEM_STACK
+
+	// switch to SVC mode, set sp
+	mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #SVR_STACK
+
 	bx lr
 
 #ifdef XINU_STARTUP
@@ -465,12 +648,12 @@ get_stack_size:
 bzero:
 	mov	r2, #0					/* Round address to multiple	*/
 	add	r0, r0, #3				/*   of four by adding 3 and	*/
-	and	r0, r0, #0xFFFFFFFC		/*   taking the result module 4	*/
+	and	r0, r0, #0xFFFFFFFC			/*   taking the result module 4	*/
 1:	cmp	r0, r1					/* Loop until last address	*/
-	bhs	2f						/*   has been reached		*/
+	bhs	2f					/*   has been reached		*/
 	str	r2, [r0]				/* Zero four-byte word of memory*/
 	add	r0, r0, #4				/* Move to next word		*/
-	b	1b						/* Continue to iterate		*/
+	b	1b					/* Continue to iterate		*/
 2:	mov	pc, lr					/* Return to caller		*/
 #endif /* XINU_STARTUP */
 
@@ -952,19 +1135,6 @@ set_vbar:
 	mcr 	p15, 0, r0, c12, c0, 0
 	bx	lr
 
-#ifdef notdef
-/* SCTRL - System Control*/
-	.globl get_sctrl
-get_sctrl:
-	mrc     p15, 0, r0, c1, c0, 0
-	bx	lr
-
-	.globl set_sctrl
-set_sctrl:
-	mcr 	p15, 0, r0, c1, c0, 0
-	bx	lr
-#endif
-
 /* ASCTRL - Auxiliary System Control*/
 	.globl get_asctrl
 get_asctrl:
@@ -977,17 +1147,6 @@ set_asctrl:
 	bx	lr
 
 #ifdef notdef
-/* MMU table base */
-	.globl get_mmu
-get_mmu:
-	mrc     p15, 0, r0, c2, c0, 0
-	bx	lr
-
-	.globl set_mmu
-set_mmu:
-	mcr 	p15, 0, r0, c2, c0, 0
-	bx	lr
-
 /* Protection Unit base */
 	.globl get_prot
 get_prot:
@@ -1191,6 +1350,10 @@ zcore:
 	bx	lr
 #endif
 
+/* This version of newcore works,
+ * but fails to enable the D cache.
+ */
+
 #define SENTINEL	0x4
 
 	.globl newcore
@@ -1199,6 +1362,8 @@ newcore:
         mrc     p15, 0, r0, c0, c0, 5
 	and	r0, #3
 	lsl	r0, #14
+
+	/* Find place for stack */
 	ldr	r2, =core_stacks
 	ldr	r2, [r2]
 	add	sp, r2, r0
@@ -1257,6 +1422,12 @@ oldcore:
 loopcore2:
         str     r0, [r1]
         b      loopcore2
+
+go_red:
+	ldr	r12,=0x01c20810
+	ldr	r11,=0xffffffff
+	str	r11, [r12]
+	bx	lr
 
 #endif /* BOARD_ORANGE_PI */
 

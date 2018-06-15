@@ -160,6 +160,7 @@ static void test_uart ( int );
 
 static void test_clear ( int );
 static void test_blink ( int );
+static void test_blink_d ( int );
 
 /* Here is the IO test menu */
 
@@ -187,6 +188,7 @@ struct test io_test_list[] = {
 
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
+	test_blink_d,	"LED blink test (via delay)",	0,
 	test_clear,	"clear memory test",	0,
 
 #ifdef ARCH_X86
@@ -2478,6 +2480,32 @@ test_blink ( int arg )
 	}
 	led_norm ();
 }
+
+/* Useful for seeing if D cache is enabled or not */
+static void
+test_blink_d ( int arg )
+{
+	int a = 100;
+	int b = 1000;
+
+        b -= 3*a;
+
+        for ( ;; ) {
+            status_on ();
+            delay_ms ( a );
+
+            status_off ();
+            delay_ms ( a );
+
+            status_on ();
+            delay_ms ( a );
+
+            status_off ();
+
+            delay_ms ( b );
+        }
+}
+
 
 /* -------------------------------------------- */
 

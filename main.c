@@ -107,7 +107,7 @@ arm_idiv ( void )
  * We then do the rest of the initialization in the sys_init thread.
  */
 void
-kern_startup ( void )
+kyu_startup ( void )
 {
 	unsigned long malloc_base;
 	int sp;
@@ -121,12 +121,15 @@ kern_startup ( void )
 
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	printf ( "Kyu starting with stack: %08x\n",  sp );
+	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
 
 	// fail ();
 
 	// emac_probe (); /* XXX */
 
-	board_hardware_init ();
+	// now called from locore.S  6-14-2018
+	// board_hardware_init ();
+
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
 	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
