@@ -108,7 +108,8 @@ asm_startup:
  */
 .globl	secondary_start
 secondary_start:
-	b xinu_core
+// Just fall through
+@	b xinu_core
 
 /* This is the 6-14-2018 hack on the standard Kyu startup */
 
@@ -135,8 +136,14 @@ primary_start_NEW:
 
 	bl	setup_stacks_kyu
 
-	bl	clear_bss
-	dsb
+	/* Only core zero should zero BSS */
+        read_MPID ( r11 )
+        and     r11, r11, #0x03
+        cmp     r11, #0
+        bne     1f
+	    bl	clear_bss
+	    dsb
+1:
 
         // enable SMP -- near as I can tell this sets
 	// the IBE bit, which enables invalidate all
@@ -165,10 +172,13 @@ primary_start_NEW:
 	write_SCTLR ( r0 )
         isb
 
-        @bl     go_red  // OK
-
-	// This sets up the page table
-	bl	board_mmu_init
+	/* Only core zero should setup page tables */
+        read_MPID ( r11 )
+        and     r11, r11, #0x03
+        cmp     r11, #0
+        bne     1f
+	    bl	board_mmu_init
+1:
 
 	// invalidate I cache
 	mov	r1, #0x0
@@ -204,6 +214,13 @@ primary_start_NEW:
         orr     r0, #CTLR_D_CACHE
 	write_SCTLR ( r0 )
 
+        read_MPID ( r11 )
+        and     r11, r11, #0x03
+        cmp     r11, #0
+        beq     2f
+	    bl	kyu_newcore
+1:	    b	1b
+2:
 	// start Kyu
 	bl	kyu_startup
 
@@ -422,7 +439,8 @@ yspin:	b	yspin
 
 setup_stacks_kyu:
 	// fetch core number into r11
-	mrc p15, 0, r11, c0, c0, 5
+	read_MPID ( r11 )
+	// mrc p15, 0, r11, c0, c0, 5
 	and r11, r11, #0x03
 	
 	// calc offset for this core
