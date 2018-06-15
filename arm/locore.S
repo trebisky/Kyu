@@ -10,6 +10,8 @@
  *
  * Kyu project  5-12-2015  Tom Trebisky
  *
+ *  Multicore code by Marco Warga, Philip Michael Van Every, and myself.
+ *
  * temporary catch-all for assembly language
  *
  * Amazingly enough, ARM by default is little-endian.
@@ -17,14 +19,13 @@
  *
  * Transition to multicore  6-15-2018  Tom Trebisky
  *
- * XXX - the BBB now runs slow with this startup file,
- * both spin delays and timer delays seem slow.
  */
 
 #include "board/board.h"
 
 @ Apparently the at-sign is the ARM comment character.
 @ on the x86 you use the pound sign.
+@ You can also use C style comments including //
 
 #define PSR_M_SUPER	0x13
 #define PSR_M_IRQ	0x12

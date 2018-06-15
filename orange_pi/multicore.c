@@ -191,21 +191,19 @@ test_reg ( volatile unsigned long *reg )
 }
 
 void
-run_blink ( int a, int b )
+run_blink ( int num, int a, int b )
 {
-	b -= 3*a;
+	int i;
+
+	b -= 2*num*a;
 
         for ( ;; ) {
-            status_on ();
-            delay_ms ( a );
-
-            status_off ();
-            delay_ms ( a );
-
-            status_on ();
-            delay_ms ( a );
-
-            status_off ();
+	    for ( i=0; i<num; i++ ) {
+		status_on ();
+		delay_ms ( a );
+		status_off ();
+		delay_ms ( a );
+	    }
 
 	    delay_ms ( b );
         }
@@ -243,11 +241,13 @@ test_core ( void )
 
 	printf ( "Address of core stacks: %08x\n", core_stacks );
 	test_one ( 1 );
+	thr_delay ( 1000 );
 	test_one ( 2 );
+	thr_delay ( 1000 );
 	test_one ( 3 );
 
 	// This yields proper timing
-	// run_blink ( 100, 2000 );
+	// run_blink ( 2, 100, 2000 );
 
 	/*
 	test_reg ( ROM_START );
@@ -323,23 +323,20 @@ run_newcore ( int core )
 	}
 #endif
 
+#ifdef notdef
 	if ( core != 1 ) {
 	    // spin
 	    for ( ;; )
 		;
 	}
+#endif
 
 	printf ( "Core %d blinking\n", core );
 
 	/* Blink red status light */
 	// gpio_blink_red ();
 
-	/* This runs MUCH too slow, taking 21 seconds,
-	 * when it should take 0.2 (100x too slow)
-	 * No doubt the D cache is not enabled.
-	 */
-	// run_blink ( 10, 200 );
-	run_blink ( 100, 2000 );
+	run_blink ( core+1, 100, 4000 );
 }
 
 /* THE END */
