@@ -14,6 +14,11 @@
  *
  * Amazingly enough, ARM by default is little-endian.
  * It can switch, but watch out if you do!
+ *
+ * Transition to multicore  6-15-2018  Tom Trebisky
+ *
+ * XXX - the BBB now runs slow with this startup file,
+ * both spin delays and timer delays seem slow.
  */
 
 #include "board/board.h"
@@ -102,16 +107,21 @@
 	.globl asm_startup
 asm_startup:
 
-	b primary_start_NEW
+#ifdef BOARD_BBB
+	b primary_start_bbb
+#endif
+
+// Just fall through for Orange Pi multicore
+@	b primary_start_NEW
 
 /* Secondary cores will start up here.
  */
 .globl	secondary_start
 secondary_start:
 // Just fall through
-@	b xinu_core
 
 /* This is the 6-14-2018 hack on the standard Kyu startup */
+/* Working 6-15-2018 for main and extra cores */
 
 primary_start_NEW:
 	// switch to SVR mode and disable interrupts
@@ -131,7 +141,6 @@ primary_start_NEW:
 
 	movw	r0, #:lower16:vectors	/* set VBAR */
 	movt	r0, #:upper16:vectors
-	// mcr 	p15, 0, r0, c12, c0, 0
 	write_VBAR ( r0 )
 
 	bl	setup_stacks_kyu
@@ -165,10 +174,12 @@ primary_start_NEW:
 
 	// disable I cache, D cache and MMU
         // (we want to set up everything from scratch)
-	read_SCTLR ( r0 )
-        bic     r0, #CTLR_I_CACHE
-        bic     r0, #CTLR_D_CACHE
-        bic     r0, #CTLR_MMU
+	// May as well set the whole register to zero.
+@	read_SCTLR ( r0 )
+@       bic     r0, #CTLR_I_CACHE
+@       bic     r0, #CTLR_D_CACHE
+@       bic     r0, #CTLR_MMU
+	mov	r0, #0x0
 	write_SCTLR ( r0 )
         isb
 
@@ -182,7 +193,6 @@ primary_start_NEW:
 
 	// invalidate I cache
 	mov	r1, #0x0
-	// mcr p15, 0, r1, c7, c5, 0
 	write_I_INV ( r1 )
 
 	// Reenable I cache
@@ -229,6 +239,115 @@ primary_start_NEW:
 // spin if we return
 1:	b	1b
 
+clear_bss:
+	movw	r3, #:lower16:__bss_start__
+	movt	r3, #:upper16:__bss_start__
+	movw	r2, #:lower16:__bss_end__
+	movt	r2, #:upper16:__bss_end__
+	mov	r1, #0
+loop:	cmp	r3, r2
+	strcc	r1, [r3]
+	addcc	r3, r3, #4
+	bcc	loop
+	bx	lr
+
+/* We have 6 modes -- and each needs a stack.
+ * See also board.h
+ */
+#define SVR_STACK         MODE_STACK_SIZE
+#define IRQ_STACK         MODE_STACK_SIZE * 1
+#define FIQ_STACK         MODE_STACK_SIZE * 2
+#define SYSTEM_STACK      MODE_STACK_SIZE * 3
+#define ABORT_STACK       MODE_STACK_SIZE * 4
+#define UNDEFINED_STACK   MODE_STACK_SIZE * 5
+
+setup_stacks_kyu:
+	// fetch core number into r11
+	read_MPID ( r11 )
+	and r11, r11, #0x03
+	
+	// calc offset for this core
+	ldr r2,=STACK_PER_CORE
+	mul r0, r2, r11
+
+	// ldr r1,=STACK_ADDR
+	// sub r4, r1, r0
+	ldr	r1, =core_stacks
+	ldr	r1, [r1]
+	add	r4, r1, r0
+
+	// stacks start at end of region
+	add r4, r4, r2
+
+	// switch to interrupt mode, set sp
+	mov r0, #(CPSR_MODE_IRQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #IRQ_STACK
+
+	// switch to fiq mode, set sp
+	mov r0, #(CPSR_MODE_FIQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #FIQ_STACK
+
+	// switch to undefined exception mode, set sp
+	mov r0, #(CPSR_MODE_UNDEFINED | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #UNDEFINED_STACK
+
+	// switch to data abort exception mode, set sp
+	mov r0, #(CPSR_MODE_ABORT | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #ABORT_STACK
+
+	// switch to user mode, set sp
+	mov r0, #(CPSR_MODE_SYSTEM | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #SYSTEM_STACK
+
+	// switch to SVC mode, set sp
+	mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
+	msr cpsr_c, r0
+	sub sp, r4, #SVR_STACK
+
+	bx lr
+
+/* This is the old standard Kyu startup,
+ *  with some tweaks so we can use it for the BBB,
+ *  yet with the multicore framework.
+ * This works with the BBB (tested 6-15-2018)
+ * XXX - the above multicore startup also works, BUT ...
+ *  the BBB runs slow (this startup is fine).
+ *  Both spin timed delays and timer timed delays run slow with
+ *  the multicore startup.
+ */
+primary_start_bbb:
+	mrs	r0, cpsr		/* disable interrupts */
+	orr	r0, r0, #PSR_INT_DIS
+	msr	cpsr, r0
+
+	movw	r0, #:lower16:vectors	/* set VBAR */
+	movt	r0, #:upper16:vectors
+	write_VBAR ( r0 )
+
+	bl	clear_bss
+	dsb
+
+	bl	board_mmu_init
+	dsb
+
+	bl	mmu_set_ttbr
+
+	bl	kyu_startup
+
+// spin if we return
+1:	b	1b
+
+/* ----------------------------------------------------------- */
+/* ----------------------------------------------------------- */
+/*  Below here we hope and expect to discard soon */
+/* ----------------------------------------------------------- */
+/* ----------------------------------------------------------- */
+
 /* This is the old standard Kyu startup */
 primary_start_OLD:
 	mrs	r0, cpsr		/* disable interrupts */
@@ -251,18 +370,6 @@ primary_start_OLD:
 
 // spin if we return
 1:	b	1b
-
-clear_bss:
-	movw	r3, #:lower16:__bss_start__
-	movt	r3, #:upper16:__bss_start__
-	movw	r2, #:lower16:__bss_end__
-	movt	r2, #:upper16:__bss_end__
-	mov	r1, #0
-loop:	cmp	r3, r2
-	strcc	r1, [r3]
-	addcc	r3, r3, #4
-	bcc	loop
-	bx	lr
 
 xinu_core:
 start_core:
@@ -385,7 +492,7 @@ start_core:
 	// mcr p15, 0, r0, c8, c7, 0
 	write_TLB_INV ( r0 )
 	isb
-	bl	go_red	// OK
+	@bl	go_red	// OK
 
 	// enable the MMU
 	mrc p15,0,r0,c1,c0,0
@@ -393,7 +500,7 @@ start_core:
 	mcr p15,0,r0,c1,c0,0
 	isb
 	dsb
-	bl	go_red	// FAILS
+	@bl	go_red	// FAILS
 
 	// invalidate and enable the D cache
 	// (it needs an enabled MMU to work)
@@ -422,72 +529,6 @@ start_core:
 
 // should never return here
 yspin:	b	yspin
-	bx lr
-
-#ifdef notdef
-/* Moved 6-14-2018.
- * to orange_pi/board.h
- */
-#define STACK_PER_CORE    STACK_PER_MODE * 6
-#define STACK_TOTAL       STACK_PER_CORE * 4
-
-#define SVR_STACK         STACK_PER_MODE
-#define IRQ_STACK         STACK_PER_MODE * 1
-#define FIQ_STACK         STACK_PER_MODE * 2
-#define SYSTEM_STACK      STACK_PER_MODE * 3
-#define ABORT_STACK       STACK_PER_MODE * 4
-#define UNDEFINED_STACK   STACK_PER_MODE * 5
-#endif
-
-setup_stacks_kyu:
-	// fetch core number into r11
-	read_MPID ( r11 )
-	// mrc p15, 0, r11, c0, c0, 5
-	and r11, r11, #0x03
-	
-	// calc offset for this core
-	ldr r2,=STACK_PER_CORE
-	mul r0, r2, r11
-
-	// ldr r1,=STACK_ADDR
-	// sub r4, r1, r0
-	ldr	r1, =core_stacks
-	ldr	r1, [r1]
-	add	r4, r1, r0
-
-	// stacks start at end of region
-	add r4, r4, r2
-
-	// switch to interrupt mode, set sp
-	mov r0, #(CPSR_MODE_IRQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #IRQ_STACK
-
-	// switch to fiq mode, set sp
-	mov r0, #(CPSR_MODE_FIQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #FIQ_STACK
-
-	// switch to undefined exception mode, set sp
-	mov r0, #(CPSR_MODE_UNDEFINED | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #UNDEFINED_STACK
-
-	// switch to data abort exception mode, set sp
-	mov r0, #(CPSR_MODE_ABORT | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #ABORT_STACK
-
-	// switch to user mode, set sp
-	mov r0, #(CPSR_MODE_SYSTEM | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #SYSTEM_STACK
-
-	// switch to SVC mode, set sp
-	mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #SVR_STACK
-
 	bx lr
 
 #ifdef XINU_STARTUP
@@ -1489,6 +1530,7 @@ loopcore2:
         str     r0, [r1]
         b      loopcore2
 
+// Turn on RED led on Orange Pi
 go_red:
 	ldr	r12,=0x01c20810
 	ldr	r11,=0xffffffff

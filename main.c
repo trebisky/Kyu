@@ -100,6 +100,15 @@ arm_idiv ( void )
 }
 #endif
 
+/* When additional cores (if there are any) start up,
+ * they come here instead of kyu_startup() below.
+ */
+void
+kyu_newcore ( void )
+{
+	board_core_startup ();
+}
+
 /* This is the first bit of C code that runs in 32 bit mode.
  *
  * It runs with whatever stack we inherit from U-boot.

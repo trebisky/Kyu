@@ -24,6 +24,15 @@
  */
 #define NUM_INTS	128
 
+#define NUM_CORES       1
+
+/* Allow 16K of stack per mode */
+/* These things are used in locore.S */
+#define MODE_STACK_SIZE         32*1024
+#define NUM_MODES               6
+
+#define STACK_PER_CORE    MODE_STACK_SIZE * NUM_MODES
+
 /* The BBB has 1/2 G of RAM always
  */
 #define BOARD_RAM_SIZE	0x20000000

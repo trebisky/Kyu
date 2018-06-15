@@ -167,7 +167,7 @@ delay_calib ( void )
  * initialization.
  * Aligned for no particular reason.
  */
-static char stack_area[NUM_CORES*CORE_STACK_SIZE] __attribute__ ((aligned (256)));
+static char stack_area[NUM_CORES*STACK_PER_CORE] __attribute__ ((aligned (256)));
 
 char *core_stacks = stack_area;
 

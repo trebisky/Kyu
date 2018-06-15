@@ -87,6 +87,15 @@ delay_ns ( int delay )
 static unsigned int ram_start;
 static unsigned int ram_size;
 
+/* Let the compiler find a place for this so
+ * that we can use this as early as possible during
+ * initialization.
+ * Aligned for no particular reason.
+ */
+static char stack_area[NUM_CORES*STACK_PER_CORE] __attribute__ ((aligned (256)));
+
+char *core_stacks = stack_area;
+
 /* Called very early in initialization
  *  (now from locore.S to set up MMU)
  *
@@ -105,7 +114,14 @@ board_mmu_init ( void )
 	mmu_initialize ( ram_start, ram_size );
 }
 
-/* Called early, but not as early as the above.
+/* extra cores come here on startup */
+void
+board_core_startup ( int core )
+{
+	/* the BBB has only one core */
+}
+
+/* Called early, but not as early as board_mmu_init ()
  */
 void
 board_hardware_init ( void )

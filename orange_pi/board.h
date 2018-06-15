@@ -33,21 +33,18 @@
 /* Allow 16K of stack per mode */
 /* These things are used in locore.S */
 #define MODE_STACK_SIZE         16*1024
+#define NUM_MODES               6
 
-#define STACK_PER_MODE    MODE_STACK_SIZE
-#define STACK_PER_CORE    STACK_PER_MODE * 6
-#define STACK_TOTAL       STACK_PER_CORE * 4
+#define STACK_PER_CORE    MODE_STACK_SIZE * NUM_MODES
 
+#ifdef notdef
 #define SVR_STACK         STACK_PER_MODE
 #define IRQ_STACK         STACK_PER_MODE * 1
 #define FIQ_STACK         STACK_PER_MODE * 2
 #define SYSTEM_STACK      STACK_PER_MODE * 3
 #define ABORT_STACK       STACK_PER_MODE * 4
 #define UNDEFINED_STACK   STACK_PER_MODE * 5
-
-// #define CORE_STACK_SIZE         16*1024
-#define NUM_MODES               6
-#define CORE_STACK_SIZE         (NUM_MODES * MODE_STACK_SIZE)
+#endif
 
 /* XXX - This is 1G of RAM as I have on my PC and PC plus boards.
  * There are H3 based boards with 1/2 G (the Lite and One)

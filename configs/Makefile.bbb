@@ -4,7 +4,8 @@
 
 # Here is where you set the Kyu version number.
 # 0.7.1 introduces Orange Pi
-VERSION = 0.7.1
+# Not any longer, there is a file named VERSION
+# VERSION = 0.7.1
 
 INCS = -I. -Iarm
 
@@ -73,7 +74,7 @@ FORCE:
 
 version.c:	FORCE
 	rm -f version.c
-	./mkversion -ikyu_version -v$(VERSION) >version.c
+	./mkversion >version.c
 
 #.PHONY: subdirs $(SUBDIRS)
 #
@@ -97,10 +98,10 @@ help:
 
 kyu:	kyu.lds
 
-#	$(LD) -g -Ttext 0x80000000 -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+#	$(LD) -g -Ttext 0x80000000 -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
 
 kyu: $(OBJS)
-	$(LD) -g -T kyu.lds -e kern_startup -o kyu $(OBJS) $(LIBS)
+	$(LD) -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
 
 kyu.bin: kyu
 	$(BIN) kyu kyu.bin

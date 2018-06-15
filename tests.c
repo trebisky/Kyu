@@ -189,6 +189,7 @@ struct test io_test_list[] = {
 	test_blink,	"start LED blink test",	0,
 	test_blink,	"stop LED blink test",	1,
 	test_blink_d,	"LED blink test (via delay)",	0,
+
 	test_clear,	"clear memory test",	0,
 
 #ifdef ARCH_X86
@@ -2481,7 +2482,37 @@ test_blink ( int arg )
 	led_norm ();
 }
 
-/* Useful for seeing if D cache is enabled or not */
+#ifdef BOARD_ORANGE_PI
+static void
+test_led_on ( void )
+{
+	status_on ();
+}
+
+static void
+test_led_off ( void )
+{
+	status_off ();
+}
+#endif
+
+#ifdef BOARD_BBB
+static void
+test_led_on ( void )
+{
+	gpio_led_set ( 1 );
+}
+
+static void
+test_led_off ( void )
+{
+	gpio_led_set ( 0 );
+}
+#endif
+
+/* Useful for seeing if D cache is enabled or not.
+ * Should blink two quick pulses, 1 second apart.
+ */
 static void
 test_blink_d ( int arg )
 {
@@ -2491,21 +2522,20 @@ test_blink_d ( int arg )
         b -= 3*a;
 
         for ( ;; ) {
-            status_on ();
+            test_led_on ();
             delay_ms ( a );
 
-            status_off ();
+            test_led_off ();
             delay_ms ( a );
 
-            status_on ();
+            test_led_on ();
             delay_ms ( a );
 
-            status_off ();
+            test_led_off ();
 
             delay_ms ( b );
         }
 }
-
 
 /* -------------------------------------------- */
 

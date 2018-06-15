@@ -2,8 +2,9 @@
 
 # Holy cow! A perl script!!
 # usage: mkversion -ihexapod_version -v$(shell cat VERSION) >version.c
+# ./mkversion -ikyu_version -v$(VERSION) >version.c
 
-$ident = "";
+$ident = "kyu_version";
 $vernum = "";
 $board = "";
 
@@ -12,6 +13,9 @@ chomp $user;
 
 $board = `readlink board`;
 chomp $board;
+
+$vernum = `cat VERSION`;
+chomp $vernum;
 
 # Command line arguments, -v and -i
 while ( $_ = $ARGV[0] ) {
