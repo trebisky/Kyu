@@ -171,8 +171,26 @@ static char stack_area[NUM_CORES*CORE_STACK_SIZE] __attribute__ ((aligned (256))
 
 char *core_stacks = stack_area;
 
+static unsigned int ram_start;
+static unsigned int ram_size;
+
 /* Called very early in initialization
  *  (now from locore.S to set up MMU)
+ */
+void
+board_mmu_init ( void )
+{
+	ram_start = BOARD_RAM_START;
+	// ram_size = BOARD_RAM_SIZE;
+
+	printf ( "Probing for amount of ram\n" );
+	ram_size = ram_probe ( ram_start );
+	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
+
+	mmu_initialize ( ram_start, ram_size );
+}
+
+/* Called early, but not as early as the above.
  */
 void
 board_hardware_init ( void )
@@ -184,7 +202,7 @@ board_hardware_init ( void )
         printf ( "board_hardware_init - cpsr: %08x\n",  get_cpsr() );
 
 	cache_init ();
-	ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
+	ram_init ( ram_start, ram_size );
 	/*
 	core_stacks = ram_alloc ( NUM_CORES * CORE_STACK_SIZE );
 	*/

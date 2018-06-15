@@ -127,8 +127,7 @@ kyu_startup ( void )
 
 	// emac_probe (); /* XXX */
 
-	// now called from locore.S  6-14-2018
-	// board_hardware_init ();
+	board_hardware_init ();
 
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );

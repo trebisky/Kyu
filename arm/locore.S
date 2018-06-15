@@ -154,14 +154,12 @@ primary_start_NEW:
 	// instructions.
 	//
         // (this needs to be done before the MMU is enabled)
-        // mrc     p15, 0, r0, c1, c0, 1
 	read_ACTLR ( r0 )
         bic     r0, r0, #0x040
-        // mcr     p15, 0, r0, c1, c0, 1
 	write_ACTLR ( r0 )
 
 	// This sets up the page table
-	bl	board_hardware_init
+	bl	board_mmu_init
 
 	// start Kyu
 	bl	kyu_startup

@@ -9,11 +9,16 @@
  * ram.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  4/20/2017
+ * Tom Trebisky  6/15/2018
  */
 
 #include "kyu.h"
 #include "kyulib.h"
 #include "board/board.h"
+
+/* XXX ultimately this should not be an ARM specific or board specific thing
+ * and should get moved up one level.
+ */
 
 /* This is just a starting point for a low level
  * ram allocator.  The basic idea is that we find ourselves
@@ -80,15 +85,20 @@ static int ram_sizes[] = { 2048, 1024, 512, 256 };
 
 /* This was introduced for the NanoPi Neo
  *  6-14-2017
+ *
+ * Now called very early in initialization in order to figure
+ *  out the ram size in order to set up the MMU.
+ *
  * Prior to this I worked only with the Orange Pi PC, with 1024M
  * But the NanoPi may have 512M (or 256M), which is also true of
  *  other Orange Pi variants.
  * Note that on my Orange Pi PC plus, I have 1024M of ram, but it
- * gets duplicated into the upper part of the address space.
+ * gets replicated into the upper part of the address space.
  * I try to watch for that.
+ *
  * XXX - it would not be a bad idea to have the mmu unmap that.
  */
-static unsigned long
+unsigned long
 ram_probe ( unsigned long start )
 {
 	unsigned long save;
@@ -121,6 +131,10 @@ ram_probe ( unsigned long start )
 	return 256 * MEG;
 }
 
+/* ------------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------------- */
+
 void
 ram_init ( unsigned long start, unsigned long size )
 {
@@ -129,18 +143,21 @@ ram_init ( unsigned long start, unsigned long size )
 	cache_line_size = get_cache_line_size();
 	cache_line_mask = cache_line_size - 1;
 
+#ifdef notdef
 	if ( size <= 0 ) {
 	    printf ( "Probing for amount of ram\n" );
 	    size = ram_probe ( start );
 	} else {
 	    printf ( "Configured with %d M of ram\n", size );
 	}
+#endif
 
 	ram_start = start;
 	ram_endp = start + size;
 
 	next_ram = start;
 	last_ram = start + size;
+
 	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
 
 	kernel_end = (unsigned long) &_end;
@@ -169,7 +186,8 @@ ram_init ( unsigned long start, unsigned long size )
 	if ( next_ram & cache_line_mask )
 	    panic_spin ( "Invalid cache alignment in ram_init\n" );
 
-	mmu_initialize ( start, size );
+	// not any more, now called from board_mmu_init()
+	// mmu_initialize ( start, size );
 
 	// this was an early test
 	// kernel_end = ram_alloc ( 55*1024 );
