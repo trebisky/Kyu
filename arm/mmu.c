@@ -48,17 +48,6 @@ void mmu_status ( void );
 /* Mask for TTBR0 */
 #define MMU_BASE_MASK 0x3fff
 
-#ifdef notdef
-/* ARM v7 now has actual barrier instructions, but these work for
- * older ARM (like v5) as well as v7.
- * At some point U-boot used these since it compiled with -march=armv5
- * but we compile Kyu with -marm -march=armv7-a
- */
-#define CP15ISB asm volatile ("mcr     p15, 0, %0, c7, c5, 4" : : "r" (0))
-#define CP15DSB asm volatile ("mcr     p15, 0, %0, c7, c10, 4" : : "r" (0))
-#define CP15DMB asm volatile ("mcr     p15, 0, %0, c7, c10, 5" : : "r" (0))
-#endif
-
 /* The low 7 bits in the TTBR0 register are described on page B4-1731
  * of the ARM v7-A and v7-R Architecture Reference Manual
  */
@@ -106,23 +95,17 @@ mmu_set_ttbr ( void )
 {
 	unsigned int new_ttbr;
 
-	// TTBCR = 0
-	// asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( 0 ) );
 	set_TTBCR ( 0 );
 
 	new_ttbr = (unsigned int) page_table;
 	new_ttbr |= TTBR_BITS;
 
-	/* TTBR0 */
-	// asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" (new_ttbr) );
 	set_TTBR0 ( new_ttbr );
 
-	/* TTBR1 - also, "just in case" */
-	// asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" (new_ttbr) );
+	/* "just in case" */
 	set_TTBR1 ( new_ttbr );
 
 	// set DACR to manager level for all domains
-	// asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( 0xffffffff ) );
 	set_DACR ( 0xffffffff );
 
 	asm volatile ( "isb" );
@@ -130,22 +113,29 @@ mmu_set_ttbr ( void )
 	asm volatile ( "dmb" );
 }
 
+#ifdef notdef
 void
 invalidate_tlb ( void )
 {
-        /* Invalidate entire unified TLB */
-        asm volatile ("mcr p15, 0, %0, c8, c7, 0" : : "r" (0));
+        /* Invalidate entire I and D TLB */
+	set_TLB_INV ( 0 );
+
+	/* XXX - it is not clear that these comments are accurate.
+	 * The manual says that these invalidate both I and D given
+	 * an MVA or ASID -- so it is not clear what they do given
+	 * a zero value.
+	 * But this is moot since we no longer use this routine.
+	 */
         /* Invalidate entire data TLB */
-        asm volatile ("mcr p15, 0, %0, c8, c6, 0" : : "r" (0));
+	set_TLB_INV_MVA ( 0 );
         /* Invalidate entire instruction TLB */
-        asm volatile ("mcr p15, 0, %0, c8, c5, 0" : : "r" (0));
+	set_TLB_INV_ASID ( 0 );
 
         /* Barriers so we don't move on until this is complete */
-        // CP15DSB;
-        // CP15ISB;
 	asm volatile ( "dsb" );
 	asm volatile ( "isb" );
 }
+#endif
 
 /* Oddly enough, U-Boot sets the XN bit for all of RAM and we had no problems ...
  * But we don't do that.
@@ -328,7 +318,8 @@ mmu_initialize_OLD ( unsigned long ram_start, unsigned long ram_size )
 
 	// mmu_display ( (unsigned int) new_mmu );
 
-	invalidate_tlb ();
+	// invalidate_tlb ();
+	set_TLB_INV ( 0 );
 
 	mmu_set_ttbr ();
 
@@ -355,15 +346,15 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 	desc |= bits;
 	index = va >> MMU_SHIFT;
 
-	/* TTBR0 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	get_TTBR0 ( mmubase );
 
 	printf ( "mmu_remap, mmubase = %08x\n", mmubase );
 	printf ( "mmu_remap, index, bits = %d, %08x\n", index, bits );
 
 	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
 	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
-	invalidate_tlb ();
+	// invalidate_tlb ();
+	set_TLB_INV ( 0 );
 
 	mmubase[index] = desc;
 
@@ -372,7 +363,8 @@ mmu_remap ( unsigned long va, unsigned long pa, int bits )
 
 	// mmu_page_table_flush ( mmubase, &mmubase[MMU_SIZE] );
 	flush_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
-	invalidate_tlb ();
+	// invalidate_tlb ();
+	set_TLB_INV ( 0 );
 }
 
 /* Make a section uncacheable.
@@ -410,12 +402,9 @@ mmu_off ( void )
 {
 	int val;
 
-	/* SCTRL */
-        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
-
+	get_SCTLR ( val );
 	val &= ~SCTRL_MMU_ENABLE;
-
-        asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (val) : "cc");
+	set_SCTLR ( val );
 }
 
 static void
@@ -423,12 +412,9 @@ mmu_on ( void )
 {
 	int val;
 
-	/* SCTRL */
-        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
-
+	get_SCTLR ( val );
 	val |= SCTRL_MMU_ENABLE;
-
-        asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (val) : "cc");
+	set_SCTLR ( val );
 }
 
 /* Run this in a thread since it tends to generate data aborts */
@@ -481,7 +467,7 @@ mmu_tester ( int xxx )
 	unsigned long *mmubase;
 
 	mmu_remap ( evil, evil, 0 );
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	get_TTBR0 ( mmubase );
 	invalidate_dcache_range ( mmubase, &mmubase[MMU_SIZE] );
 	mmu_scan ( "Before remapping\n" );
 #endif
@@ -516,35 +502,22 @@ void
 mmu_show ( void )
 {
 	unsigned long *mmubase;
-	unsigned long pu_base;
 	unsigned long esp;
 	unsigned long val;
 
-#ifdef notdef
-	/* We know this works */
-	esp = get_sp();
-	printf ( " SP = %08x\n", esp );
-	esp = 0xBADBAD;
-#endif
-
-	/* This works just fine !! */
-	asm volatile ("add %0, sp, #0\n" :"=r"(esp));
+	get_SP ( esp );
 	printf ( " SP = %08x\n", esp );
 
-	/* SCTRL */
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (val) : : "cc");
+	get_SCTLR ( val );
 	printf ( "SCTRL = %08x\n", val );
 
-	/* TTBCR */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 2" : "=r"(val) );
+	get_TTBCR ( val );
 	printf ( "--TTBCR = %08x\n", val );
 
-	/* TTBR0 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	get_TTBR0 ( mmubase );
 	printf ( "--TTBR0 = %08x\n", mmubase );
 
-	/* TTBR1 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 1" : "=r"(val) );
+	get_TTBR1 ( val );
 	printf ( "--TTBR1 = %08x\n", val );
 
 	if ( ! mmubase )
@@ -553,12 +526,6 @@ mmu_show ( void )
 	    printf ( "MMU base = %08x\n", mmubase );
 
 	mmu_status ();
-
-	/* protection unit base */
-	asm volatile ("mrc p15, 0, %0, c6, c0, 0" : "=r"(pu_base) );
-
-	if ( pu_base )
-	    printf ( "Protection unit base = %08x\n", pu_base );
 
 	if ( mmubase ) {
 	    mmu_scan ( "Setup by Kyu: " );
@@ -610,9 +577,7 @@ mmu_base ( char *msg )
 {
 	unsigned long ttbr;
 
-	/* TTBR0 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(ttbr) );
-
+	get_TTBR0 ( ttbr );
 	printf ( "%s TTBR0 = %08x\n", msg, ttbr );
 }
 
@@ -623,8 +588,7 @@ mmu_scan ( char *msg )
 
 	mmu_base ( msg );
 
-	/* TTBR0 */
-	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r"(mmubase) );
+	get_TTBR0 ( mmubase );
 	mmu_display ( mmubase );
 
 }
@@ -638,8 +602,7 @@ mmu_status ( void )
 	int scr;
 	int mmu_base;
 
-	/* SCTRL */
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
+	get_SCTLR ( scr );
 
 	if ( scr & 0x01 )
 	    printf ( "MMU enabled\n" );
