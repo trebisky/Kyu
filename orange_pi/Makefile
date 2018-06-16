@@ -14,7 +14,6 @@ OBJS =  board.o \
 	emac.o \
 	timer.o \
 	spinlocks.o \
-	cores.o \
 	ccu.o \
 	multicore.o
 

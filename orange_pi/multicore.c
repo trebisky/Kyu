@@ -10,6 +10,7 @@
  *
  * Tom Trebisky  1/19/2017
  *
+ * "It is the difference that makes the difference"  (Sal Glesser, Spyderco)
  */
 
 #define CPUCFG_BASE     0x01f01c00
@@ -66,151 +67,18 @@
  * This is probably a redundant address decode, but who knows.
  */
 
-void test_core ( void );
-
 typedef void (*vfptr) ( void );
-
-extern unsigned long core_stacks;
-
-/* screwball entry point to allow core testing
- * early in Kyu initialization.
- */
-void
-preinit_core ( void )
-{
-	core_stacks = 0x50000000;
-}
-
-/* This is in locore.S */
-// extern void newcore ( void );
-extern void secondary_start ( void );
-
-void
-launch_core ( int cpu )
-{
-        volatile unsigned long *reset;
-        unsigned long mask = 1 << cpu;
-
-        reset = (volatile unsigned long *) ( CPUCFG_BASE + (cpu+1) * 0x40);
-	// printf ( "-- reset = %08x\n", reset );
-
-        //*ROM_START = (unsigned long) newcore;  /* in locore.S */
-        *ROM_START = (unsigned long) secondary_start;  /* in locore.S */
-
-        *reset = 0;                     /* put core into reset */
-
-        *GEN_CTRL &= ~mask;             /* reset L1 cache */
-        *POWER_OFF &= ~mask;            /* power on */
-	// thr_delay ( 2 );
-	delay_ms ( 2 );
-
-        *reset = 3;			/* take out of reset */
-}
 
 // #define SENTINEL	ROM_START
 #define SENTINEL	(volatile unsigned long *) 4
 
-#ifdef notdef
-void
-watch_core ( void )
-{
-	volatile unsigned long *sent;
-	int i;
+/* This is in locore.S */
+extern void secondary_start ( void );
 
-	sent = SENTINEL;
-
-	printf ( "\n" );
-	printf ( "Sentinel addr: %08x\n", sent );
-
-	for ( i=0; i<40; i++ ) {
-	    thr_delay ( 100 );
-	    // printf ( "Core status: %08x\n", *sent );
-	    if ( *sent == 0 ) {
-		printf ( "Core started !!\n" );
-		return;
-	    }
-	}
-	printf ( "** Core failed to start\n" );
-
-}
-#endif
-
-/* Most of the time a core takes 30 counts to start */
-#define MAX_CORE	100
-
-int
-wait_core ( void )
-{
-	volatile unsigned long *sent;
-	int i;
-
-	sent = SENTINEL;
-
-	for ( i=0; i<MAX_CORE; i++ ) {
-	    if ( *sent == 0 ) {
-		// printf ( "Core started in %d\n", i );
-		return 1;
-	    }
-	}
-	return 0;
-}
-
-static void
-test_one ( int cpu )
-{
-	int stat;
-
-	*SENTINEL = 0xdeadbeef;
-
-	printf ( "Starting core %d ...\n", cpu );
-	launch_core ( cpu );
-
-	// watch_core ();
-	stat = wait_core ();
-	if ( stat )
-	    printf ( " Core %d verified to start\n", cpu );
-	else
-	    printf ( "** Core %d failed to start\n", cpu );
-
-
-	*ROM_START = 0;
-}
-
-void
-test_reg ( volatile unsigned long *reg )
-{
-	unsigned long val;
-
-	printf ( "Test REG, read %08x as %08x\n", reg, *reg );
-	*reg = val = 0;
-	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
-	*reg = val = 0xdeadbeef;
-	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
-	*reg = val = 0;
-	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
-}
-
-void
-run_blink ( int num, int a, int b )
-{
-	int i;
-
-	b -= 2*num*a;
-
-        for ( ;; ) {
-	    for ( i=0; i<num; i++ ) {
-		status_on ();
-		delay_ms ( a );
-		status_off ();
-		delay_ms ( a );
-	    }
-
-	    delay_ms ( b );
-        }
-}
+static void test_one ( int );
+static void launch_core ( int );
 
 /* This gets called by the test menu
- *   (or something of the sort)
  */
 void
 test_core ( void )
@@ -239,7 +107,6 @@ test_core ( void )
 	printf ( "Gate register: %08x\n", val );
 #endif
 
-	printf ( "Address of core stacks: %08x\n", core_stacks );
 	test_one ( 1 );
 	thr_delay ( 1000 );
 	test_one ( 2 );
@@ -257,40 +124,110 @@ test_core ( void )
 
 }
 
-#ifdef notdef
-/* Runs mighty slow without D cache enabled */
-static void
-delay_ms_cache ( int msecs )
-{
-        volatile int count = 100000 * msecs;
+/* Most of the time a core takes 30 counts to start */
+#define MAX_CORE	100
 
-        while ( count-- )
-            ;
+int
+wait_core ( void )
+{
+	volatile unsigned long *sent;
+	int i;
+
+	sent = SENTINEL;
+
+	for ( i=0; i<MAX_CORE; i++ ) {
+	    if ( *sent == 0 ) {
+		// printf ( "Core started in %d\n", i );
+		return 1;
+	    }
+	}
+	return 0;
 }
 
+/* Start a single core */
 static void
-delay_ms ( int msecs )
+test_one ( int cpu )
 {
-	delay_ms_cache ( msecs );
-	// delay_ms_nocache ( msecs );
-}
-#endif
+	int stat;
 
-/* If all goes well, we will be running here,
- * And indeed we are, this is the first C code
- * run by a new core.
+	*SENTINEL = 0xdeadbeef;
+
+	printf ( "Starting core %d ...\n", cpu );
+	launch_core ( cpu );
+
+	// watch_core ();
+	stat = wait_core ();
+	if ( stat )
+	    printf ( " Core %d verified to start\n", cpu );
+	else
+	    printf ( "** Core %d failed to start\n", cpu );
+
+
+	*ROM_START = 0;
+}
+
+/* Manipulate the hardware to power up a core
  */
+static void
+launch_core ( int cpu )
+{
+        volatile unsigned long *reset;
+        unsigned long mask = 1 << cpu;
+
+        reset = (volatile unsigned long *) ( CPUCFG_BASE + (cpu+1) * 0x40);
+	// printf ( "-- reset = %08x\n", reset );
+
+        *ROM_START = (unsigned long) secondary_start;  /* in locore.S */
+
+        *reset = 0;                     /* put core into reset */
+
+        *GEN_CTRL &= ~mask;             /* reset L1 cache */
+        *POWER_OFF &= ~mask;            /* power on */
+	// thr_delay ( 2 );
+	delay_ms ( 2 );
+
+        *reset = 3;			/* take out of reset */
+}
+
+/* blink the red status LED on the orange pi
+ */
+static void
+run_blink ( int num, int a, int b )
+{
+	int i;
+
+	b -= 2*num*a;
+
+        for ( ;; ) {
+	    for ( i=0; i<num; i++ ) {
+		status_on ();
+		delay_ms ( a );
+		status_off ();
+		delay_ms ( a );
+	    }
+
+	    delay_ms ( b );
+        }
+}
+
+
+static void
+core_demo1 ( int core )
+{
+	// printf ( "Core %d blinking\n", core );
+
+	/* Blink red status light */
+	run_blink ( core+1, 100, 4000 );
+}
 
 #define CORE_QUIET
 
-/* This is the first C code a new core runs */
+/* When a core comes alive, this is the first C code it runs.
+ */
 void
 run_newcore ( int core )
 {
 	volatile unsigned long *sent;
-	unsigned long sp;
-	int val = 0;
-	int cpu = 99;
 
 	/* Clear flag to indicate we are running */
 	sent = SENTINEL;
@@ -302,25 +239,16 @@ run_newcore ( int core )
 	cpu &= 0x3;
 #endif
 
+
+#ifndef CORE_QUIET
+	unsigned long sp;
 	/* Get the value of sp */
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 
-#ifndef CORE_QUIET
 	/* Makes a mess without synchronization */
 	printf ( "Core %d running with sp = %08x\n", cpu, sp );
 	printf ( "Core %d core (arg) = %08x\n", cpu, core );
 	// printf ( "Core %d running\n", cpu );
-#endif
-
-#ifdef notdef
-	for ( ;; ) {
-	    *sent = val++;
-	    delay_ms ( 1 );
-	    if ( val % 5 == 0 )
-		printf ( "Tick !!\n" );
-	    if ( *ROM_START == 0 )
-		break;
-	}
 #endif
 
 #ifdef notdef
@@ -330,13 +258,53 @@ run_newcore ( int core )
 		;
 	}
 #endif
+	core_demo1 ( core );
 
-	printf ( "Core %d blinking\n", core );
+}
 
-	/* Blink red status light */
-	// gpio_blink_red ();
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* old cruft below here */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
 
-	run_blink ( core+1, 100, 4000 );
+#ifdef notdef
+void
+watch_core ( void )
+{
+	volatile unsigned long *sent;
+	int i;
+
+	sent = SENTINEL;
+
+	printf ( "\n" );
+	printf ( "Sentinel addr: %08x\n", sent );
+
+	for ( i=0; i<40; i++ ) {
+	    thr_delay ( 100 );
+	    // printf ( "Core status: %08x\n", *sent );
+	    if ( *sent == 0 ) {
+		printf ( "Core started !!\n" );
+		return;
+	    }
+	}
+	printf ( "** Core failed to start\n" );
+
+}
+#endif
+
+void
+test_reg ( volatile unsigned long *reg )
+{
+	unsigned long val;
+
+	printf ( "Test REG, read %08x as %08x\n", reg, *reg );
+	*reg = val = 0;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
+	*reg = val = 0xdeadbeef;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
+	*reg = val = 0;
+	printf ( "Test REG, set %08x: read %08x as %08x\n", val, reg, *reg );
 }
 
 /* THE END */
