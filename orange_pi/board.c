@@ -229,7 +229,7 @@ board_init ( void )
 	pwr_on ();
 	wd_init ();
 
-	spinlocks_init ();
+	h3_spinlocks_init ();
 	gic_init ();
 
 	serial_init ( CONSOLE_BAUD );

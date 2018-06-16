@@ -343,6 +343,48 @@ primary_start_bbb:
 // spin if we return
 1:	b	1b
 
+/*------------------------------------------------------------------------
+ * spin_lock  -  Lock a spinlock using arm exclusive monitors
+ *------------------------------------------------------------------------
+ */
+
+#define SPIN_UNLOCKED        0       /* Exclusive memory access unlocked state */
+#define SPIN_LOCKED          1       /* Exclusive memory access locked state */
+
+.text
+.globl spin_lock
+.globl spin_unlock
+
+/*------------------------------------------------------------------------
+ * spin_lock  -  Lock a spinlock using arm exclusive monitors
+ *------------------------------------------------------------------------
+ */
+spin_lock:
+	ldr	r1, =SPIN_LOCKED
+
+1:	ldrex	r2, [r0]	/* spin until unlocked */
+        cmp	r2, r1
+        beq	1b
+
+        strexne	r2, r1, [r0]	/* Attempt to lock it */
+        cmpne	r2, #1
+        beq	1b		/* Failed - retry */
+
+        /* Lock acquired */
+        dmb
+        bx lr
+
+/*------------------------------------------------------------------------
+ * spin_unlock  -  Unlock a spinlock using arm exclusive monitors
+ *------------------------------------------------------------------------
+ */
+spin_unlock:
+                ldr r1, =SPIN_UNLOCKED
+                dmb
+
+                str r1, [r0]
+                bx lr
+
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
 /*  Below here we hope and expect to discard soon */

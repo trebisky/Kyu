@@ -6,16 +6,16 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * spinlocks.c for the Orange Pi PC and PC Plus
+ * h3_spinlocks.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  1/23/2017
  *
  */
 
-#define SPINLOCK_BASE     (struct spinlocks *) 0x01c18000
+#define SPINLOCK_BASE     (struct h3_spinlocks *) 0x01c18000
 #define NLOCKS	32
 
-struct spinlocks {
+struct h3_spinlocks {
 	volatile unsigned long sysstatus;
 	long  _pad0[3];
 	volatile unsigned long status;
@@ -23,10 +23,61 @@ struct spinlocks {
 	volatile unsigned long lock[NLOCKS];
 };
 
-static void
-spinlocks_test ( void )
+#define CCU_BASE		0x01c20000
+
+#define BUS_GATING_REG1     	0x64
+#define BUS_RESET_REG1     	0x02C4
+
+#define SPINLOCK_BIT		(1<<22)
+
+/* Initially all locks are unlocked */
+
+void
+h3_spinlocks_init ( void )
 {
-	struct spinlocks *sl = SPINLOCK_BASE;
+	volatile unsigned long *lp;
+
+	lp = (volatile unsigned long *) (CCU_BASE + BUS_GATING_REG1);
+	*lp |= SPINLOCK_BIT;
+	lp = (volatile unsigned long *) (CCU_BASE + BUS_RESET_REG1);
+	*lp |= SPINLOCK_BIT;
+
+	// h3_spinlocks_test ();
+}
+
+int
+h3_spin_check ( int lock )
+{
+	struct h3_spinlocks *sl = SPINLOCK_BASE;
+
+	return sl->status & (1<<lock);
+}
+
+void
+h3_spin_lock ( int lock )
+{
+	struct h3_spinlocks *sl = SPINLOCK_BASE;
+
+	for ( ;; ) {
+	    if ( sl->lock[lock] == 0 )
+		break;
+	}
+
+}
+
+void
+h3_spin_unlock ( int lock )
+{
+	struct h3_spinlocks *sl = SPINLOCK_BASE;
+
+	sl->lock[lock] = 0;	/* release it */
+}
+
+#ifdef notdef
+static void
+h3_spinlocks_test ( void )
+{
+	struct h3_spinlocks *sl = SPINLOCK_BASE;
 	int lock = 0;
 	int lmask = 1<<lock;
 	unsigned long xyz;
@@ -54,53 +105,7 @@ spinlocks_test ( void )
 	printf ( "Spin sys: %08x\n", sl->sysstatus );
 	printf ( "Spin stat: %08x\n", sl->status );
 }
+#endif
 
-#define CCU_BASE		0x01c20000
-
-#define BUS_GATING_REG1     	0x64
-#define BUS_RESET_REG1     	0x02C4
-
-#define SPINLOCK_BIT		(1<<22)
-
-void
-spinlocks_init ( void )
-{
-	volatile unsigned long *lp;
-
-	lp = (volatile unsigned long *) (CCU_BASE + BUS_GATING_REG1);
-	*lp |= SPINLOCK_BIT;
-	lp = (volatile unsigned long *) (CCU_BASE + BUS_RESET_REG1);
-	*lp |= SPINLOCK_BIT;
-
-	// spinlocks_test ();
-}
-
-int
-spin_check ( int lock )
-{
-	struct spinlocks *sl = SPINLOCK_BASE;
-
-	return sl->status & (1<<lock);
-}
-
-void
-spin_lock ( int lock )
-{
-	struct spinlocks *sl = SPINLOCK_BASE;
-
-	for ( ;; ) {
-	    if ( sl->lock[lock] == 0 )
-		break;
-	}
-
-}
-
-void
-spin_unlock ( int lock )
-{
-	struct spinlocks *sl = SPINLOCK_BASE;
-
-	sl->lock[lock] = 0;	/* release it */
-}
 
 /* THE END */

@@ -86,6 +86,13 @@ static void start_test2 ( void );
 static void pulses ( int, int );
 static void run_blink ( int, int, int );
 
+static void core_demo1 ( int );
+static void core_demo2 ( int );
+
+typedef void (*ifptr) ( int );
+
+static ifptr	demo_func;
+
 /* This gets called by the test menu
  */
 void
@@ -106,15 +113,19 @@ test_core ( void )
 	printf ( "SCTRL = %08x\n", reg );
 #endif
 
-	reg = spin_check ( 0 );
+#ifdef notdef
+	reg = h3_spin_check ( 0 );
 	printf ( "Spin: %d\n", reg );
 
-	spin_lock ( 0 );
+	h3_spin_lock ( 0 );
 
-	reg = spin_check ( 0 );
+	reg = h3_spin_check ( 0 );
 	printf ( "Spin: %d\n", reg );
+#endif
 
+	// demo_func = core_demo1;
 	// start_test1 ();
+	demo_func = core_demo2;
 	start_test2 ();
 }
 
@@ -150,9 +161,9 @@ static void
 start_test2 ( void )
 {
 	/* acquire all the locks */
-	spin_lock ( 1 );
-	spin_lock ( 2 );
-	spin_lock ( 3 );
+	h3_spin_lock ( 1 );
+	h3_spin_lock ( 2 );
+	h3_spin_lock ( 3 );
 
 	/* start all the cores */
 	test_one ( 1 );
@@ -161,11 +172,11 @@ start_test2 ( void )
 
 	for ( ;; ) {
 	    thr_delay ( 2000 );
-	    spin_unlock ( 1 );
+	    h3_spin_unlock ( 1 );
 	    thr_delay ( 1000 );
-	    spin_unlock ( 2 );
+	    h3_spin_unlock ( 2 );
 	    thr_delay ( 1000 );
-	    spin_unlock ( 3 );
+	    h3_spin_unlock ( 3 );
 	}
 }
 
@@ -175,7 +186,48 @@ core_demo2 ( int core )
 	// printf ( "Core %d blinking\n", core );
 
 	for ( ;; ) {
-	    spin_lock ( core );
+	    h3_spin_lock ( core );
+	    pulses ( core+1, 100 );
+	}
+}
+
+/* -------------------------------------------------------------------------------- */
+/* Demo 3,
+ *  cores all wait on spin lock
+ *  "master" core signals them when to blink.
+ *  like Demo 2, but uses ARM spinlocks
+ */
+
+static int demo3_locks[4];
+
+static void
+start_test3 ( void )
+{
+	// Set to 1, these are locked */
+	demo3_locks[1] = 1;
+	demo3_locks[2] = 1;
+	demo3_locks[3] = 1;
+
+	/* start all the cores */
+	test_one ( 1 );
+	test_one ( 2 );
+	test_one ( 3 );
+
+	for ( ;; ) {
+	    thr_delay ( 2000 );
+	    spin_unlock ( &demo3_locks[1] );
+	    thr_delay ( 1000 );
+	    spin_unlock ( &demo3_locks[2] );
+	    thr_delay ( 1000 );
+	    spin_unlock ( &demo3_locks[3] );
+	}
+}
+
+static void
+core_demo3 ( int core )
+{
+	for ( ;; ) {
+	    spin_lock ( &demo3_locks[core] );
 	    pulses ( core+1, 100 );
 	}
 }
@@ -283,7 +335,8 @@ run_newcore ( int core )
 	*sent = 0;
 
 	// core_demo1 ( core );
-	core_demo2 ( core );
+	// core_demo2 ( core );
+	(*demo_func) ( core );
 }
 
 /* -------------------------------------------------------------------------------- */
