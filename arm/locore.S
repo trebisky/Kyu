@@ -344,28 +344,22 @@ primary_start_bbb:
 1:	b	1b
 
 /*------------------------------------------------------------------------
- * spin_lock  -  Lock a spinlock using arm exclusive monitors
- *------------------------------------------------------------------------
- */
-
-#define SPIN_UNLOCKED        0       /* Exclusive memory access unlocked state */
-#define SPIN_LOCKED          1       /* Exclusive memory access locked state */
+ * spin_lock / spin_unlock  -  spinlocks using ARM exclusive monitors
+ * From Xinu code by Phil Van Every
+ * 1 is locked, 0 is unlocked
+ *------------------------------------------------------------------------ */
 
 .text
 .globl spin_lock
 .globl spin_unlock
 
-/*------------------------------------------------------------------------
- * spin_lock  -  Lock a spinlock using arm exclusive monitors
- *------------------------------------------------------------------------
- */
 spin_lock:
-	ldr	r1, =SPIN_LOCKED
 
 1:	ldrex	r2, [r0]	/* spin until unlocked */
-        cmp	r2, r1
+        cmp	r2, #0
         beq	1b
 
+	mov	r1, #1
         strexne	r2, r1, [r0]	/* Attempt to lock it */
         cmpne	r2, #1
         beq	1b		/* Failed - retry */
@@ -374,20 +368,16 @@ spin_lock:
         dmb
         bx lr
 
-/*------------------------------------------------------------------------
- * spin_unlock  -  Unlock a spinlock using arm exclusive monitors
- *------------------------------------------------------------------------
- */
 spin_unlock:
-                ldr r1, =SPIN_UNLOCKED
-                dmb
+	mov	r1, #0
+        dmb
 
-                str r1, [r0]
-                bx lr
+        str r1, [r0]
+        bx lr
 
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
-/*  Below here we hope and expect to discard soon */
+/*  Everything below here we hope and expect to discard soon */
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
 
