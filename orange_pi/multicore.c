@@ -69,6 +69,8 @@
 
 typedef void (*vfptr) ( void );
 
+/* We just pick a location in low memory (the on chip ram)
+ */
 // #define SENTINEL	ROM_START
 #define SENTINEL	(volatile unsigned long *) 4
 
@@ -77,6 +79,12 @@ extern void secondary_start ( void );
 
 static void test_one ( int );
 static void launch_core ( int );
+
+static void start_test1 ( void );
+static void start_test2 ( void );
+
+static void pulses ( int, int );
+static void run_blink ( int, int, int );
 
 /* This gets called by the test menu
  */
@@ -98,30 +106,78 @@ test_core ( void )
 	printf ( "SCTRL = %08x\n", reg );
 #endif
 
-#ifdef notdef
-	unsigned long val;
-	val = *CPU_CLK_GATE;
-	printf ( "Gate register: %08x\n", val );
-	*CPU_CLK_GATE = 0x101;
-	val = *CPU_CLK_GATE;
-	printf ( "Gate register: %08x\n", val );
-#endif
+	reg = spin_check ( 0 );
+	printf ( "Spin: %d\n", reg );
 
+	spin_lock ( 0 );
+
+	reg = spin_check ( 0 );
+	printf ( "Spin: %d\n", reg );
+
+	// start_test1 ();
+	start_test2 ();
+}
+
+/* -------------------------------------------------------------------------------- */
+/* Demo 1, hard delay loop to blink LED patterns */
+
+static void
+start_test1 ( void )
+{
 	test_one ( 1 );
 	thr_delay ( 1000 );
 	test_one ( 2 );
 	thr_delay ( 1000 );
 	test_one ( 3 );
+}
 
-	// This yields proper timing
-	// run_blink ( 2, 100, 2000 );
+static void
+core_demo1 ( int core )
+{
+	// printf ( "Core %d blinking\n", core );
 
-	/*
-	test_reg ( ROM_START );
-	test_reg ( PRIVA );
-	test_reg ( PRIVB );
-	*/
+	/* Blink red status light */
+	run_blink ( core+1, 100, 4000 );
+}
 
+/* -------------------------------------------------------------------------------- */
+/* Demo 2,
+ *  cores all wait on spin lock
+ *  "master" core signals them when to blink.
+ */
+
+static void
+start_test2 ( void )
+{
+	/* acquire all the locks */
+	spin_lock ( 1 );
+	spin_lock ( 2 );
+	spin_lock ( 3 );
+
+	/* start all the cores */
+	test_one ( 1 );
+	test_one ( 2 );
+	test_one ( 3 );
+
+	for ( ;; ) {
+	    thr_delay ( 2000 );
+	    spin_unlock ( 1 );
+	    thr_delay ( 1000 );
+	    spin_unlock ( 2 );
+	    thr_delay ( 1000 );
+	    spin_unlock ( 3 );
+	}
+}
+
+static void
+core_demo2 ( int core )
+{
+	// printf ( "Core %d blinking\n", core );
+
+	for ( ;; ) {
+	    spin_lock ( core );
+	    pulses ( core+1, 100 );
+	}
 }
 
 /* Most of the time a core takes 30 counts to start */
@@ -189,43 +245,59 @@ launch_core ( int cpu )
         *reset = 3;			/* take out of reset */
 }
 
+static void
+pulses ( int num, int ms )
+{
+	int i;
+
+	for ( i=0; i<num; i++ ) {
+	    status_on ();
+	    delay_ms ( ms );
+	    status_off ();
+	    delay_ms ( ms );
+	}
+}
+
 /* blink the red status LED on the orange pi
  */
 static void
 run_blink ( int num, int a, int b )
 {
-	int i;
-
 	b -= 2*num*a;
 
         for ( ;; ) {
-	    for ( i=0; i<num; i++ ) {
-		status_on ();
-		delay_ms ( a );
-		status_off ();
-		delay_ms ( a );
-	    }
-
+	    pulses ( num, a );
 	    delay_ms ( b );
         }
 }
-
-
-static void
-core_demo1 ( int core )
-{
-	// printf ( "Core %d blinking\n", core );
-
-	/* Blink red status light */
-	run_blink ( core+1, 100, 4000 );
-}
-
-#define CORE_QUIET
 
 /* When a core comes alive, this is the first C code it runs.
  */
 void
 run_newcore ( int core )
+{
+	volatile unsigned long *sent;
+
+	/* Clear flag to indicate we are running */
+	sent = SENTINEL;
+	*sent = 0;
+
+	// core_demo1 ( core );
+	core_demo2 ( core );
+}
+
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* old cruft below here */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+
+#ifdef notdef
+
+#define CORE_QUIET
+
+void
+run_newcore_OLD ( int core )
 {
 	volatile unsigned long *sent;
 
@@ -262,13 +334,6 @@ run_newcore ( int core )
 
 }
 
-/* -------------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------------- */
-/* old cruft below here */
-/* -------------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------------- */
-
-#ifdef notdef
 void
 watch_core ( void )
 {

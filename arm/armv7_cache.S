@@ -141,6 +141,8 @@ done_l1inv:
 	isb
 	bx	lr
 
+#ifdef notdef
+
 .globl	armv7_icache_inv_all
 armv7_icache_inv_all:
 	mov	r0, #0
@@ -178,3 +180,6 @@ armv7_icache_inv_all:
 	isb				@ instruction sync barrier
 	bx	lr			@ return
 	
+#endif
+
+// THE END

@@ -13,7 +13,7 @@ OBJS =  board.o \
 	serial.o \
 	emac.o \
 	timer.o \
-	spinlocks.o \
+	h3_spinlocks.o \
 	ccu.o \
 	multicore.o
 
