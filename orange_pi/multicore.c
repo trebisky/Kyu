@@ -101,15 +101,10 @@ test_core ( void )
 	int reg;
 
 #ifdef notdef
-	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
+	get_CPSR ( reg );
 	printf ( "CPSR  = %08x\n", reg );
-	asm volatile ("mrs %0, cpsr\n" : "=r"(reg) : : "cc" );
-	printf ( "CPSR  = %08x\n", reg );
-	printf ( "CPSR  = %08x\n", get_cpsr() );
-	printf ( "CPSR  = %08x\n", get_cpsr() );
 
-	/* SCTRL */
-        asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (reg) : : "cc");
+	get_SCTRL ( reg );
 	printf ( "SCTRL = %08x\n", reg );
 #endif
 

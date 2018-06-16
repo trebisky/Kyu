@@ -15,6 +15,7 @@
 #include "kyu.h"
 #include "kyulib.h"
 #include "board/board.h"
+#include "arch/cpu.h"
 
 #include "netbuf.h"
 
@@ -60,14 +61,14 @@ delay_calib ( void )
 	for ( i=0; i< 10; i++ ) {
 	    reset_ccnt ();
 	    delay_us ( 10 );
-	    ticks = get_ccnt ();
+	    ticks = r_CCNT ();
 	    printf ( "US Delay ticks = %d\n", ticks/10 );
 	}
 
 	for ( i=0; i< 10; i++ ) {
 	    reset_ccnt ();
 	    delay_ms ( 10 );
-	    ticks = get_ccnt ();
+	    ticks = r_CCNT ();
 	    printf ( "MS Delay ticks = %d\n", ticks/10 );
 	}
 }
@@ -79,7 +80,7 @@ void
 delay_ns ( int delay )
 {
         reset_ccnt ();
-        while ( get_ccnt() < delay )
+        while ( r_CCNT() < delay )
             ;
 }
 #endif
@@ -126,15 +127,6 @@ board_core_startup ( int core )
 void
 board_hardware_init ( void )
 {
-#ifdef notdef
-	{
-	unsigned int sp;
-	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
-        printf ( "board_hardware_init - sp: %08x\n",  sp );
-        printf ( "board_hardware_init - cpsr: %08x\n",  get_cpsr() );
-	}
-#endif
-
 	cache_init ();
 	// ram_init ( BOARD_RAM_START, BOARD_RAM_SIZE );
 	ram_init ( ram_start, ram_size );

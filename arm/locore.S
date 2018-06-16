@@ -66,6 +66,10 @@
 #define read_ACTLR(reg)		MRC p15, 0, reg, c1, c0, 1
 #define write_ACTLR(reg)	MCR p15, 0, reg, c1, c0, 1
 
+/* Coprocessor access control register */
+#define read_CACR(reg)		MRC p15, 0, reg, c1, c0, 2
+#define write_CACR(reg)		MCR p15, 0, reg, c1, c0, 2
+
 /* vector base address register */
 #define read_VBAR(reg)		MRC p15, 0, reg, c12, c0, 0
 #define write_VBAR(reg)		MCR p15, 0, reg, c12, c0, 0
@@ -375,560 +379,14 @@ spin_unlock:
         str r1, [r0]
         bx lr
 
+/* Call this to hang the processor in a spin loop */
+	.globl spin
+spin:
+	b	spin
+
 /* ----------------------------------------------------------- */
+/*  Exception and interrupt vectors */
 /* ----------------------------------------------------------- */
-/*  Everything below here we hope and expect to discard soon */
-/* ----------------------------------------------------------- */
-/* ----------------------------------------------------------- */
-
-/* This is the old standard Kyu startup */
-primary_start_OLD:
-	mrs	r0, cpsr		/* disable interrupts */
-	orr	r0, r0, #PSR_INT_DIS
-	msr	cpsr, r0
-
-	movw	r0, #:lower16:vectors	/* set VBAR */
-	movt	r0, #:upper16:vectors
-	mcr 	p15, 0, r0, c12, c0, 0
-
-	bl	clear_bss
-	dsb
-
-@	bl	paging_init_XINU	// Xinu multicore
-@	dsb
-
-	bl	kyu_startup
-
-@	bl	test_core
-
-// spin if we return
-1:	b	1b
-
-xinu_core:
-start_core:
-	// first switch to SVR mode and disable interrupts
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr cpsr, r0
-
-	// set the spsr to a known value
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr spsr_cxsf, r0
-	mrs r0, spsr
-
-	// allow unaligned data access
-	mrc      p15, 0, r0, c1, c0, 0
-	bic      r0, r0, #2
-	mcr      p15, 0, r0, c1, c0, 0
-
-	movw	r0, #:lower16:vectors	/* set VBAR */
-	movt	r0, #:upper16:vectors
-	mcr 	p15, 0, r0, c12, c0, 0
-
-	// if enabled, flush D cache
-	// (this needs to be done before disabling the MMU)
-	mrc     p15, 0, r0, c1, c0, 0
-	and     r0, r0, #(1 << 2)
-	cmp     r0, #0
-	beq     1f
-		bl armv7_dcache_wbinv_all
-
-1:
-	/* XXX ok */
-	// disable I cache, D cache and MMU
-	// (we want to set up everything from scratch)
-	mrc	p15, 0, r0, c1, c0, 0
-	bic	r0, #0x00001000		// I cache
-	bic	r0, #0x00000004		// D cache
-	bic	r0, #0x00000001		// MMU
-	mcr	p15, 0, r0, c1, c0, 0
-	isb
-	@bl	go_red	// OK
-
-	// enable SMP
-	// (this needs to be done before the MMU is enabled)
-	mrc	p15, 0, r0, c1, c0, 1
-	bic	r0, r0, #0x040
-	mcr	p15, 0, r0, c1, c0, 1
-
-	// set up stacks for all modes of this core (Xinu method)
-	// bl setup_stacks
-	@bl	go_red	// OK
-
-	// setup stack for this core (Kyu method)
-	// Read processor affinity register
-        // mrc     p15, 0, r0, c0, c0, 5
-	read_MPID ( r0 )
-	and	r0, #3
-
-@	lsl	r0, #14
-@	ldr	r2, =core_stacks
-@	ldr	r2, [r2]
-@	add	sp, r2, r0
-
-	bl	setup_stacks_kyu
-
-	@bl	go_red	// OK
-
-	// core 0 has to inititialize
-	// some shared data
-	// mrc	p15, 0, r11, c0, c0, 5
-	read_MPID ( r11 )
-	and	r11, r11, #0x03
-	cmp	r11, #0
-	bne	2f
-		/// zero BSS
-@		ldr	r0, =edata
-@		ldr	r1, =end
-@		bl	bzero
-@		dsb
-
-		// create exception vector
-@		bl initevec
-@		dsb
-
-		// create page table
-@		bl paging_init
-@		dsb
-
-2:
-	// set exception vector
-@	ldr r0, =exp_vector
-@	bl evec_set_addr
-	@bl	go_red	// OK
-
-	// as per Kyu main core
-	movw	r0, #:lower16:vectors	/* set VBAR */
-	movt	r0, #:upper16:vectors
-	mcr 	p15, 0, r0, c12, c0, 0
-
-	// enable I cache
-	// (it works without MMU enabled)
-	mov r1, #0x0
-	mcr p15, 0, r1, c7, c5, 0	// invalidate I cache
-	mov  r1, #0x1000
-	mcr p15, 0, r1, c1, c0, 0	// enable I cache
-	isb
-
-	// set page table address in TTBR0/TTBR1
-	// ldr r0, =page_table
-	// dsb
-@	bl mmu_set_ttbr_XINU
-@	isb
-
-	// set DACR to manager level for all domains
-@	ldr r0, =0xffffffff
-@	bl mmu_set_dacr
-	@bl	go_red	// OK
-
-	// invalidate TLB
-	mov r0, #1
-	// mcr p15, 0, r0, c8, c7, 0
-	write_TLB_INV ( r0 )
-	isb
-	@bl	go_red	// OK
-
-	// enable the MMU
-	mrc p15,0,r0,c1,c0,0
-	orr r0,r0,#1
-	mcr p15,0,r0,c1,c0,0
-	isb
-	dsb
-	@bl	go_red	// FAILS
-
-	// invalidate and enable the D cache
-	// (it needs an enabled MMU to work)
-	bl armv7_dcache_l1inv_all
-	mrc	p15, 0, r0, c1, c0, 0
-	orr	r0, #0x00000004
-	mcr	p15, 0, r0, c1, c0, 0
-
-	// jump to C code
-	// find out what core is starting
-	// mrc p15, 0, r11, c0, c0, 5
-	read_MPID ( r11 )
-	and r11, r11, #0x03
-	cmp r11, #0
-	bne 3f
-		// start core0
-		bl	kyu_startup
-3:
-	// other cores
-	/* pass core number in r0 as argument */
-        // mrc     p15, 0, r0, c0, c0, 5
-	read_MPID ( r0 )
-	and	r0, #3
-
-	bl	kyu_newcore
-
-// should never return here
-yspin:	b	yspin
-	bx lr
-
-#ifdef XINU_STARTUP
-
-#include <armv7a.h>
-
-#define CPSR_MODE_USER			0x10
-#define CPSR_MODE_FIQ			0x11
-#define CPSR_MODE_IRQ			0x12
-#define CPSR_MODE_SVR			0x13
-#define CPSR_MODE_ABORT			0x17
-#define CPSR_MODE_HYP			0x1A
-#define CPSR_MODE_UNDEFINED		0x1B
-#define CPSR_MODE_SYSTEM		0x1F
-#define CPSR_IRQ_INHIBIT		0x80
-#define CPSR_FIQ_INHIBIT		0x40
-
-.text
-
-/*------------------------------------------------------------------------
- * start  -  Initial entry point for a Xinu image (ARM) for primary core
- *------------------------------------------------------------------------
- */
-.globl start
-start:
-	b start_core_XINU
-
-/*------------------------------------------------------------------------
- * secondary_start  -  entry point for secondary cores
- *------------------------------------------------------------------------
- */
-.globl	secondary_start
-secondary_start:
-	b start_core_XINU
-
-/*------------------------------------------------------------------------
- * start_core  -  core initialization
- *------------------------------------------------------------------------
- */
-start_core_XINU:
-	// first switch to SVR mode and disable interrupts
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr cpsr, r0
-
-	// set the spsr to a known value
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr spsr_cxsf, r0
-	mrs r0, spsr
-
-	// allow unaligned data access
-	mrc      p15, 0, r0, c1, c0, 0
-	bic      r0, r0, #2
-	mcr      p15, 0, r0, c1, c0, 0
-
-	// if enabled, flush D cache
-	// (this needs to be done before disabling the MMU)
-	mrc     p15, 0, r0, c1, c0, 0
-	and     r0, r0, #(1 << 2)
-	cmp     r0, #0
-	beq     1f
-		bl armv7_dcache_wbinv_all
-
-1:
-	// disable I cache, D cache and MMU
-	// (we want to set up everything from scratch)
-	mrc p15, 0, r0, c1, c0, 0
-	bic r0, #0x00001000		// I cache
-	bic r0, #0x00000004		// D cache
-	bic r0, #0x00000001		// MMU
-	mcr p15, 0, r0, c1, c0, 0
-	isb
-
-	// enable SMP
-	// (this needs to be done before the MMU is enabled)
-	mrc p15, 0, r0, c1, c0, 1
-	bic r0, r0, #0x040
-	mcr p15, 0, r0, c1, c0, 1
-
-	// set up stacks for all modes of this core
-	bl setup_stacks
-
-	// core 0 has to inititialize
-	// some shared data
-	mrc p15, 0, r11, c0, c0, 5
-	and r11, r11, #0x03
-	cmp r11, #0
-	bne 2f
-		/// zero BSS
-		ldr	r0, =edata
-		ldr	r1, =end
-		bl	bzero
-		dsb
-
-		// create exception vector
-		bl initevec
-		dsb
-
-		// create page table
-		bl paging_init
-		dsb
-
-2:
-	// set exception vector
-	ldr r0, =exp_vector
-	bl evec_set_addr
-
-	// enable I cache
-	// (it works without MMU enabled)
-	mov r1, #0x0
-	mcr p15, 0, r1, c7, c5, 0	// invalidate I cache
-	mov  r1, #0x1000
-	mcr p15, 0, r1, c1, c0, 0	// enable I cache
-	isb
-
-	// set page table address in TTBR0/TTBR1
-	ldr r0, =page_table
-	dsb
-	bl mmu_set_ttbr
-	isb
-
-	// set DACR to manager level for all domains
-	ldr r0, =0xffffffff
-	bl mmu_set_dacr
-
-	// invalidate TLB and enable the MMU
-	mov r0, #1
-	mcr p15, 0, r0, c8, c7, 0
-	isb
-	mrc p15,0,r0,c1,c0,0
-	orr r0,r0,#1
-	mcr p15,0,r0,c1,c0,0
-	isb
-	dsb
-
-	// invalidate and enable the D cache
-	// (it needs an enabled MMU to work)
-	bl armv7_dcache_l1inv_all
-	mrc	p15, 0, r0, c1, c0, 0
-	orr	r0, #0x00000004
-	mcr	p15, 0, r0, c1, c0, 0
-
-	// jump to Xinu
-	mrc p15, 0, r11, c0, c0, 5
-	and r11, r11, #0x03
-	cmp r11, #0
-	bne 3f
-		bl	nulluser	// core0
-3:
-	bl secondary_run	// the other cores
-
-	bx lr
-
-/*------------------------------------------------------------------------
- * Set up stacks for all modes for the current core
- *------------------------------------------------------------------------
- */
-#define STACK_ADDR        MAXADDR
-#define STACK_PER_MODE    0x8000
-#define STACK_PER_CORE    STACK_PER_MODE * 6
-#define STACK_TOTAL       STACK_PER_CORE * 4
-#define SVR_STACK         STACK_PER_MODE
-#define IRQ_STACK         STACK_PER_MODE * 1
-#define FIQ_STACK         STACK_PER_MODE * 2
-#define SYSTEM_STACK      STACK_PER_MODE * 3
-#define ABORT_STACK       STACK_PER_MODE * 4
-#define UNDEFINED_STACK   STACK_PER_MODE * 5
-
-setup_stacks:
-	// fetch core number into r11
-	mrc p15, 0, r11, c0, c0, 5
-	and r11, r11, #0x03
-
-	// calc stack offset for this core
-	ldr r1,=STACK_PER_CORE
-	mul r0, r1, r11
-	ldr r1,=STACK_ADDR
-	sub r4, r1, r0
-
-	// switch to interrupt mode, set sp
-	mov r0, #(CPSR_MODE_IRQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #IRQ_STACK
-
-	// switch to fiq mode, set sp
-	mov r0, #(CPSR_MODE_FIQ | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #FIQ_STACK
-
-	// switch to undefined exception mode, set sp
-	mov r0, #(CPSR_MODE_UNDEFINED | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #UNDEFINED_STACK
-
-	// switch to data abort exception mode, set sp
-	mov r0, #(CPSR_MODE_ABORT | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #ABORT_STACK
-
-	// switch to user mode, set sp
-	mov r0, #(CPSR_MODE_SYSTEM | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #SYSTEM_STACK
-
-	// switch to SVC mode, set sp
-	mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
-	msr cpsr_c, r0
-	sub sp, r4, #SVR_STACK
-
-	bx lr
-
-/*------------------------------------------------------------------------
- * Return the total size of all stacks
- *------------------------------------------------------------------------
- */
-.globl get_stack_size
-get_stack_size:
-	mov r0, #STACK_TOTAL
-	bx	lr
-
-/*------------------------------------------------------------------------
- * Function to zero memory (r0 is lowest addr; r1 is highest)
- *------------------------------------------------------------------------
- */
-bzero:
-	mov	r2, #0					/* Round address to multiple	*/
-	add	r0, r0, #3				/*   of four by adding 3 and	*/
-	and	r0, r0, #0xFFFFFFFC			/*   taking the result module 4	*/
-1:	cmp	r0, r1					/* Loop until last address	*/
-	bhs	2f					/*   has been reached		*/
-	str	r2, [r0]				/* Zero four-byte word of memory*/
-	add	r0, r0, #4				/* Move to next word		*/
-	b	1b					/* Continue to iterate		*/
-2:	mov	pc, lr					/* Return to caller		*/
-#endif /* XINU_STARTUP */
-
-/*------------------------------------------------------------------------ */
-/*------------------------------------------------------------------------ */
-/*------------------------------------------------------------------------ */
-/*------------------------------------------------------------------------ */
-
-#ifdef XINU_EXTRAS
-.globl get_ccnt
-get_ccnt:
-	mrc     p15, 0, r0, c9, c13, 0
-	bx	lr
-
-.globl set_ccnt
-set_ccnt:
-	mcr     p15, 0, r0, c9, c13, 0
-	bx	lr
-
-.globl get_pmcr
-get_pmcr:
-	mrc     p15, 0, r0, c9, c12, 0
-	bx	lr
-
-.globl set_pmcr
-set_pmcr:
-	mcr     p15, 0, r0, c9, c12, 0
-	bx	lr
-
-.globl get_prrr
-get_prrr:
-	mrc     p15, 0, r0, c10, c2, 0
-	bx	lr
-
-.globl get_nmrr
-get_nmrr:
-	mrc     p15, 0, r0, c10, c2, 1
-	bx	lr
-
-.globl get_idsar
-get_idsar:
-	mrc p15, 0, r0, c0, c2, 3
-	bx lr
-
-.globl get_cena
-get_cena:
-	mrc     p15, 0, r0, c9, c12, 1
-	bx	lr
-
-.globl set_cena
-set_cena:
-	mcr     p15, 0, r0, c9, c12, 1
-	bx	lr
-
-.globl get_cdis
-get_cdis:
-	mrc     p15, 0, r0, c9, c12, 2
-	bx	lr
-
-.globl get_sctlr
-get_sctlr:
-	mrc     p15, 0, r0, c1, c0, 0
-	bx	lr
-
-.globl get_actlr
-get_actlr:
-	mrc     p15, 0, r0, c1, c0, 1
-	bx	lr
-
-.globl get_ttbr0
-get_ttbr0:
-	mrc     p15, 0, r0, c2, c0, 0
-	bx	lr
-
-.globl get_ttbcr
-get_ttbcr:
-	mrc     p15, 0, r0, c2, c0, 2
-	bx	lr
-
-.globl get_scr
-get_scr:
-	mrc p15, 0, r0, c1, c1, 0
-	bx	lr
-
-/*------------------------------------------------------------------------
- * Page Table
- *------------------------------------------------------------------------
- */
-.data
-/* Page table base address must be aligned at 16 KB boundary */
-	.align	14
-	.globl page_table
-page_table:
-	.space	(0x1000 * 4)
-
-/*------------------------------------------------------------------------
- * bputc	-	simple polled output, prints C to screen for assembly
-				debugging when kputc won't work
- *------------------------------------------------------------------------
- */
-#define UART0LSR 0x01C28014
-#define UART0RBR 0x01C28000
-#define TX_READY 0x40
-
-.text
-.globl bputc
-bputc:
-	ldr r0, =UART0LSR		/* point to uart line status reg */
-	ldr r1, [r0]			/* get value of line status reg */
-	and r1, r1, #TX_READY	/* mask tx ready bit bit */
-	cmp r1, #TX_READY		/* check for bit set */
-	bne bputc				/* keep poling until bit is set */
-	ldr r0, =UART0RBR		/* point to TX register */
-	mov r1, #67				/* decimal 67 is capitol C */
-	str r1, [r0]
-	isb
-	dsb
-	dmb
-	mov pc, lr
-#endif /* XINU_EXTRAS */
-
-xdelay:
-	mov	r0, #0xFFFFFF
-dloop:	sub	r0, #1
-	cmp	r0, #0
-	bgt	dloop
-	bx	lr
-
-/* spit out endless characters -- sanity check */
-	.globl sanity
-sanity:
-	movw	r0, #'b'
-	bl	serial_putc
-	bl	xdelay
-	b	sanity
 
 /* on the BBB, the reset vector will never come here, it will start the
  * firmware ROM code running, which will transfer to the SPL, which will
@@ -945,7 +403,7 @@ sanity:
  * And so on the ARM .align 5 is aligning on 32 byte boundaries.
  *
  * I am probably being overly fussy about alignment,
- *  but maybe I will thank myself if I move to 64 bit ARM processors.
+ *  but maybe I will thank myself when I move to 64 bit ARM processors.
  */
 
 	.align  5
@@ -1002,6 +460,10 @@ reset:
 #define S_PSR		64
 
 #define FRAME_SIZE	68
+
+/* ----------------------------------------------------------- */
+/*  Kyu context switching and such */
+/* ----------------------------------------------------------- */
 
 	.globl	cur_thread
 
@@ -1060,28 +522,6 @@ resume_i:
 
 	ldmia	r0, {r0-pc}^
 
-#ifdef notdef
-OLDresume_i:
-	/* keep r0 till bitter end */
-	ldr	r1, [r0, #S_PSR]
-	msr	spsr, r1
-	ldr	r1, [r0, #S_SP]
-	ldr	r2, [r0, #S_LR]
-
-	mrs     ip, cpsr	/* save mode */
-        bic     r3, ip, #0x1f
-        orr     r3, r3, #PSR_M_SUPER	/* enable interrupts */
-        msr     cpsr, r3	/* switch back to super */
-
-	add	sp, r1, #0	/* setup SP and LR */
-	add	lr, r2, #0
-	msr	cpsr, ip
-
-	ldr	lr, [r0, #S_PC]
-	ldmia	r0, {r0-r12}
-	movs	pc, lr
-#endif
-
 /* This routine launches a thread from scratch.
  *  on the ARM it gets a pointer to an array of 4 items:
  *	an argument to pass
@@ -1133,34 +573,6 @@ resume_j:
 
 	ldmia	r0, {r0-pc}^
 
-#ifdef notdef
-OLDresume_j:
-	/* keep r0 till the bitter end */
-	mrs     r1, cpsr
-	bic	r1, r1, #0xff
-	orr	r1, r1, #PSR_M_SUPER	/* enable interrupts */
-	msr	spsr, r1
-
-	ldr	r1, [r0, #S_SP]
-	ldr	r2, [r0, #S_LR]
-
-	mrs     ip, cpsr	/* save mode */
-        bic     r3, ip, #0x1f
-        orr     r3, r3, #PSR_M_SUPER	
-        msr     cpsr, r3	/* switch back to super */
-
-	add	sp, r1, #0	/* setup SP and LR */
-	add	lr, r2, #0
-	msr	cpsr, ip
-
-	ldr	lr, [r0, #S_PC]
-	ldmia	r0, {r0-r12}
-	movs	pc, lr
-
-VERYOLDresume_j:
-	ldmia	r0, {r0-pc}
-#endif
-
 /*
  * exception handlers
  */
@@ -1210,24 +622,9 @@ fiq:
 	bl	do_fiq
 	kyu_epilog
 
-/* ----------------------------------------- */
-/* ----------------------------------------- */
-
-        .globl get_sp
-get_sp:
-        add     r0, sp, #0
-	bx	lr
-
-        .globl get_fp
-get_fp:
-        add     r0, fp, #0
-	bx	lr
-
-/* Use only in dire situations */
-        .globl set_sp
-set_sp:
-        add     sp, r0, #0
-	bx	lr
+/* ----------------------------------------------------------- */
+/* Various handy things */
+/* ----------------------------------------------------------- */
 
         .globl get_regs
 get_regs:
@@ -1236,131 +633,24 @@ get_regs:
 	str	ip, [r0,#S_PSR]
 	bx	lr
 
-/* For an experiment from interrupt code */
-        .globl get_ssp
-get_ssp:
-	mrs	ip, cpsr
-	bic	r0, ip, #0x1f
-	orr	r0, r0, #PSR_M_SUPER
-	msr	cpsr, r0
-
-	add	r0, sp, #0
-
-	msr	cpsr, ip
-	bx	lr
-
-	.globl spin
-spin:
-	b	spin
-
-        .globl get_pc
-get_pc:
-        add     r0, pc, #0
-	bx	lr
-
-        .globl get_cpsr
-get_cpsr:
-	mrs     r0, cpsr
-	bx	lr
-
-/* Read VBAR Register */
-
-	.globl get_vbar
-get_vbar:
-	mrc 	p15, 0, r0, c12, c0, 0
-	bx	lr
-
-	.globl set_vbar
-set_vbar:
-	mcr 	p15, 0, r0, c12, c0, 0
-	bx	lr
-
-/* ASCTRL - Auxiliary System Control*/
-	.globl get_asctrl
-get_asctrl:
-	mrc     p15, 0, r0, c1, c0, 1
-	bx	lr
-
-	.globl set_asctrl
-set_asctrl:
-	mcr 	p15, 0, r0, c1, c0, 1
-	bx	lr
-
-#ifdef notdef
-/* Protection Unit base */
-	.globl get_prot
-get_prot:
-	mrc     p15, 0, r0, c6, c0, 0
-	bx	lr
-
-	.globl set_prot
-set_prot:
-	mcr 	p15, 0, r0, c6, c0, 0
-	bx	lr
+#define FLOATING_POINT
+#ifdef FLOATING_POINT
+	.globl fp_enable
+fp_enable:
+	read_CACR ( r0 )
+	orr	r0, r0, #0x300000 @ single precision
+	orr	r0, r0, #0xC00000 @ double precision
+	write_CACR ( r0 )
+	isb
+	mov	r0, #0x40000000
+	fmxr	fpexc,r0
+	mov	pc, lr
 #endif
 
 
-/* The cycle count register is a 32 bit register
- * This is for a Cortex A8 arm chip.
- */
-	.globl get_ccnt
-get_ccnt:
-	mrc     p15, 0, r0, c9, c13, 0
-	bx	lr
-
-	.globl set_ccnt
-set_ccnt:
-	mcr     p15, 0, r0, c9, c13, 0
-	bx	lr
-
-/* The performance monitor control register controls
- * the behavior of the CCNT register.
- */
-	.globl get_pmcr
-get_pmcr:
-	mrc     p15, 0, r0, c9, c12, 0
-	bx	lr
-
-	.globl set_pmcr
-set_pmcr:
-	mcr     p15, 0, r0, c9, c12, 0
-	bx	lr
-
-/* Counter enable register.
- */
-	.globl get_cena
-get_cena:
-	mrc     p15, 0, r0, c9, c12, 1
-	bx	lr
-
-	.globl set_cena
-set_cena:
-	mcr     p15, 0, r0, c9, c12, 1
-	bx	lr
-
-/* Counter disable register.
- */
-	.globl get_cdis
-get_cdis:
-	mrc     p15, 0, r0, c9, c12, 2
-	bx	lr
-
-	.globl set_cdis
-set_cdis:
-	mcr     p15, 0, r0, c9, c12, 2
-	bx	lr
-
-/* Counter overflow register.
- */
-	.globl get_covr
-get_covr:
-	mrc     p15, 0, r0, c9, c12, 3
-	bx	lr
-
-	.globl set_covr
-set_covr:
-	mcr     p15, 0, r0, c9, c12, 3
-	bx	lr
+/* ==================================================================== */
+/* ==================================================================== */
+/* ==================================================================== */
 
 /* XXX XXX - clean up this mess !!
  * we have way too many ways to disable/enable
@@ -1426,142 +716,41 @@ restore:
         pop     {r1, r2}        /* Restore r1, r2                       */
         mov     pc, lr          /* Return to caller                     */
 
-#define FLOATING_POINT
-#ifdef FLOATING_POINT
-	.globl fp_enable
-fp_enable:
-	mrc	p15, 0, r0, c1, c0, 2
-	orr	r0, r0, #0x300000 @ single precision
-	orr	r0, r0, #0xC00000 @ double precision
-	mcr	p15, 0, r0, c1, c0, 2
-	isb
-	mov	r0, #0x40000000
-	fmxr	fpexc,r0
-	mov	pc, lr
-#endif
+/* ==================================================================== */
+/* ==================================================================== */
+/* ==================================================================== */
 
 #ifdef notdef
-/*------------------------------------------------------------------------
- * As per Xinu and Marco -- we declare the page_table
- *  here so we can conveniently force alignment.
- *------------------------------------------------------------------------
- */
-.data
-/* Page table base address must be aligned at 16 KB boundary */
-        .align  14
-        .globl page_table
-page_table:
-        .space  (0x1000 * 4)
+/* For an experiment from interrupt code */
+        .globl get_ssp
+get_ssp:
+	mrs	ip, cpsr
+	bic	r0, ip, #0x1f
+	orr	r0, r0, #PSR_M_SUPER
+	msr	cpsr, r0
+
+	add	r0, sp, #0
+
+	msr	cpsr, ip
+	bx	lr
+
+xdelay:
+	mov	r0, #0xFFFFFF
+dloop:	sub	r0, #1
+	cmp	r0, #0
+	bgt	dloop
+	bx	lr
+
+/* spit out endless characters -- sanity check */
+	.globl sanity
+sanity:
+	movw	r0, #'b'
+	bl	serial_putc
+	bl	xdelay
+	b	sanity
 #endif
-
-/* ==================================================================== */
-/* ==================================================================== */
-/* ==================================================================== */
-
-/* Experimental section for Orange Pi multiple cores */
 
 #ifdef BOARD_ORANGE_PI
-
-#ifdef notdef
-@ fails
-core_startup:
-        mrs     r0, cpsr                /* disable interrupts */
-        orr     r0, r0, #PSR_INT_DIS
-        msr     cpsr, r0
-
-        movw    sp, #0
-        movt    sp, #0x4fff
-        bl      core_main
-#endif
-
-#ifdef notdef
-/* We tried using this as a sentinel,
- * but caching hides the results.
- */
-@	.globl statcore
-@ statcore:
-@ 	.word	0xdeadbeef
-
-	.globl zcore
-zcore:
-	mov	r0, #3
-	ldr	r1, =0x01f01da4
-        str     r0, [r1]
-	bx	lr
-#endif
-
-/* This version of newcore works,
- * but fails to enable the D cache.
- */
-
-#define SENTINEL	0x4
-
-	.globl newcore
-newcore:
-	/* Read processor affinity register */
-        mrc     p15, 0, r0, c0, c0, 5
-	and	r0, #3
-	lsl	r0, #14
-
-	/* Find place for stack */
-	ldr	r2, =core_stacks
-	ldr	r2, [r2]
-	add	sp, r2, r0
-
-	/* pass core number in r0 as argument */
-        mrc     p15, 0, r0, c0, c0, 5
-	and	r0, #3
-
-	bl	kyu_newcore
-
-@ If we return, we will spin here rapidly
-@ incrementing the sentinel location.
-@ note that there is special static ram at addr 0
-
-	mov	r0, #0
-	ldr	r1, =SENTINEL
-loopcore:
-	add	r0, #1
-        str     r0, [r1]
-        b      loopcore
-
-/* We realize that each core needs its own stack ...
- *  1-28-2017
- * Putting a stack at 0x7f00800 makes bad things happen
- * Start each cpu with a 16K stack (very generous).
- */
-	@ .align 3
-	.globl newcoreX
-newcoreX:
-	/* Read processor affinity register */
-        mrc     p15, 0, r1, c0, c0, 5
-	and	r1, #3
-	lsl	r1, #14
-	ldr	r0, =0x6f004000
-	add	r0, r0, r1
-	add	sp, r0, #0
-
-	@ldr	sp, =0x6f008000
-	bl	kyu_newcore
-
-	@ mov	r0, #0
-        @ str     r0, statcore
-	@ ldr	r0, =0x1234abcd
-	mov	r0, #0
-	@ ldr	r1, =0x01f01da4
-	ldr	r1, =SENTINEL
-loopcoreX:
-	add	r0, #1
-        str     r0, [r1]
-        b      loopcoreX
-
-        .globl oldcore
-oldcore:
-        mov     r0, #0
-        ldr     r1, =0x01f01da4
-loopcore2:
-        str     r0, [r1]
-        b      loopcore2
 
 // Turn on RED led on Orange Pi
 go_red:

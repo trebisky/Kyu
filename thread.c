@@ -2246,7 +2246,7 @@ thread_tick ( void )
 		struct xxx_info *d;
 		d = &xxx_data[xxx_count++];
 		d->delay = wait_head->delay;
-		d->ccnt = get_ccnt ();
+		d->ccnt = r_CCNT ();
 	    }
 	    --wait_head->delay;
 	    while ( wait_head && wait_head->delay == 0 ) {

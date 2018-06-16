@@ -15,6 +15,7 @@
 #include "kyu.h"
 #include "kyulib.h"
 #include "board.h"
+#include "arch/cpu.h"
 
 #include "netbuf.h"
 
@@ -86,14 +87,14 @@ delay_calib ( void )
 	for ( i=0; i< 10; i++ ) {
 	    reset_ccnt ();
 	    delay_us ( 10 );
-	    ticks = get_ccnt ();
+	    get_CCNT ( ticks );
 	    printf ( "US Delay ticks = %d\n", ticks/10 );
 	}
 
 	for ( i=0; i< 10; i++ ) {
 	    reset_ccnt ();
 	    delay_ms ( 10 );
-	    ticks = get_ccnt ();
+	    get_CCNT ( ticks );
 	    printf ( "MS Delay ticks = %d\n", ticks/10 );
 	}
 #endif
@@ -106,7 +107,7 @@ void
 delay_ns ( int delay )
 {
         reset_ccnt ();
-        while ( get_ccnt() < delay )
+        while ( r_CCNT() < delay )
             ;
 }
 #endif
@@ -142,7 +143,7 @@ delay_calib ( void )
 
 	reset_ccnt ();
 	delay_ns ( 1000 * CALIB_MICROSECONDS );
-	ticks = get_ccnt ();
+	get_CCNT ( ticks );
 	printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 
 	delay_factor *= ticks;
@@ -150,14 +151,14 @@ delay_calib ( void )
 
 	reset_ccnt ();
 	delay_ns ( 1000 * CALIB_MICROSECONDS );
-	ticks = get_ccnt ();
+	get_CCNT ( ticks );
 	printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 
 	/* This reports a value of about 53 ticks */
 	want = 0;
 	reset_ccnt ();
 	delay_ns ( 0 );
-	ticks = get_ccnt ();
+	get_CCNT ( ticks );
 	printf ( "Delay w/ calib %d: ticks = %d (want: %d)\n", delay_factor, ticks, want );
 }
 #endif
@@ -202,11 +203,12 @@ board_core_startup ( int core )
 void
 board_hardware_init ( void )
 {
-	unsigned int sp;
+	unsigned int reg;
 
-	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
-        printf ( "board_hardware_init - sp: %08x\n",  sp );
-        printf ( "board_hardware_init - cpsr: %08x\n",  get_cpsr() );
+	get_SP ( reg );
+        printf ( "board_hardware_init - sp: %08x\n",  reg );
+	get_CPSR ( reg );
+        printf ( "board_hardware_init - cpsr: %08x\n",  reg );
 
 	cache_init ();
 	ram_init ( ram_start, ram_size );

@@ -20,6 +20,7 @@
 #include <kyulib.h>
 #include <gpio.h>
 #include <omap_mux.h>
+#include <arch/cpu.h>
 
 /* Lookup table to map gpio number to mux index.
  */
@@ -467,9 +468,9 @@ gpio_test8 ( void )
 	reset_ccnt ();
 	xxx_arm ();
 
-	t1 = get_ccnt();
+	t1 = r_CCNT ();
 	thr_delay ( 5 );
-	t2 = get_ccnt();
+	t2 = r_CCNT ();
 
 	printf ( "DELAY done: %d %d %d\n", t1, t2, t2-t1 );
 	show_xxx ();
@@ -511,10 +512,10 @@ gpio_test_ccnt ( void )
 	printf ( "PMCR = %d %08x\n", val, val );
 
 	reset_ccnt ();
-	val = get_ccnt ();
+	val = r_CCNT  ();
 	printf ( "CCNT = %d %08x\n", val, val );
 	thr_delay ( 2 );
-	val2 = get_ccnt ();
+	val2 = r_CCNT  ();
 	printf ( "CCNT = %d %08x\n", val2, val2 );
 	printf ( " elapsed = %d\n", val2 - val );
 	*/
@@ -522,7 +523,7 @@ gpio_test_ccnt ( void )
 	for ( i=0; i < 5; i++ ) {
 	    // delay_ns ( 2000000 - 50 );
 	    delay_us ( 2000 );
-	    val = get_ccnt ();
+	    val = r_CCNT  ();
 	    printf ( "CCNT = %d %08x\n", val, val );
 	}
 }

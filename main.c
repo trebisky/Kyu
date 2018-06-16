@@ -12,10 +12,10 @@
 
 #include "kyu.h"
 #include "kyulib.h"
-/*
-#include "intel.h"
-*/
 #include "thread.h"
+
+// #include "intel.h"
+#include "arch/cpu.h"
 
 void kern_startup ( void );
 void user_init ( int );
@@ -119,7 +119,7 @@ void
 kyu_startup ( void )
 {
 	unsigned long malloc_base;
-	int sp;
+	int val;
 
 #ifdef notdef
 	// ensure core stack pointer valid
@@ -128,9 +128,11 @@ kyu_startup ( void )
 	test_core ();
 #endif
 
-	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
-	printf ( "Kyu starting with stack: %08x\n",  sp );
-	printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
+	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
+	get_SP ( val );
+	printf ( "Kyu starting with stack: %08x\n",  val );
+	get_CPSR ( val );
+	printf ( "Kyu starting with cpsr: %08x\n",  val );
 
 	// fail ();
 
@@ -167,7 +169,7 @@ kyu_startup ( void )
 	xprintf ( "blow up\n" );
 	puts ( "Made it !!" );	/* XXX */
 
-	spin ();
+	for ( ;; ) ;
 #endif
 
 	/* print initial banner on console
@@ -309,8 +311,13 @@ static int dregs[17];
 void
 XXuser_init ( int xx )
 {
+	int val;
+
 	get_regs ( dregs );
-	dregs[16] = get_cpsr ();
+	// dregs[16] = get_cpsr ();
+	get_CPSR ( val )
+	dregs[16] = val;
+
 	show_regs ( dregs );
 
 	printf ( "User thread running with stack: %08x\n",  get_sp() );
@@ -320,7 +327,9 @@ XXuser_init ( int xx )
 	    delay1 ();
 
 	get_regs ( dregs );
-	dregs[16] = get_cpsr ();
+	// dregs[16] = get_cpsr ();
+	get_CPSR ( val )
+	dregs[16] = val;
 	show_regs ( dregs );
 
 	printf ( "User thread running with stack: %08x\n",  get_sp() );

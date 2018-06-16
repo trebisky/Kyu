@@ -17,6 +17,7 @@
 #include "kyu.h"
 #include "kyulib.h"
 #include "board/board.h"
+#include "cpu.h"
 
 /* Remember the BBB is an ARM Cortex-A8, the cycle count
  * registers on other ARM variants have different addresses.
@@ -50,44 +51,20 @@
 #define CENA_CTR1	0x00000002
 #define CENA_CTR0	0x00000001
 
-static inline unsigned int get_cc (void)
-{
-    unsigned int value;
-
-    // Read CCNT Register
-    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r"(value));
-    return value;
-}
-
-#ifdef notdef
-/* The cycle count register is a 32 bit register
- * This is for a Cortex A8 arm chip.
- */
-        .globl get_ccnt
-get_ccnt:
-        mrc     p15, 0, r0, c9, c13, 0
-        bx      lr
-
-        .globl set_ccnt
-set_ccnt:
-        mcr     p15, 0, r0, c9, c13, 0
-        bx      lr
-#endif
-
-
+/* Called at system startup */
 void
 enable_ccnt ( int div64 )
 {
 	int val;
 
-	val = get_pmcr ();
+	get_PMCR ( val );
 	val |= PMCR_ENABLE;
 	if ( div64 )
 	    val |= PMCR_CC_DIV;
-	set_pmcr ( val );
+	set_PMCR ( val );
 
-	set_cena ( CENA_CCNT );
-	// set_covr ( CENA_CCNT );
+	set_CENA ( CENA_CCNT );
+	// set_COVR ( CENA_CCNT );
 }
 
 /* It does not seem necessary to disable the counter
@@ -96,9 +73,20 @@ enable_ccnt ( int div64 )
 void
 reset_ccnt ( void )
 {
-	// set_cdis ( CENA_CCNT );
-	set_pmcr ( get_pmcr() | PMCR_CC_RESET );
-	// set_cena ( CENA_CCNT );
+	int reg;
+
+	// set_CDIS ( CENA_CCNT );
+	get_PMCR ( reg );
+	reg |= PMCR_CC_RESET ;
+	set_PMCR ( reg );
+	// set_CENA ( CENA_CCNT );
+}
+
+void
+hardware_init ( void )
+{
+	enable_ccnt ( 0 );
+	// enable_unaligned ();
 }
 
 #ifdef notdef
@@ -125,36 +113,9 @@ void
 delay_ns ( int delay )
 {
 	reset_ccnt ();
-	while ( get_ccnt() < delay )
+	while ( r_CCNT() < delay )
 	    ;
 }
 #endif
-
-/* All v7 arm chips (so both the Cortex A7 and A8)
- * have a bit to allow unaligned accesses
- */
-#define SCTRL_A		0x0002
-
-static void
-enable_unaligned ( void )
-{
-	int scr;
-
-	asm volatile("mrc p15, 0, %0, c1, c0, 0" : "=r" (scr) : : "cc");
-
-	scr &= ~SCTRL_A;
-
-	asm volatile("mcr p15, 0, %0, c1, c0, 0" : : "r" (scr) : "cc");
-}
-
-/* The following are "standard" entry points for all hardware */
-/* hardware_init() should not expect printf to work */
-
-void
-hardware_init ( void )
-{
-	enable_ccnt ( 0 );
-	enable_unaligned ();
-}
 
 /* THE END */

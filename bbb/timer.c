@@ -17,6 +17,7 @@
 #include <kyu.h>
 #include <kyulib.h>
 #include <thread.h>
+#include <arch/cpu.h>
 
 #include <omap_ints.h>
 // #include <cpu.h>
@@ -357,9 +358,9 @@ dmtimer_int ( int xxx )
 		reset_ccnt ();
 		xxx_start = 0;
 	    }
-	    // printf ( "Tick: %d\n", get_ccnt () );
+	    // printf ( "Tick: %d\n", r_CCNT () );
 	    // printf ( " regs 1 -- %08x %08x\n", tmr->irq_stat_raw, tmr->irq_stat );
-	    xxx_data[xxx_count] = get_ccnt ();
+	    xxx_data[xxx_count] = r_CCNT ();
 	    post_spin ( POST_COUNT );
 	    xxx_counts[xxx_count] = tmr->count;
 	    xxx_stat[xxx_count] = tmr->irq_stat;
@@ -440,7 +441,7 @@ dmtimer_checkrate ( void )
 	post_spin ( POST_CTRL );
 	tmr->ctrl = 0;
 
-	// printf ( "CCNT = %d\n", get_ccnt() );
+	// printf ( "CCNT = %d\n", r_CCNT() );
 	// printf ( "Checkrate: %d %d -- %d\n", v1, v2, v2-v1 );
 	printf ( "32K timer running at ~%d Hz\n", v2-v1 );
 

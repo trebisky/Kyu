@@ -120,18 +120,42 @@ typedef unsigned long __u32;
  * A collection of inline assembly for ARM control register access
  * Above all, this makes code more readable and less error prone.
  */
+#define get_SCTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 0" : "=r" ( val ) )
+#define set_SCTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 0" : : "r" ( val ) )
+#define get_ACTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 1" : "=r" ( val ) )
+#define set_ACTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 1" : : "r" ( val ) )
 
 #define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
 #define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
 #define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
 #define set_DACR(val)	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
 
-/* Note that macros of this "get_XXX" type do not allow expressions like
+#define get_VBAR(val)	asm volatile ( "mrc p15, 0, %0, c12, c0, 0" : "=r" ( val ) )
+#define set_VBAR(val)	asm volatile ( "mcr p15, 0, %0, c12, c0, 0" : : "r" ( val ) )
+
+/* Performance monitoring unit registers */
+#define get_CCNT(val)	asm volatile ( "mrc p15, 0, %0, c9, c13, 0" : "=r" ( val ) )
+#define set_CCNT(val)	asm volatile ( "mcr p15, 0, %0, c9, c13, 0" : : "r" ( val ) )
+
+#define get_PMCR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 0" : "=r" ( val ) )
+#define set_PMCR(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 0" : : "r" ( val ) )
+#define get_CENA(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 1" : "=r" ( val ) )
+#define set_CENA(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 1" : : "r" ( val ) )
+#define get_CDIS(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 2" : "=r" ( val ) )
+#define set_CDIS(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 2" : : "r" ( val ) )
+#define get_COVR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 3" : "=r" ( val ) )
+
+/* Note that macros of the "get_XXX" type do not allow expressions like
  * var = get_XXX();
  * For that, we need inline functions, and we give them distinct names,
  *  such as r_XXX() to avoid collision with these macros.
  */
 #define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
+#define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
+#define get_PC(x)	asm volatile ("add %0, pc, #0\n" :"=r" ( x ) )
+
+#define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
+
 
 static inline unsigned int
 r_CCNT ( void )
@@ -142,6 +166,5 @@ r_CCNT ( void )
     asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (rv) );
     return rv;
 }
-
 
 /* THE END */

@@ -86,13 +86,13 @@ evil_exception ( char *msg, int code )
 
 	if ( cur_thread == &silly_thread ) {
 	    if ( in_evil )
-		spin ();
+		for ( ;; ) ;
 	    in_evil = 1;
 
 	    printf ( "%s in Kyu early initialization !!\n", msg );
 	    show_thread_regs ( cur_thread, 64 );
 	    printf ( "Processor halted (spinning)\n" );
-	    spin ();
+	    for ( ;; ) ;
 	}
 
 	printf ( "%s in thread %s\n", msg, cur_thread->name );
@@ -252,10 +252,10 @@ special_debug ( void )
 {
 	printf ( "timer_int sp = %08x\n", get_sp () );
 	printf ( "timer_int sr = %08x\n", get_cpsr () );
-	printf ( "timer_int ssp = %08x\n", get_ssp () );
+	// printf ( "timer_int ssp = %08x\n", get_ssp () );
 	printf ( "timer_int sr = %08x\n", get_cpsr () );
 	printf ( "timer_int sp = %08x\n", get_sp () );
-	spin ();
+	for ( ;; ) ;
 }
 #endif
 
@@ -279,7 +279,7 @@ void do_irq ( void )
 	show_thread_regs ( cur_thread, 0 );
 	printf ( "\n" );
 	show_stack ( get_sp (), 0 );
-	spin ();
+	for ( ;; ) ;
 #endif
 
 	/* Tell Kyu thread system we are in an interrupt */
@@ -299,7 +299,7 @@ void do_irq ( void )
 	     */
 	    printf ("Unknown interrupt request: %d\n", nint );
 	    show_thread_regs ( cur_thread, 0 );
-	    spin ();
+	    for ( ;; ) ;
 	}
 
 	/* call the user handler

@@ -280,7 +280,9 @@ shell_x ( char **arg, int narg )
 	}
 }
 
+/* XXX very much ARM specific */
 #include "hardware.h"
+#include "arm/cpu.h"
 
 extern char * stack_start;
 
@@ -318,16 +320,20 @@ void
 unroll_cur ( void )
 {
 	int *fp;
+	unsigned int sp;
 	char stbuf[16];
 	struct thread *cp;
 
-	fp = (int *) get_fp ();
+	get_SP ( sp );
+
+	// fp = (int *) get_fp ();
+	get_FP ( fp );
 
 	cp = thr_self ();
 	printf ( "Current thread is %s\n", cp->name );
-	printf ( " SP = %08x,  FP = %08x\n", get_sp(), get_fp() );
+	printf ( " SP = %08x,  FP = %08x\n", sp, fp );
 
-	sprintf ( stbuf, "%08x", get_sp() );
+	sprintf ( stbuf, "%08x", sp );
 	mem_dumper ( 'l', stbuf, "16" );
 
 	unroll_fp ( fp );

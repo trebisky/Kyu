@@ -18,6 +18,7 @@
 #include "kyulib.h"
 #include "thread.h"
 #include "malloc.h"
+#include "arch/cpu.h"
 
 #include "netbuf.h"
 
@@ -302,7 +303,10 @@ kb_debug ( int val )
 int
 is_irq_disabled ( void )
 {
-	if ( get_cpsr() & 0x80 )
+	unsigned int reg;
+
+	get_CPSR ( reg );
+	if ( reg & 0x80 )
 	    return 1;
 	return 0;
 }
@@ -1021,7 +1025,7 @@ test_main ( int xx )
 	/*
 	thr_show ();
 	show_my_regs ();
-	spin ();
+	for ( ;; ) ;
 	*/
 
 	tester ();
@@ -1202,7 +1206,8 @@ static void my_tick1 ( void )
 	     * get endless nested interrupts.
 	     */
 	    sti ();
-	    for ( ;; ) ;
+	    for ( ;; )
+		;
 #endif
 	}
 }
@@ -1914,7 +1919,7 @@ slim79 ( int count )
 static void
 busy79 ( int nice )
 {
-	int psr;
+	unsigned int psr;
 
 	/*
 	printf ( "busy starting\n" );
@@ -1924,7 +1929,8 @@ busy79 ( int nice )
 		thr_yield ();
 	    ++t7_sum;
 	    /* if ( is_irq_disabled() ) */
-	    psr = get_cpsr();
+	    // psr = get_cpsr();
+	    get_CPSR ( psr );
 	    if ( psr & 0x80 )
 		printf ("busy -- no IRQ (%08x)\n", psr );
 	}
@@ -3330,7 +3336,7 @@ void pkt_arrive ()
 	// of the system using this for timing.  A basic lesson here.
 	// reset_ccnt ();
 	// pk.arrive = 0;
-	pk.arrive = get_ccnt ();
+	pk.arrive = r_CCNT ();
 	pk.dispatch = -1;
 	pk.seen = -1;
 	pk.reply = -1;
@@ -3341,28 +3347,28 @@ void pkt_arrive ()
 
 void pkt_dispatch ()
 {
-	pk.dispatch = get_ccnt ();
+	pk.dispatch = r_CCNT ();
 }
 
 void pkt_seen ()
 {
-	pk.seen = get_ccnt ();
+	pk.seen = r_CCNT ();
 }
 
 void pkt_reply ()
 {
-	pk.reply = get_ccnt ();
+	pk.reply = r_CCNT ();
 }
 
 void pkt_send ()
 {
-	pk.send = get_ccnt ();
+	pk.send = r_CCNT ();
 }
 
 // Called at interrupt level */
 void pkt_finish ()
 {
-	pk.finish = get_ccnt ();
+	pk.finish = r_CCNT ();
 
 	if ( pk_limit == 0 )
 	    return;
@@ -3470,12 +3476,12 @@ check_clock_DETAIL ( void )
 	secs = NVALS * delay / 1000;
 
 	printf ( "Collecting data for %d seconds\n", secs );
-	last = get_ccnt ();
+	last = r_CCNT ();
 
 	for ( i=0; i< NVALS; i++ ) {
 	    // reset_ccnt ();
 	    thr_delay ( delay );
-	    vals[i] = get_ccnt ();
+	    vals[i] = r_CCNT ();
 	}
 
 	for ( i=0; i< NVALS; i++ ) {
@@ -3508,7 +3514,7 @@ check_clock ( void )
 	for ( i=0; i< NVALS; i++ ) {
 	    reset_ccnt ();
 	    thr_delay ( delay );
-	    vals[i] = get_ccnt ();
+	    vals[i] = r_CCNT ();
 	}
 
 	for ( i=0; i< NVALS; i++ )

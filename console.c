@@ -263,11 +263,11 @@ console_puts ( char *buf )
 {
 #ifdef BOARD_ORANGE_PI
 #ifdef WANT_PUTS_LOCK
-	spin_lock ( 3 );
+	h3_spin_lock ( 3 );
 #endif
 	serial_puts ( buf );
 #ifdef WANT_PUTS_LOCK
-	spin_unlock ( 3 );
+	h3_spin_unlock ( 3 );
 #endif
 #endif
 #ifdef BOARD_BBB
