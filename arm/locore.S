@@ -116,9 +116,6 @@ asm_startup:
 	b primary_start_bbb
 #endif
 
-// Just fall through for Orange Pi multicore
-@	b primary_start_NEW
-
 /* Secondary cores will start up here.
  */
 .globl	secondary_start
@@ -128,7 +125,7 @@ secondary_start:
 /* This is the 6-14-2018 hack on the standard Kyu startup */
 /* Working 6-15-2018 for main and extra cores */
 
-primary_start_NEW:
+primary_start:
 	// switch to SVR mode and disable interrupts
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
 	msr cpsr, r0

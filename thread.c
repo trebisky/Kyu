@@ -59,6 +59,9 @@ static enum console_mode first_console = INITIAL_CONSOLE;
 struct thread silly_thread;
 struct thread *cur_thread = & silly_thread;
 
+static long in_interrupt;
+static struct thread *in_newtp;
+
 /* list of thread structures to recycle
  */
 static struct thread *thread_avail;
@@ -83,9 +86,6 @@ static int thread_debug;
 char *stack_start;
 static char *stack_next;
 static int stack_limit;
-
-static long in_interrupt;
-static struct thread *in_newtp;
 
 /* Here is an informal rule,
  * entry point names we export to the world
@@ -1355,8 +1355,7 @@ thr_yield ( void )
  *  - we can avoid having a special
  *    change_thread routine for interrupts.
  *  - we can avoid exporting in_newtp
- * Having this here avoids having to export
- * in_newtp and in_interrupt as globals (maybe).
+ *  - we can avoid exporting in_interrupt
  *
  * By this time a couple of things could
  * make us want to return to a different

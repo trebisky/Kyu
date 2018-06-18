@@ -165,6 +165,7 @@ typedef unsigned long __u32;
 #define get_PC(x)	asm volatile ("add %0, pc, #0\n" :"=r" ( x ) )
 
 #define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
+#define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
 
 
 static inline unsigned int
@@ -175,6 +176,24 @@ r_CCNT ( void )
     // Read CCNT Register
     asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (rv) );
     return rv;
+}
+
+/* Disable interrupts to lock section */
+static inline void
+INT_lock ( void )
+{
+	asm volatile ( "mrs     r0, cpsr" );
+	asm volatile ( "orr     r0, r0, #0xc0" );
+	asm volatile ( "msr     cpsr, r0" );
+}
+
+/* Enable interrupts to unlock section */
+static inline void
+INT_unlock ( void )
+{
+	asm volatile ( "mrs     r0, cpsr" );
+	asm volatile ( "bic     r0, r0, #0xc0" );
+	asm volatile ( "msr     cpsr, r0" );
 }
 
 /* THE END */

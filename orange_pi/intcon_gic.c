@@ -158,12 +158,32 @@ intcon_irqack ( int irq )
 	gic_unpend ( irq );
 }
 
+/* Initialize the "banked" registers that are unique to each core
+ * This needs to be called by each core when it starts up.
+ */
+void
+gic_cpu_init ( void )
+{
+	struct h3_gic_dist *gp = GIC_DIST_BASE;
+	struct h3_gic_cpu *cp = GIC_CPU_BASE;
+	int i;
+
+	/* enable all SGI, disable all PPI */
+	gp->eclear[0] = 0xffff0000;
+	gp->eset[0]   = 0x0000ffff;
+
+	/* priority for PPI and SGI */
+	for ( i=0; i<8; i++ )
+	    gp->prio[i] = 0xa0a0a0a0;
+
+	cp->primask = 0xf0;
+	cp->ctrl = 1;
+}
+
 void
 gic_init ( void )
 {
 	struct h3_gic_dist *gp = GIC_DIST_BASE;
-	struct h3_gic_cpu *cp = GIC_CPU_BASE;
-	unsigned long *p;
 	int i;
 
 	/* Initialize the distributor */
@@ -187,21 +207,8 @@ gic_init ( void )
 
 	gp->ctrl = G0_ENABLE;
 
-	/* ** now initialize the per CPU stuff.
-	 *  XXX - the following will need to be done by each CPU
-	 *  when we get multiple cores running.
-	 */
-
-	/* enable all SGI, disable all PPI */
-	gp->eclear[0] = 0xffff0000;
-	gp->eset[0]   = 0x0000ffff;
-
-	/* priority for PPI and SGI */
-	for ( i=0; i<8; i++ )
-	    gp->prio[i] = 0xa0a0a0a0;
-
-	cp->primask = 0xf0;
-	cp->ctrl = 1;
+	/* Initialize banked registers for core 0 */
+	gic_cpu_init ();
 }
 
 /* THE END */

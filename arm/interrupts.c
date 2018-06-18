@@ -308,7 +308,10 @@ void do_irq ( void )
 
 	intcon_irqack ( nint );
 
-	/* Tell Kyu thread system we are done with an interrupt */
+	/* Tell Kyu thread system we are done with an interrupt.
+	 * This will return from interrupt via resume_i()
+	 * and never returns here.
+	 */
 	finish_interrupt ();
 
 	panic ( "do_irq, resume" );

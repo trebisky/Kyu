@@ -93,10 +93,11 @@ static void run_blink ( int, int, int );
 static void core_demo1 ( int );
 static void core_demo2 ( int );
 static void core_demo3 ( int );
+static void core_demo4 ( int );
 
 typedef void (*ifptr) ( int );
 
-static ifptr	demo_func;
+static ifptr	demo_func = (ifptr) 0;
 
 /* This gets called by the test menu
  */
@@ -129,6 +130,7 @@ test_core ( void )
 	// start_test2 ();
 	// demo_func = core_demo3;
 	// start_test3 ();
+	demo_func = core_demo3;
 	start_test4 ();
 }
 
@@ -227,7 +229,6 @@ start_test3 ( void )
 	}
 }
 
-
 static void
 core_demo3 ( int core )
 {
@@ -255,13 +256,40 @@ test4_handler_2 ( int xxx )
 }
 
 static void
+test4_handler_3 ( int xxx )
+{
+	printf ( "BONK!\n" );
+}
+
+static void
 start_test4 ( void )
 {
 	irq_hookup ( IRQ_SGI_1, test4_handler_1, 0 );
 	irq_hookup ( IRQ_SGI_2, test4_handler_2, 0 );
+	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
 
 	gic_soft_self ( SGI_1 );
 	gic_soft ( SGI_2, 0 );
+
+	/* acquire the lock */
+	// h3_spin_lock ( 1 );
+
+	/* Start another core */
+	test_one ( 1 );
+	thr_delay ( 500 );
+
+	/* see if we can interrupt core 1 */
+	gic_soft ( SGI_3, 1 );
+}
+
+static void
+core_demo4 ( int core )
+{
+	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
+
+	for ( ;; ) {
+	    ;
+	}
 }
 
 /* -------------------------------------------------------------------------------- */
@@ -372,7 +400,8 @@ run_newcore ( int core )
 
 	// core_demo1 ( core );
 	// core_demo2 ( core );
-	(*demo_func) ( core );
+	if ( demo_func )
+	    (*demo_func) ( core );
 }
 
 /* -------------------------------------------------------------------------------- */

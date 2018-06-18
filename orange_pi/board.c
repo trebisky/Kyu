@@ -195,6 +195,9 @@ board_mmu_init ( void )
 void
 board_core_startup ( int core )
 {
+	gic_cpu_init ();
+	INT_unlock ();
+
 	run_newcore ( core );
 }
 
