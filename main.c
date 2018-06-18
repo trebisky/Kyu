@@ -159,9 +159,8 @@ kyu_startup ( void )
 	// printf ( "Kyu starting with stack: %08x\n",  get_sp() );
 	// printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
 
-	//sanity ();
 	/* A sanity thing in case printf is broken */
-	puts ( "Kyu starting" );
+	// puts ( "Kyu starting" );
 
 
 	/* debug broken linux printf */
@@ -174,7 +173,7 @@ kyu_startup ( void )
 
 	/* print initial banner on console
 	 */
-	printf ( "\n" );
+	// printf ( "\n" );
 	printf ( "Kyu %s starting\n", kyu_version );
 
 	/* This will get 0x8ffce on the x86 */
@@ -218,9 +217,10 @@ sys_init ( int xxx )
 	 * We should probably fix this in locore.S
 	 * This won't matter unless some interrupt source is
 	 * active on startup.
-	 * This is not the case on the ARM
+	 * This is not the case on the ARM, and interrupts should
+	 * be disabled anway.
 	 */
-	cpu_enter ();
+	// cpu_enter ();
 
 	/*
 	printf ( "sys_init thread running\n" );
@@ -236,7 +236,9 @@ sys_init ( int xxx )
 	// timer_init ( DEFAULT_TIMER_RATE );
 
 	/* enable interrupts */
-	cpu_leave ();
+	printf ( "Enabling interrupts\n" );
+	// cpu_leave ();
+	INT_unlock;
 
 	/* display the MMU setup handed us by U-Boot */
 	// mmu_scan ( "From U-Boot " );

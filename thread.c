@@ -56,8 +56,16 @@ static enum console_mode first_console = INITIAL_CONSOLE;
  * This does waste a tiny bit of memory when we complete
  * initialization and abandon this structure.
  */
-struct thread silly_thread;
-struct thread *cur_thread = & silly_thread;
+// struct thread silly_thread;
+// struct thread *cur_thread = & silly_thread;
+
+/* Introducing an array of static thread structures,
+ * one per core.  This is an intermediate hack to allow
+ * interrupts to occur in cores other than zero
+ * 6-18-2018
+ */
+struct thread static_thread[NUM_CORES];
+struct thread *cur_thread = & static_thread[0];
 
 static long in_interrupt;
 static struct thread *in_newtp;
@@ -98,6 +106,8 @@ void thr_yield ( void );
 void thr_block ( enum thread_state );
 void thr_unblock ( struct thread * );
 void thr_block_q ( enum thread_state );
+
+static void thrcp ( char *, char *, int );
 
 static void cleanup_thread ( struct thread * );
 static void change_thread ( struct thread *, int );
@@ -233,6 +243,8 @@ thr_free ( char *stack, int size )
 	stack_avail = xp;
 }
 
+static char *tnames[NUM_CORES] = { "t-core-0", "t-core-1", "t-core-2", "t-core-3" };
+
 void
 thr_init ( void )
 {
@@ -268,8 +280,13 @@ thr_init ( void )
 	}
 
 	/* XXX to make initial debug pretty.
+	 * commented out, since we now set this
+	 * to point to a static thread.
 	 */
-	cur_thread = (struct thread *) 0;
+	// cur_thread = (struct thread *) 0;
+
+	for ( i=0; i<NUM_CORES; i++ )
+	    thrcp ( static_thread[i].name, tnames[i], MAX_TNAME-1 );
 
 	thread_ready = (struct thread *) 0;
 
@@ -286,13 +303,14 @@ thr_init ( void )
 	 * the idle thread (added 8-15-2016) exists to ensure
 	 * that a suspended thread always has someplace to transfer to.
 	 *
-	 * This threads will not run until thr_sched()
+	 * This thread will not run until thr_sched()
 	 *   launches the current thread.  
-	 * The sys thread run briefly performing initialization.
-	 *   initialization lauches the network threads net and net_slow
+	 * The sys thread runs briefly performing initialization.
+	 * Initialization lauches the network threads: net and net_slow
 	 * Finally, the sys thread launches the user thread and exits.
 	 * At the present time, the user thread simply launches
 	 *   the test thread and exits.
+	 * In an actual application, the user will replace the user thread.
 	 */
 	cur_thread = thr_new ( "sys", sys_init, (void *) 0, PRI_SYS, 0 );
 	(void) thr_new ( "idle", thr_idle, (void *) 0, PRI_IDLE, 0 );
@@ -374,7 +392,7 @@ thr_one_all ( struct thread *tp, char *msg )
 #define ARM_FP	11
 
 	if ( tp->mode == JMP ) {
-	    unroll_fp ( tp->regs.regs[ARM_FP] );
+	    unroll_fp ( tp->jregs.regs[ARM_FP] );
 	}
 
 #ifdef ARCH_X86
@@ -1544,7 +1562,7 @@ change_thread ( struct thread *new_tp, int options )
 
 	if ( ! (options & RSF_INTER) && (options & RSF_CONT) == 0 ) {
 		    cur_thread->mode = JMP;
-		    if ( save_j ( &cur_thread->regs ) ) {
+		    if ( save_j ( &cur_thread->jregs ) ) {
 			if ( thread_debug )
 			    printf ( "Change_thread: emerged from save_j\n" );
 			return;
@@ -1580,7 +1598,7 @@ change_thread ( struct thread *new_tp, int options )
 	    case JMP:
 		if ( thread_debug )
 		    printf ("change_thread_resume_j\n");
-		resume_j ( &new_tp->regs );
+		resume_j ( &new_tp->jregs );
 		panic ( "change_thread, switch_j" );
 		break;
 	    case INT:

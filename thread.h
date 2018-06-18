@@ -93,6 +93,7 @@ void cpu_signal ( struct sem * );
 
 #ifdef ARCH_ARM
 /* XXX - move this */
+/* For setjmp/longjmp */
 /* We only need to save registers that the
  * compiler EABI says we should, since this
  * is always done from synchronous calls
@@ -163,7 +164,7 @@ enum thread_mode { JMP, INT, CONT };
 
 struct thread {
 	struct int_regs iregs;		/* must be first */
-	struct jmp_regs regs;
+	struct jmp_regs jregs;
 	struct cont_regs cregs;		/* new for ARM */
 	int prof;
 	struct thread *next;		/* all threads */

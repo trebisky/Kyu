@@ -17,7 +17,7 @@
 #include "cpu.h"
 #include "board/board.h"
 
-extern struct thread silly_thread;
+extern struct thread static_thread[NUM_CORES];
 extern struct thread *cur_thread;
 
 static vfptr data_abort_hook;
@@ -84,7 +84,7 @@ evil_exception ( char *msg, int code )
 {
 	int pc;
 
-	if ( cur_thread == &silly_thread ) {
+	if ( cur_thread == &static_thread[0] ) {
 	    if ( in_evil )
 		for ( ;; ) ;
 	    in_evil = 1;

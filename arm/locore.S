@@ -12,7 +12,7 @@
  *
  *  Multicore code by Marco Warga, Philip Michael Van Every, and myself.
  *
- * temporary catch-all for assembly language
+ * temporary catch-all for all kinds of assembly language
  *
  * Amazingly enough, ARM by default is little-endian.
  * It can switch, but watch out if you do!
@@ -27,15 +27,21 @@
 @ on the x86 you use the pound sign.
 @ You can also use C style comments including //
 
-#define PSR_M_SUPER	0x13
+/* We always run in SVR (supervisor) mode */
+#define PSR_M_SYS	0x1F	/* system */
+#define PSR_M_UDI	0x1B	/* undefined instruction */
+#define PSR_M_ABT	0x17	/* abort */
+#define PSR_M_MON	0x16	/* monitor */
+#define PSR_M_SVR	0x13	/* supervisor */
 #define PSR_M_IRQ	0x12
 #define PSR_M_FIQ	0x11
+#define PSR_M_USER	0x10
 
 #define PSR_IRQ_DIS	0x80
 #define PSR_FIQ_DIS	0x40
 #define PSR_INT_DIS	0xc0
 
-#define PSR_DEFAULT	PSR_M_SUPER
+#define PSR_DEFAULT	PSR_M_SVR
 
 #define CPSR_MODE_USER			0x10
 #define CPSR_MODE_FIQ			0x11
@@ -254,6 +260,7 @@ loop:	cmp	r3, r2
 	bx	lr
 
 /* We have 6 modes -- and each needs a stack.
+ * (we ignore USER and MONITOR)
  * See also board.h
  */
 #define SVR_STACK         MODE_STACK_SIZE
@@ -391,7 +398,10 @@ spin:
  *
  * Someday we could eliminate U-boot, although I don't know why,
  * and just let the SPL load us directly.
- * At any rate, the reset vector here won't get any use on the BBB.
+ * At any rate, the reset vector here won't get any use
+ *  given this code is launched from U-Boot, or in the
+ *  case of a second core, the reset vector goes to the
+ *  bootrom, not here in the H3.
  */
 
 /* Note on ".align".  On some processors (like the x86, not the arm)
@@ -448,8 +458,8 @@ reset:
 #define S_R8		32
 #define S_R9		36
 #define S_R10		40
-#define S_R11		44
-#define S_R12		48
+#define S_R11		44	/* fp */
+#define S_R12		48	/* ip */
 #define S_SP		52	/* r13 */
 #define S_LR		56	/* r14 */
 #define S_PC		60	/* r15 */
@@ -463,18 +473,86 @@ reset:
 /* ----------------------------------------------------------- */
 
 	.globl	cur_thread
+	.globl	static_thread
 
 /* When an interrupt happens we have our own private r13 and r14 (sp and lr)
  * r14 has the address to return to (plus some adjustment),
- *  but sp is entirely free to be used.
+ *  we can do as we please with sp (as long as we don't care about
+ *  the interrupt stack it now points to).
  *
  * So, we start the prolog with an adjusted PC in the lr register.
  * we simply use sp as a scratch register (and lr as well later on).
  *
  * Using the "^" to get the "non-interrupt" registers would be a mistake.
  *  this gets the user mode registers, which we have no interest in.
+ *
+ * The MPID register reads all zeros on a Cortex-A8 (as per the BBB).
  */
+
+cthread:	.word	0
+
 	.macro kyu_prolog
+#ifdef notdef
+        push    {r0,r1}
+        read_MPID ( r0 )
+        and     r0, r0, #0x03
+	cmp	r0, #0
+        beq	1f
+
+
+7:
+	bl	go_red
+	b	7b
+	pop	{r0,r1}
+	ldr     sp, =cur_thread
+	b	2f
+
+	lsl	r0, r0, #2
+        ldr     r1, =static_thread
+	add	r1, r1, r0
+	str	r1, cthread
+	pop	{r0,r1}
+	ldr	sp, cthread
+	b	2f
+
+1:
+	pop	{r0,r1}
+#endif
+
+@	movw	sp, #:lower16:cur_thread
+@	movt	sp, #:upper16:cur_thread
+// This works in lieu of the above.
+	ldr     sp, =cur_thread
+	ldr	sp, [sp, #0]
+
+2:
+	stmia	sp, {r0-r12}
+
+	mrs	ip, spsr	/* save before forcing to super */
+	str	ip, [sp,#S_PSR]	/* saved SR */
+
+	add	r0, sp, #0	/* our cur_thread */
+	add	r1, lr, #0	/* shuffle this (becomes PC on resume) */
+
+@	mrs     ip, cpsr	/* get current mode */
+@       bic     ip, ip, #0x1f
+@       orr     ip, ip, #PSR_M_SVR
+@       msr     cpsr, ip	/* force it to super */
+	// this replaces the above 4 instructions
+        cps     #PSR_M_SVR
+
+	str	sp, [r0,#S_SP]	/* save this */
+	str	lr, [r0,#S_LR]	/* this too */
+
+	str	r1, [r0,#S_PC]	/* PC when we resume */
+
+	.endm
+
+	/* This is the tried and true prolog from days before
+	 * we added code to handle interrupts in any core.
+	 * 6-18-2018
+	 */
+	.macro kyu_prolog_OLD
 	movw	sp, #:lower16:cur_thread
 	movt	sp, #:upper16:cur_thread
 	ldr	sp, [sp, #0]
@@ -489,7 +567,7 @@ reset:
 
 	mrs     ip, cpsr	/* get current mode */
         bic     ip, ip, #0x1f
-        orr     ip, ip, #PSR_M_SUPER
+        orr     ip, ip, #PSR_M_SVR
         msr     cpsr, ip	/* force it to super */
 
 	str	sp, [r0,#S_SP]	/* save this */
@@ -533,7 +611,7 @@ resume_c:
 	ldmia	r0,{r0,ip,sp,lr}
 	mrs     r1, cpsr
 	bic	r1, r1, #0xff
-	orr	r1, r1, #PSR_M_SUPER	/* enable both IRQ and FIQ */
+	orr	r1, r1, #PSR_M_SVR	/* enable both IRQ and FIQ */
 	msr	cpsr, r1
 	mov	fp, #0		/* added 8-13-2016 to end backtraces */
 	mov	pc, ip
@@ -562,6 +640,7 @@ save_j:
 	mov	r0, #0		/* we return 0 */
 	bx	lr
 
+/* Now identical to resume_i */
 	.globl resume_j
 resume_j:
 	/* keep r0 till bitter end */
@@ -723,7 +802,7 @@ restore:
 get_ssp:
 	mrs	ip, cpsr
 	bic	r0, ip, #0x1f
-	orr	r0, r0, #PSR_M_SUPER
+	orr	r0, r0, #PSR_M_SVR
 	msr	cpsr, r0
 
 	add	r0, sp, #0

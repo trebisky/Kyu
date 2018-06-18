@@ -167,7 +167,26 @@ typedef unsigned long __u32;
 #define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
 #define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
 
+/* Disable interrupts to lock section */
+#define INT_lock	\
+	asm volatile (	"mrs     r0, cpsr; \
+			orr     r0, r0, #0xc0; \
+			msr     cpsr, r0" ::: "r0" )
 
+/* Enable interrupts to unlock section */
+#define INT_unlock	\
+	asm volatile (	"mrs     r0, cpsr; \
+			bic     r0, r0, #0xc0; \
+			msr     cpsr, r0" ::: "r0" )
+
+/* These functions don't get compiled inline unless some level of
+ * optimization is enabled.  By default they become just static functions
+ * and get duplicated in more than one place in the code, which is harmless
+ * but yields some unfortunate bloat.
+ */
+
+/* Provided for the sake of syntax, the macros above will yield better code.
+ */
 static inline unsigned int
 r_CCNT ( void )
 {
@@ -178,9 +197,10 @@ r_CCNT ( void )
     return rv;
 }
 
+#ifdef notdef
 /* Disable interrupts to lock section */
 static inline void
-INT_lock ( void )
+INT_lock_f ( void )
 {
 	asm volatile ( "mrs     r0, cpsr" );
 	asm volatile ( "orr     r0, r0, #0xc0" );
@@ -189,11 +209,12 @@ INT_lock ( void )
 
 /* Enable interrupts to unlock section */
 static inline void
-INT_unlock ( void )
+INT_unlock_f ( void )
 {
 	asm volatile ( "mrs     r0, cpsr" );
 	asm volatile ( "bic     r0, r0, #0xc0" );
 	asm volatile ( "msr     cpsr, r0" );
 }
+#endif
 
 /* THE END */
