@@ -13,6 +13,8 @@
  * "It is the difference that makes the difference"  (Sal Glesser, Spyderco)
  */
 
+#include "h3_ints.h"
+
 #define CPUCFG_BASE     0x01f01c00
 #define PRCM_BASE       0x01f01400
 
@@ -82,12 +84,15 @@ static void launch_core ( int );
 
 static void start_test1 ( void );
 static void start_test2 ( void );
+static void start_test3 ( void );
+static void start_test4 ( void );
 
 static void pulses ( int, int );
 static void run_blink ( int, int, int );
 
 static void core_demo1 ( int );
 static void core_demo2 ( int );
+static void core_demo3 ( int );
 
 typedef void (*ifptr) ( int );
 
@@ -120,8 +125,11 @@ test_core ( void )
 
 	// demo_func = core_demo1;
 	// start_test1 ();
-	demo_func = core_demo2;
-	start_test2 ();
+	// demo_func = core_demo2;
+	// start_test2 ();
+	// demo_func = core_demo3;
+	// start_test3 ();
+	start_test4 ();
 }
 
 /* -------------------------------------------------------------------------------- */
@@ -195,6 +203,7 @@ core_demo2 ( int core )
 
 static int demo3_locks[4];
 
+/* XXX - still buggy */
 static void
 start_test3 ( void )
 {
@@ -218,6 +227,7 @@ start_test3 ( void )
 	}
 }
 
+
 static void
 core_demo3 ( int core )
 {
@@ -226,6 +236,37 @@ core_demo3 ( int core )
 	    pulses ( core+1, 100 );
 	}
 }
+
+/* -------------------------------------------------------------------------------- */
+/* Demo 4,
+ *  Play with GIC and Software generated interrupts
+ */
+
+static void
+test4_handler_1 ( int xxx )
+{
+	printf ( "BANG!\n" );
+}
+
+static void
+test4_handler_2 ( int xxx )
+{
+	printf ( "BOOM!\n" );
+}
+
+static void
+start_test4 ( void )
+{
+	irq_hookup ( IRQ_SGI_1, test4_handler_1, 0 );
+	irq_hookup ( IRQ_SGI_2, test4_handler_2, 0 );
+
+	gic_soft_self ( SGI_1 );
+	gic_soft ( SGI_2, 0 );
+}
+
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
 
 /* Most of the time a core takes 30 counts to start */
 #define MAX_CORE	100

@@ -10,7 +10,7 @@
  *
  * Tom Trebisky  1/19/2017
  *
- * Driver for the H3 GIC
+ * Driver for the ARM GIC in the Allwinner H3
  *
  * The GIC is the ARM "Generic Interrupt Controller"
  * It has two sections, "cpu" and "dist"
@@ -44,7 +44,7 @@ struct h3_gic_dist {
 	int __pad7[216];
 	volatile unsigned long config[NUM_CONFIG];	/* 0xc00 */
 	int __pad8[182];
-	volatile unsigned long soft;		/* 0xf00 */
+	volatile unsigned long soft;			/* 0xf00 */
 };
 
 struct h3_gic_cpu {
@@ -91,6 +91,32 @@ gic_unpend ( int irq )
 	unsigned long mask = 1 << (irq%32);
 
 	gp->pclear[x] = mask;
+}
+
+#define SGI_LIST	0
+#define SGI_ALL		(1<<24)
+#define SGI_SELF	(2<<24)
+
+/* Trigger a software generated interrupt (SGI)
+ * "cpu" is the target core.
+ */
+void
+gic_soft ( int sgi_num, int cpu )
+{
+	struct h3_gic_dist *gp = GIC_DIST_BASE;
+
+	gp->soft = SGI_LIST | (1<<(16+cpu)) | sgi_num;
+}
+
+/* Trigger a software generated interrupt (SGI)
+ *  to ourself
+ */
+void
+gic_soft_self ( int sgi_num )
+{
+	struct h3_gic_dist *gp = GIC_DIST_BASE;
+
+	gp->soft = SGI_SELF | sgi_num;
 }
 
 #ifdef notdef
