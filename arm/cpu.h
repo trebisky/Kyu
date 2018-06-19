@@ -30,48 +30,6 @@
 #define F_DIVZ	8	/* pseudo for linux library */
 #define F_PANIC	9	/* pseudo for Kyu, user panic */
 
-
-/* restore prior interrupt status */
-static inline void splx ( int arg )
-{
-    asm volatile ( "msr     cpsr, %[new]" : : [new] "r" (arg) );
-}
-
-/* lock out all interrupts */
-static inline int splhigh ( void )
-{
-    int rv;
-    asm volatile ( "mrs     %[old], cpsr\n\t"
-		    "mov     r4, %[old]\n\t"
-		    "orr     r4, r4, #0xc0\n\t"
-		    "msr     cpsr, r4"
-		    : [old] "=r" (rv) : : "r4" );
-    return rv;
-}
-
-/* lock out IRQ */
-static inline int splirq ( void )
-{
-    int rv;
-    asm volatile ( "mrs     %[old], cpsr\n\t"
-		    "mov     r4, %[old]\n\t"
-		    "orr     r4, r4, #0x80\n\t"
-		    "msr     cpsr, r4"
-		    : [old] "=r" (rv) : : "r4" );
-    return rv;
-}
-/* lock out FIQ */
-static inline int splfiq ( void )
-{
-    int rv;
-    asm volatile ( "mrs     %[old], cpsr\n\t"
-		    "mov     r4, %[old]\n\t"
-		    "orr     r4, r4, #0x40\n\t"
-		    "msr     cpsr, r4"
-		    : [old] "=r" (rv) : : "r4" );
-    return rv;
-}
-
 /* Almost surely we could do something ARM specific
  * that would be better than this. XXX XXX
  * Quick and dirty for now  5-30-2015 10:45 PM
@@ -214,6 +172,50 @@ INT_unlock_f ( void )
 	asm volatile ( "mrs     r0, cpsr" );
 	asm volatile ( "bic     r0, r0, #0xc0" );
 	asm volatile ( "msr     cpsr, r0" );
+}
+#endif
+
+/* Old BSD style interrupt locking */
+#ifdef nodef
+/* restore prior interrupt status */
+static inline void splx ( int arg )
+{
+    asm volatile ( "msr     cpsr, %[new]" : : [new] "r" (arg) );
+}
+
+/* lock out all interrupts */
+static inline int splhigh ( void )
+{
+    int rv;
+    asm volatile ( "mrs     %[old], cpsr\n\t"
+		    "mov     r4, %[old]\n\t"
+		    "orr     r4, r4, #0xc0\n\t"
+		    "msr     cpsr, r4"
+		    : [old] "=r" (rv) : : "r4" );
+    return rv;
+}
+
+/* lock out IRQ */
+static inline int splirq ( void )
+{
+    int rv;
+    asm volatile ( "mrs     %[old], cpsr\n\t"
+		    "mov     r4, %[old]\n\t"
+		    "orr     r4, r4, #0x80\n\t"
+		    "msr     cpsr, r4"
+		    : [old] "=r" (rv) : : "r4" );
+    return rv;
+}
+/* lock out FIQ */
+static inline int splfiq ( void )
+{
+    int rv;
+    asm volatile ( "mrs     %[old], cpsr\n\t"
+		    "mov     r4, %[old]\n\t"
+		    "orr     r4, r4, #0x40\n\t"
+		    "msr     cpsr, r4"
+		    : [old] "=r" (rv) : : "r4" );
+    return rv;
 }
 #endif
 

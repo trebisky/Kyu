@@ -16,6 +16,11 @@
 #include "h3_ints.h"
 #include "arch/cpu.h"
 
+#define CORE_0	0
+#define CORE_1	1
+#define CORE_2	2
+#define CORE_3	3
+
 #define CPUCFG_BASE     0x01f01c00
 #define PRCM_BASE       0x01f01400
 
@@ -85,7 +90,7 @@ static void launch_core ( int );
 
 static void start_test1 ( void );
 static void start_test2 ( void );
-static void start_test3 ( void );
+// static void start_test3 ( void );
 static void start_test4 ( void );
 
 static void pulses ( int, int );
@@ -93,7 +98,7 @@ static void run_blink ( int, int, int );
 
 static void core_demo1 ( int );
 static void core_demo2 ( int );
-static void core_demo3 ( int );
+// static void core_demo3 ( int );
 static void core_demo4 ( int );
 
 typedef void (*ifptr) ( int );
@@ -127,10 +132,16 @@ test_core ( void )
 
 	// demo_func = core_demo1;
 	// start_test1 ();
+
+	// test H3 spin locks
 	// demo_func = core_demo2;
 	// start_test2 ();
+
+	// test ARM spin locks
 	// demo_func = core_demo3;
 	// start_test3 ();
+
+	// test interrupt between cores 
 	demo_func = core_demo4;
 	start_test4 ();
 }
@@ -198,10 +209,14 @@ core_demo2 ( int core )
 }
 
 /* -------------------------------------------------------------------------------- */
+
+#ifdef notdef
 /* Demo 3,
  *  cores all wait on spin lock
  *  "master" core signals them when to blink.
  *  like Demo 2, but uses ARM spinlocks
+ * Or tries to anyway.
+ * See locore.S -- I suspect these just don't work on the H3 chip.
  */
 
 static int demo3_locks[4];
@@ -210,23 +225,31 @@ static int demo3_locks[4];
 static void
 start_test3 ( void )
 {
-	// Set to 1, these are locked */
-	demo3_locks[1] = 1;
-	demo3_locks[2] = 1;
-	demo3_locks[3] = 1;
+	// Initialize these all locked
+	printf ( "Initializing lock\n" );
+	demo3_locks[1] = 0;
+	    spin_lock ( &demo3_locks[1] );
+	printf ( "Initializing lock\n" );
+	demo3_locks[2] = 0;
+	    spin_lock ( &demo3_locks[2] );
+	printf ( "Initializing lock\n" );
+	demo3_locks[3] = 0;
+	    spin_lock ( &demo3_locks[3] );
 
-	/* start all the cores */
-	test_one ( 1 );
-	test_one ( 2 );
-	test_one ( 3 );
+	printf ( "Starting other core[s]\n" );
+	/* start the cores */
+	// test_one ( 1 );
+	// test_one ( 2 );
+	test_one ( CORE_3 );
 
 	for ( ;; ) {
-	    thr_delay ( 2000 );
-	    spin_unlock ( &demo3_locks[1] );
-	    thr_delay ( 1000 );
-	    spin_unlock ( &demo3_locks[2] );
-	    thr_delay ( 1000 );
-	    spin_unlock ( &demo3_locks[3] );
+	    //thr_delay ( 2000 );
+	    //spin_unlock ( &demo3_locks[1] );
+	    //thr_delay ( 1000 );
+	    //spin_unlock ( &demo3_locks[2] );
+	    thr_delay ( 4000 );
+	    printf ( "Blip\n" );
+	    spin_unlock ( &demo3_locks[CORE_3] );
 	}
 }
 
@@ -235,9 +258,10 @@ core_demo3 ( int core )
 {
 	for ( ;; ) {
 	    spin_lock ( &demo3_locks[core] );
-	    pulses ( core+1, 100 );
+	    pulses ( core+1, 250 );
 	}
 }
+#endif
 
 /* -------------------------------------------------------------------------------- */
 /* Demo 4,
@@ -261,11 +285,6 @@ test4_handler_3 ( int xxx )
 {
 	printf ( "BONK!\n" );
 }
-
-#define CORE_0	0
-#define CORE_1	1
-#define CORE_2	2
-#define CORE_3	3
 
 static void
 start_test4 ( void )

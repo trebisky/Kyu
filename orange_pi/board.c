@@ -273,7 +273,7 @@ board_init ( void )
 	delay_calib ();
 
 	/* CPU interrupts on */
-	enable_irq ();
+	INT_unlock;
 }
 
 /* Called by timer_init () */

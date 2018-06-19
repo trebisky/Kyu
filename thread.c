@@ -1006,7 +1006,7 @@ thr_block ( enum thread_state why )
 	if ( thread_debug )
 	    printf ( "thr_block(%d) for %s\n", why, cur_thread->name );
 
-	cpu_enter ();
+	INT_lock;
 	cur_thread->state = why;
 
 	/* here we *must* switch
@@ -1029,7 +1029,7 @@ thr_block_c ( enum thread_state why, tfptr func, void *arg )
 	if ( why == READY )	/* XXX paranoia !? */
 	    return;
 
-	cpu_enter ();
+	INT_lock;
 	cur_thread->state = why;
 
 	setup_c ( cur_thread, func, arg );
@@ -1070,7 +1070,7 @@ thr_block_q ( enum thread_state why )
 	if ( why == READY )	/* XXX paranoia !? */
 	    return;
 
-	cpu_enter ();
+	INT_lock;
 	cur_thread->state = why;
 
 #ifdef notdef
@@ -1117,7 +1117,7 @@ thr_block_q ( enum thread_state why )
 void
 thr_block_m ( enum thread_state why, struct sem *mutex )
 {
-	cpu_enter ();
+	INT_lock;
 
 	sem_unblock ( mutex );
 	thr_block ( why );
@@ -1588,7 +1588,7 @@ change_thread ( struct thread *new_tp, int options )
 	 * Otherwise a bad race results.
 	 * Note that each resume reenables interrupts.
 	 */
-	cpu_enter ();
+	INT_lock;
 	switch ( cur_thread->mode ) {
 	    case JMP:
 		if ( thread_debug )
@@ -1673,7 +1673,7 @@ resched ( int options )
 	if ( ! cur_thread )
 	    panic_spin ( "resched, invalid current thread" );
 
-	cpu_enter ();		/* XXX XXX */
+	INT_lock;		/* XXX XXX */
 
 #ifdef SORT_PRI
 	/* We do not currently do this */
@@ -1736,7 +1736,7 @@ resched ( int options )
 	    change_thread ( best_tp, options );
 	}
 
-	cpu_leave ();		/* XXX XXX */
+	INT_unlock;		/* XXX XXX */
 
 	/* We could find no other thread to
 	 * switch to, if the current thread is
@@ -1921,9 +1921,9 @@ sem_unblock ( struct sem *sem )
 int
 sem_block_try ( struct sem *sem )
 {
-	cpu_enter ();	/* XXX */
+	INT_lock;	/* XXX */
 	if ( sem->state == SEM_SET ) {
-	    cpu_leave ();
+	    INT_unlock;
 	    return 0;
 	} else {
 	    sem_block ( sem );
@@ -1981,7 +1981,7 @@ sem_block_cpu ( struct sem *sem )
 {
 	if ( sem->state == SEM_CLEAR ) {
 	    sem->state = SEM_SET;
-	    cpu_leave ();
+	    INT_unlock;
 	    return;
 	}
 
@@ -2000,17 +2000,17 @@ sem_block_cpu ( struct sem *sem )
 void
 sem_block ( struct sem *sem )
 {
-	cpu_enter ();
+	INT_lock;
 	sem_block_cpu ( sem );
 }
 
 void
 sem_block_c ( struct sem *sem, tfptr func, void *arg )
 {
-	cpu_enter ();	/* XXX */
+	INT_lock;	/* XXX */
 	if ( sem->state == SEM_CLEAR ) {
 	    sem->state = SEM_SET;
-	    cpu_leave ();
+	    INT_unlock;
 	    return;
 	}
 
@@ -2022,10 +2022,10 @@ sem_block_c ( struct sem *sem, tfptr func, void *arg )
 void
 sem_block_q ( struct sem *sem )
 {
-	cpu_enter ();	/* XXX */
+	INT_lock;	/* XXX */
 	if ( sem->state == SEM_CLEAR ) {
 	    sem->state = SEM_SET;
-	    cpu_leave ();
+	    INT_unlock;
 	    return;
 	}
 
@@ -2045,7 +2045,7 @@ sem_block_q ( struct sem *sem )
 void
 sem_block_t ( struct sem *sem, int timeout )
 {
-	cpu_enter ();
+	INT_lock;
 	if ( sem->state == SEM_SET ) {
 	    /* maybe we should have thr_block_t()
 	     * to handle this.
@@ -2061,7 +2061,7 @@ sem_block_t ( struct sem *sem, int timeout )
 void
 sem_block_m ( struct sem *sem, struct sem *mutex )
 {
-	cpu_enter ();
+	INT_lock;
 	sem_unblock ( mutex );
 	sem_block ( sem );
 }
@@ -2129,7 +2129,7 @@ cv_signal ( struct cv *cp )
 void
 cv_wait ( struct cv *cp )
 {
-	cpu_enter ();
+	INT_lock;
 	sem_unblock ( cp->mutex );
 	sem_block ( cp->signal );
 	/* XXX
@@ -2138,40 +2138,6 @@ cv_wait ( struct cv *cp )
 	 */
 	sem_block ( cp->mutex );
 }
-
-#ifdef notdef
-/* defined in sklib.h */
-extern inline void cpu_enter ( void )
-{
-    __asm__ __volatile__ ( "cli" );
-}
-
-extern inline void cpu_leave ( void )
-{
-    __asm__ __volatile__ ( "sti" );
-}
-#endif
-
-/* "safe" versions
- * (hack to make printf work from interrupt
- *  code when we are using a serial console)
- */
-
-#ifdef ARCH_X86
-void cpu_enter_s ( void )
-{
-    if ( ! in_interrupt ) {
-	__asm__ __volatile__ ( "cli" );
-    }
-}
-
-void cpu_leave_s ( void )
-{
-    if ( ! in_interrupt ) {
-	__asm__ __volatile__ ( "sti" );
-    }
-}
-#endif
 
 /* Just some "sugar" to make the cpu_xxx() calls all nice
  * and analogous to the cv_xxx() calls.
@@ -2198,9 +2164,9 @@ cpu_signal ( struct sem *xp )
 void
 cpu_wait ( struct sem *xp )
 {
-	cpu_leave ();
+	INT_unlock;
 	sem_block ( xp );
-	cpu_enter ();
+	INT_lock;
 }
 #endif
 
@@ -2377,11 +2343,11 @@ cancel_repeat ( struct thread *tp )
 	if ( ! repeat_head )
 	    return;
 
-	x = splhigh ();
+	INT_lock;
 
 	if ( repeat_head == tp ) {
 	    repeat_head = tp->rep_next;
-	    splx ( x );
+	    INT_unlock;
 	    return;
 	}
 
@@ -2395,17 +2361,17 @@ cancel_repeat ( struct thread *tp )
 	    cp = pp->rep_next;
 	}
 
-	splx ( x );
+	INT_unlock;
 }
 
 static void
 timer_add_wait ( struct thread *tp, int delay )
 {
-	cpu_enter ();
+	INT_lock;
 
 	timer_add_wait_int ( tp, delay );
 
-	cpu_leave ();
+	INT_unlock;
 }
 
 static void
@@ -2436,11 +2402,11 @@ sem_add_wait_int ( struct sem *sp, int delay )
 static void
 sem_add_wait ( struct sem *sp, int delay )
 {
-	cpu_enter ();
+	INT_lock;
 
 	sem_add_wait_int ( sp, delay );
 
-	cpu_leave ();
+	INT_unlock;
 }
 
 /* This gets called from sen_unblock() when we
@@ -2453,7 +2419,7 @@ sem_cancel_wait ( struct sem *sp )
 {
 	struct sem *lp;
 
-	if ( ! in_interrupt ) cpu_enter ();
+	if ( ! in_interrupt ) INT_lock;
 
 	sp->flags &= ~SEM_TIMEOUT;
 
@@ -2465,7 +2431,7 @@ sem_cancel_wait ( struct sem *sp )
 		    lp = sp->next;
 	}
 
-	if ( ! in_interrupt ) cpu_leave ();
+	if ( ! in_interrupt ) INT_unlock;
 }
 
 /* This gets called from thr_unblock() when we
@@ -2477,7 +2443,7 @@ timer_cancel ( struct thread *tp )
 {
 	struct thread *lp;
 
-	if ( ! in_interrupt ) cpu_enter ();
+	if ( ! in_interrupt ) INT_lock;
 
 	if ( wait_head == tp ) {
 	    wait_head = tp->wnext;
@@ -2494,7 +2460,7 @@ timer_cancel ( struct thread *tp )
 
 	tp->delay = 0;	/* not really necessary */
 
-	if ( ! in_interrupt ) cpu_leave ();
+	if ( ! in_interrupt ) INT_unlock;
 }
 
 /* THE END */

@@ -297,7 +297,7 @@ net_rcv_noint ( struct netbuf *nbp )
 
 	nbp->next = (struct netbuf *) 0;
 
-	x = splhigh();	/* XXX XXX */
+	INT_lock;
     	if ( inq_tail ) {
 	    inq_tail->next = nbp;
 	    inq_tail = nbp;
@@ -305,7 +305,7 @@ net_rcv_noint ( struct netbuf *nbp )
 	    inq_tail = nbp;
 	    inq_head = nbp;
 	}
-	splx ( x );	/* XXX XXX */
+	INT_unlock;
 
 	/*
 	cpu_signal ( inq_sem );
@@ -320,8 +320,6 @@ net_rcv_noint ( struct netbuf *nbp )
 void
 net_rcv ( struct netbuf *nbp )
 {
-	int x;
-
 	nbp->next = (struct netbuf *) 0;
 
     	if ( inq_tail ) {
@@ -341,11 +339,11 @@ static void
 net_thread ( int xxx )
 {
     	struct netbuf *nbp;
-	int x;
 
 	for ( ;; ) {
 
-	    x = splhigh ();
+	    INT_lock;
+
 	    nbp = NULL;
 	    if ( inq_head ) {
 		nbp = inq_head;
@@ -353,7 +351,8 @@ net_thread ( int xxx )
 		if ( ! inq_head )
 		    inq_tail = (struct netbuf *) 0;
 	    }
-	    splx ( x );
+
+	    INT_unlock;
 
 	    if ( nbp )
 		net_handle ( nbp );
@@ -371,7 +370,7 @@ net_thread ( int arg )
 {
     	struct netbuf *nbp;
 
-    	cpu_enter ();
+    	INT_lock;
 
 	for ( ;; ) {
 	    while ( inq_head ) {
@@ -379,11 +378,11 @@ net_thread ( int arg )
 		inq_head = nbp->next;
 		if ( ! inq_head )
 		    inq_tail = (struct netbuf *) 0;
-		cpu_leave ();
+		INT_unlock;
 
 		net_handle ( nbp );
 
-		cpu_enter ();
+		INT_lock;
 	    }
 
 	    cpu_wait ( inq_sem );
@@ -615,9 +614,9 @@ netbuf_alloc ( void )
 {
 	struct netbuf *rv;
 
-    	cpu_enter ();
+    	INT_lock;
 	rv = netbuf_alloc_i ();
-	cpu_leave ();
+	INT_unlock;
 
 	return rv;
 }

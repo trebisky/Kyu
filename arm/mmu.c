@@ -244,7 +244,8 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 	for ( i=0; i<size; i++ ) {
 	    // mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
 	    // mmu[start+i] = PDE_TOM_RAM | addr;
-	    mmu[start+i] = PDE_MARCO_RAM | addr;
+	    // mmu[start+i] = PDE_MARCO_RAM | addr;
+	    mmu[start+i] = PDE_MARCO_RAM_S | addr;
 	    addr += MMU_TICK;
 	}
 
@@ -287,6 +288,7 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 	// mmu_set_ttbr ();
 }
 
+#ifdef notdef
 /* Call this to set up our very own MMU tables */
 void
 mmu_initialize_OLD ( unsigned long ram_start, unsigned long ram_size )
@@ -310,7 +312,7 @@ mmu_initialize_OLD ( unsigned long ram_start, unsigned long ram_size )
 
 	mmu_setup ( new_mmu, ram_start, ram_size );
 
-	cpu_enter();
+	INT_lock;
 
 	// mmu_off();
 	flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
@@ -325,10 +327,11 @@ mmu_initialize_OLD ( unsigned long ram_start, unsigned long ram_size )
 
 	// mmu_on();
 
-	cpu_leave();
+	INT_unlock;
 
 	printf ( "New MMU at: %08x\n", new_mmu );
 }
+#endif
 
 /* ------------------------------------------------------------------- */
 /* ------------------------------------------------------------------- */

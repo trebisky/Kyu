@@ -368,6 +368,7 @@ primary_start_bbb:
 // spin if we return
 1:	b	1b
 
+#ifdef notdef
 /*------------------------------------------------------------------------
  * spin_lock / spin_unlock  -  spinlocks using ARM exclusive monitors
  * From Xinu code by Phil Van Every
@@ -399,11 +400,7 @@ spin_unlock:
 
         str r1, [r0]
         bx lr
-
-/* Call this to hang the processor in a spin loop */
-	.globl spin
-spin:
-	b	spin
+#endif
 
 /* ----------------------------------------------------------- */
 /*  Exception and interrupt vectors */
@@ -424,7 +421,7 @@ spin:
 /* Note on ".align".  On some processors (like the x86, not the arm)
  * this is the multiple of bytes to align on.  On the ARM it is the
  * power of 2.  So on the ARM .align 3 is like .align 8 on the x86.
- * And so on the ARM .align 5 is aligning on 32 byte boundaries.
+ * On the ARM .align 5 is aligning on 32 byte boundaries.
  *
  * I am probably being overly fussy about alignment,
  *  but maybe I will thank myself when I move to 64 bit ARM processors.
@@ -787,56 +784,18 @@ fp_enable:
 	mov	pc, lr
 #endif
 
+/* Call this to hang the processor in a spin loop */
+	.globl spin
+spin:
+	b	spin
 
 /* ==================================================================== */
 /* ==================================================================== */
 /* ==================================================================== */
-
-/* XXX XXX - clean up this mess !!
- * we have way too many ways to disable/enable
- * processor interrupts.
- */
-
-/* enable_irq (void); */
-	.globl enable_irq
-enable_irq:
-	mrs	r0, cpsr
-	@ bic	r0, r0, #0x80
-	bic	r0, #0x80
-	msr	cpsr, r0
-	bx	lr
-
-/* enable_fiq (void); */
-	.globl enable_fiq
-enable_fiq:
-	mrs	r0, cpsr
-	bic	r0, r0, #0x40
-	msr	cpsr, r0
-	bx	lr
-
-/* enter critical region
- * i.e. disable both irq and fiq
- */
-	.globl cpu_enter
-cpu_enter:
-	mrs	r0, cpsr
-	orr	r0, r0, #0xc0
-	msr	cpsr, r0
-	bx	lr
-
-/* leave critical region
- * i.e. enable both irq and fiq
- * XXX - do we really want to enable both?
- */
-	.globl cpu_leave
-cpu_leave:
-	mrs	r0, cpsr
-	bic	r0, r0, #0xc0
-	msr	cpsr, r0
-	bx	lr
 
 /* This is how Xinu does it, returns a mask to later
  * be passed to restore(m);
+ * This pair is used in the Xinu TCP code.
  */
 	.globl disable
 disable:

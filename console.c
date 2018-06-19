@@ -16,6 +16,8 @@
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
+#include "arch/cpu.h"
+
 #include <stdarg.h>
 
 // #include "interrupts.h"
@@ -391,9 +393,9 @@ panic_debug ( void )
 		printf ( "TSC: %u %u (%d)\n", hi, lo, dt );
 	    }
 	    if ( c == '+' )	/* allow interrupts */
-		cpu_leave ();
+		INT_unlock;
 	    if ( c == '-' )	/* mask interrupts */
-		cpu_enter ();
+		INT_lock;
 	    if ( c == 'r' )
 	    	kb_reset ();
 	    if ( c == 't' )
@@ -589,10 +591,10 @@ kyu_debugger ( void )
 	    	thr_show_current ();
 
 	    if ( **wp == '+' )	/* allow interrupts */
-		cpu_leave ();
+		INT_unlock;
 
 	    if ( **wp == '-' )	/* mask interrupts */
-		cpu_enter ();
+		INT_lock;
 
 	    /* Show thread by name */
 	    if ( **wp == 't' && nw == 2 ) {

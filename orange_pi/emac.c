@@ -19,6 +19,7 @@
 #include <thread.h>
 #include <malloc.h>
 #include <h3_ints.h>
+#include <arch/cpu.h>
 
 #include "netbuf.h"
 // #include "net.h"
@@ -1889,12 +1890,12 @@ emac_send ( struct netbuf *nbp )
 
 	pkt_send ();
 
-    cpu_enter ();
+	INT_lock;
 	// tx_cleaner ();
 
 	if ( cur_tx_dma->next == clean_tx_dma ) {
 	    printf ( " !!! *** Tx ring full, packet not sent\n" );
-	    cpu_leave ();
+	    INT_unlock;
 	    return;
 	}
 
@@ -1930,7 +1931,7 @@ emac_send ( struct netbuf *nbp )
 	cur_tx_dma = cur_tx_dma->next;
 
 	// tx_cleaner ();
-    cpu_leave ();
+	INT_unlock;
 
 	tx_poll ();
 }
