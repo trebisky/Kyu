@@ -64,8 +64,8 @@ static enum console_mode first_console = INITIAL_CONSOLE;
  * interrupts to occur in cores other than zero
  * 6-18-2018
  */
-struct thread static_thread[NUM_CORES];
-struct thread *cur_thread = & static_thread[0];
+struct thread static_thread;
+struct thread *cur_thread = & static_thread;
 
 static long in_interrupt;
 static struct thread *in_newtp;
@@ -243,8 +243,6 @@ thr_free ( char *stack, int size )
 	stack_avail = xp;
 }
 
-static char *tnames[NUM_CORES] = { "t-core-0", "t-core-1", "t-core-2", "t-core-3" };
-
 void
 thr_init ( void )
 {
@@ -284,9 +282,6 @@ thr_init ( void )
 	 * to point to a static thread.
 	 */
 	// cur_thread = (struct thread *) 0;
-
-	for ( i=0; i<NUM_CORES; i++ )
-	    thrcp ( static_thread[i].name, tnames[i], MAX_TNAME-1 );
 
 	thread_ready = (struct thread *) 0;
 

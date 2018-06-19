@@ -259,11 +259,39 @@ special_debug ( void )
 }
 #endif
 
+/* Temporary hack for alternate core
+ */
+void 
+do_irq_alt ( unsigned int *frame )
+{
+	int nint;
+
+#ifdef notdef
+	int sp;
+	printf ( "ALT interrupt, frame = %08x\n", frame );
+	get_SP ( sp );
+	printf ( "ALT interrupt, sp = %08x\n", sp );
+#endif
+
+	nint = intcon_irqwho ();
+
+	if ( ! irq_table[nint].func ) {
+	    printf ("Unknown (ALT) interrupt request: %d\n", nint );
+	    for ( ;; ) ;
+	}
+
+	/* call the user handler
+	 */
+	(irq_table[nint].func)( irq_table[nint].arg );
+
+	intcon_irqack ( nint );
+}
 
 /* Interrupt handler, called at interrupt level
  * when the IRQ line indicates an interrupt.
  */
-void do_irq ( void )
+void 
+do_irq ( void )
 {
 	int nint;
 	struct thread *tp;

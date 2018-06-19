@@ -147,9 +147,24 @@ primary_start:
 	bic      r0, r0, #CTLR_ALIGN
 	write_SCTLR ( r0 )
 
-	movw	r0, #:lower16:vectors	/* set VBAR */
-	movt	r0, #:upper16:vectors
-	write_VBAR ( r0 )
+	/* core zero gets standard vectors */
+        read_MPID ( r11 )
+        and     r11, r11, #0x03
+        cmp     r11, #0
+        bne     1f
+	    movw	r0, #:lower16:vectors
+	    movt	r0, #:upper16:vectors
+	    write_VBAR ( r0 )
+	    b		2f
+1:
+	    movw	r0, #:lower16:alt_vectors
+	    movt	r0, #:upper16:alt_vectors
+	    write_VBAR ( r0 )
+2:
+
+@	movw	r0, #:lower16:vectors
+@	movt	r0, #:upper16:vectors
+@	write_VBAR ( r0 )
 
 	bl	setup_stacks_kyu
 
@@ -262,13 +277,15 @@ loop:	cmp	r3, r2
 /* We have 6 modes -- and each needs a stack.
  * (we ignore USER and MONITOR)
  * See also board.h
+ * They are in this order,
+ *  these are offsets from the end of the core region.
  */
-#define SVR_STACK         MODE_STACK_SIZE
-#define IRQ_STACK         MODE_STACK_SIZE * 1
-#define FIQ_STACK         MODE_STACK_SIZE * 2
-#define SYSTEM_STACK      MODE_STACK_SIZE * 3
-#define ABORT_STACK       MODE_STACK_SIZE * 4
-#define UNDEFINED_STACK   MODE_STACK_SIZE * 5
+#define SVR_STACK         MODE_STACK_SIZE * 5
+#define IRQ_STACK         MODE_STACK_SIZE * 4
+#define FIQ_STACK         MODE_STACK_SIZE * 3
+#define SYSTEM_STACK      MODE_STACK_SIZE * 2
+#define ABORT_STACK       MODE_STACK_SIZE * 1
+#define UNDEFINED_STACK   MODE_STACK_SIZE
 
 setup_stacks_kyu:
 	// fetch core number into r11
@@ -313,7 +330,7 @@ setup_stacks_kyu:
 	msr cpsr_c, r0
 	sub sp, r4, #SYSTEM_STACK
 
-	// switch to SVC mode, set sp
+	// switch to SVR mode, set sp
 	mov r0, #(CPSR_MODE_SVR | CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT )
 	msr cpsr_c, r0
 	sub sp, r4, #SVR_STACK
@@ -334,7 +351,7 @@ primary_start_bbb:
 	orr	r0, r0, #PSR_INT_DIS
 	msr	cpsr, r0
 
-	movw	r0, #:lower16:vectors	/* set VBAR */
+	movw	r0, #:lower16:vectors
 	movt	r0, #:upper16:vectors
 	write_VBAR ( r0 )
 
@@ -425,6 +442,20 @@ vectors:
 	ldr	pc, _irq
 	ldr	pc, _fiq
 
+/* An experiment, let other cores have a separate table, for some testing.
+ */
+	.align  5
+.globl vectors
+alt_vectors:
+	b	reset
+	ldr	pc, _undef
+	ldr	pc, _swi
+	ldr	pc, _iabt
+	ldr	pc, _dabt
+	ldr	pc, _unused
+	ldr	pc, _irq_alt
+	ldr	pc, _fiq
+
 
 	/* This branch table lets the handlers be anywhere */
 	.globl	_undef
@@ -435,6 +466,8 @@ vectors:
 	.globl	_irq
 	.globl	_fiq
 
+	.globl	_irq_alt
+
 _undef:		.word undefined_instruction
 _swi:		.word software_interrupt
 _iabt:		.word prefetch_abort
@@ -442,6 +475,8 @@ _dabt:		.word data_abort
 _unused:	.word not_used
 _irq:		.word irq
 _fiq:		.word fiq
+
+_irq_alt:	.word irq_alt
 
 /* XXX - spin and hang */
 reset:
@@ -492,33 +527,6 @@ reset:
 cthread:	.word	0
 
 	.macro kyu_prolog
-#ifdef notdef
-        push    {r0,r1}
-        read_MPID ( r0 )
-        and     r0, r0, #0x03
-	cmp	r0, #0
-        beq	1f
-
-
-7:
-	bl	go_red
-	b	7b
-	pop	{r0,r1}
-	ldr     sp, =cur_thread
-	b	2f
-
-	lsl	r0, r0, #2
-        ldr     r1, =static_thread
-	add	r1, r1, r0
-	str	r1, cthread
-	pop	{r0,r1}
-	ldr	sp, cthread
-	b	2f
-
-1:
-	pop	{r0,r1}
-#endif
-
 @	movw	sp, #:lower16:cur_thread
 @	movt	sp, #:upper16:cur_thread
 // This works in lieu of the above.
@@ -651,6 +659,8 @@ resume_j:
 
 /*
  * exception handlers
+ * XXX - do these really need to be align 5,
+ *  or just the vector table itself??
  */
 	.align  5
 undefined_instruction:
@@ -697,6 +707,60 @@ fiq:
 	kyu_prolog
 	bl	do_fiq
 	kyu_epilog
+
+/* This is the Xinu way of entering an exception handler */
+/* This fails if we do not do the cps to SVR mode, why? */
+/* It works fine, but does not save the state Kyu needs
+ * to allow thread switching during interrupts */
+	.align	5
+irq_alt_XINU:
+	sub	lr, lr, #4
+	srsdb	sp!, #PSR_M_SVR
+	cps	#PSR_M_SVR
+	push	{r0-r12,lr}
+	bl	do_irq_alt
+	pop	{r0-r12,lr}
+	rfeia	sp!
+
+# This is "trusting" and does not allow nested interrupts.
+# It builds a 68 byte "frame" on the interrupt stack and
+# passes it as a parameter, but does not maintain the
+# stack pointer pointing to this frame, so any other
+# activity on the IRQ stack will trash it.
+# --
+# The alternative to this is to use cps to jump back to
+# IRQ mode and free the space on the stack after the
+# call to C code returns.
+	.align	5
+irq_alt:
+	sub	lr, lr, #4	@ enter in IRQ mode
+	sub	sp, sp, #FRAME_SIZE
+	stmia	sp, {r0-r12}
+	mrs	r0, spsr
+	str	r0, [sp,#S_PSR]
+
+	add	r0, sp, #0	@ pointer to frame we are building
+	add	sp, sp, #FRAME_SIZE
+	add	r2, lr, #0	@ pc
+
+	cps	#PSR_M_SVR	@ permanent transition to SVR mode
+	str	sp, [r0, #S_SP]
+	str	lr, [r0, #S_LR]
+	str	r2, [r0, #S_PC]
+	push	{r0}
+
+	bl	do_irq_alt
+
+	pop	{r0}
+	ldr	r1, [r0, #S_PSR]
+	msr	spsr, r1
+	ldmia	r0, {r0-pc}^
+	// the ending ^ (caret) in the above says that if the register
+	// list includes the PC (as it does), then the spsr is also
+	// copied into the cpsr, which is just the thing for exception
+	// handlers.
+	// Once we make the marked transition to SVR mode,
+	// we never return to IRQ mode.
 
 /* ----------------------------------------------------------- */
 /* Various handy things */

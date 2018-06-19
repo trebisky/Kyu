@@ -195,11 +195,43 @@ board_mmu_init ( void )
 void
 board_core_startup ( int core )
 {
+	// int sp;
+	// get_SP ( sp );
+	// garbled without lock
+	// printf ( "Core %d starting with sp = %08x\n", core, sp );
+
 	gic_cpu_init ();
 	INT_unlock;
 
 	run_newcore ( core );
 }
+
+#ifdef notdef
+static void
+stack_addr_show ( void )
+{
+	int i;
+	char * core_base;
+	char * s_base;
+	char * i_base;
+
+	printf ( "Core stacks at %08x\n", core_stacks );
+	printf ( "Core stack area at %08x\n", stack_area );
+	for ( i=0; i< NUM_CORES; i++ ) {
+	    core_base = &stack_area[i*STACK_PER_CORE];
+	    printf ( "Core %d stacks at: %08x\n", i, core_base );
+	    s_base = core_base;
+	    i_base = s_base + MODE_STACK_SIZE;
+	    printf ( " Core %d SVR stack at: %08x (%08x)\n", i, s_base, i_base );
+	    s_base = s_base + MODE_STACK_SIZE;
+	    i_base = s_base + MODE_STACK_SIZE;
+	    printf ( " Core %d IRQ stack at: %08x (%08x)\n", i, s_base, i_base );
+	    s_base = s_base + MODE_STACK_SIZE;
+	    i_base = s_base + MODE_STACK_SIZE;
+	    printf ( " Core %d FIQ stack at: %08x (%08x)\n", i, s_base, i_base );
+	}
+}
+#endif
 
 /* Called early, but not as early as the above.
  */
@@ -215,10 +247,8 @@ board_hardware_init ( void )
 
 	cache_init ();
 	ram_init ( ram_start, ram_size );
-	/*
-	core_stacks = ram_alloc ( NUM_CORES * CORE_STACK_SIZE );
-	*/
-	printf ( "Core stacks at %08x\n", core_stacks );
+	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
+	// stack_addr_show ();
 }
 
 void

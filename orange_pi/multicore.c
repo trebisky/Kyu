@@ -14,6 +14,7 @@
  */
 
 #include "h3_ints.h"
+#include "arch/cpu.h"
 
 #define CPUCFG_BASE     0x01f01c00
 #define PRCM_BASE       0x01f01400
@@ -130,7 +131,7 @@ test_core ( void )
 	// start_test2 ();
 	// demo_func = core_demo3;
 	// start_test3 ();
-	demo_func = core_demo3;
+	demo_func = core_demo4;
 	start_test4 ();
 }
 
@@ -261,34 +262,48 @@ test4_handler_3 ( int xxx )
 	printf ( "BONK!\n" );
 }
 
+#define CORE_0	0
+#define CORE_1	1
+#define CORE_2	2
+#define CORE_3	3
+
 static void
 start_test4 ( void )
 {
+	int i;
+
 	irq_hookup ( IRQ_SGI_1, test4_handler_1, 0 );
 	irq_hookup ( IRQ_SGI_2, test4_handler_2, 0 );
-	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
+	// irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
 
 	gic_soft_self ( SGI_1 );
-	gic_soft ( SGI_2, 0 );
+	gic_soft ( SGI_2, CORE_0 );
 
 	/* acquire the lock */
 	// h3_spin_lock ( 1 );
 
 	/* Start another core */
-	test_one ( 1 );
+	test_one ( CORE_1 );
 	thr_delay ( 500 );
 
 	/* see if we can interrupt core 1 */
-	gic_soft ( SGI_3, 1 );
+	// XXX - currently under test
+	for ( i=0; i<10; i++ ) {
+	    gic_soft ( SGI_3, CORE_1 );
+	    thr_delay ( 100 );
+	}
 }
 
+/* The extra core itself, just sets up a handler and
+ * waits for the interrupt.
+ */
 static void
 core_demo4 ( int core )
 {
 	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
 
 	for ( ;; ) {
-	    ;
+	    delay_ms ( 1000 );
 	}
 }
 
@@ -324,16 +339,16 @@ test_one ( int cpu )
 
 	*SENTINEL = 0xdeadbeef;
 
-	printf ( "Starting core %d ...\n", cpu );
+	// printf ( "Starting core %d ...\n", cpu );
 	launch_core ( cpu );
 
 	// watch_core ();
 	stat = wait_core ();
-	if ( stat )
-	    printf ( " Core %d verified to start\n", cpu );
-	else
+	if ( ! stat ) {
 	    printf ( "** Core %d failed to start\n", cpu );
+	}
 
+	// if ( stat ) printf ( " Core %d verified to start\n", cpu );
 
 	*ROM_START = 0;
 }

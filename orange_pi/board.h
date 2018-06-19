@@ -38,12 +38,12 @@
 #define STACK_PER_CORE    MODE_STACK_SIZE * NUM_MODES
 
 #ifdef notdef
-#define SVR_STACK         STACK_PER_MODE
-#define IRQ_STACK         STACK_PER_MODE * 1
-#define FIQ_STACK         STACK_PER_MODE * 2
-#define SYSTEM_STACK      STACK_PER_MODE * 3
-#define ABORT_STACK       STACK_PER_MODE * 4
-#define UNDEFINED_STACK   STACK_PER_MODE * 5
+#define SVR_STACK         MODE_STACK_SIZE
+#define IRQ_STACK         MODE_STACK_SIZE * 1
+#define FIQ_STACK         MODE_STACK_SIZE * 2
+#define SYSTEM_STACK      MODE_STACK_SIZE * 3
+#define ABORT_STACK       MODE_STACK_SIZE * 4
+#define UNDEFINED_STACK   MODE_STACK_SIZE * 5
 #endif
 
 /* XXX - This is 1G of RAM as I have on my PC and PC plus boards.
