@@ -492,14 +492,9 @@ test_daytime ( void )
 /* Just use telnet to talk to this, once the connection is made
  * the two strings "cat and dog" should be received.
  *
- * XXX
- * This needs further debug, it works once,
- * but that single time it works looks like so:
- * Listening on port 1234 (slot 0)
- * Waiting for connection
- * Connection!! 1, 2
- * Waiting for connection
- * recv on port 1234 fails - maybe no more slots?
+ * Seems to be working fine as of 6-21-2018
+ *
+ *  "classic server"
  */
 
 static void
@@ -556,13 +551,6 @@ test_xinu_tcp ( void )
 	    launch_classic_server ();
 
 	    thr_delay ( 10 );
-
-	    /* Start a new style server on port 13 */
-	    /* No thread needed */
-	    /* BUG - if we run this alongside the classic,
-	     * the classic fails */
-	    // test_daytime ();
-
 	}
 }
 

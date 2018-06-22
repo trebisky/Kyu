@@ -62,6 +62,9 @@
 /* XXX there should be a better place for all this ..
  * maybe types.h ?
  */
+
+typedef void (*cfptr) ( int, void * );
+
 #ifndef NULL
 #define NULL (0)
 #endif

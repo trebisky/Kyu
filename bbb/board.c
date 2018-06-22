@@ -122,6 +122,12 @@ board_core_startup ( int core )
 	/* the BBB has only one core */
 }
 
+void
+board_new_core ( int core, cfptr func, void *arg )
+{
+	/* nothing to do here */
+}
+
 /* Called early, but not as early as board_mmu_init ()
  */
 void

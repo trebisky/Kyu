@@ -109,6 +109,14 @@ kyu_newcore ( int core )
 	board_core_startup ( core );
 }
 
+/* This is the standard entry point to start a new core.
+ */
+void
+new_core ( int core, cfptr func, void *arg )
+{
+	board_new_core ( core, func, arg );
+}
+
 /* This is the first bit of C code that runs in 32 bit mode.
  *
  * It runs with whatever stack we inherit from U-boot.
