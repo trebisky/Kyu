@@ -106,7 +106,7 @@ static void core_demo4 ( int, void * );
 
 static cfptr	core_func[NUM_CORES];
 static void *	core_arg[NUM_CORES];
-static int	core_run[NUM_CORES] = { 0, 0, 0, 0 };
+static int	core_run[NUM_CORES] = { 1, 0, 0, 0 };
 
 static int wait_core ( void );
 static void launch_core ( int );
@@ -119,7 +119,8 @@ h3_start_core ( int core, cfptr func, void *arg )
 {
 	int stat;
 
-	if ( core < 0 || core >= NUM_CORES )
+	/* We won't try to restart core 0 */
+	if ( core < 1 || core >= NUM_CORES )
 	    return;
 	if ( core_run[core] )
 	    return;
