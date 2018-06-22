@@ -206,6 +206,12 @@ board_core_startup ( int core )
 	run_newcore ( core );
 }
 
+void
+board_new_core ( int core, cfptr func, void *arg )
+{
+	h3_start_core ( core, func, arg );
+}
+
 #ifdef notdef
 static void
 stack_addr_show ( void )

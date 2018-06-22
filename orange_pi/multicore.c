@@ -6,13 +6,14 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * cpu.c for the Orange Pi PC and PC Plus
+ * multicore.c for the Orange Pi PC and PC Plus
  *
  * Tom Trebisky  1/19/2017
  *
  * "It is the difference that makes the difference"  (Sal Glesser, Spyderco)
  */
 
+#include "kyu.h"
 #include "h3_ints.h"
 #include "arch/cpu.h"
 
@@ -85,8 +86,9 @@ typedef void (*vfptr) ( void );
 /* This is in locore.S */
 extern void secondary_start ( void );
 
-static void test_one ( int );
-static void launch_core ( int );
+typedef void (*ifptr) ( int );
+
+/* ------------ */
 
 static void start_test1 ( void );
 static void start_test2 ( void );
@@ -96,14 +98,116 @@ static void start_test4 ( void );
 static void pulses ( int, int );
 static void run_blink ( int, int, int );
 
-static void core_demo1 ( int );
-static void core_demo2 ( int );
-// static void core_demo3 ( int );
-static void core_demo4 ( int );
+static void core_demo1 ( int, void * );
+static void core_demo2 ( int, void * );
+// static void core_demo3 ( int, void * );
+static void core_demo4 ( int, void * );
 
-typedef void (*ifptr) ( int );
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
 
-static ifptr	demo_func = (ifptr) 0;
+// static ifptr	demo_func = (ifptr) 0;
+
+static cfptr	core_func[NUM_CORES];
+static void *	core_arg[NUM_CORES];
+
+static int wait_core ( void );
+static void launch_core ( int );
+
+/* Start a single core.
+ * This is the public entry point.
+ */
+void
+h3_start_core ( int core, cfptr func, void *arg )
+{
+	int stat;
+
+	*SENTINEL = 0xdeadbeef;
+
+
+	// printf ( "Starting core %d ...\n", core );
+	launch_core ( core );
+
+	// watch_core ();
+	stat = wait_core ();
+	if ( ! stat ) {
+	    printf ( "** Core %d failed to start\n", core );
+	}
+
+	// if ( stat ) printf ( " Core %d verified to start\n", core );
+
+	*ROM_START = 0;
+}
+
+/* When a core comes alive, this is the first C code it runs.
+ */
+void
+run_newcore ( int core )
+{
+	volatile unsigned long *sent;
+
+	/* Clear flag to indicate we are running */
+	sent = SENTINEL;
+	*sent = 0;
+
+	(*core_func[core]) ( core, core_arg[core]  );
+
+	// core_demo1 ( core );
+	// core_demo2 ( core );
+	// if ( demo_func )
+	//     (*demo_func) ( core );
+}
+
+/* Most of the time a core takes 30 counts to start */
+#define MAX_CORE	100
+
+static int
+wait_core ( void )
+{
+	volatile unsigned long *sent;
+	int i;
+
+	sent = SENTINEL;
+
+	for ( i=0; i<MAX_CORE; i++ ) {
+	    if ( *sent == 0 ) {
+		// printf ( "Core started in %d\n", i );
+		return 1;
+	    }
+	}
+	return 0;
+}
+
+/* Manipulate the hardware to power up a core
+ */
+static void
+launch_core ( int core )
+{
+        volatile unsigned long *reset;
+        unsigned long mask = 1 << core;
+
+        reset = (volatile unsigned long *) ( CPUCFG_BASE + (core+1) * 0x40);
+	// printf ( "-- reset = %08x\n", reset );
+
+        *ROM_START = (unsigned long) secondary_start;  /* in locore.S */
+
+        *reset = 0;                     /* put core into reset */
+
+        *GEN_CTRL &= ~mask;             /* reset L1 cache */
+        *POWER_OFF &= ~mask;            /* power on */
+	// thr_delay ( 2 );
+	delay_ms ( 2 );
+
+        *reset = 3;			/* take out of reset */
+}
+
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* Test fixtures below here */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
 
 /* This gets called by the test menu
  */
@@ -142,7 +246,7 @@ test_core ( void )
 	// start_test3 ();
 
 	// test interrupt between cores 
-	demo_func = core_demo4;
+	// demo_func = core_demo4;
 	start_test4 ();
 }
 
@@ -150,17 +254,7 @@ test_core ( void )
 /* Demo 1, hard delay loop to blink LED patterns */
 
 static void
-start_test1 ( void )
-{
-	test_one ( 1 );
-	thr_delay ( 1000 );
-	test_one ( 2 );
-	thr_delay ( 1000 );
-	test_one ( 3 );
-}
-
-static void
-core_demo1 ( int core )
+core_demo1 ( int core, void *xxx )
 {
 	// printf ( "Core %d blinking\n", core );
 
@@ -168,11 +262,32 @@ core_demo1 ( int core )
 	run_blink ( core+1, 100, 4000 );
 }
 
+static void
+start_test1 ( void )
+{
+	h3_start_core ( CORE_1, core_demo1, NULL );
+	thr_delay ( 1000 );
+	h3_start_core ( CORE_2, core_demo1, NULL );
+	thr_delay ( 1000 );
+	h3_start_core ( CORE_3, core_demo1, NULL );
+}
+
 /* -------------------------------------------------------------------------------- */
 /* Demo 2,
  *  cores all wait on spin lock
  *  "master" core signals them when to blink.
  */
+
+static void
+core_demo2 ( int core, void *xx )
+{
+	// printf ( "Core %d blinking\n", core );
+
+	for ( ;; ) {
+	    h3_spin_lock ( core );
+	    pulses ( core+1, 100 );
+	}
+}
 
 static void
 start_test2 ( void )
@@ -183,9 +298,9 @@ start_test2 ( void )
 	h3_spin_lock ( 3 );
 
 	/* start all the cores */
-	test_one ( 1 );
-	test_one ( 2 );
-	test_one ( 3 );
+	h3_start_core ( CORE_1, core_demo2, NULL );
+	h3_start_core ( CORE_2, core_demo2, NULL );
+	h3_start_core ( CORE_3, core_demo2, NULL );
 
 	for ( ;; ) {
 	    thr_delay ( 2000 );
@@ -194,17 +309,6 @@ start_test2 ( void )
 	    h3_spin_unlock ( 2 );
 	    thr_delay ( 1000 );
 	    h3_spin_unlock ( 3 );
-	}
-}
-
-static void
-core_demo2 ( int core )
-{
-	// printf ( "Core %d blinking\n", core );
-
-	for ( ;; ) {
-	    h3_spin_lock ( core );
-	    pulses ( core+1, 100 );
 	}
 }
 
@@ -220,6 +324,15 @@ core_demo2 ( int core )
  */
 
 static int demo3_locks[4];
+
+static void
+core_demo3 ( int core, void *xx )
+{
+	for ( ;; ) {
+	    spin_lock ( &demo3_locks[core] );
+	    pulses ( core+1, 250 );
+	}
+}
 
 /* XXX - still buggy */
 static void
@@ -238,9 +351,9 @@ start_test3 ( void )
 
 	printf ( "Starting other core[s]\n" );
 	/* start the cores */
-	// test_one ( 1 );
-	// test_one ( 2 );
-	test_one ( CORE_3 );
+	// h3_start_core ( CORE_1, core_demo3, NULL );
+	// h3_start_core ( CORE_2, core_demo3, NULL );
+	h3_start_core ( CORE_3, core_demo3, NULL );
 
 	for ( ;; ) {
 	    //thr_delay ( 2000 );
@@ -253,14 +366,6 @@ start_test3 ( void )
 	}
 }
 
-static void
-core_demo3 ( int core )
-{
-	for ( ;; ) {
-	    spin_lock ( &demo3_locks[core] );
-	    pulses ( core+1, 250 );
-	}
-}
 #endif
 
 /* -------------------------------------------------------------------------------- */
@@ -286,6 +391,19 @@ test4_handler_3 ( int xxx )
 	printf ( "BONK!\n" );
 }
 
+/* The extra core itself, just sets up a handler and
+ * waits for the interrupt.
+ */
+static void
+core_demo4 ( int core, void *xxx )
+{
+	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
+
+	for ( ;; ) {
+	    delay_ms ( 1000 );
+	}
+}
+
 static void
 start_test4 ( void )
 {
@@ -302,7 +420,7 @@ start_test4 ( void )
 	// h3_spin_lock ( 1 );
 
 	/* Start another core */
-	test_one ( CORE_1 );
+	h3_start_core ( CORE_1, core_demo4, NULL );
 	thr_delay ( 500 );
 
 	/* see if we can interrupt core 1 */
@@ -313,87 +431,9 @@ start_test4 ( void )
 	}
 }
 
-/* The extra core itself, just sets up a handler and
- * waits for the interrupt.
- */
-static void
-core_demo4 ( int core )
-{
-	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
-
-	for ( ;; ) {
-	    delay_ms ( 1000 );
-	}
-}
-
 /* -------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------- */
-
-/* Most of the time a core takes 30 counts to start */
-#define MAX_CORE	100
-
-int
-wait_core ( void )
-{
-	volatile unsigned long *sent;
-	int i;
-
-	sent = SENTINEL;
-
-	for ( i=0; i<MAX_CORE; i++ ) {
-	    if ( *sent == 0 ) {
-		// printf ( "Core started in %d\n", i );
-		return 1;
-	    }
-	}
-	return 0;
-}
-
-/* Start a single core */
-static void
-test_one ( int cpu )
-{
-	int stat;
-
-	*SENTINEL = 0xdeadbeef;
-
-	// printf ( "Starting core %d ...\n", cpu );
-	launch_core ( cpu );
-
-	// watch_core ();
-	stat = wait_core ();
-	if ( ! stat ) {
-	    printf ( "** Core %d failed to start\n", cpu );
-	}
-
-	// if ( stat ) printf ( " Core %d verified to start\n", cpu );
-
-	*ROM_START = 0;
-}
-
-/* Manipulate the hardware to power up a core
- */
-static void
-launch_core ( int cpu )
-{
-        volatile unsigned long *reset;
-        unsigned long mask = 1 << cpu;
-
-        reset = (volatile unsigned long *) ( CPUCFG_BASE + (cpu+1) * 0x40);
-	// printf ( "-- reset = %08x\n", reset );
-
-        *ROM_START = (unsigned long) secondary_start;  /* in locore.S */
-
-        *reset = 0;                     /* put core into reset */
-
-        *GEN_CTRL &= ~mask;             /* reset L1 cache */
-        *POWER_OFF &= ~mask;            /* power on */
-	// thr_delay ( 2 );
-	delay_ms ( 2 );
-
-        *reset = 3;			/* take out of reset */
-}
 
 static void
 pulses ( int num, int ms )
@@ -421,23 +461,6 @@ run_blink ( int num, int a, int b )
         }
 }
 
-/* When a core comes alive, this is the first C code it runs.
- */
-void
-run_newcore ( int core )
-{
-	volatile unsigned long *sent;
-
-	/* Clear flag to indicate we are running */
-	sent = SENTINEL;
-	*sent = 0;
-
-	// core_demo1 ( core );
-	// core_demo2 ( core );
-	if ( demo_func )
-	    (*demo_func) ( core );
-}
-
 /* -------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------- */
 /* old cruft below here */
@@ -459,8 +482,8 @@ run_newcore_OLD ( int core )
 
 #ifdef notdef
 	/* Read processor affinity register */
-	asm volatile("mrc 15, 0, %0, cr0, cr0, 5" : "=r" (cpu) : : "cc");
-	cpu &= 0x3;
+	asm volatile("mrc 15, 0, %0, cr0, cr0, 5" : "=r" (xcore) : : "cc");
+	xcore &= 0x3;
 #endif
 
 
@@ -470,9 +493,9 @@ run_newcore_OLD ( int core )
 	asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 
 	/* Makes a mess without synchronization */
-	printf ( "Core %d running with sp = %08x\n", cpu, sp );
-	printf ( "Core %d core (arg) = %08x\n", cpu, core );
-	// printf ( "Core %d running\n", cpu );
+	printf ( "Core %d running with sp = %08x\n", core, sp );
+	printf ( "Core %d core (arg) = %08x\n", core, xcore );
+	// printf ( "Core %d running\n", core );
 #endif
 
 #ifdef notdef
