@@ -86,8 +86,6 @@ typedef void (*vfptr) ( void );
 /* This is in locore.S */
 extern void secondary_start ( void );
 
-typedef void (*ifptr) ( int );
-
 /* ------------ */
 
 static void start_test1 ( void );
@@ -106,10 +104,9 @@ static void core_demo4 ( int, void * );
 /* -------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------- */
 
-// static ifptr	demo_func = (ifptr) 0;
-
 static cfptr	core_func[NUM_CORES];
 static void *	core_arg[NUM_CORES];
+static int	core_run[NUM_CORES] = { 0, 0, 0, 0 };
 
 static int wait_core ( void );
 static void launch_core ( int );
@@ -122,8 +119,12 @@ h3_start_core ( int core, cfptr func, void *arg )
 {
 	int stat;
 
-	*SENTINEL = 0xdeadbeef;
+	if ( core < 0 || core >= NUM_CORES )
+	    return;
+	if ( core_run[core] )
+	    return;
 
+	*SENTINEL = 0xdeadbeef;
 
 	// printf ( "Starting core %d ...\n", core );
 	launch_core ( core );
@@ -132,7 +133,10 @@ h3_start_core ( int core, cfptr func, void *arg )
 	stat = wait_core ();
 	if ( ! stat ) {
 	    printf ( "** Core %d failed to start\n", core );
+	    return;
 	}
+
+	core_run[core] = 1;
 
 	// if ( stat ) printf ( " Core %d verified to start\n", core );
 
@@ -151,11 +155,6 @@ run_newcore ( int core )
 	*sent = 0;
 
 	(*core_func[core]) ( core, core_arg[core]  );
-
-	// core_demo1 ( core );
-	// core_demo2 ( core );
-	// if ( demo_func )
-	//     (*demo_func) ( core );
 }
 
 /* Most of the time a core takes 30 counts to start */
@@ -234,19 +233,16 @@ test_core ( void )
 	printf ( "Spin: %d\n", reg );
 #endif
 
-	// demo_func = core_demo1;
 	// start_test1 ();
 
 	// test H3 spin locks
-	// demo_func = core_demo2;
 	// start_test2 ();
 
 	// test ARM spin locks
-	// demo_func = core_demo3;
+	//  (broken on H3)
 	// start_test3 ();
 
 	// test interrupt between cores 
-	// demo_func = core_demo4;
 	start_test4 ();
 }
 
