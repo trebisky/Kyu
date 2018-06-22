@@ -63,7 +63,7 @@ struct netbuf {
 	int flags;
 	int refcount;
 	char *bptr;		/* base pointer */
-	char *cptr;		/* controller info pointer */
+	// char *cptr;		/* controller info pointer */
 	/* */
 	struct eth_hdr *eptr;	/* pointer to ether header */
 	struct ip_hdr *iptr;	/* pointer to IP or ARP header */

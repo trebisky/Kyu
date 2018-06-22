@@ -6,16 +6,20 @@
  *  tcpalloc  -  allocate a buffer for an IP datagram carrying TCP
  *------------------------------------------------------------------------
  */
-struct netpacket *tcpalloc(
+// struct netpacket *tcpalloc(
+struct netbuf *tcpalloc(
 	  struct tcb	*tcbptr,	/* Ptr to a TCB			*/
 	  int32		len		/* Length of the TCP segment	*/
 	)
 {
 	struct netpacket *pkt;		/* Ptr to packet for new struct	*/
+	struct netbuf *nbp;
 
 	/* Allocate a buffer for a TCB */
 #ifdef KYU
-	pkt = (struct netpacket *) get_netpacket ();
+	nbp = (struct netbuf *) net_alloc ();
+	pkt = (struct netpacket *) nbp->eptr;
+	// pkt = (struct netpacket *) get_netpacket ();
 #else
 	pkt = (struct netpacket *)getbuf(netbufpool);
 #endif
@@ -71,5 +75,6 @@ struct netpacket *tcpalloc(
 
 	/* Return entire packet to caller */
 
-	return pkt;
+	// return pkt;
+	return nbp;
 }

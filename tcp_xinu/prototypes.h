@@ -1,4 +1,6 @@
 /* NETWORK BYTE ORDER CONVERSION NOT NEEDED ON A BIG-ENDIAN COMPUTER */
+
+/* These macros are for a little endian machine */
 #define	htons(x)   ( ( 0xff & ((x)>>8) ) | ( (0xff & (x)) << 8 ) )
 #define	htonl(x)   (  (((x)>>24) & 0x000000ff) | (((x)>> 8) & 0x0000ff00) | \
 		      (((x)<< 8) & 0x00ff0000) | (((x)<<24) & 0xff000000) )
@@ -35,7 +37,8 @@ extern	void	tcpabort(struct tcb *);
 extern	void	tcpack(struct tcb *, int32);
 
 /* in file tcpalloc.c */
-extern	struct	netpacket *tcpalloc(struct tcb *, int32);
+// extern	struct	netpacket *tcpalloc(struct tcb *, int32);
+extern	struct	netbuf *tcpalloc(struct tcb *, int32);
 
 /* in file tcpcksum.c */
 extern	uint16	tcpcksum(struct netpacket *);

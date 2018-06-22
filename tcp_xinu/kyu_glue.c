@@ -10,6 +10,191 @@
 #include "thread.h"
 #include "../net/net.h"
 
+static void xinu_memb_init ( void );
+
+/* See timer.c */
+static void
+xinu_timer ( void )
+{
+	if ( tmnext && (--(*tmnext)) == 0 )
+	    tmfire ();
+}
+
+/* Kyu calls this during initialization */
+void
+tcp_xinu_init ( void )
+{
+	char xx[] = "dog\n";
+	int *lp;
+
+	xinu_memb_init ();
+
+	net_timer_hookup ( xinu_timer );
+
+	tcp_init ();
+
+	lp = (int *) &xx[0];
+	printf ("%s -- %08x %08x\n", xx, xx, *lp );
+}
+
+static void
+ip_ntoh ( struct netpacket *pktptr )
+{
+        pktptr->net_iplen = ntohs(pktptr->net_iplen);
+        pktptr->net_ipid = ntohs(pktptr->net_ipid);
+        pktptr->net_ipfrag = ntohs(pktptr->net_ipfrag);
+        pktptr->net_ipsrc = ntohl(pktptr->net_ipsrc);
+        pktptr->net_ipdst = ntohl(pktptr->net_ipdst);
+}
+
+/* This is where arriving packets get delivered by Kyu
+ *  to the Xinu tcp code.
+ *  From ip_rcv() in net/net_ip.c
+ * Be sure and let Kyu free the packet.
+ */
+void
+tcp_xinu_rcv ( struct netbuf *nbp )
+{
+	struct netpacket *pkt;
+
+	// printf ( "TCP: xinu_rcv %d\n", ntohs(nbp->iptr->len) );
+
+	/* Must give eptr since we may have PREPAD */
+	pkt = (struct netpacket *) nbp->eptr;
+	ip_ntoh ( pkt );
+	tcp_ntoh ( pkt );
+
+	tcp_in ( pkt );
+	/* do NOT free the packet here */
+}
+
+/* A packet allocator for when Xinu needs to start
+ * from scratch to send a packet.
+ * This happens in 3 places, typically triggered
+ * from tcp_out():
+ *  1 - tcpsendseg() - to send data
+ *  2 - tcpack() - to send ACK
+ *  3 - tcpreset() - to send RST
+ * In each of these cases, the packet is handed to
+ *  ip_enqueue above, which passes it to ip_send() in Kyu code.
+ *  this calls the driver "send" routine, then frees the netbuf
+ *  once the driver has done whatever it wants to do.
+ *
+ * On 6-21-2018, this replaced get_netpacket()
+ */
+
+struct netbuf *
+net_alloc ( void )
+{
+	struct netbuf *nbp;
+
+	nbp = netbuf_alloc ();
+	return nbp;
+}
+
+/* This is where Xinu tcp code sends packets to hand them off to Kyu */
+void
+net_enqueue ( struct netbuf *nbp ) 
+{
+	unsigned short cksum;
+	struct netpacket *pkt;
+
+	pkt = (struct netpacket *) nbp->eptr;
+
+	nbp->ilen = pkt->net_iplen;
+	nbp->plen = pkt->net_iplen - sizeof(struct ip_hdr);
+
+	// printf ( "TCP:  ip_enqueue %d (%d)\n", nbp->ilen, sizeof(struct eth_hdr) );
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	tcp_hton ( pkt );
+	cksum = tcpcksum ( pkt );
+	pkt->net_tcpcksum = htons(cksum) & 0xffff;
+
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	ip_send ( nbp, htonl(pkt->net_ipdst) );
+}
+
+#ifdef notdef
+/* This is where Xinu tcp code sends packets to hand them off to Kyu */
+void
+ip_enqueue ( struct netpacket *pkt ) 
+{
+	struct netbuf *nbp;
+	unsigned short cksum;
+
+	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
+
+	/* XXX - should just be able to set ilen */
+	nbp->ilen = pkt->net_iplen;
+	nbp->plen = pkt->net_iplen - sizeof(struct ip_hdr);
+
+	// printf ( "TCP:  ip_enqueue %d (%d)\n", nbp->ilen, sizeof(struct eth_hdr) );
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	tcp_hton ( pkt );
+	cksum = tcpcksum ( pkt );
+	pkt->net_tcpcksum = htons(cksum) & 0xffff;
+
+	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
+	//     pkt->net_tcpsport, pkt->net_tcpdport );
+
+	ip_send ( nbp, htonl(pkt->net_ipdst) );
+}
+
+/* A packet allocator for when Xinu needs to start
+ * from scratch to send a packet.
+ * This happens in 3 places, typically triggered
+ * from tcp_out():
+ *  1 - tcpsendseg() - to send data
+ *  2 - tcpack() - to send ACK
+ *  3 - tcpreset() - to send RST
+ * In each of these cases, the packet is handed to
+ *  ip_enqueue above, which passes it to ip_send() in Kyu code.
+ *  this calls the driver "send" routine, then frees the netbuf
+ *  once the driver has done whatever it wants to do.
+ */
+struct netpacket *
+get_netpacket ( void )
+{
+	struct netbuf *nbp;
+
+	nbp = netbuf_alloc ();
+	if ( nbp ) {
+	    // printf ( "TCP: alloc %08x, %08x\n", nbp, nbp->eptr );
+	    printf ( "XGET netpacket: %08x\n", nbp->eptr );
+	    return (struct netpacket *) nbp->eptr;
+	}
+	return NULL;
+}
+#endif
+
+#ifdef notdef
+/* This whole idea was broken anyway.
+ * This is called only in tcp_in() and we now have all
+ * those calls commented out.  Kyu will free any input packets
+ * after we return from tcp_in().
+ */
+void
+free_netpacket ( struct netpacket *pkt )
+{
+	struct netbuf *nbp;
+
+	printf ( "XFREE netpacket: %08x\n", pkt );
+	printf ( ".... leaks\n" );
+
+	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
+	// printf ( "TCP: free  %08x, %08x\n", nbp, pkt );
+	printf ( "XFREE netbuf: %08x\n", nbp );
+	netbuf_free ( nbp );
+}
+#endif
+
+
 int
 semcreate ( int arg )
 {
@@ -18,6 +203,162 @@ semcreate ( int arg )
 	else
 	    sem_signal_new ( SEM_FIFO );
 }
+
+/* getmem and freemem were macros in kyu_glue.h up to 6-20-2018
+ * I got a data abort from within malloc, and thought
+ * perhaps my macros are to blame.  That was not the issue.
+ * Next I added INT_lock/unlock to malloc/free.  That was not it.
+ * XXX - still under investigation ....
+ */
+
+#ifdef notdef
+#define	getmem(n)	malloc((n))
+#define	freemem(x,s)	free((x))
+#endif
+
+/* getmem / freemem are used in the Xinu TCP code to allocate buffers
+ * of a fixed size (65535).  I just hand out blocks of 65536
+ * since that is a nice round number.
+ * We get 16 of these per megabyte.
+ */
+
+#define XINU_BSIZE 65536
+#define XINU_BCOUNT 4*16
+
+static char *memb_head;
+static int memb_count;
+
+void xinu_memb_show ( int );
+
+static void
+xinu_memb_init ( void )
+{
+	char * buf;
+	int i;
+
+	buf = (char *) ram_alloc ( XINU_BCOUNT * XINU_BSIZE );
+
+	/* Create linked list */
+	memb_head = (char *) 0;
+	memb_count = 0;
+	for ( i=0; i < XINU_BCOUNT; i++ ) {
+	    * (char **) buf = memb_head;
+	    memb_head = buf;
+	    buf += XINU_BSIZE;
+	    memb_count++;
+	}
+
+	xinu_memb_show ( 8 );
+}
+
+void
+xinu_memb_show ( int limit )
+{
+	int count;
+	char * next;
+
+	count = 0;
+	next = memb_head;
+	while ( count++ < limit ) {
+	    printf ( "MEM %d: %08x\n", count, next );
+	    next = * (char **) next;
+	}
+}
+
+char *
+getmem ( uint32 nbytes )
+{
+	char *rv;
+
+	printf ( "GETMEM -- %d bytes (%d available: %08x)\n", nbytes, memb_count, memb_head );
+	xinu_memb_show ( 8 );
+
+	if ( nbytes > XINU_BSIZE )
+	    panic ( "Xinu TCP getmem allocator block too small" );
+	if ( ! memb_head )
+	    panic ( "Xinu TCP getmem allocator out of memory" );
+
+	rv = memb_head;
+	memb_head = * (char **) memb_head;
+	memb_count--;
+	printf ( "GETMEM:: %08x\n", rv );
+	return rv;
+}
+
+int
+freemem ( char *buf, uint32 xxx_nbytes )
+{
+	printf ( "FREEMEM -- %08x\n", buf );
+
+	* (char **) buf = memb_head;
+	memb_head = buf;
+	memb_count++;
+	return OK;
+}
+
+#ifdef notdef
+char *
+getmem ( uint32 nbytes )
+{
+	char *rv;
+
+	printf ( "Xinu: getmem  %5d bytes requested\n", nbytes );
+
+	rv =  (char *) malloc ( nbytes );
+
+	printf ( "Xinu: getmem  %5d: %08x\n", nbytes, rv );
+
+	return rv;
+	//return (char *) malloc ( nbytes );
+}
+
+// syscall
+int
+freemem ( char *blkaddr, uint32 nbytes )
+{
+	printf ( "Xinu: freemem %5d: %08x\n", nbytes, blkaddr );
+	free ( blkaddr );
+
+	return OK;
+}
+#endif
+
+void
+xinu_show ( void )
+{
+	int i;
+	struct tcb *tp;
+
+	for (i = 0; i < Ntcp; i++) {
+	    if (tcbtab[i].tcb_state == TCB_FREE)
+		continue;
+
+	    tp = &tcbtab[i];
+	    if ( tp->tcb_state == TCB_LISTEN )
+		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
+	    else if ( tp->tcb_state == TCB_ESTD )
+		printf ( "TCB slot %d: Established %d (%d)\n", i, tp->tcb_lport, tp->tcb_rport );
+	    else if ( tp->tcb_state == TCB_CLOSED )
+		printf ( "TCB slot %d: Closed\n", i );
+	    else if ( tp->tcb_state == TCB_CWAIT )
+		printf ( "TCB slot %d: Close wait\n", i );
+	    else if ( tp->tcb_state == TCB_TWAIT )
+		printf ( "TCB slot %d: TWAIT\n", i );
+	    else if ( tp->tcb_state == TCB_SYNSENT )
+		printf ( "TCB slot %d: SYNSENT\n", i );
+	    else
+		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
+        }
+}
+
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* Test stuff follows. */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------- */
+
 
 #define TEST_SERVER     "192.168.0.5"
 #define ECHO_PORT       7       /* echo */
@@ -32,19 +373,15 @@ dots2ip ( char *s )
 	return ntohl ( nip );
 }
 
-/* This requires a daytime server running on port 13 someplace
- * ( likely the boot host).
+/* This requires a daytime server running on port 13
+ * ( on TEST_SERVER -- likely the boot host).
  * To run this on fedora:
  *  dnf install xinetd
- *  edit /etc/xinetd/daytime-stream to enable
+ *  edit /etc/xinet.d/daytime-stream to enable
  *  systemctl start  xinetd.service
  */
-
-/* Test - active connection to Daytime server */
-/* Sometimes this just locks up in SYNSENT ??!! */
-
 static void
-test_client ( void )
+client_daytime ( void )
 {
 	int port = DAYTIME_PORT;
 	int slot;
@@ -62,6 +399,61 @@ test_client ( void )
 	// printf ( "Client %02x\n", buf[n-2] );
 	// printf ( "Client %02x\n", buf[n-1] );
 	tcp_close ( slot );
+}
+
+/* This requires an echo server running on port 7
+ *  on the TEST_SERVER host ( likely the boot host).
+ * To run this on fedora:
+ *  dnf install xinetd
+ *  edit /etc/xinet.dd/echo-stream to enable
+ *  (change disable to no)
+ *  systemctl restart  xinetd.service
+ *  test using "telnet localhost 7"
+ */
+static void
+client_echo ( void )
+{
+	int port = ECHO_PORT;
+	int slot;
+	char buf[100];
+	int n;
+
+	// printf ( "Begin making client connection\n" );
+	slot = tcp_register ( dots2ip(TEST_SERVER), port, 1 );
+	printf ( "Client connection on port %d, slot = %d\n", port, slot );
+	tcp_send ( slot, "Duck!\r\n", 6 );
+	n = tcp_recv ( slot, buf, 100 );
+	printf ( "Client recv returns %d bytes\n", n );
+	buf[n] = '\0';
+	printf ( "Client recv got %s\n", buf );
+
+	tcp_send ( slot, "Duck!\r\n", 6 );
+	n = tcp_recv ( slot, buf, 100 );
+	printf ( "Client recv returns %d bytes\n", n );
+	buf[n] = '\0';
+	printf ( "Client recv got %s\n", buf );
+
+	tcp_send ( slot, "Goose!\r\n", 6 );
+	n = tcp_recv ( slot, buf, 100 );
+	printf ( "Client recv returns %d bytes\n", n );
+	buf[n] = '\0';
+	printf ( "Client recv got %s\n", buf );
+
+	// replies are terminated with \r\n
+	// printf ( "Client %02x\n", buf[n-2] );
+	// printf ( "Client %02x\n", buf[n-1] );
+
+	tcp_close ( slot );
+}
+
+/* Test - active connection to Daytime server */
+/* Sometimes this just locks up in SYNSENT ??!! */
+
+static void
+test_client ( void )
+{
+	client_daytime ();
+	client_echo ();
 }
 
 /* Callback function to handle the following */
@@ -174,147 +566,14 @@ test_xinu_tcp ( void )
 	}
 }
 
+/* Available from test menu
+ *  Test 13: Endless TCP echo
+ */
 void
 tcp_echo_test ( void )
 {
 	/* Your ad here */
 	printf ( "Not ready yet\n" );
-}
-
-static void
-xinu_timer ( void )
-{
-	if ( tmnext && (--(*tmnext)) == 0 )
-	    tmfire ();
-}
-
-void
-tcp_xinu_init ( void )
-{
-	net_timer_hookup ( xinu_timer );
-
-	tcp_init ();
-}
-
-// static int kyu_drop = 0;
-
-static void
-ip_ntoh ( struct netpacket *pktptr )
-{
-        pktptr->net_iplen = ntohs(pktptr->net_iplen);
-        pktptr->net_ipid = ntohs(pktptr->net_ipid);
-        pktptr->net_ipfrag = ntohs(pktptr->net_ipfrag);
-        pktptr->net_ipsrc = ntohl(pktptr->net_ipsrc);
-        pktptr->net_ipdst = ntohl(pktptr->net_ipdst);
-}
-
-/* This is where packets arrive, sent to us
- * from net/net_ip.c
- */
-void
-tcp_xinu_rcv ( struct netbuf *nbp )
-{
-	struct netpacket *pkt;
-
-#ifdef notdef
-	if ( kyu_drop ) {
-	    printf ( "xinu_rcv - drop\n" );
-	    netbuf_free ( nbp );
-	    return;
-	}
-
-	// kyu_drop = 1;
-	printf ( "TCP: xinu_rcv %d\n", ntohs(nbp->iptr->len) );
-#endif
-
-	/* Must give eptr since we may have PREPAD */
-	pkt = (struct netpacket *) nbp->eptr;
-	ip_ntoh ( pkt );
-	tcp_ntoh ( pkt );
-
-	tcp_in ( pkt );
-	/* do NOT free the packet here */
-}
-
-/* XXX - just a stub so we can link for now */
-void
-ip_enqueue ( struct netpacket *pkt ) 
-{
-	struct netbuf *nbp;
-	unsigned short cksum;
-
-	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
-
-	/* XXX - should just be able to set ilen */
-	nbp->ilen = pkt->net_iplen;
-	nbp->plen = pkt->net_iplen - sizeof(struct ip_hdr);
-
-	// printf ( "TCP:  ip_enqueue %d (%d)\n", nbp->ilen, sizeof(struct eth_hdr) );
-	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
-	//     pkt->net_tcpsport, pkt->net_tcpdport );
-
-	tcp_hton ( pkt );
-	cksum = tcpcksum ( pkt );
-	pkt->net_tcpcksum = htons(cksum) & 0xffff;
-
-	// printf ( "TCP:  ip_enqueue sport, dport = %d %d\n", 
-	//     pkt->net_tcpsport, pkt->net_tcpdport );
-
-	ip_send ( nbp, htonl(pkt->net_ipdst) );
-}
-
-void
-xinu_show ( void )
-{
-	int i;
-	struct tcb *tp;
-
-	for (i = 0; i < Ntcp; i++) {
-	    if (tcbtab[i].tcb_state == TCB_FREE)
-		continue;
-
-	    tp = &tcbtab[i];
-	    if ( tp->tcb_state == TCB_LISTEN )
-		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
-	    else if ( tp->tcb_state == TCB_ESTD )
-		printf ( "TCB slot %d: Established %d (%d)\n", i, tp->tcb_lport, tp->tcb_rport );
-	    else if ( tp->tcb_state == TCB_CLOSED )
-		printf ( "TCB slot %d: Closed\n", i );
-	    else if ( tp->tcb_state == TCB_CWAIT )
-		printf ( "TCB slot %d: Close wait\n", i );
-	    else if ( tp->tcb_state == TCB_TWAIT )
-		printf ( "TCB slot %d: TWAIT\n", i );
-	    else if ( tp->tcb_state == TCB_SYNSENT )
-		printf ( "TCB slot %d: SYNSENT\n", i );
-	    else
-		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
-        }
-}
-
-/* We now hide a pointer to the netbuf inside the netbuf
- * in the 4 bytes just in front of the packet itself.
- */
-struct netpacket *
-get_netpacket ( void )
-{
-	struct netbuf *nbp;
-
-	nbp = netbuf_alloc ();
-	if ( nbp ) {
-	    // printf ( "TCP: alloc %08x, %08x\n", nbp, nbp->eptr );
-	    return (struct netpacket *) nbp->eptr;
-	}
-	return NULL;
-}
-
-void
-free_netpacket ( struct netpacket *pkt )
-{
-	struct netbuf *nbp;
-
-	nbp = * (struct netbuf **) ((char *)pkt - sizeof(struct netbuf *));
-	// printf ( "TCP: free  %08x, %08x\n", nbp, pkt );
-	netbuf_free ( nbp );
 }
 
 #ifdef notdef
@@ -375,7 +634,7 @@ struct	netpk	{
 #pragma pack()
 
 void
-net_bozo ( void )
+net_inspect ( void )
 {
 	struct netpk *np;
 

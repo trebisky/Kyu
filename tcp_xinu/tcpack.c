@@ -12,6 +12,7 @@ void	tcpack(
 	)
 {
 	struct netpacket *pkt;	/* Pointer to a datagram	*/
+	struct netbuf *nbp;
 
 	/* If not forcing transmission, schedule an event */
 
@@ -36,7 +37,9 @@ void	tcpack(
 
 	/* Allocate a datagram buffer and fill in IP header */
 
-	pkt = tcpalloc(tcbptr, 0);
+	// pkt = tcpalloc(tcbptr, 0);
+	nbp = tcpalloc(tcbptr, 0);
+	pkt = (struct netpacket *) nbp->eptr;
 
 	/* Fill in TCP header */
 
@@ -46,6 +49,9 @@ void	tcpack(
 
 	//kprintf("OUT: seq %x ackseq %x\n", pkt->net_tcpseq, pkt->net_tcpack);
 	//pdumph(pkt);
-	ip_enqueue(pkt);
+
+	// ip_enqueue(pkt);
+	net_enqueue ( nbp );
+
 	return;
 }

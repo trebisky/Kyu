@@ -14,6 +14,7 @@ int32	tcpreset(
 	uint32		lip;		/* Local IP address to use	*/
 	uint32		rip;		/* Remote IP address (reply)	*/
 	int32		len;		/* Length of the TCP data	*/
+	struct netbuf *nbp;
 
 	/* Did we already send a RESET? */
 
@@ -22,7 +23,9 @@ int32	tcpreset(
 
 	/* Allocate a buffer */
 #ifdef KYU
-	pkt = (struct netpacket *) get_netpacket ();
+	// pkt = (struct netpacket *) get_netpacket ();
+	nbp = (struct netbuf *) net_alloc ();
+	pkt = (struct netpacket *) nbp->eptr;
 #else
 	pkt = (struct netpacket *)getbuf(netbufpool);
 #endif
@@ -84,6 +87,8 @@ int32	tcpreset(
 
 	/* Call ip_send to send the datagram */
 
-	ip_enqueue(pkt);
+	// ip_enqueue(pkt);
+	net_enqueue ( nbp );
+
 	return OK;
 }

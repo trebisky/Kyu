@@ -21,10 +21,13 @@ void	tcpsendseg(
 	char		*data;		/* ptr to data being copied	*/
 
 	struct netpacket *pkt;		/* ptr for new formant		*/
+	struct netbuf *nbp;
 
 	/* Allocate a network buffer */
 
-	pkt = tcpalloc (tcbptr, len);
+	// pkt = tcpalloc (tcbptr, len);
+	nbp = tcpalloc (tcbptr, len);
+	pkt = (struct netpacket *) nbp->eptr;
 
 	if ((int32)pkt == SYSERR) {
 		return;
@@ -70,7 +73,8 @@ void	tcpsendseg(
 	}
 
 #ifdef KYU
-	ip_enqueue(pkt);
+	// ip_enqueue(pkt);
+	net_enqueue ( nbp );
 #else
 	ip_send(pkt);
 #endif

@@ -7,6 +7,12 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
+# A place to park things we aren't linking right now.
+XX_OBJS = \
+	h3_thermal.o \
+	h3_sid.o \
+	bogus.o
+
 OBJS =  board.o \
 	intcon_gic.o \
 	gpio.o \

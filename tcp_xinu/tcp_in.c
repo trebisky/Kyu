@@ -27,7 +27,8 @@ void	tcp_in(
 	if ((memcmp(pkt->net_ethdst,ebcast,ETH_ADDR_LEN)== 0) ||
 				(pkt->net_ipdst == IP_BCAST)) {
 		// KYU freebuf ((char *)pkt);
-		free_netpacket ( pkt );
+		// Let Kyu free these 6-20-2018
+		// free_netpacket ( pkt );
 		return;
 	}
 
@@ -39,7 +40,8 @@ void	tcp_in(
 
 	if (len < (IP_HDR_LEN + TCP_HLEN(pkt)) ) {
 		// KYU freebuf ((char *)pkt);
-		free_netpacket ( pkt );
+		// Let Kyu free these 6-20-2018
+		// free_netpacket ( pkt );
 		return;
 	}
 
@@ -95,7 +97,8 @@ void	tcp_in(
 		signal (Tcp.tcpmutex);
 		tcpreset (pkt);
 		// KYU freebuf ((char *)pkt);
-		free_netpacket ( pkt );
+		// Let Kyu free these 6-20-2018
+		// free_netpacket ( pkt );
 		return;
 	}
 
@@ -110,7 +113,8 @@ void	tcp_in(
 	signal (tcbtab[entry].tcb_mutex);
 
 	// KYU freebuf ((char *)pkt);
-	free_netpacket ( pkt );
+	// Let Kyu free these 6-20-2018
+	// free_netpacket ( pkt );
 
 	return;
 }

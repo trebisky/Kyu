@@ -38,6 +38,36 @@ void	mqinit(void)
 	mqready = 1;
 }
 
+/* Kyu 6-21-2018
+ * mqtab is currently static with 200 entries
+ * Ntcp is now set to 100
+ * mqcreate gets called 100 times to get 15 entries,
+ *  then once to get 10 entries.
+ * This is primarily to get around some weird bug
+ *  in Kyu malloc/free
+ */
+#define KYU_MQ_STATIC
+
+#ifdef KYU_MQ_STATIC
+#define MQ_STATIC_SIZE ((Ntcp+1)*16)
+
+static int32 mq_static[MQ_STATIC_SIZE];
+static int mq_next = 0;
+
+static int32 *
+mq_alloc ( int32 size )
+{
+	int32 * rv;
+
+	if ( mq_next + size > MQ_STATIC_SIZE )
+	    panic ( "Xinu TCP: MQ static size too small" );
+
+	rv = &mq_static[mq_next];
+	mq_next += 16;
+	return rv;
+}
+#endif
+
 
 /*------------------------------------------------------------------------
  *  mqcreate  -  create a message queue and return its ID
@@ -68,7 +98,14 @@ int32	mqcreate (
 			return SYSERR;
 		}
 
+#ifdef KYU_MQ_STATIC
+		mqtab[i].mq_msgs = mq_alloc ( qlen );
+#else
 		/* Allocate memory to hold a set of qlen messages */
+		/* KYU - note: this allocates a bunch of 60 byte objects.
+		 *  As near as I can tell, they never get freed.
+		 *  mqdelete provides for it, but is never called.
+		 */
 
 		if ((mqtab[i].mq_msgs = (int32 *)getmem (qlen * sizeof(int32)))
 		    == (int32 *)SYSERR) {
@@ -77,6 +114,7 @@ int32	mqcreate (
 			signal (mqsem);
 			return SYSERR;
 		}
+#endif
 
 		/* Initialize remaining entries for the queue structure */
 
@@ -99,6 +137,7 @@ int32	mqcreate (
 	return SYSERR;
 }
 
+#ifdef notdef
 /*------------------------------------------------------------------------
  *  mqdelete  -  delete a message queue
  *------------------------------------------------------------------------
@@ -132,6 +171,7 @@ int32	mqdelete (
 	signal (mqsem);
 	return OK;
 }
+#endif
 
 /*------------------------------------------------------------------------
  *  mqsend  -  deposit a message on a queue
@@ -278,6 +318,7 @@ int32	mqdisbale (
 	mqp->mq_state = MQ_DISABLE;
 
 	/* Reset semaphore in case processes are waiting */
+	/* XXX will cause panic in Kyu */
 
 	semreset(mqp->mq_sem, 0);
 	mqp->mq_rcvrs = 0;

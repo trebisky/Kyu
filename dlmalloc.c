@@ -9,6 +9,7 @@
 
 #ifdef KYU
 #include <kyulib.h>
+#include <arch/cpu.h>
 #define assert(x)
 #endif
 
@@ -1289,21 +1290,33 @@ Void_t* mALLOc(bytes) size_t bytes;
 
   INTERNAL_SIZE_T nb;
 
+  /* XXX */
+  // printf ( "MALLOC: %d\n", bytes );
+
+  INT_lock;	/* Kyu */
+
 #ifdef CONFIG_SYS_MALLOC_F_LEN
-	if (gd && !(gd->flags & GD_FLG_FULL_MALLOC_INIT))
+	if (gd && !(gd->flags & GD_FLG_FULL_MALLOC_INIT)) {
+	        INT_unlock;	/* Kyu */
 		return malloc_simple(bytes);
+	}
 #endif
+
 
 #ifdef KYU
   /* as per U-boot additions */
   /* check if mem_malloc_init() was run */
   if ((mem_malloc_start == 0) && (mem_malloc_end == 0)) {
     /* not initialized yet */
+    INT_unlock;	/* Kyu */
     return NULL;
   }
 #endif
 
-  if ((long)bytes < 0) return NULL;
+  if ((long)bytes < 0) {
+    INT_unlock;	/* Kyu */
+    return NULL;
+  }
 
   nb = request2size(bytes);  /* padded request size; */
 
@@ -1330,6 +1343,8 @@ Void_t* mALLOc(bytes) size_t bytes;
       unlink(victim, bck, fwd);
       set_inuse_bit_at_offset(victim, victim_size);
       check_malloced_chunk(victim, nb);
+      /* XXX blows up here */
+      INT_unlock;	/* Kyu */
       return chunk2mem(victim);
     }
 
@@ -1357,6 +1372,7 @@ Void_t* mALLOc(bytes) size_t bytes;
 	unlink(victim, bck, fwd);
 	set_inuse_bit_at_offset(victim, victim_size);
 	check_malloced_chunk(victim, nb);
+        INT_unlock;	/* Kyu */
 	return chunk2mem(victim);
       }
     }
@@ -1380,6 +1396,7 @@ Void_t* mALLOc(bytes) size_t bytes;
       set_head(remainder, remainder_size | PREV_INUSE);
       set_foot(remainder, remainder_size);
       check_malloced_chunk(victim, nb);
+      INT_unlock;	/* Kyu */
       return chunk2mem(victim);
     }
 
@@ -1389,6 +1406,7 @@ Void_t* mALLOc(bytes) size_t bytes;
     {
       set_inuse_bit_at_offset(victim, victim_size);
       check_malloced_chunk(victim, nb);
+      INT_unlock;	/* Kyu */
       return chunk2mem(victim);
     }
 
@@ -1444,6 +1462,7 @@ Void_t* mALLOc(bytes) size_t bytes;
 	    set_head(remainder, remainder_size | PREV_INUSE);
 	    set_foot(remainder, remainder_size);
 	    check_malloced_chunk(victim, nb);
+            INT_unlock;	/* Kyu */
 	    return chunk2mem(victim);
 	  }
 
@@ -1452,6 +1471,7 @@ Void_t* mALLOc(bytes) size_t bytes;
 	    set_inuse_bit_at_offset(victim, victim_size);
 	    unlink(victim, bck, fwd);
 	    check_malloced_chunk(victim, nb);
+            INT_unlock;	/* Kyu */
 	    return chunk2mem(victim);
 	  }
 
@@ -1500,13 +1520,16 @@ Void_t* mALLOc(bytes) size_t bytes;
     /* If big and would otherwise need to extend, try to use mmap instead */
     if ((unsigned long)nb >= (unsigned long)mmap_threshold &&
 	(victim = mmap_chunk(nb)) != 0)
+      INT_unlock;	/* Kyu */
       return chunk2mem(victim);
 #endif
 
     /* Try to extend */
     malloc_extend_top(nb);
-    if ( (remainder_size = chunksize(top) - nb) < (long)MINSIZE)
+    if ( (remainder_size = chunksize(top) - nb) < (long)MINSIZE) {
+      INT_unlock;	/* Kyu */
       return NULL; /* propagate failure */
+    }
   }
 
   victim = top;
@@ -1514,6 +1537,7 @@ Void_t* mALLOc(bytes) size_t bytes;
   top = chunk_at_offset(victim, nb);
   set_head(top, remainder_size | PREV_INUSE);
   check_malloced_chunk(victim, nb);
+  INT_unlock;	/* Kyu */
   return chunk2mem(victim);
 
 }
@@ -1566,8 +1590,13 @@ void fREe(mem) Void_t* mem;
 		return;
 #endif
 
+  /* XXX */
+  // printf ( "FREE: %08x\n", mem );
+
   if (mem == NULL)                              /* free(0) has no effect */
     return;
+
+  INT_lock;	/* Kyu */
 
   p = mem2chunk(mem);
   hd = p->size;
@@ -1576,6 +1605,7 @@ void fREe(mem) Void_t* mem;
   if (hd & IS_MMAPPED)                       /* release mmapped memory. */
   {
     munmap_chunk(p);
+    INT_unlock;	/* Kyu */
     return;
   }
 #endif
@@ -1602,6 +1632,7 @@ void fREe(mem) Void_t* mem;
     top = p;
     if ((unsigned long)(sz) >= (unsigned long)trim_threshold)
       malloc_trim(top_pad);
+    INT_unlock;	/* Kyu */
     return;
   }
 
@@ -1639,6 +1670,8 @@ void fREe(mem) Void_t* mem;
   set_foot(p, sz);
   if (!islr)
     frontlink(p, sz, idx, bck, fwd);
+
+  INT_unlock;	/* Kyu */
 }
 
 

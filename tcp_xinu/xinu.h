@@ -2,7 +2,9 @@
 
 #include <kernel.h>
 
+/* Add these two for Kyu */
 #include <kyu_glue.h>
+#include <../net/netbuf.h>
 
 // #define TCP_DEBUG
 

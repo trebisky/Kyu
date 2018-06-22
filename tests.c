@@ -156,6 +156,7 @@ static void test_fault2 ( int );
 #ifdef BOARD_ORANGE_PI
 static void test_wdog ( int );
 static void test_cores ( int );
+static void test_thermal ( int );
 static void test_uart ( int );
 #endif
 
@@ -184,6 +185,7 @@ struct test io_test_list[] = {
 #ifdef BOARD_ORANGE_PI
 	test_wdog,	"Watchdog test",	0,
 	test_cores,	"Opi cores test",	0,
+	test_thermal,	"H3 thermal test",	0,
 	test_uart,	"uart test",		0,
 #endif
 
@@ -2373,6 +2375,12 @@ test_cores ( int xxx )
 
 	/* the crazy business */
 	// check_core ();
+}
+
+void
+test_thermal ( int xxx )
+{
+	// test_ths ();
 }
 #endif
 
