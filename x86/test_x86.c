@@ -388,6 +388,36 @@ test_pci ( int xx )
 		    show_vtable_1 ( iv, 10 );
 		}
 	    }
+#ifdef notdef
+	    /* sort of like a keyboard test.
+	     * useful with a serial port to figure out
+	     * what gets sent when various keys get pressed.
+	     */
+	    if ( **wp == 'k' ) {
+		int cc = getchare ();
+		printf ( "Received: %02x\n", cc );
+	    }
+	    if ( **wp == 'w' && nw == 2 ) {
+		int timer_rate = timer_rate_get ();
+		nw = atoi(wp[1]);
+		printf ("Delay for %d seconds\n", nw );
+
+		thr_delay ( nw * timer_rate );
+	    }
+
+	    if ( **wp == 's' ) {
+		static int screen;
+
+		/*
+		screen = 1 - screen;
+		*/
+		screen = (screen+1) % 8;
+	    	vga_screen ( screen );
+		if ( screen )
+		    printf ( "Screen %d\n", screen );
+	    }
+#endif
+
 #endif
 
 #ifdef ARCH_X86

@@ -29,7 +29,11 @@ extern struct test io_test_list[];
 
 struct test *cur_test_list = kyu_test_list;
 
-static int test_debug = 0;
+/* This had turned into a 3000+ line disaster before being broken
+ * up into several file in June of 2018.
+ * Now we have one main "menu" and 3 submenus,
+ * each collected into its own file.
+ */
 
 struct test_info {
 	tfptr func;
@@ -38,80 +42,9 @@ struct test_info {
 	int times;
 };
 
-/* Wrapper function to catch troubles when making new semaphores.
- */
-struct sem *
-safe_sem_signal_new ( void )
-{
-	struct sem *rv;
-
-	rv = sem_signal_new ( SEM_FIFO );
-	if ( ! rv ) {
-	    printf ( "Cannot create new semaphore\n" );
-	    panic ( "user sem new" );
-	}
-
-	return rv;
-}
-
-/* This gets launched as a thread to run
- * each of the basic tests */
-void
-basic_wrapper ( int arg )
-{
-	struct test_info *ip = (struct test_info *) arg;
-
-	(*ip->func) ( ip->arg );
-	sem_unblock ( ip->sem );
-}
-
-/* lauch a wrapper thread to run a test.
- * the main purpose of doing this is to be
- * notified when the test finishes.
- *
- * We almost don't need another thread here.
- * The new scheduler will pass control to the higher
- * priority thread, immediately -- effectively never
- * returning from thr_new.
- */
-void
-run_test ( tfptr func, int arg )
-{
-	struct test_info info;
-
-	info.func = func;
-	info.arg = arg;
-	info.sem = safe_sem_signal_new ();
-	info.times = 1;	/* ignored */
-
-	(void) safe_thr_new ( 
-	    "bwrapper", basic_wrapper, (void *) &info, PRI_WRAP, 0 );
-
-	sem_block ( info.sem );
-	sem_destroy ( info.sem );
-
-}
-
-static void
-all_tests ( int nl )
-{
-	struct test *tp;
-	int i;
-
-	if ( cur_test_list != kyu_test_list )
-	    return;
-
-	if ( nl < 1 )
-	    nl = 1;
-
-	for ( i=0; i<nl; i++ )
-	    for ( tp = &kyu_test_list[0]; tp->func; tp++ ) {
-		(*tp->func) ( tp->arg );
-	    }
-}
-
-/* This gets launched as a thread to run each test
- *  repeating the test as many times as indicated.
+/* This gets launched as a thread to run each regression test
+ *  when they are being selected one at a time.
+ *  It repeats the test as indicated.
  */
 static void
 wrapper ( int arg )
@@ -119,28 +52,16 @@ wrapper ( int arg )
 	struct test_info *ip = (struct test_info *) arg;
 	int i;
 
-	// printf ( "&ip = %08x, ip = %08x, ip->times = %d\n", &ip, ip, ip->times );
-
 	for ( i=0; i< ip->times; i++ ) {
-	    // printf ( "RUNNING test (%d of %d)\n", i+1, ip->times);
-	    // printf ( "Stack at %08x\n", get_sp() );
-
 	    (*ip->func) ( ip->arg );
-
-	    // printf ( "FINISH test (%d of %d)\n", i+1, ip->times);
 	}
-
-	// printf ( "&ip = %08x, ip = %08x, ip->times = %d\n", &ip, ip, ip->times );
-
-	/*
-	sem_unblock ( ip->sem );
-	*/
 }
 
 static struct test_info info;
 
+/* Used only for a single regression test */
 static void
-single_test ( struct test *tstp, int times )
+single_test ( struct test *tp, int repeat )
 {
 	/* Having this on the stack, calling a thread,
 	 * then returning from this function is very bad,
@@ -149,12 +70,11 @@ single_test ( struct test *tstp, int times )
 	 */
 	// struct test_info info;
 
-	info.func = tstp->func;
-	info.arg = tstp->arg;
-	info.times = times;
+	info.func = tp->func;
+	info.arg = tp->arg;
+	info.times = repeat;
 
-	(void) safe_thr_new ( 
-	    "wrapper", wrapper, (void *) &info, PRI_WRAP, 0 );
+	(void) safe_thr_new ( "wrapper", wrapper, (void *) &info, PRI_WRAP, 0 );
 
 /* This nice synchronization does not give us
  * the desired result when a thread faults.
@@ -168,8 +88,43 @@ single_test ( struct test *tstp, int times )
 #endif
 }
 
-/* ---------------------------------------------------------------
+
+/* Run a single regression test, perhaps with looping
  */
+static void
+single_regression ( struct test *tp, int n, int repeat )
+{
+	char *desc;
+
+	desc = tp->desc;
+	if ( repeat > 1 ) {
+	    printf ( "looping test %d (%s), %d times\n", n, desc, repeat );
+	    set_delay_auto ();
+	} else {
+	    printf ( "Running test %d (%s)\n", n, desc );
+	    set_delay_user ();
+	}
+
+	single_test ( tp, repeat );
+}
+
+static void
+all_tests ( int repeat )
+{
+	struct test *tp;
+	int i;
+
+	// if ( cur_test_list != kyu_test_list )
+	//     return;
+
+	if ( repeat < 1 )
+	    repeat = 1;
+
+	for ( i=0; i<repeat; i++ )
+	    for ( tp = &kyu_test_list[0]; tp->func; tp++ ) {
+		(*tp->func) ( tp->arg );
+	    }
+}
 
 static void
 help_tests ( struct test *tp, int nt )
@@ -186,6 +141,54 @@ help_tests ( struct test *tp, int nt )
 	}
 }
 
+static void
+submenu ( struct test *test_list, char **wp, int nw )
+{
+	struct test *tp;
+	int nt;
+	int n;
+	int repeat = 1;
+
+	for ( nt = 0, tp = test_list; tp->desc; ++tp )
+	    ++nt;
+
+	/* Just the letter gets help */
+	if ( nw == 1 ) {
+	    help_tests ( test_list, nt );
+	    return;
+	}
+
+	n = atoi ( wp[1] );
+
+	/* We allow a repeat for the regression suite */
+	if ( nw == 3 )
+	    repeat = atoi ( wp[2] );
+
+	/* only run all tests for the regression test suite */
+	if ( n == 0 && test_list == kyu_test_list ) {
+	    all_tests ( repeat );
+	    return;
+	}
+
+	if ( n < 1 || n > nt ) {
+	    printf ( " ... No such test.\n" );
+	    return;
+	}
+
+	/* It is easy to run a single test if this is
+	 * not the regression suite.
+	 * This ignores any repeat.
+	 */
+	if ( test_list != kyu_test_list ) {
+	    (*test_list[n-1].func) ( test_list[n-1].arg );
+	    return;
+	}
+
+	/* run single test for regression case ...
+	 */
+	single_regression ( &test_list[n-1], n, repeat );
+}
+
 #define MAXB	64
 #define MAXW	4
 
@@ -195,7 +198,7 @@ tester ( void )
 	char buf[MAXB];
 	char *wp[MAXW];
 	int n, nw, nl;
-	int nt, nnt;
+	int nt;
 	int i;
 	char *p;
 	struct test *tp;
@@ -213,11 +216,6 @@ tester ( void )
 	    for ( nt = 0, tp = cur_test_list; tp->desc; ++tp )
 		++nt;
 
-#ifdef WANT_NET
-	    for ( nnt = 0, tp = net_test_list; tp->desc; ++tp )
-		++nnt;
-#endif
-
 	    printf ( "Kyu, ready> " );
 	    getline ( buf, MAXB );
 	    if ( ! buf[0] )
@@ -229,16 +227,29 @@ tester ( void )
 		help_tests ( cur_test_list, nt );
 	    }
 
-	    /* Select special IO test menu */
-	    if ( **wp == 'i' ) {
-		printf ( "select io test menu (q to quit)\n" );
-	    	cur_test_list = io_test_list;
+	    /* Lookup an entry in the symbol table
+	     * and invoke it.
+	     */
+	    if ( **wp == 'x' ) {
+		shell_x ( &wp[1], nw-1 );
 	    }
-	    /* Restore standard test menu */
-	    if ( **wp == 'q' ) {
-		printf ( "select standard test menu\n" );
-	    	cur_test_list = kyu_test_list;
-	    }
+
+	    /* kyu thread test submenu
+	     *  (regression tests)
+	     */
+	    if ( **wp == 'k' )
+		submenu ( kyu_test_list, wp, nw );
+
+#ifdef WANT_NET
+	    /* network test submenu
+	     */
+	    if ( **wp == 'n' )
+		submenu ( net_test_list, wp, nw );
+#endif
+	    /* IO test submenu
+	     */
+	    if ( **wp == 'i' )
+		submenu ( io_test_list, wp, nw );
 
 	    if ( **wp == 'y' ) {
 		kyu_debugger ();
@@ -256,9 +267,6 @@ tester ( void )
 	    }
 #endif
 
-	    if ( **wp == 'x' ) {
-		shell_x ( &wp[1], nw-1 );
-	    }
 
 /* On the Orange Pi there is SRAM at 0-0xffff.
  * also supposed to be at 0x44000 to 0x4Bfff (I see this)
@@ -303,48 +311,7 @@ tester ( void )
 		continue;
 	    }
 
-#ifdef notdef
-	    if ( **wp == 'w' && nw == 2 ) {
-		int timer_rate = timer_rate_get ();
-		nw = atoi(wp[1]);
-		printf ("Delay for %d seconds\n", nw );
-
-		thr_delay ( nw * timer_rate );
-	    }
-
-	    if ( **wp == 's' ) {
-		static int screen;
-
-		/*
-		screen = 1 - screen;
-		*/
-		screen = (screen+1) % 8;
-	    	vga_screen ( screen );
-		if ( screen )
-		    printf ( "Screen %d\n", screen );
-	    }
-#endif
-
-#ifdef WANT_NET
-	    /* network test submenu
-	     */
-	    if ( **wp == 'n' && nw == 1 ) {
-		help_tests ( net_test_list, nnt );
-	    }
-	    if ( **wp == 'n' && nw > 1 ) {
-		n = atoi ( wp[1] );
-
-		if ( n < 1 || n > nnt ) {
-		    printf ( " ... No such test.\n" );
-		    continue;
-		}
-
-		/* run single test ...
-		 */
-		(*net_test_list[n-1].func) ( net_test_list[n-1].arg );
-	    }
-#endif
-
+	    /* Turn on Kyu thread debugging */
 	    if ( **wp == 'o' ) {
 		if ( nw > 1 )
 		    thr_debug ( atoi (wp[1]) );
@@ -406,17 +373,6 @@ tester ( void )
 	    }
 
 #ifdef notdef
-	    /* sort of like a keyboard test.
-	     * useful with a serial port to figure out
-	     * what gets sent when various keys get pressed.
-	     */
-	    if ( **wp == 'k' ) {
-		int cc = getchare ();
-		printf ( "Received: %02x\n", cc );
-	    }
-#endif
-
-#ifdef notdef
 	    printf ( "%s\n", buf );
 	    for ( i=0; i<nw; i++ ) {
 		printf ("word %d: %s", i+1, wp[i] );
@@ -433,18 +389,10 @@ tester ( void )
 
 /* The test thread starts here.
  * wrapper for the above.
- * Here so we can examine a simple stack right after
- * this thread gets launched.
  */
 void
 test_main ( int xx )
 {
-	/*
-	thr_show ();
-	show_my_regs ();
-	for ( ;; ) ;
-	*/
-
 	tester ();
 }
 

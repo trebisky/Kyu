@@ -23,6 +23,4 @@ struct test {
 #define PRI_TEST	10
 #define PRI_WRAP	20
 
-struct sem * safe_sem_signal_new ( void );
-
 /* THE END */

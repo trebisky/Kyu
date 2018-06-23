@@ -23,7 +23,7 @@
 
 #include "tests.h"
 
-int
+static int
 is_irq_disabled ( void )
 {
 	unsigned int reg;
@@ -32,6 +32,22 @@ is_irq_disabled ( void )
 	if ( reg & 0x80 )
 	    return 1;
 	return 0;
+}
+
+/* Wrapper function to catch troubles when making new semaphores.
+ */
+static struct sem *
+safe_sem_signal_new ( void )
+{
+	struct sem *rv;
+
+	rv = sem_signal_new ( SEM_FIFO );
+	if ( ! rv ) {
+	    printf ( "Cannot create new semaphore\n" );
+	    panic ( "user sem new" );
+	}
+
+	return rv;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -130,6 +146,55 @@ void f_ez ( int arg )
 
 /* -------------------------------------------------
  */
+
+struct test_info {
+	tfptr func;
+	int arg;
+	struct sem *sem;
+	int times;
+};
+
+struct test_info static_info;
+
+/* This gets launched as a thread to run
+ * each of the basic tests */
+void
+basic_wrapper ( int arg )
+{
+	struct test_info *ip = (struct test_info *) arg;
+
+	(*ip->func) ( ip->arg );
+	sem_unblock ( ip->sem );
+}
+
+/* lauch a wrapper thread to run a test.
+ * the main purpose of doing this is to be
+ * notified when the test finishes.
+ *
+ * We almost don't need another thread here.
+ * The new scheduler will pass control to the higher
+ * priority thread, immediately -- effectively never
+ * returning from thr_new.
+ *
+ * We might not need to make info static given that
+ * we block here on the semaphore as we do,
+ * but it reminds us of the risk of having it on
+ * the stack, launching the thread, then returning.
+ */
+void
+run_test ( tfptr func, int arg )
+{
+	static_info.func = func;
+	static_info.arg = arg;
+	static_info.sem = safe_sem_signal_new ();
+	static_info.times = 1;	/* ignored */
+
+	(void) safe_thr_new ( 
+	    "bwrapper", basic_wrapper, (void *) &static_info, PRI_WRAP, 0 );
+
+	sem_block ( static_info.sem );
+	sem_destroy ( static_info.sem );
+}
 
 /* Here is a thread to run a sequence of diagnostics.
  * At one time, this was the whole show (up until
