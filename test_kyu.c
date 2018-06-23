@@ -70,7 +70,7 @@ static void test_cancel ( int );
 /* These are the tests we run in the automatic regression set
  * Don't put anything ugly in here we cannot run in a loop.
  */
-struct test thread_test_list[] = {
+struct test kyu_test_list[] = {
 	test_basic,	"Basic tests",		0,
 
 #ifdef WANT_SETJMP

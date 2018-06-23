@@ -24,10 +24,10 @@
 #include "tests.h"
 
 extern struct test net_test_list[];
-extern struct test thread_test_list[];
+extern struct test kyu_test_list[];
 extern struct test io_test_list[];
 
-struct test *cur_test_list = thread_test_list;
+struct test *cur_test_list = kyu_test_list;
 
 static int test_debug = 0;
 
@@ -95,22 +95,17 @@ run_test ( tfptr func, int arg )
 static void
 all_tests ( int nl )
 {
-	int i, t;
 	struct test *tp;
+	int i;
 
-	if ( cur_test_list != thread_test_list )
+	if ( cur_test_list != kyu_test_list )
 	    return;
 
-	// nt = sizeof ( thread_test_list ) / sizeof(struct test) - 1;
 	if ( nl < 1 )
 	    nl = 1;
 
-	// for ( i=0; i<nl; i++ )
-	//     for ( t=0; t<nt; t++ )
-	// 	(*thread_test_list[t].func) ( thread_test_list[t].arg );
-
 	for ( i=0; i<nl; i++ )
-	    for ( tp = &thread_test_list[0]; tp->func; tp++ ) {
+	    for ( tp = &kyu_test_list[0]; tp->func; tp++ ) {
 		(*tp->func) ( tp->arg );
 	    }
 }
@@ -242,7 +237,7 @@ tester ( void )
 	    /* Restore standard test menu */
 	    if ( **wp == 'q' ) {
 		printf ( "select standard test menu\n" );
-	    	cur_test_list = thread_test_list;
+	    	cur_test_list = kyu_test_list;
 	    }
 
 	    if ( **wp == 'y' ) {
@@ -380,13 +375,13 @@ tester ( void )
 		if ( nl < 1 )
 		    nl = 1;
 
-		if ( n == 0 && cur_test_list == thread_test_list ) {
+		if ( n == 0 && cur_test_list == kyu_test_list ) {
 		    all_tests ( nl );
 		    continue;
 		}
 
 		/* No looping except for standard tests */
-		if ( cur_test_list != thread_test_list )
+		if ( cur_test_list != kyu_test_list )
 		    nl = 1;
 
 		if ( n < 1 || n > nt ) {

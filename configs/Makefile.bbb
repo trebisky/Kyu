@@ -26,6 +26,9 @@ OBJS =  machine.o \
     main.o \
     user.o \
     tests.o \
+    test_kyu.o \
+    test_io.o \
+    test_net.o \
     console.o \
     thread.o \
     prf.o \
