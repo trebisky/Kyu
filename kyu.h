@@ -42,6 +42,7 @@
 #define WANT_USER
 #define WANT_FLOAT
 #define WANT_PUTS_LOCK		/* orange pi experimental */
+#define WANT_SETJMP
 #endif
 
 #define WANT_HOST_DHCP
