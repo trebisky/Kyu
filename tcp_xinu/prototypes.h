@@ -231,8 +231,8 @@ extern  void exception(int32, int32*);
 /* in file freebuf.c */
 extern	syscall	freebuf(char *);
 
-/* in file freemem.c */
-extern	syscall	freemem(char *, uint32);
+extern	char	*kyu_getmem(uint32);
+extern	int	kyu_freemem(char *, uint32);
 
 /* in file getbuf.c */
 extern	char	*getbuf(bpid32);
@@ -244,9 +244,6 @@ extern	syscall	getc(did32);
 extern	pid32	getfirst(qid16);
 extern	pid32	getlast(qid16);
 extern	pid32	getitem(pid32);
-
-/* in file getmem.c */
-extern	char	*getmem(uint32);
 
 /* in file getpid.c */
 extern	pid32	getpid(void);

@@ -44,19 +44,21 @@ int32	tcplisten(
 	/* Kyu */
 	pnewtcb->tcb_lfunc = tcbptr->tcb_lfunc;
 	pnewtcb->tcb_slot = i;
+	/* end of Kyu addition */
 
-	pnewtcb->tcb_rbuf = (char *)getmem (65535);
+	pnewtcb->tcb_rbuf = (char *) kyu_getmem (65535);
 	if (pnewtcb->tcb_rbuf == (char *)SYSERR) {
 		signal (Tcp.tcpmutex);
 		return SYSERR;
 	}
 	pnewtcb->tcb_rbsize = 65535;
+
 	pnewtcb->tcb_rbdata = pnewtcb->tcb_rbuf;
 	pnewtcb->tcb_rbend = pnewtcb->tcb_rbuf + pnewtcb->tcb_rbsize;
 	//pnewtcb->tcb_rbsize = 25*1024;
-	pnewtcb->tcb_sbuf = (char *)getmem (65535);
+	pnewtcb->tcb_sbuf = (char *) kyu_getmem (65535);
 	if (pnewtcb->tcb_sbuf == (char *)SYSERR) {
-		freemem ((char *)pnewtcb->tcb_rbuf, 65535);
+		kyu_freemem ((char *)pnewtcb->tcb_rbuf, 65535);
 		signal (Tcp.tcpmutex);
 		return SYSERR;
 	}

@@ -228,7 +228,7 @@ semcreate ( int arg )
 static char *memb_head;
 static int memb_count;
 
-void xinu_memb_show ( int );
+static void xinu_memb_show ( int );
 
 static void
 xinu_memb_init ( void )
@@ -251,7 +251,7 @@ xinu_memb_init ( void )
 	xinu_memb_show ( 8 );
 }
 
-void
+static void
 xinu_memb_show ( int limit )
 {
 	int count;
@@ -266,12 +266,12 @@ xinu_memb_show ( int limit )
 }
 
 char *
-getmem ( uint32 nbytes )
+kyu_getmem ( uint32 nbytes )
 {
 	char *rv;
 
-	printf ( "GETMEM -- %d bytes (%d available: %08x)\n", nbytes, memb_count, memb_head );
-	xinu_memb_show ( 8 );
+	// printf ( "GETMEM -- %d bytes (%d available: %08x)\n", nbytes, memb_count, memb_head );
+	// xinu_memb_show ( 8 );
 
 	if ( nbytes > XINU_BSIZE )
 	    panic ( "Xinu TCP getmem allocator block too small" );
@@ -281,47 +281,20 @@ getmem ( uint32 nbytes )
 	rv = memb_head;
 	memb_head = * (char **) memb_head;
 	memb_count--;
-	printf ( "GETMEM:: %08x\n", rv );
+	// printf ( "GETMEM:: %08x\n", rv );
 	return rv;
 }
 
 int
-freemem ( char *buf, uint32 xxx_nbytes )
+kyu_freemem ( char *buf, uint32 xxx_nbytes )
 {
-	printf ( "FREEMEM -- %08x\n", buf );
+	// printf ( "FREEMEM -- %08x\n", buf );
 
 	* (char **) buf = memb_head;
 	memb_head = buf;
 	memb_count++;
 	return OK;
 }
-
-#ifdef notdef
-char *
-getmem ( uint32 nbytes )
-{
-	char *rv;
-
-	printf ( "Xinu: getmem  %5d bytes requested\n", nbytes );
-
-	rv =  (char *) malloc ( nbytes );
-
-	printf ( "Xinu: getmem  %5d: %08x\n", nbytes, rv );
-
-	return rv;
-	//return (char *) malloc ( nbytes );
-}
-
-// syscall
-int
-freemem ( char *blkaddr, uint32 nbytes )
-{
-	printf ( "Xinu: freemem %5d: %08x\n", nbytes, blkaddr );
-	free ( blkaddr );
-
-	return OK;
-}
-#endif
 
 void
 xinu_show ( void )

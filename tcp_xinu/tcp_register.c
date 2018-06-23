@@ -90,7 +90,7 @@ int32	tcp_register (
 
 		/* Allocate receive buffer and initialize ptrs */
 
-		tcbptr->tcb_rbuf = (char *)getmem (65535);
+		tcbptr->tcb_rbuf = (char *) kyu_getmem (65535);
 		if (tcbptr->tcb_rbuf == (char *)SYSERR) {
 			signal (Tcp.tcpmutex);
 			return SYSERR;
@@ -98,9 +98,10 @@ int32	tcp_register (
 		tcbptr->tcb_rbsize = 65535;
 		tcbptr->tcb_rbdata = tcbptr->tcb_rbuf;
 		tcbptr->tcb_rbend = tcbptr->tcb_rbuf + tcbptr->tcb_rbsize;
-		tcbptr->tcb_sbuf = (char *)getmem (65535);
+
+		tcbptr->tcb_sbuf = (char *) kyu_getmem (65535);
 		if (tcbptr->tcb_sbuf == (char *)SYSERR) {
-			freemem ((char *)tcbptr->tcb_rbuf, 65535);
+			kyu_freemem ((char *)tcbptr->tcb_rbuf, 65535);
 			signal (Tcp.tcpmutex);
 			return SYSERR;
 		}
