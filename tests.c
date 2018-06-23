@@ -27,8 +27,6 @@ extern struct test net_test_list[];
 extern struct test kyu_test_list[];
 extern struct test io_test_list[];
 
-struct test *cur_test_list = kyu_test_list;
-
 /* This had turned into a 3000+ line disaster before being broken
  * up into several file in June of 2018.
  * Now we have one main "menu" and 3 submenus,
@@ -114,9 +112,6 @@ all_tests ( int repeat )
 	struct test *tp;
 	int i;
 
-	// if ( cur_test_list != kyu_test_list )
-	//     return;
-
 	if ( repeat < 1 )
 	    repeat = 1;
 
@@ -189,6 +184,18 @@ submenu ( struct test *test_list, char **wp, int nw )
 	single_regression ( &test_list[n-1], n, repeat );
 }
 
+static void
+main_help ( void )
+{
+	printf ( "R - reboot board.\n" );
+	printf ( "t - show thread list.\n" );
+	printf ( "x func [args] - call C function.\n" );
+	printf ( "k [num] [repeat] - Kyu thread regression tests.\n" );
+	printf ( "i [num] - IO test menu.\n" );
+	printf ( "n [num] - Network test menu.\n" );
+	printf ( " .. and much more.\n" );
+}
+
 #define MAXB	64
 #define MAXW	4
 
@@ -198,11 +205,8 @@ tester ( void )
 	char buf[MAXB];
 	char *wp[MAXW];
 	int n, nw, nl;
-	int nt;
 	int i;
 	char *p;
-	struct test *tp;
-	char *desc;
 
 	/* Allow the lower priority user thread to
 	 * run (and exit), not that this matters all
@@ -213,9 +217,6 @@ tester ( void )
 
 	for ( ;; ) {
 
-	    for ( nt = 0, tp = cur_test_list; tp->desc; ++tp )
-		++nt;
-
 	    printf ( "Kyu, ready> " );
 	    getline ( buf, MAXB );
 	    if ( ! buf[0] )
@@ -223,12 +224,27 @@ tester ( void )
 
 	    nw = split ( buf, wp, MAXW );
 
-	    if ( **wp == 'h' ) {
-		help_tests ( cur_test_list, nt );
+	    if ( **wp == 'h' )
+		main_help ();
+
+	    /* We use this more than anything else in
+	     * this menu.  It usually calls some board specific
+	     * reboot function.
+	     */
+	    if ( **wp == 'R' ) {
+	    	/* Reboot the machine */
+		printf ( "Rebooting\n" );
+	    	reset_cpu ();
 	    }
 
-	    /* Lookup an entry in the symbol table
-	     * and invoke it.
+	    /* Show threads.
+	     * this gets used a lot too
+	     */
+	    if ( **wp == 't' && nw == 1 ) {
+	    	thr_show ();
+	    }
+
+	    /* Run a C function by name
 	     */
 	    if ( **wp == 'x' ) {
 		shell_x ( &wp[1], nw-1 );
@@ -240,39 +256,25 @@ tester ( void )
 	    if ( **wp == 'k' )
 		submenu ( kyu_test_list, wp, nw );
 
+	    /* IO test submenu
+	     */
+	    if ( **wp == 'i' )
+		submenu ( io_test_list, wp, nw );
+
 #ifdef WANT_NET
 	    /* network test submenu
 	     */
 	    if ( **wp == 'n' )
 		submenu ( net_test_list, wp, nw );
 #endif
-	    /* IO test submenu
-	     */
-	    if ( **wp == 'i' )
-		submenu ( io_test_list, wp, nw );
-
 	    if ( **wp == 'y' ) {
 		kyu_debugger ();
 	    }
-
-#ifdef ARCH_ARM
-	    if ( **wp == 'R' ) {
-	    	/* Reboot the machine */
-		printf ( "Rebooting\n" );
-	    	reset_cpu ();
-	    }
-
-	    if ( **wp == 's' ) {
-		show_my_regs ();
-	    }
-#endif
-
 
 /* On the Orange Pi there is SRAM at 0-0xffff.
  * also supposed to be at 0x44000 to 0x4Bfff (I see this)
  * also supposed to be at 0x10000 to 0x1afff, but not for me.
  */
-
 	    if ( **wp == 'l' ) {
 		printf ( "Memory test\n" );
 		mem_verify ( 0x0, 0x10000 );
@@ -319,19 +321,13 @@ tester ( void )
 		    thr_debug ( 0 );
 	    }
 
-	    /* Show a specific thread
+	    /* Show a specific thread given its name.
 	     */
 	    if ( **wp == 'u' && nw == 2 ) {
 	    	thr_show_name ( wp[1] );
 	    }
 
-
-	    /* Show threads */
-	    /* Conflicts with t for test mode below */
-	    if ( **wp == 't' && nw == 1 ) {
-	    	thr_show ();
-	    }
-
+#ifdef notdef
 	    /* Run a test or tests */
 	    if ( **wp == 't' && nw > 1 ) {
 		n = atoi ( wp[1] );
@@ -371,6 +367,7 @@ tester ( void )
 		 */
 		single_test ( &cur_test_list[n-1], nl );
 	    }
+#endif
 
 #ifdef notdef
 	    printf ( "%s\n", buf );

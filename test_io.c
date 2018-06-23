@@ -46,6 +46,7 @@ static void test_fault ( int );
 static void test_zdiv ( int );
 static void test_gpio ( int );
 static void test_clock ( int );
+static void test_regs ( int );
 
 #ifdef BOARD_BBB
 static void test_adc ( int );
@@ -75,6 +76,7 @@ struct test io_test_list[] = {
 	test_zdiv,	"Zero divide test",	0,
 	test_gpio,	"GPIO test",		0,
 	test_clock,	"CPU clock test",	0,
+	test_regs,	"Show registers",	0,
 
 #ifdef BOARD_BBB
 	test_adc,	"BBB adc test",		0,
@@ -637,6 +639,12 @@ test_sort ( int count )
 	(void) safe_thr_new ( 0, f_linger, (void *) 9, 11, 0 );
 	(void) safe_thr_new ( 0, f_linger, (void *) 9, 17, 0 );
 	(void) safe_thr_new ( 0, f_linger, (void *) 9, 22, 0 );
+}
+
+static void
+test_regs ( int xxx )
+{
+	show_my_regs ();
 }
 
 /* THE END */
