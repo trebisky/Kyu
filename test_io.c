@@ -1,0 +1,642 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ *
+ * test_io.c
+ * Tom Trebisky
+ *
+ * began as user.c -- 11/17/2001
+ * made into tests.c  9/15/2002
+ * added to kyu 5/11/2015
+ * split into test_io.c  --  6/23/2018
+ */
+
+#include "kyu.h"
+#include "kyulib.h"
+#include "thread.h"
+#include "malloc.h"
+#include "arch/cpu.h"
+
+#include "tests.h"
+
+static int timer_rate;	/* ticks per second */
+
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+/* IO tests -- anything that should not be run in a loop */
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+
+/* These go in the "i" menu which is kind of a grab bag
+ * of mostly architecture dependent tests.
+ *
+ * Don't run these tests automatically.
+ * Don't run them in a repeat loop either.
+ */
+static void test_sort ( int );
+static void test_ran ( int );
+static void test_malloc ( int );
+static void test_wait ( int );
+static void test_unroll ( int );
+static void test_fault ( int );
+static void test_zdiv ( int );
+static void test_gpio ( int );
+static void test_clock ( int );
+
+#ifdef BOARD_BBB
+static void test_adc ( int );
+static void test_fault2 ( int );
+#endif
+
+#ifdef BOARD_ORANGE_PI
+static void test_wdog ( int );
+static void test_cores ( int );
+static void test_thermal ( int );
+static void test_uart ( int );
+#endif
+
+static void test_clear ( int );
+static void test_blink ( int );
+static void test_blink_d ( int );
+
+/* Here is the IO test menu */
+
+struct test io_test_list[] = {
+	test_sort,	"Thread sort test",	5,
+	test_ran,	"Random test",		0,
+	test_malloc,	"malloc test",		0,
+	test_wait,	"wait for 5 seconds",	0,
+	test_unroll,	"stack traceback",	0,
+	test_fault,	"Fault test",		0,
+	test_zdiv,	"Zero divide test",	0,
+	test_gpio,	"GPIO test",		0,
+	test_clock,	"CPU clock test",	0,
+
+#ifdef BOARD_BBB
+	test_adc,	"BBB adc test",		0,
+	test_fault2,	"data abort probe",	0,
+#endif
+
+#ifdef BOARD_ORANGE_PI
+	test_wdog,	"Watchdog test",	0,
+	test_cores,	"Opi cores test",	0,
+	test_thermal,	"H3 thermal test",	0,
+	test_uart,	"uart test",		0,
+#endif
+
+	test_blink,	"start LED blink test",	0,
+	test_blink,	"stop LED blink test",	1,
+	test_blink_d,	"LED blink test (via delay)",	0,
+
+	test_clear,	"clear memory test",	0,
+
+	0,		0,			0
+};
+
+/* -------------------------------------------- */
+
+static void
+test_malloc ( int xxx )
+{
+	char *p;
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+
+	free ( p );
+
+	p = malloc ( 1024 );
+	printf ( "Malloc gives: %08x\n", p );
+	memset ( p, 0, 1024 );
+}
+
+/* Wait for 5 seconds */
+/* This runs in its own thread,
+ * which can be interesting.
+ */
+static void
+test_wait ( int xxx )
+{
+	thr_delay ( 5 * timer_rate );
+	printf ( "Done waiting\n" );
+}
+
+/* -------------------------------------------- */
+
+/* test ARM stack backtrace */
+static void
+test_unroll ( int xxx )
+{
+	unroll_cur();
+}
+
+/* Generate a data abort on the BBB
+ * On the BBB this causes a fault, but
+ *  is perfectly fine on the Orange Pi.
+ */
+static void
+fault_addr_zero ( void )
+{
+	volatile int data;
+	char *p = (char *) 0;
+
+	printf ( "Read byte from address zero\n" );
+	data = *p;
+	printf ( " Got: %02x\n", data );
+
+	printf ( "Write byte to address zero\n" );
+	*p = 0xAB;
+
+	printf ( "Read it back\n" );
+	data = *p;
+	printf ( " Got: %02x\n", data );
+}
+
+static int fault_buf[2];
+
+static void
+fault_align ( void )
+{
+	int *p;
+	short *sp;
+	int data;
+
+	fault_buf[0] = 0x12345678;
+	fault_buf[1] = 0x9abcdef0;
+
+	/* This should work */
+	printf ( "Read nicely aligned 4 bytes\n" );
+	p = fault_buf;
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* This should fail */
+	printf ( "Read short aligned 4 bytes\n" );
+	p = (int *) ((short *)p + 1);
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* This should fail also */
+	printf ( "Read byte aligned 4 bytes\n" );
+	p = (int *) ((char *)p + 1);
+
+	printf ( "4 byte read from address: %08x\n", p );
+	data = *p;
+	printf ( "Fetched %08x\n", data );
+
+	/* AND - what about 2 byte reads */
+
+	/* This should work */
+	printf ( "Read nicely aligned 2 bytes\n" );
+	sp = (short *) fault_buf;
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+	/* And so should this */
+	sp++;
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+	/* But probably not this */
+	sp = (short *) fault_buf;
+	sp = (short *) ((char *)sp + 1);
+
+	printf ( "2 byte read from address: %08x\n", sp );
+	data = *sp;
+	printf ( "Fetched %08x\n", data );
+
+}
+
+void
+test_fault ( int xxx )
+{
+	fault_addr_zero ();
+	fault_align ();
+}
+
+static void
+test_zdiv ( int xxx )
+{
+	volatile int a = 1;
+	int b = 0;
+
+	printf ("Lets try a divide by zero ...\n");
+	a = a / b;
+	printf ("... All done!\n");
+}
+
+#ifdef BOARD_BBB
+/* Use data abort to poke at some fishy addresses on the BBB */
+
+static void
+prober ( unsigned int addr )
+{
+	int s;
+
+	s = data_abort_probe ( addr );
+	printf ( "Probe address %08x ", addr );
+	if ( s )
+	    printf ( "Fails\n" );
+	else
+	    printf ( "ok\n" );
+}
+
+void
+test_fault2 ( int xxx )
+{
+	unsigned long s;
+	char *p;
+
+	prober ( 0x44e30000 );	/* CM */
+	prober ( 0x44e35000 );	/* WDT1 */
+	prober ( 0x44e31000 );	/* Timer 1 (ms) */
+	prober ( 0x4a334000 );	/* PRU 0 iram */
+	prober ( 0x4a338000 );	/* PRU 1 iram */
+#define I2C0_BASE      0x44E0B000
+	prober ( I2C0_BASE );
+#define I2C1_BASE      0x4802A000
+	prober ( I2C1_BASE );
+#define I2C2_BASE      0x4819C000       /* Gets data abort */
+	prober ( I2C2_BASE );
+
+	p = (char *) &s;
+
+	prober ( (unsigned int) p );
+	prober ( (unsigned int) (p + 1) );
+	prober ( (unsigned int) (p + 2) );
+}
+#endif
+
+#ifdef BOARD_ORANGE_PI
+void
+test_cores ( int xxx )
+{
+	/* official test */
+	test_core ();
+
+	/* the crazy business */
+	// check_core ();
+}
+
+void
+test_thermal ( int xxx )
+{
+	// test_ths ();
+}
+#endif
+
+
+/* -------------------------------------------- */
+
+#ifdef BOARD_BBB
+/* BBB blink test - also a good test of
+ * mixing repeats and delays
+ */
+#define BLINK_RATE	1000
+
+static void
+led_blinker ( int xx )
+{
+	/* Writing a "1" does turn the LED on */
+	gpio_led_set ( 1 );
+	thr_delay ( 100 );
+	gpio_led_set ( 0 );
+}
+
+static void
+led_norm ( void )
+{
+	gpio_led_set ( 0 );
+}
+
+#endif
+
+#ifdef BOARD_ORANGE_PI
+int led_state = 0;
+#define BLINK_RATE	500
+
+static void
+led_blinker ( int xx )
+{
+	printf ( "Blink: %d\n", led_state );
+	if ( led_state ) {
+	    pwr_on ();
+	    status_off ();
+	    led_state = 0;
+	} else {
+	    pwr_off ();
+	    status_on ();
+	    led_state = 1;
+	}
+}
+
+static void
+led_norm ( void )
+{
+	pwr_on ();
+	status_off ();
+}
+
+#endif
+
+#ifdef BOARD_ORANGE_PI
+#define X_UART	3
+
+static void
+test_uart ( int arg )
+{
+	uart_init ( X_UART, 115200 );
+
+	for ( ;; ) {
+	    printf ( "." );
+	    uart_putc ( X_UART, 'a' );
+	    uart_putc ( X_UART, 'b' );
+	    uart_putc ( X_UART, 'c' );
+	    thr_delay ( 100 );
+	}
+}
+#endif
+
+static void
+test_clear ( int arg )
+{
+	unsigned long *start;
+	unsigned long size;
+	unsigned long *p;
+	int i;
+
+	start = (unsigned long *) ram_next ();
+	size = ram_size ();
+
+	printf ( "Clearing ram, %d bytes from %08x\n", size, start );
+	size /= sizeof(unsigned long);
+
+	p = start;
+	for ( i=0; i<size; i++ )
+	    *p++ = 0;
+
+	p = start;
+	for ( i=0; i<size; i++ )
+	    *p++ = 0xdeadbeef;
+
+	printf ( "Done clearning ram\n" );
+}
+
+static struct thread *blink_tp;
+
+static void
+test_blink ( int arg )
+{
+	if ( arg == 0 ) {
+	    printf ( "Start the blink\n" );
+	    blink_tp = thr_new_repeat ( "blinker", led_blinker, 0, 10, 0, BLINK_RATE );
+	} else {
+	    printf ( "Stop the blink\n" );
+	    thr_repeat_stop ( blink_tp );
+	}
+	led_norm ();
+}
+
+#ifdef BOARD_ORANGE_PI
+static void
+test_led_on ( void )
+{
+	status_on ();
+}
+
+static void
+test_led_off ( void )
+{
+	status_off ();
+}
+#endif
+
+#ifdef BOARD_BBB
+static void
+test_led_on ( void )
+{
+	gpio_led_set ( 1 );
+}
+
+static void
+test_led_off ( void )
+{
+	gpio_led_set ( 0 );
+}
+#endif
+
+/* Useful for seeing if D cache is enabled or not.
+ * Should blink two quick pulses, 1 second apart.
+ */
+static void
+test_blink_d ( int arg )
+{
+	int a = 100;
+	int b = 1000;
+
+        b -= 3*a;
+
+        for ( ;; ) {
+            test_led_on ();
+            delay_ms ( a );
+
+            test_led_off ();
+            delay_ms ( a );
+
+            test_led_on ();
+            delay_ms ( a );
+
+            test_led_off ();
+
+            delay_ms ( b );
+        }
+}
+
+/* -------------------------------------------- */
+
+static void check_clock ( void );
+
+#ifdef notdef
+#define NVALS 100
+
+static void
+check_clock_DETAIL ( void )
+{
+	unsigned int vals[NVALS];
+	int secs;
+	int delay = 100;
+	unsigned int last;
+	int count;
+	int i;
+
+	secs = NVALS * delay / 1000;
+
+	printf ( "Collecting data for %d seconds\n", secs );
+	last = r_CCNT ();
+
+	for ( i=0; i< NVALS; i++ ) {
+	    // reset_ccnt ();
+	    thr_delay ( delay );
+	    vals[i] = r_CCNT ();
+	}
+
+	for ( i=0; i< NVALS; i++ ) {
+	    count = vals[i] - last;
+	    last = vals[i];
+	    printf ( "CCNT for 1 interval: %d %d\n", vals[i], count );
+	}
+}
+#endif
+
+/* 6-8-2018 -- this is actually quite bogus.
+ * It would be fine if we were the only thing in the system
+ * using the CCNT register for timing, but we aren't and only
+ * one "thing" can use this at a time.
+ */
+
+#define NVALS 20
+
+static void
+check_clock ( void )
+{
+	int vals[NVALS];
+	int i;
+	int secs;
+	int delay = 1000;
+
+	secs = NVALS * delay / 1000;
+
+	printf ( "Collecting data for %d seconds\n", secs );
+	for ( i=0; i< NVALS; i++ ) {
+	    reset_ccnt ();
+	    thr_delay ( delay );
+	    vals[i] = r_CCNT ();
+	}
+
+	for ( i=0; i< NVALS; i++ )
+	    printf ( "CCNT for 1 sec: %d\n", vals[i] );
+}
+
+
+static void test_clock ( int count ) {
+	check_clock ();
+}
+
+/* Test gpio on BBB or Orange Pi */
+static void test_gpio ( int count ) { gpio_test (); }
+
+#ifdef BOARD_ORANGE_PI
+/* Test watchdog on Orange Pi */
+static void test_wdog ( int count ) { wd_test (); }
+#endif
+
+#ifdef BOARD_BBB
+
+/* Test adc on BBB */
+static void test_adc ( int count ) { adc_test (); }
+#endif
+
+/* -------------------------------------------- */
+/* Random numbers.
+ */
+
+#define NB 20
+#define MAXB 64
+
+static void
+test_ran ( int count )
+{
+	int i, n, x;
+	char buf[MAXB];
+	int bins[NB];
+
+	gb_init_rand ( 0x163389 );
+
+	for ( i=0; i<20; i++ ) {
+	    printf ( "%d\n", gb_next_rand() );
+	}
+
+	printf ( "More ... " );
+	getline ( buf, MAXB );
+
+	for ( i=0; i<NB; i++ )
+	    bins[i] = 0;
+	x = 0;
+
+	for ( i=0; i<200000; i++ ) {
+	    n = gb_unif_rand(NB);
+	    if ( n < 0 || n >= NB )
+	    	x++;
+	    else
+	    	bins[n]++;
+	}
+
+	for ( i=0; i<NB; i++ ) {
+	    printf ( "%d: %d\n", i, bins[i] );
+	}
+	printf ( "%d: %d\n", 99, x++ );
+}
+
+/* -------------------------------------------- */
+
+static void f_croak ( int junk )
+{
+	printf ( "thr_sort: Gone!\n");
+}
+
+static void f_linger ( int time )
+{
+	/*
+	thr_delay ( time * timer_rate );
+	*/
+	thr_delay_c ( time * timer_rate, f_croak, 0 );
+	printf ( "thr_sort: Exit!\n");
+}
+
+/* This test just verifies that threads get inserted into
+ * the ready list in numerical order.
+ * At first we just left the threads blocked and there
+ * was no way to get rid of them.  Then I got the idea
+ * of using thr_delay to have them go away after a while.
+ *
+ * This exposed a bug (the keyboard no longer worked after
+ * the timeout, well at least not from the prompt, the
+ * CAPS lock would still do a reboot.).  This is only the
+ * case when the CV option is in use for the keyboard, and
+ * when the current thread is not the one delayed.
+ * This bug was fixed 8/22/2002 (it was in thr_unblock)
+ */
+static void
+test_sort ( int count )
+{
+	/*
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 13, TF_BLOCK );
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 18, TF_BLOCK );
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 15, TF_BLOCK );
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 11, TF_BLOCK );
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 17, TF_BLOCK );
+	(void) safe_thr_new ( 0, f_ez, (void *) 0, 22, TF_BLOCK );
+	*/
+
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 13, 0 );
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 18, 0 );
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 15, 0 );
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 11, 0 );
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 17, 0 );
+	(void) safe_thr_new ( 0, f_linger, (void *) 9, 22, 0 );
+}
+
+/* THE END */
