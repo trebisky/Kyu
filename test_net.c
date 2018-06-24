@@ -21,13 +21,8 @@
 #include "malloc.h"
 #include "arch/cpu.h"
 
+#include "tests.h"
 #include "netbuf.h"
-
-struct test {
-	tfptr	func;
-	char	*desc;
-	int	arg;
-};
 
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
@@ -46,12 +41,12 @@ static void test_dhcp ( int );
 static void test_icmp ( int );
 static void test_dns ( int );
 static void test_arp ( int );
-void test_tftp ( int );
+ void test_tftp ( int );
 static void test_udp ( int );
 static void test_netdebug ( int );
 static void test_udp_echo ( int );
-static void test_tcp_echo ( int );
 
+#ifdef notdef
 void
 test_tcp ( int xxx )
 {
@@ -63,8 +58,10 @@ test_tcp ( int xxx )
 	test_kyu_tcp ();
 #endif
 }
+#endif
 
 /* Exported to main test code */
+/* Arguments are now ignored */
 struct test net_test_list[] = {
 	test_netshow,	"Net show",		0,
 	test_netarp,	"ARP ping",		0,
@@ -72,13 +69,11 @@ struct test net_test_list[] = {
 	test_dhcp,	"test DHCP",		0,
 	test_icmp,	"Test ICMP",		0,
 	test_dns,	"Test DNS",		0,
-	test_arp,	"one gratu arp",	1,
-	test_arp,	"8 gratu arp",		8,
+	test_arp,	"gratu arp [n]",	0,
 	test_tftp,	"Test TFTP",		0,
 	test_udp,	"Test UDP",		0,
-	test_tcp,	"Test TCP",		1,
 	test_udp_echo,	"Endless UDP echo",	0,
-	test_tcp_echo,	"Endless TCP echo",	0,
+	// test_tcp,	"Test TCP",		0,
 	test_netdebug,	"Debug interface",	0,
 	0,		0,			0
 };
@@ -122,12 +117,6 @@ static void
 test_dns ( int test )
 {
 	dns_test();
-}
-
-static void
-test_tcp_echo ( int test )
-{
-	tcp_echo_test();
 }
 
 static void

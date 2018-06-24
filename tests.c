@@ -23,9 +23,10 @@
 
 #include "tests.h"
 
-extern struct test net_test_list[];
 extern struct test kyu_test_list[];
 extern struct test io_test_list[];
+extern struct test net_test_list[];
+extern struct test tcp_test_list[];
 
 /* This had turned into a 3000+ line disaster before being broken
  * up into several file in June of 2018.
@@ -141,7 +142,7 @@ submenu ( struct test *test_list, char **wp, int nw )
 {
 	struct test *tp;
 	int nt;
-	int n;
+	int test;
 	int repeat = 1;
 
 	for ( nt = 0, tp = test_list; tp->desc; ++tp )
@@ -153,35 +154,39 @@ submenu ( struct test *test_list, char **wp, int nw )
 	    return;
 	}
 
-	n = atoi ( wp[1] );
+	test = atoi ( wp[1] );
 
 	/* We allow a repeat for the regression suite */
 	if ( nw == 3 )
 	    repeat = atoi ( wp[2] );
 
 	/* only run all tests for the regression test suite */
-	if ( n == 0 && test_list == kyu_test_list ) {
+	if ( test == 0 && test_list == kyu_test_list ) {
 	    all_tests ( repeat );
 	    return;
 	}
 
-	if ( n < 1 || n > nt ) {
+	if ( test < 1 || test > nt ) {
 	    printf ( " ... No such test.\n" );
 	    return;
 	}
 
+	tp = &test_list[test-1];
+
 	/* It is easy to run a single test if this is
 	 * not the regression suite.
-	 * This ignores any repeat.
+	 * we pass the repeat count to the test,
+	 *  which in most cases ignores it.
 	 */
 	if ( test_list != kyu_test_list ) {
-	    (*test_list[n-1].func) ( test_list[n-1].arg );
+	    // (*tp->func) ( test_list[test-1].arg );
+	    (*tp->func) ( repeat );
 	    return;
 	}
 
 	/* run single test for regression case ...
 	 */
-	single_regression ( &test_list[n-1], n, repeat );
+	single_regression ( tp, test, repeat );
 }
 
 static void
@@ -237,10 +242,10 @@ tester ( void )
 	    	reset_cpu ();
 	    }
 
-	    /* Show threads.
+	    /* Show threads (l = "list")
 	     * this gets used a lot too
 	     */
-	    if ( **wp == 't' && nw == 1 ) {
+	    if ( **wp == 'l' && nw == 1 ) {
 	    	thr_show ();
 	    }
 
@@ -266,30 +271,12 @@ tester ( void )
 	     */
 	    if ( **wp == 'n' )
 		submenu ( net_test_list, wp, nw );
+
+	    if ( **wp == 't' )
+		submenu ( tcp_test_list, wp, nw );
 #endif
 	    if ( **wp == 'y' ) {
 		kyu_debugger ();
-	    }
-
-/* On the Orange Pi there is SRAM at 0-0xffff.
- * also supposed to be at 0x44000 to 0x4Bfff (I see this)
- * also supposed to be at 0x10000 to 0x1afff, but not for me.
- */
-	    if ( **wp == 'l' ) {
-		printf ( "Memory test\n" );
-		mem_verify ( 0x0, 0x10000 );
-	    }
-
-	    if ( **wp == 'm' ) {
-		/* Orange Pi SRAM A1 */
-		printf ( "Memory test 0 to 0x10000\n" );
-		mem_test ( 0x0, 0x10000 );
-		/* Orange Pi SRAM A2 */
-		printf ( "Memory test 0x44000 to 0x4C000\n" );
-		mem_test ( 0x44000, 0x4c000 );
-		/* Orange Pi SRAM C */
-		printf ( "Memory test 0x10000 to 0x20000\n" );
-		mem_test ( 0x10000, 0x20000 );
 	    }
 
 	    /* Dump without ram safety check */

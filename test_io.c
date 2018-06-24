@@ -23,8 +23,6 @@
 
 #include "tests.h"
 
-static int timer_rate;	/* ticks per second */
-
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 /* IO tests -- anything that should not be run in a loop */
@@ -58,19 +56,23 @@ static void test_wdog ( int );
 static void test_cores ( int );
 static void test_thermal ( int );
 static void test_uart ( int );
+static void test_ram1 ( int );
+static void test_ram2 ( int );
 #endif
 
 static void test_clear ( int );
 static void test_blink ( int );
+static void test_blink_s ( int );
 static void test_blink_d ( int );
 
 /* Here is the IO test menu */
+/* arguments are now ignored */
 
 struct test io_test_list[] = {
-	test_sort,	"Thread sort test",	5,
+	test_sort,	"Thread sort test",	0,
 	test_ran,	"Random test",		0,
 	test_malloc,	"malloc test",		0,
-	test_wait,	"wait for 5 seconds",	0,
+	test_wait,	"wait for [n] seconds",	0,
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
@@ -88,10 +90,12 @@ struct test io_test_list[] = {
 	test_cores,	"Opi cores test",	0,
 	test_thermal,	"H3 thermal test",	0,
 	test_uart,	"uart test",		0,
+	test_ram1,	"Opi low ram test",	0,
+	test_ram2,	"Opi ram test",		0,
 #endif
 
 	test_blink,	"start LED blink test",	0,
-	test_blink,	"stop LED blink test",	1,
+	test_blink_s,	"stop LED blink test",	0,
 	test_blink_d,	"LED blink test (via delay)",	0,
 
 	test_clear,	"clear memory test",	0,
@@ -100,6 +104,33 @@ struct test io_test_list[] = {
 };
 
 /* -------------------------------------------- */
+
+/* On the Orange Pi there is SRAM at 0-0xffff.
+ * also supposed to be at 0x44000 to 0x4Bfff (I see this)
+ * also supposed to be at 0x10000 to 0x1afff, but not for me.
+ */
+
+/* I swear this worked once on the Orange Pi */
+static void
+test_ram1 ( int xxx )
+{
+	printf ( "Memory test - verify 0 to 0x10000\n" );
+	mem_verify ( 0x0, 0x10000 );
+}
+
+static void
+test_ram2 ( int xxx )
+{
+	/* Orange Pi SRAM A1 */
+	printf ( "Memory test 0 to 0x10000\n" );
+	mem_test ( 0x0, 0x10000 );
+	/* Orange Pi SRAM A2 */
+	printf ( "Memory test 0x44000 to 0x4C000\n" );
+	mem_test ( 0x44000, 0x4c000 );
+	/* Orange Pi SRAM C */
+	printf ( "Memory test 0x10000 to 0x20000\n" );
+	mem_test ( 0x10000, 0x20000 );
+}
 
 static void
 test_malloc ( int xxx )
@@ -117,14 +148,15 @@ test_malloc ( int xxx )
 	memset ( p, 0, 1024 );
 }
 
-/* Wait for 5 seconds */
+/* Wait for N seconds */
 /* This runs in its own thread,
  * which can be interesting.
  */
 static void
-test_wait ( int xxx )
+test_wait ( int secs )
 {
-	thr_delay ( 5 * timer_rate );
+	printf ( "Waiting ...\n" );
+	thr_delay ( secs * timer_rate_get() );
 	printf ( "Done waiting\n" );
 }
 
@@ -399,16 +431,23 @@ test_clear ( int arg )
 
 static struct thread *blink_tp;
 
+/* start the blink */
 static void
-test_blink ( int arg )
+test_blink ( int xxx )
 {
-	if ( arg == 0 ) {
-	    printf ( "Start the blink\n" );
-	    blink_tp = thr_new_repeat ( "blinker", led_blinker, 0, 10, 0, BLINK_RATE );
-	} else {
-	    printf ( "Stop the blink\n" );
-	    thr_repeat_stop ( blink_tp );
-	}
+	printf ( "Start the blink\n" );
+	blink_tp = thr_new_repeat ( "blinker", led_blinker, 0, 10, 0, BLINK_RATE );
+
+	led_norm ();
+}
+
+/* stop the blink */
+static void
+test_blink_s ( int xxx )
+{
+	printf ( "Stop the blink\n" );
+	thr_repeat_stop ( blink_tp );
+
 	led_norm ();
 }
 
@@ -602,9 +641,9 @@ static void f_croak ( int junk )
 static void f_linger ( int time )
 {
 	/*
-	thr_delay ( time * timer_rate );
+	thr_delay ( time * timer_rate_get() );
 	*/
-	thr_delay_c ( time * timer_rate, f_croak, 0 );
+	thr_delay_c ( time * timer_rate_get(), f_croak, 0 );
 	printf ( "thr_sort: Exit!\n");
 }
 
@@ -622,7 +661,7 @@ static void f_linger ( int time )
  * This bug was fixed 8/22/2002 (it was in thr_unblock)
  */
 static void
-test_sort ( int count )
+test_sort ( int xxx )
 {
 	/*
 	(void) safe_thr_new ( 0, f_ez, (void *) 0, 13, TF_BLOCK );

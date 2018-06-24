@@ -43,6 +43,7 @@ OBJS = mq.o \
     tcp_send.o \
     tcp_recv.o \
     tcp_hton.o \
+    kyu_test_tcp.o \
     kyu_glue.o
 
 all: ../tcp_xinu.o
