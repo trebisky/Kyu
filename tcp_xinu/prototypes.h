@@ -1,5 +1,10 @@
-/* NETWORK BYTE ORDER CONVERSION NOT NEEDED ON A BIG-ENDIAN COMPUTER */
+/* NETWORK BYTE ORDER CONVERSION IS NOT NEEDED ON A BIG-ENDIAN COMPUTER */
 
+/* Kyu introduces this ifdef thing because these conflict with
+ * macros in arch/cpu.h  --  and we need to include both files.
+ */
+#ifndef __SWAP_H
+#define __SWAP_H 1
 /* These macros are for a little endian machine */
 #define	htons(x)   ( ( 0xff & ((x)>>8) ) | ( (0xff & (x)) << 8 ) )
 #define	htonl(x)   (  (((x)>>24) & 0x000000ff) | (((x)>> 8) & 0x0000ff00) | \
@@ -7,6 +12,7 @@
 #define	ntohs(x)   ( ( 0xff & ((x)>>8) ) | ( (0xff & (x)) << 8 ) )
 #define	ntohl(x)   (  (((x)>>24) & 0x000000ff) | (((x)>> 8) & 0x0000ff00) | \
 		      (((x)<< 8) & 0x00ff0000) | (((x)<<24) & 0xff000000) )
+#endif /* __SWAP_H */
 
 /* tcp_hton.c */
 extern	void	tcp_hton(struct netpacket *);

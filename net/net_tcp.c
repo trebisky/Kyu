@@ -537,7 +537,6 @@ tcp_rcv ( struct netbuf *nbp )
 	/* At this point, we aren't a gateway, so drop the packet */
 	if ( nbp->iptr->dst != host_info.my_ip ) {
 	    printf ("TCP packet is not for us - dropped\n" );
-	    netbuf_free ( nbp );
 	    return;
 	}
 
@@ -546,14 +545,12 @@ tcp_rcv ( struct netbuf *nbp )
 	    sp = tcp_server_lookup ( nbp );
 	    if ( sp ) {
 		tcp_server_connect ( sp, nbp );
-		netbuf_free ( nbp );
 		return;
 	    } else {
 		/* Tell them to go away */
 		/* - could just silently drop packet */
 		printf ( "Sending TCP rst/ack\n");
 		tcp_reply_rst ( nbp );
-		netbuf_free ( nbp );
 		return;
 	    }
 	}
@@ -562,12 +559,11 @@ tcp_rcv ( struct netbuf *nbp )
 	tp = tcp_io_lookup ( nbp );
 	if ( tp ) {
 	    tcp_io_receive ( tp, nbp );
-	    netbuf_free ( nbp );
 	    return;
 	}
 
 	/* otherwise, silently drop packet */
-	netbuf_free ( nbp );
+	return;
 }
 
 /* Send a RST/ACK packet to make somebody go away */

@@ -38,6 +38,9 @@
 typedef unsigned short __u16;
 typedef unsigned long __u32;
 
+#ifndef __SWAP_H
+#define __SWAP_H 1
+
 #define ___swab16(x) \
         ((__u16)( \
                 (((__u16)(x) & (__u16)0x00ffU) << 8) | \
@@ -55,13 +58,7 @@ typedef unsigned long __u32;
 
 #define htonl(x)        ___swab32(x)
 #define ntohl(x)        ___swab32(x)
-
-/*
-#define __constant_htonl(x) ((__force __be32)___constant_swab32((x)))
-#define __constant_ntohl(x) ___constant_swab32((__force __be32)(x))
-#define __constant_htons(x) ((__force __be16)___constant_swab16((x)))
-#define __constant_ntohs(x) ___constant_swab16((__force __be16)(x))
-*/
+#endif /* __SWAP_H */
 
 #ifdef notdef
 /* ARM v7 now has actual barrier instructions, but these work for

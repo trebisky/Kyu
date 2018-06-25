@@ -10,13 +10,13 @@
  * Tom Trebisky
  */
 
+#include "xinu.h"
+
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
 #include "malloc.h"
-#include "arch/cpu.h"
-
-// #include "netbuf.h"
+// #include "arch/cpu.h"
 
 #define TEST_SERVER     "192.168.0.5"
 #define ECHO_PORT       7       /* echo */
@@ -34,6 +34,24 @@ struct test {
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 
+static void xtest_show ( int );
+static void xtest_client_echo ( int );
+static void xtest_client_daytime ( int );
+static void xtest_tcp_echo ( int );
+
+/* Exported to main test code */
+/* Arguments are now ignored */
+struct test tcp_test_list[] = {
+	xtest_show,		"Show TCB table",	0,
+	xtest_client_echo,	"Echo client [n]",	0,
+	xtest_client_daytime,	"Daytime client [n]",	0,
+	xtest_tcp_echo,		"Endless TCP echo",	0,
+	0,		0,			0
+};
+
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+
 static unsigned long
 dots2ip ( char *s )
 {
@@ -43,21 +61,41 @@ dots2ip ( char *s )
 	return ntohl ( nip );
 }
 
-/* ---------------------------------------------------------------------- */
-/* ---------------------------------------------------------------------- */
+static void
+xtest_show ( int xxx )
+{
+	struct tcb *tp;
+	int i;
+	int count;
 
-static void xtest_client_echo ( int );
-static void xtest_client_daytime ( int );
-static void xtest_tcp_echo ( int );
+	count = 0;
+	for (i = 0; i < Ntcp; i++) {
+	    if (tcbtab[i].tcb_state == TCB_FREE) {
+		count++;
+		continue;
+	    }
 
-/* Exported to main test code */
-/* Arguments are now ignored */
-struct test tcp_test_list[] = {
-	xtest_client_echo,	"Echo client [n]",	0,
-	xtest_client_daytime,	"Daytime client [n]",	0,
-	xtest_tcp_echo,		"Endless TCP echo",	0,
-	0,		0,			0
-};
+	    tp = &tcbtab[i];
+	    if ( tp->tcb_state == TCB_LISTEN )
+		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
+	    else if ( tp->tcb_state == TCB_ESTD )
+		printf ( "TCB slot %d: Established %d (%d)\n", i, tp->tcb_lport, tp->tcb_rport );
+	    else if ( tp->tcb_state == TCB_CLOSED )
+		printf ( "TCB slot %d: Closed\n", i );
+	    else if ( tp->tcb_state == TCB_CWAIT )
+		printf ( "TCB slot %d: Close wait\n", i );
+	    else if ( tp->tcb_state == TCB_TWAIT )
+		printf ( "TCB slot %d: TWAIT\n", i );
+	    else if ( tp->tcb_state == TCB_SYNSENT )
+		printf ( "TCB slot %d: SYNSENT\n", i );
+	    else
+		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
+        }
+	printf ( "%d TCB slots free\n", count );
+
+	xinu_memb_stats ();
+	netbuf_show ();
+}
 
 static void
 xtest_tcp_echo ( int test )
@@ -65,12 +103,25 @@ xtest_tcp_echo ( int test )
 	printf ( "Not ready yet\n" );
 }
 
+/* There are examples of Xinu clients and servers in
+ *  the shell directory:
+ *
+ *   xsh_tcpclient_big.c
+ *   xsh_tcpclient.c
+ *   xsh_tcpserver_big.c
+ *   xsh_tcpserver.c
+ */
+
 /* This requires a daytime server running on port 13
  * ( on TEST_SERVER -- likely the boot host).
  * To run this on fedora:
  *  dnf install xinetd
  *  edit /etc/xinet.d/daytime-stream to enable
  *  systemctl start  xinetd.service
+ *
+ * This consumes slots.  6-24-2018
+ * This ends up in TCB_CLOSED state and stays
+ * there forever.
  */
 static char *
 client_daytime ( void )
@@ -118,6 +169,10 @@ xtest_client_daytime ( int count )
  *  (change disable to no)
  *  systemctl restart  xinetd.service
  *  test using "telnet localhost 7"
+ *
+ * This seems to work perfectly.  6-24-2018
+ * The TCB ends up in TWAIT, then after the finwait
+ * timeout expires, the TCB becomes free.
  */
 static void
 client_echo ( void )
@@ -134,24 +189,27 @@ client_echo ( void )
 	    return;
 	}
 
-	printf ( "Client connection on port %d, slot = %d\n", port, slot );
+	// printf ( "Client connection on port %d, slot = %d\n", port, slot );
 	tcp_send ( slot, "Duck!\r\n", 6 );
 	n = tcp_recv ( slot, buf, 100 );
-	printf ( "Client recv returns %d bytes\n", n );
+	//printf ( "Client recv returns %d bytes\n", n );
 	buf[n] = '\0';
-	printf ( "Client recv got %s\n", buf );
+	// printf ( "Client recv got %s\n", buf );
+	printf ( "%s\n", buf );
 
 	tcp_send ( slot, "Duck!\r\n", 6 );
 	n = tcp_recv ( slot, buf, 100 );
-	printf ( "Client recv returns %d bytes\n", n );
+	//printf ( "Client recv returns %d bytes\n", n );
 	buf[n] = '\0';
-	printf ( "Client recv got %s\n", buf );
+	// printf ( "Client recv got %s\n", buf );
+	printf ( "%s\n", buf );
 
 	tcp_send ( slot, "Goose!\r\n", 6 );
 	n = tcp_recv ( slot, buf, 100 );
-	printf ( "Client recv returns %d bytes\n", n );
+	//printf ( "Client recv returns %d bytes\n", n );
 	buf[n] = '\0';
-	printf ( "Client recv got %s\n", buf );
+	// printf ( "Client recv got %s\n", buf );
+	printf ( "%s\n", buf );
 
 	// replies are terminated with \r\n
 	// printf ( "Client %02x\n", buf[n-2] );
@@ -160,13 +218,24 @@ client_echo ( void )
 	tcp_close ( slot );
 }
 
+/* When in a loop, this makes 4 connections per second.
+ * with a 5 second finwait, this will yield 20 connections
+ * in FINWAIT, which should work.
+ * Bumping it up to 10 per second, will yield 50 in FINWAIT.
+ * (this did not work)
+ */
 static void
 xtest_client_echo ( int count )
 {
 	int i;
 
 	for ( i=0; i<count; i++ ) {
+	    if ( count > 1 )
+		printf ( "Echo %d\n", i );
 	    client_echo ();
+	    // thr_delay ( 250 );
+	    thr_delay ( 200 );
+	    // thr_delay ( 100 );
 	}
 }
 

@@ -9,8 +9,37 @@
 #include "kyu.h"
 #include "thread.h"
 #include "../net/net.h"
+#include "../arch/cpu.h"
 
 static void xinu_memb_init ( void );
+void xinu_memb_stats ( void );
+
+/* Make this a tuneable parameter.
+ * The "proper" value is 120 seconds !!
+ * Linux uses 15 seconds, and that is our default.
+ *
+ * Making this tuneable allows shorter values to be set,
+ * which may make sense for devices that only operate
+ * on a fast LAN.  Long values tie up TCB entries and
+ * thus limit the number of open connections, and ultimately
+ * limit the number of connections per second that can
+ * be made.   Short values and a big TCB table are
+ * the only solution if a high connection rate is needed.
+ * Note that the freemem buffers are not tied up when
+ * a connection is in finwait.
+ *
+ * For some crazy reason all the calls were shifting it by 1,
+ * making the actual timeout 30 seconds.
+ * I do away with that confusing nonsense.
+ */
+// int finwait_ms = TCP_MSL<<1;
+int finwait_ms = TCP_MSL;
+
+void
+set_finwait ( int secs )
+{
+	finwait_ms = secs * 1000;
+}
 
 /* See timer.c */
 static void
@@ -24,17 +53,23 @@ xinu_timer ( void )
 void
 tcp_xinu_init ( void )
 {
-	char xx[] = "dog\n";
-	int *lp;
-
 	xinu_memb_init ();
+
+	xinu_memb_stats ();
+	netbuf_show ();
+
+	set_finwait ( 5 );
 
 	net_timer_hookup ( xinu_timer );
 
 	tcp_init ();
 
+#ifdef notdef
+	char xx[] = "dog\n";
+	int *lp;
 	lp = (int *) &xx[0];
 	printf ("%s -- %08x %08x\n", xx, xx, *lp );
+#endif
 }
 
 static void
@@ -81,8 +116,10 @@ tcp_xinu_rcv ( struct netbuf *nbp )
  *  once the driver has done whatever it wants to do.
  *
  * On 6-21-2018, this replaced get_netpacket()
+ * As of 6-24-2018, we directly call netbuf_alloc()
  */
 
+#ifdef notdef
 struct netbuf *
 net_alloc ( void )
 {
@@ -91,6 +128,7 @@ net_alloc ( void )
 	nbp = netbuf_alloc ();
 	return nbp;
 }
+#endif
 
 /* This is where Xinu tcp code sends packets to hand them off to Kyu */
 void
@@ -121,7 +159,7 @@ net_enqueue ( struct netbuf *nbp )
 #ifdef notdef
 /* This is where Xinu tcp code sends packets to hand them off to Kyu */
 void
-ip_enqueue ( struct netpacket *pkt ) 
+ip_enqueue_OLD ( struct netpacket *pkt ) 
 {
 	struct netbuf *nbp;
 	unsigned short cksum;
@@ -159,7 +197,7 @@ ip_enqueue ( struct netpacket *pkt )
  *  once the driver has done whatever it wants to do.
  */
 struct netpacket *
-get_netpacket ( void )
+get_netpacket_OLD ( void )
 {
 	struct netbuf *nbp;
 
@@ -171,16 +209,14 @@ get_netpacket ( void )
 	}
 	return NULL;
 }
-#endif
 
-#ifdef notdef
 /* This whole idea was broken anyway.
  * This is called only in tcp_in() and we now have all
  * those calls commented out.  Kyu will free any input packets
  * after we return from tcp_in().
  */
 void
-free_netpacket ( struct netpacket *pkt )
+free_netpacket_OLD ( struct netpacket *pkt )
 {
 	struct netbuf *nbp;
 
@@ -193,7 +229,6 @@ free_netpacket ( struct netpacket *pkt )
 	netbuf_free ( nbp );
 }
 #endif
-
 
 int
 semcreate ( int arg )
@@ -220,13 +255,15 @@ semcreate ( int arg )
  * of a fixed size (65535).  I just hand out blocks of 65536
  * since that is a nice round number.
  * We get 16 of these per megabyte.
+ * We need two per TCB control block, so with Ntcp = 100, we need 200
+ *  which consumes 200/16 = 12.5 megabytes.
  */
 
 #define XINU_BSIZE 65536
-#define XINU_BCOUNT 4*16
 
 static char *memb_head;
 static int memb_count;
+static int memb_limit;
 
 static void xinu_memb_show ( int );
 
@@ -235,20 +272,38 @@ xinu_memb_init ( void )
 {
 	char * buf;
 	int i;
+	int bcount = Ntcp * 2 + 2;
 
-	buf = (char *) ram_alloc ( XINU_BCOUNT * XINU_BSIZE );
+	buf = (char *) ram_alloc ( bcount * XINU_BSIZE );
 
 	/* Create linked list */
 	memb_head = (char *) 0;
 	memb_count = 0;
-	for ( i=0; i < XINU_BCOUNT; i++ ) {
+	for ( i=0; i < bcount; i++ ) {
 	    * (char **) buf = memb_head;
 	    memb_head = buf;
 	    buf += XINU_BSIZE;
 	    memb_count++;
 	}
+	memb_limit = memb_count;
 
-	xinu_memb_show ( 8 );
+	// xinu_memb_show ( 8 );
+}
+
+/* Called from test menu */
+void
+xinu_memb_stats ( void )
+{
+	int count;
+	char * next;
+
+	count = 0;
+	next = memb_head;
+	while ( next ) {
+	    count++;
+	    next = * (char **) next;
+	}
+	printf ( "MEMB: %d available of %d\n", count, memb_limit );
 }
 
 static void
@@ -265,6 +320,7 @@ xinu_memb_show ( int limit )
 	}
 }
 
+/* XXX - the following need locks */
 char *
 kyu_getmem ( uint32 nbytes )
 {
@@ -295,108 +351,5 @@ kyu_freemem ( char *buf, uint32 xxx_nbytes )
 	memb_count++;
 	return OK;
 }
-
-void
-xinu_show ( void )
-{
-	int i;
-	struct tcb *tp;
-
-	for (i = 0; i < Ntcp; i++) {
-	    if (tcbtab[i].tcb_state == TCB_FREE)
-		continue;
-
-	    tp = &tcbtab[i];
-	    if ( tp->tcb_state == TCB_LISTEN )
-		printf ( "TCB slot %d: Listen on port %d\n", i, tp->tcb_lport );
-	    else if ( tp->tcb_state == TCB_ESTD )
-		printf ( "TCB slot %d: Established %d (%d)\n", i, tp->tcb_lport, tp->tcb_rport );
-	    else if ( tp->tcb_state == TCB_CLOSED )
-		printf ( "TCB slot %d: Closed\n", i );
-	    else if ( tp->tcb_state == TCB_CWAIT )
-		printf ( "TCB slot %d: Close wait\n", i );
-	    else if ( tp->tcb_state == TCB_TWAIT )
-		printf ( "TCB slot %d: TWAIT\n", i );
-	    else if ( tp->tcb_state == TCB_SYNSENT )
-		printf ( "TCB slot %d: SYNSENT\n", i );
-	    else
-		printf ( "TCB slot %d: state = %d\n", i, tp->tcb_state );
-        }
-}
-
-#ifdef notdef
-/* Without the pragma, this is 1516 bytes in size
- * with it, the size is 1514.
- * The pragma (in this case) only affects the overall size of
- *  the structure.  The packing of elements inside is the same
- *  with or without it.
- * Notice that 1516 = 379 * 4
- */
-
-#pragma pack(2)
-// struct	netpacket	{
-struct	netpk	{
-	byte	net_ethdst[ETH_ADDR_LEN];/* Ethernet dest. MAC address	*/
-	byte	net_ethsrc[ETH_ADDR_LEN];/* Ethernet source MAC address	*/
-	uint16	net_ethtype;		/* Ethernet type field		*/
-	byte	net_ipvh;		/* IP version and hdr length	*/
-	byte	net_iptos;		/* IP type of service		*/
-	uint16	net_iplen;		/* IP total packet length	*/
-	uint16	net_ipid;		/* IP datagram ID		*/
-	uint16	net_ipfrag;		/* IP flags & fragment offset	*/
-	byte	net_ipttl;		/* IP time-to-live		*/
-	byte	net_ipproto;		/* IP protocol (actually type)	*/
-	uint16	net_ipcksum;		/* IP checksum			*/
-	uint32	net_ipsrc;		/* IP source address		*/
-	uint32	net_ipdst;		/* IP destination address	*/
-	union {
-	 struct {
-	  uint16 	net_udpsport;	/* UDP source protocol port	*/
-	  uint16	net_udpdport;	/* UDP destination protocol port*/
-	  uint16	net_udplen;	/* UDP total length		*/
-	  uint16	net_udpcksum;	/* UDP checksum			*/
-	  byte		net_udpdata[1500-28];/* UDP payload (1500-above)*/
-	 };
-	 struct {
-	  byte		net_ictype;	/* ICMP message type		*/
-	  byte		net_iccode;	/* ICMP code field (0 for ping)	*/
-	  uint16	net_iccksum;	/* ICMP message checksum	*/
-	  uint16	net_icident; 	/* ICMP identifier		*/
-	  uint16	net_icseq;	/* ICMP sequence number		*/
-	  byte		net_icdata[1500-28];/* ICMP payload (1500-above)*/
-	 };
-	 struct {
-	  uint16	net_tcpsport;	/* TCP Source port		*/
-	  uint16	net_tcpdport;	/* TCP destination port		*/
-	  int32		net_tcpseq;	/* TCP sequence no.		*/
-	  int32		net_tcpack;	/* TCP acknowledgement sequence	*/
-	  uint16	net_tcpcode;	/* TCP flags			*/
-	  uint16	net_tcpwindow;	/* TCP receiver window		*/
-	  uint16	net_tcpcksum;	/* TCP checksum			*/
-	  uint16	net_tcpurgptr;	/* TCP urgent pointer		*/
-	  byte		net_tcpdata[1500-40];/* TCP payload		*/
-	 };
-	};
-	// uint32		zzz;
-};
-#pragma pack()
-
-void
-net_inspect ( void )
-{
-	struct netpk *np;
-
-	np = (struct netpk *) 0;
-
-	printf ( "netpacket is %d bytes\n", sizeof(struct netpk) );
-	printf ( " start: %08x\n", np->net_ethdst );
-	printf ( " ethtype: %08x\n", &np->net_ethtype );
-	printf ( " ipvh: %08x\n", &np->net_ipvh );
-	printf ( " iptos: %08x\n", &np->net_iptos );
-	printf ( " iplen: %08x\n", &np->net_iplen );
-	printf ( " ipdst: %08x\n", &np->net_ipdst );
-	//printf ( " zzz: %08x %d\n", &np->zzz, &np->zzz );
-}
-#endif
 
 /* THE END */

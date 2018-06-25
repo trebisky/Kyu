@@ -17,11 +17,12 @@ struct netbuf *tcpalloc(
 
 	/* Allocate a buffer for a TCB */
 #ifdef KYU
-	nbp = (struct netbuf *) net_alloc ();
-	pkt = (struct netpacket *) nbp->eptr;
+	nbp = (struct netbuf *) netbuf_alloc ();
 	// pkt = (struct netpacket *) get_netpacket ();
+	pkt = (struct netpacket *) nbp->eptr;
+	// printf ( "TCPalloc: nbp, pkt = %08x  %08x\n", nbp, pkt );
 #else
-	pkt = (struct netpacket *)getbuf(netbufpool);
+	// pkt = (struct netpacket *)getbuf(netbufpool);
 #endif
 
 	/* Set Ethernet type */

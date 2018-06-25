@@ -13,6 +13,14 @@
 
 /* Format of an Ethernet packet carrying IPv4 and UDP */
 
+/* Kyu - tjt - Without the pragma, this is 1516 bytes in size
+ * with it, the size is 1514.
+ * The pragma (in this case) only affects the overall size of
+ *  the structure.  The packing of elements inside is the same
+ *  with or without it.
+ * Notice that 1516 = 379 * 4
+ */
+
 #pragma pack(2)
 struct	netpacket	{
 	byte	net_ethdst[ETH_ADDR_LEN];/* Ethernet dest. MAC address	*/

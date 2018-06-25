@@ -2,6 +2,8 @@
 
 #include <xinu.h>
 
+extern int finwait_ms;	/* Kyu */
+
 /*------------------------------------------------------------------------
  *  tcpfin1  -  Handle an incoming segment in the FIN1 state
  *------------------------------------------------------------------------
@@ -35,7 +37,8 @@ int32	tcpfin1(
 		/*     connection is closed and TCB can expire	*/
 
 		// printf ( "Twait from fin1\n" );
-		tcptmset (TCP_MSL << 1, tcbptr, TCBC_EXPIRE);
+		// tcptmset (TCP_MSL << 1, tcbptr, TCBC_EXPIRE);
+		tcptmset (finwait_ms, tcbptr, TCBC_EXPIRE);
 		tcbptr->tcb_state = TCB_TWAIT;
 	} else if (rfin)
 

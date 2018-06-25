@@ -88,10 +88,10 @@ ip_rcv ( struct netbuf *nbp )
 	} else if ( ipp->proto == IPPROTO_TCP ) {
 #ifdef WANT_TCP_XINU
 	    tcp_xinu_rcv ( nbp );
-	    /* Don't free the net_buf here */
+	    netbuf_free ( nbp );
 #else
 	    tcp_rcv ( nbp );
-	    /* Don't free the net_buf here */
+	    netbuf_free ( nbp );
 #endif
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",

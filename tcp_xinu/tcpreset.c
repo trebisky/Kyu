@@ -24,7 +24,7 @@ int32	tcpreset(
 	/* Allocate a buffer */
 #ifdef KYU
 	// pkt = (struct netpacket *) get_netpacket ();
-	nbp = (struct netbuf *) net_alloc ();
+	nbp = (struct netbuf *) netbuf_alloc ();
 	pkt = (struct netpacket *) nbp->eptr;
 #else
 	pkt = (struct netpacket *)getbuf(netbufpool);

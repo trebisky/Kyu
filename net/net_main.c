@@ -465,10 +465,6 @@ net_show ( void )
 	netbuf_show ();
 	arp_show ();
 	dns_cache_show ();
-
-#ifdef WANT_TCP_XINU
-	xinu_show ();
-#endif
 }
 
 /* ----------------------------------------- */
@@ -590,20 +586,27 @@ netbuf_init ( void )
 	netbuf_show ();
 }
 
-void
-netbuf_show ( void )
+int
+netbuf_count ( void )
 {
 	int count = 0;
 	struct netbuf *ap;
-
-	printf ( "Netbuf head shows: %08x\n", free );
 
 	for ( ap = free; ap; ap = ap->next ) {
 	    count++;
 	    if ( count > (NUM_NETBUF+10) )	/* XXX */
 		break;
 	}
+	return count;
+}
 
+void
+netbuf_show ( void )
+{
+	int count = 0;
+
+	printf ( "Netbuf head shows: %08x\n", free );
+	count = netbuf_count ();
 	printf ( "%d buffers free of %d\n", count, NUM_NETBUF );
 }
 
@@ -618,6 +621,8 @@ netbuf_alloc ( void )
 	rv = netbuf_alloc_i ();
 	INT_unlock;
 
+	// printf ( "NETbuf_alloc: %08x\n", rv );
+
 	return rv;
 }
 
@@ -630,8 +635,10 @@ netbuf_alloc_i ( void )
 	struct netbuf *rv;
 	struct netbuf **nbpt;
 
-	if ( ! free )
-	    return (struct netbuf *) 0;
+	if ( ! free ) {
+	    panic ( "We just flat ran out of netbufs !!" );
+	    // return (struct netbuf *) 0;
+	}
 
 	rv = free;
 	free = free->next;
@@ -653,6 +660,9 @@ netbuf_alloc_i ( void )
 	    panic ( "Bad alignment for netbuf" );
 #endif
 
+	// This causes nasty slowdowns
+	// printf ( "NETbuf_alloc_i: %08x\n", rv );
+
 	return rv;
 }
 
@@ -662,12 +672,20 @@ netbuf_alloc_i ( void )
 void
 netbuf_free ( struct netbuf *old )
 {
-	old->refcount--;
-	if ( old->refcount > 0 )
-	    return;
+	// int count = netbuf_count ();
+	// printf ( "NETBUF_free: %08x, ref= %d", old, old->refcount );
 
+	old->refcount--;
+	if ( old->refcount > 0 ) {
+	    // printf ( "\n" );
+	    return;
+	}
+
+	// printf ( " (%d --> %d free)\n", count, count+1 );
+    	INT_lock;
 	old->next = free;
 	free = old;
+    	INT_unlock;
 }
 
 /* ------------------------------------------- */
