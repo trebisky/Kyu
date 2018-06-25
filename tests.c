@@ -28,16 +28,18 @@ extern struct test io_test_list[];
 extern struct test net_test_list[];
 extern struct test tcp_test_list[];
 
-/* This had turned into a 3000+ line disaster before being broken
+/* This file had turned into a 3000+ line disaster before being broken
  * up into several file in June of 2018.
- * Now we have one main "menu" and 3 submenus,
+ * Now we have one main "menu" and several submenus,
  * each collected into its own file.
  */
 
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+
 struct test_info {
 	tfptr func;
-	int arg;
-	struct sem *sem;
+	int arg;	/* only used for regression tests */
 	int times;
 };
 
@@ -46,7 +48,7 @@ struct test_info {
  *  It repeats the test as indicated.
  */
 static void
-wrapper ( int arg )
+r_wrapper ( int arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
 	int i;
@@ -56,37 +58,7 @@ wrapper ( int arg )
 	}
 }
 
-static struct test_info info;
-
-/* Used only for a single regression test */
-static void
-single_test ( struct test *tp, int repeat )
-{
-	/* Having this on the stack, calling a thread,
-	 * then returning from this function is very bad,
-	 * if the thread we pass it to expects this data
-	 * to be stable.
-	 */
-	// struct test_info info;
-
-	info.func = tp->func;
-	info.arg = tp->arg;
-	info.times = repeat;
-
-	(void) safe_thr_new ( "wrapper", wrapper, (void *) &info, PRI_WRAP, 0 );
-
-/* This nice synchronization does not give us
- * the desired result when a thread faults.
- * So we launch the test and return to the
- * command line.
- */
-#ifdef notdef
-	/* Or we could do a join */
-	sem_block ( info.sem );
-	sem_destroy ( info.sem );
-#endif
-}
-
+static struct test_info r_info;
 
 /* Run a single regression test, perhaps with looping
  */
@@ -104,9 +76,37 @@ single_regression ( struct test *tp, int n, int repeat )
 	    set_delay_user ();
 	}
 
-	single_test ( tp, repeat );
+	/* Having this on the stack, calling a thread,
+	 * then returning from this function is very bad,
+	 * if the thread we pass it to expects this data
+	 * to be stable.
+	 */
+	// struct test_info r_info;
+
+	r_info.func = tp->func;
+	r_info.arg = tp->arg;
+	r_info.times = repeat;
+
+	(void) safe_thr_new ( "r_wrapper", r_wrapper, (void *) &r_info, PRI_WRAP, 0 );
+
+/* This nice synchronization does not give us
+ * the desired result when a thread faults.
+ * So we launch the test and return to the
+ * command line.
+ */
+#ifdef notdef
+	/* Or we could do a join */
+	sem_block ( r_info.sem );
+	sem_destroy ( r_info.sem );
+#endif
 }
 
+/* For regression tests only.
+ * Note that this does not run each in its own thread.
+ * The idea is that if a given test is giving trouble,
+ * It should be run by itself, which would be done in
+ * a dedicated thread.
+ */
 static void
 all_tests ( int repeat )
 {
@@ -122,6 +122,9 @@ all_tests ( int repeat )
 	    }
 }
 
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+
 static void
 help_tests ( struct test *tp, int nt )
 {
@@ -135,6 +138,30 @@ help_tests ( struct test *tp, int nt )
 	    printf ( "Test %2d: %s\n", i+1, tp->desc );
 	    ++tp;
 	}
+}
+
+/* This gets launched as a thread to run each test
+ *  when they are being selected one at a time.
+ *  The test will do its own repeats if it implements that.
+ */
+static void
+n_wrapper ( int arg )
+{
+	struct test_info *ip = (struct test_info *) arg;
+
+	(*ip->func) ( ip->times );
+}
+
+static struct test_info n_info;
+
+static void
+run_test ( struct test *tp, int repeat )
+{
+	n_info.func = tp->func;
+	n_info.times = repeat;
+
+	// (*tp->func) ( repeat );
+	(void) safe_thr_new ( "n_wrapper", n_wrapper, (void *) &n_info, PRI_WRAP, 0 );
 }
 
 static void
@@ -180,7 +207,8 @@ submenu ( struct test *test_list, char **wp, int nw )
 	 */
 	if ( test_list != kyu_test_list ) {
 	    // (*tp->func) ( test_list[test-1].arg );
-	    (*tp->func) ( repeat );
+	    // (*tp->func) ( repeat );
+	    run_test ( tp, repeat );
 	    return;
 	}
 
@@ -188,6 +216,9 @@ submenu ( struct test *test_list, char **wp, int nw )
 	 */
 	single_regression ( tp, test, repeat );
 }
+
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
 
 static void
 main_help ( void )
@@ -198,14 +229,16 @@ main_help ( void )
 	printf ( "k [num] [repeat] - Kyu thread regression tests.\n" );
 	printf ( "i [num] - IO test menu.\n" );
 	printf ( "n [num] - Network test menu.\n" );
-	printf ( " .. and much more.\n" );
+	printf ( "t [num] - TCP test menu.\n" );
 }
 
 #define MAXB	64
 #define MAXW	4
 
-static void
-tester ( void )
+/* This normally gets run as the test thread.
+ */
+void
+test_main ( int xx )
 {
 	char buf[MAXB];
 	char *wp[MAXW];
@@ -314,70 +347,7 @@ tester ( void )
 	    	thr_show_name ( wp[1] );
 	    }
 
-#ifdef notdef
-	    /* Run a test or tests */
-	    if ( **wp == 't' && nw > 1 ) {
-		n = atoi ( wp[1] );
-
-		nl = 1;
-		if ( nw == 3 )
-		    nl = atoi ( wp[2] );
-		if ( nl < 1 )
-		    nl = 1;
-
-		if ( n == 0 && cur_test_list == kyu_test_list ) {
-		    all_tests ( nl );
-		    continue;
-		}
-
-		/* No looping except for standard tests */
-		if ( cur_test_list != kyu_test_list )
-		    nl = 1;
-
-		if ( n < 1 || n > nt ) {
-		    printf ( " ... No such test.\n" );
-		    continue;
-		}
-
-		desc = cur_test_list[n-1].desc;
-		if ( nl > 1 ) {
-		    printf ( "looping test %d (%s), %d times\n", n, desc, nl );
-		    // usual_delay = AUTO_DELAY;
-		    set_delay_auto ();
-		} else {
-		    printf ( "Running test %d (%s)\n", n, desc );
-		    // usual_delay = USER_DELAY;
-		    set_delay_user ();
-		}
-
-		/* run single test, perhaps several times
-		 */
-		single_test ( &cur_test_list[n-1], nl );
-	    }
-#endif
-
-#ifdef notdef
-	    printf ( "%s\n", buf );
-	    for ( i=0; i<nw; i++ ) {
-		printf ("word %d: %s", i+1, wp[i] );
-		p = wp[i];
-		if ( *p >= '0' && *p <= '9' ) {
-		    n = atoi ( p );
-		    printf ( ", val = %d", n );
-		}
-		printf ( "\n" );
-	    }
-#endif
 	}
-}
-
-/* The test thread starts here.
- * wrapper for the above.
- */
-void
-test_main ( int xx )
-{
-	tester ();
 }
 
 /* THE END */

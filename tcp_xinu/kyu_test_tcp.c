@@ -36,17 +36,21 @@ struct test {
 
 static void xtest_show ( int );
 static void xtest_client_echo ( int );
+static void xtest_client_echo2 ( int );
 static void xtest_client_daytime ( int );
-static void xtest_tcp_echo ( int );
+static void xtest_server_daytime ( int );
+static void xtest_server_classic ( int );
 
 /* Exported to main test code */
 /* Arguments are now ignored */
 struct test tcp_test_list[] = {
-	xtest_show,		"Show TCB table",	0,
-	xtest_client_echo,	"Echo client [n]",	0,
-	xtest_client_daytime,	"Daytime client [n]",	0,
-	xtest_tcp_echo,		"Endless TCP echo",	0,
-	0,		0,			0
+	xtest_show,		"Show TCB table",			0,
+	xtest_client_echo,	"Echo client [n]",			0,
+	xtest_client_echo2,	"Echo client (single connection) [n]",	0,
+	xtest_client_daytime,	"Daytime client [n]",			0,
+	xtest_server_daytime,	"Start daytime server",			0,
+	xtest_server_classic,	"Start classic server",			0,
+	0,			0,					0
 };
 
 /* ---------------------------------------------------------------------- */
@@ -97,11 +101,11 @@ xtest_show ( int xxx )
 	netbuf_show ();
 }
 
-static void
-xtest_tcp_echo ( int test )
-{
-	printf ( "Not ready yet\n" );
-}
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+/* Clients */
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
 
 /* There are examples of Xinu clients and servers in
  *  the shell directory:
@@ -222,7 +226,6 @@ client_echo ( void )
  * with a 5 second finwait, this will yield 20 connections
  * in FINWAIT, which should work.
  * Bumping it up to 10 per second, will yield 50 in FINWAIT.
- * (this did not work)
  */
 static void
 xtest_client_echo ( int count )
@@ -234,17 +237,57 @@ xtest_client_echo ( int count )
 		printf ( "Echo %d\n", i );
 	    client_echo ();
 	    // thr_delay ( 250 );
-	    thr_delay ( 200 );
-	    // thr_delay ( 100 );
+	    // thr_delay ( 200 );
+	    thr_delay ( 100 );
 	}
+}
+
+/* Like the above, but makes one connection,
+ * then loops using it.
+ */
+static void
+xtest_client_echo2 ( int repeat )
+{
+	int port = ECHO_PORT;
+	int slot;
+	char buf[100];
+	int n;
+	int i;
+
+	// printf ( "Begin making client connection\n" );
+	slot = tcp_register ( dots2ip(TEST_SERVER), port, 1 );
+	if ( slot < 0 ) {
+	    printf ( "No slot\n" );
+	    return;
+	}
+
+	for ( i=0; i<repeat; i++ ) {
+	    // printf ( "Client connection on port %d, slot = %d\n", port, slot );
+	    tcp_send ( slot, "Salami\r\n", 6 );
+	    n = tcp_recv ( slot, buf, 100 );
+	    //printf ( "Client recv returns %d bytes\n", n );
+	    buf[n] = '\0';
+	    // printf ( "Client recv got %s\n", buf );
+	    printf ( "%d: %s\n", i, buf );
+
+	    // thr_delay ( 100 );
+	    thr_delay ( 50 );
+	}
+
+	tcp_close ( slot );
+	printf ( " Done with echo test\n" );
 }
 
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
+/* Servers */
+/* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 
-/* Callback function to handle the following */
+static int daytime_is_running = 0;
 
+/* Handle each connection to my event style daytime server.
+ */
 static void
 daytime_func ( int slot )
 {
@@ -263,37 +306,54 @@ daytime_func ( int slot )
 /* So traffic is just handled by the network thread and we
  *  have no thread associated with this server.
  */
-
 static void
-test_daytime ( void )
+xtest_server_daytime ( int xxx )
 {
 	int port = DAYTIME_PORT;
 	int rv;
 
+	if ( daytime_is_running ) {
+	    printf ( "Daytime server is already registered on port %d\n", port );
+	    return;
+	}
+
 	rv = tcp_server ( port, daytime_func );
 	printf ( "Listening on port %d via callback (%d)\n", port, rv );
+	daytime_is_running = 1;
 }
 
-/* Original style passive connection */
+/* Original style ( "classic" ) passive connection */
 /* This stays around, blocked in tcp_recv() */
 /* Just use telnet to talk to this, once the connection is made
  * the two strings "cat and dog" should be received.
  *
  * Seems to be working fine as of 6-21-2018
- *
- *  "classic server"
  */
 
+static int classic_is_running = 0;
+
+#define CLASSIC_PORT	1234
+
+/* XXX - would be nice to append newline here ?? */
 static void
-test_server ( int bogus )
+tcp_send_string ( int slot, char *msg )
+{
+	int len = strlen ( msg );
+
+	tcp_send ( slot, msg, len );
+}
+
+static void
+classic_server ( int bogus )
 {
 	int lslot;
 	int cslot;
 	int rv;
-	int port = 1234;
+	int port = CLASSIC_PORT;
 
 	lslot = tcp_register ( 0, port, 0 );
 	printf ( "Server listening on port %d (slot %d)\n", port, lslot );
+	classic_is_running = 1;
 
 	for ( ;; ) {
 	    printf ( "Waiting for connection on port %d\n", port );
@@ -306,46 +366,25 @@ test_server ( int bogus )
 		break;
 	    }
 	    printf ( "Connection on port %d!! rv= %d, slot= %d\n", port, rv, cslot );
-	    tcp_send ( cslot, "dog\n", 4 );
-	    tcp_send ( cslot, "cat\n", 4 );
+	    tcp_send_string ( cslot, "Have a nice day.\n" );
+	    tcp_send_string ( cslot, "And to all a good night\n" );
 	    tcp_close ( cslot );
 	}
+
+	/* Why would it exit */
 	printf ( "Server on port %d exiting !!\n", port );
+	classic_is_running = 0;
 }
 
 static void
-launch_classic_server ( void )
+xtest_server_classic ( int xxx )
 {
-	(void) thr_new ( "xinu_tester", test_server, NULL, 30, 0 );
-}
-
-static int servers_running = 0;
-
-#ifdef notdef
-
-/* Test - active connection to Daytime server */
-/* Sometimes this just locks up in SYNSENT ??!! */
-/* Not anymore ??? */
-
-void
-test_xinu_tcp ( void )
-{
-	/* Test an active client to port 13 */
-	client_daytime ();
-	client_echo ();
-
-	if ( ! servers_running ) {
-	    servers_running = 1;
-
-	    /* This starts a daytime server on port 13 */
-	    test_daytime ();
-
-	    /* This starts a server on port 1234 */
-	    /* This needs to run in a thread */
-	    launch_classic_server ();
-
-	    thr_delay ( 10 );
+	if ( classic_is_running ) {
+	    printf ( "Classic server is already running on port %d\n", CLASSIC_PORT );
+	    return;
 	}
+
+	(void) thr_new ( "xinu_tester", classic_server, NULL, 30, 0 );
 }
-#endif
+
 /* THE END */
