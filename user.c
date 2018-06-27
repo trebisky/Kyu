@@ -49,7 +49,8 @@ user_init ( int xx )
 	timer_rate_set ( 100 );
 #endif
 
-	(void) safe_thr_new ( "test", test_main, (void *)0, PRI_BOSS, 0 );
+	/* Run the test "shell" as the user thread */
+	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_BOSS, 0 );
 
 	/*
 	thr_show();

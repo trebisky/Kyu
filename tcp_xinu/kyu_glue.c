@@ -261,6 +261,8 @@ semcreate ( int arg )
 
 #define XINU_BSIZE 65536
 
+#define MEMB_INIT	(Ntcp * 2 + 2)
+
 static char *memb_head;
 static int memb_count;
 static int memb_limit;
@@ -272,7 +274,7 @@ xinu_memb_init ( void )
 {
 	char * buf;
 	int i;
-	int bcount = Ntcp * 2 + 2;
+	int bcount = MEMB_INIT;
 
 	buf = (char *) ram_alloc ( bcount * XINU_BSIZE );
 
@@ -287,6 +289,9 @@ xinu_memb_init ( void )
 	}
 	memb_limit = memb_count;
 
+	if ( memb_limit != MEMB_INIT )
+	    panic ( "Crazy business in xinu_memb_init" );
+
 	// xinu_memb_show ( 8 );
 }
 
@@ -299,10 +304,19 @@ xinu_memb_stats ( void )
 
 	count = 0;
 	next = memb_head;
+
+	if ( memb_limit != MEMB_INIT ) {
+	    printf ( " Corruption in xinu_memb" );
+	    memb_limit = MEMB_INIT;
+	}
+
 	while ( next ) {
 	    count++;
 	    next = * (char **) next;
+	    if ( count > memb_limit + 10 )
+		break;
 	}
+
 	printf ( "MEMB: %d available of %d\n", count, memb_limit );
 }
 
@@ -311,6 +325,9 @@ xinu_memb_show ( int limit )
 {
 	int count;
 	char * next;
+
+	if ( limit < 1 || limit > MEMB_INIT )
+	    limit = 10;
 
 	count = 0;
 	next = memb_head;

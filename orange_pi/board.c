@@ -266,6 +266,7 @@ board_init ( void )
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
 
 	/* Turn on the green LED */
+	gpio_init ();
 	gpio_led_init ();
 	pwr_on ();
 	wd_init ();

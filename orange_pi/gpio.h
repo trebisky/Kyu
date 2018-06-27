@@ -260,6 +260,9 @@
 #define STATUS_LED	GPIO_A_15
 #define STATUS_LED_NEO	GPIO_A_10
 
+/* They call this a "power button", which is even more misleading */
+#define POWER_BUTTON	GPIO_J_3
+
 /* Aliases for GPIO pins on the Orange Pi 40 pin header.
  * (28 of them)
  */

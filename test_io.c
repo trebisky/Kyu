@@ -58,6 +58,7 @@ static void test_thermal ( int );
 static void test_uart ( int );
 static void test_ram1 ( int );
 static void test_ram2 ( int );
+static void test_button ( int );
 #endif
 
 static void test_clear ( int );
@@ -92,6 +93,7 @@ struct test io_test_list[] = {
 	test_uart,	"uart test",		0,
 	test_ram1,	"Opi low ram test",	0,
 	test_ram2,	"Opi ram test",		0,
+	test_button,	"Opi button",		0,
 #endif
 
 	test_blink,	"start LED blink test",	0,
@@ -130,6 +132,13 @@ test_ram2 ( int xxx )
 	/* Orange Pi SRAM C */
 	printf ( "Memory test 0x10000 to 0x20000\n" );
 	mem_test ( 0x10000, 0x20000 );
+}
+
+/* Test Orange Pi button */
+static void
+test_button ( int xxx )
+{
+	gpio_test_button ();
 }
 
 static void

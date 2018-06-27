@@ -52,6 +52,11 @@
 #define IRQ_PPI_15	31
 
 #define IRQ_UART0	32
+
+#define IRQ_PIO_A	43
+#define IRQ_PIO_E	49
+#define IRQ_PIO_J	77	/* aka pio "L" */
+
 #define IRQ_TIMER0	50
 #define IRQ_EMAC	114	/* Ethernet */
 

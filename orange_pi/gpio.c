@@ -37,6 +37,11 @@ struct h3_gpio {
 	volatile unsigned long data;
 	volatile unsigned long drive[2];
 	volatile unsigned long pull[2];
+	long	_pad[119];
+	volatile unsigned long int_config[4];	/* 0x200 */
+	volatile unsigned long int_control;
+	volatile unsigned long int_status;
+	volatile unsigned long int_debounce;
 };
 
 /* In theory each gpio has 32 pins, but they are actually populated like so.
@@ -65,6 +70,7 @@ static struct h3_gpio * gpio_base[] = {
 #define GPIO_OUTPUT       (1)
 #define GPIO_F2           (2)
 #define GPIO_F3           (3)
+#define GPIO_EINT         (6)
 #define GPIO_DISABLE      (7)
 
 /* GPIO pin pull-up/down config (0-3)*/
@@ -72,6 +78,8 @@ static struct h3_gpio * gpio_base[] = {
 #define GPIO_PULL_UP		(1)
 #define GPIO_PULL_DOWN		(2)
 #define GPIO_PULL_RESERVED	(3)
+
+/* As near as I can tell only PIO A, E, and J can generate interrupts */
 
 /* There are 4 config registers,
  * each with 8 fields of 4 bits.
@@ -132,6 +140,72 @@ gpio_input ( int gpio, int pin )
 	return (gp->data >> pin) & 1;
 }
 
+/* ----------------------------------------------------------- */
+/* ----------------------------------------------------------- */
+
+/* Interrupt modes */
+#define INT_POSEDGE	0
+#define INT_NEGEDGE	1
+#define INT_HIGH	2
+#define INT_LOW		3
+#define INT_DBLEDGE	4
+
+/* Bits in debounce register */
+#define GPIO_CLOCK_24K		0
+#define GPIO_CLOCK_32M		1
+#define GPIO_PRESCALE_SHIFT	4
+/* Prescaler is 3 bits (i.e. values from 0-7) */
+
+/* Interrupt support.  The Config registers hold 8 4-bit
+ * mode fields per register.  4 bits could hold 16 choices,
+ * but only 5 are defined.
+ */
+void
+gpio_int_mode ( int bit, int mode )
+{
+	int gpio = bit / 32;
+	int pin = bit % 32;
+
+	struct h3_gpio *gp;
+	int reg, shift, tmp;
+
+	gpio_config ( bit, GPIO_EINT );
+
+	gp = gpio_base[gpio];
+	reg = pin / 8;
+	shift = (pin & 0x7) * 4;
+
+	tmp = gp->int_config[reg] & ~(0xf << shift);
+	gp->int_config[reg] = tmp | (mode << shift);
+}
+
+void
+gpio_int_enable ( int bit )
+{
+	int gpio = bit / 32;
+	int pin = bit % 32;
+
+	struct h3_gpio *gp;
+	gp = gpio_base[gpio];
+
+	gp->int_control |= 1<<pin;
+}
+
+void
+gpio_int_ack ( int bit )
+{
+	int gpio = bit / 32;
+	int pin = bit % 32;
+
+	struct h3_gpio *gp;
+	gp = gpio_base[gpio];
+
+	gp->int_status |= 1<<pin;
+}
+
+
+/* ----------------------------------------------------------- */
+/* ----------------------------------------------------------- */
 /* We only support the H3 for now,
  *   the code for the H5 is parked here for a rainy day.
  */
@@ -232,9 +306,15 @@ gpio_led_init ( void )
 	gpio_out_init ( STATUS_LED );
 }
 
+/* Called from board.c */
 /* not implemented for Orange Pi */
-// void gpio_init ( void ) {}
+/* well, it is now .... */
+void gpio_init ( void )
+{
+	struct h3_gpio *gp = (struct h3_gpio *) 0;
 
+	printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
+}
 /* This is the green LED */
 void
 pwr_on ( void )
@@ -318,6 +398,40 @@ gpio_blink_green ( void )
 
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
+
+#include "h3_ints.h"
+
+void
+button_handler ( int xx )
+{
+	printf ( "Button pushed !!\n" );
+	gpio_int_ack ( POWER_BUTTON );
+}
+
+/* Called from test menu.
+ * Button is normally 1, 0 when pushed.
+ */
+void
+gpio_test_button ( void )
+{
+	int val;
+
+#ifdef notdef
+	gpio_in_init ( POWER_BUTTON );
+
+	for ( ;; ) {
+	    val = gpio_read_bit ( POWER_BUTTON );
+	    printf ( "Button: %08x\n", val );
+	    thr_delay ( 250 );
+	}
+#endif
+
+
+	irq_hookup ( IRQ_PIO_J, button_handler, 0 );
+
+	gpio_int_mode ( POWER_BUTTON, INT_NEGEDGE );
+	gpio_int_enable ( POWER_BUTTON );
+}
 
 #define TEST3_DELAY	100
 

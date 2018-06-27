@@ -16,17 +16,14 @@
 #include "kyulib.h"
 #include "thread.h"
 #include "malloc.h"
+
+#include "../tests.h"
+
 // #include "arch/cpu.h"
 
 #define TEST_SERVER     "192.168.0.5"
 #define ECHO_PORT       7       /* echo */
 #define DAYTIME_PORT    13      /* daytime */
-
-struct test {
-	tfptr	func;
-	char	*desc;
-	int	arg;
-};
 
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
@@ -97,8 +94,8 @@ xtest_show ( int xxx )
         }
 	printf ( "%d TCB slots free\n", count );
 
-	xinu_memb_stats ();
 	netbuf_show ();
+	xinu_memb_stats ();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -244,6 +241,8 @@ xtest_client_echo ( int count )
 
 /* Like the above, but makes one connection,
  * then loops using it.
+ * This was a success 4-25-2018 on the Orange Pi
+ * running at 20 Hz for 99,999 repetitions.
  */
 static void
 xtest_client_echo2 ( int repeat )

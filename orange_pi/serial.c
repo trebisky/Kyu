@@ -21,7 +21,7 @@
 /* The H3 chip has 5 uarts, the first 4 are on handy IO pins on the Orange Pi.
  * then a "special" number 5 that we so far ignore.
  * The "uart_" entry points in this driver are the general use ones.
- * The "serial_" entry points at the end support the Kyu console.
+ * The "serial_" entry points at the end of this file support the Kyu console.
  *
  * Uart 0 has a special 3 pin header of its own.
  * Uart 1 is on pins 38 and 40 (Tx,Rx) of the 40 pin IO connector (PG6, PG7)
