@@ -40,7 +40,7 @@ int32	tcpsynrcvd(
 	// KYU printf ( "TCP ESTD - synrcvd\n" );
 	// KYU printf ( "TCP ESTD - signal readers\n" );
 
-	/* KYU callback addition */
+	/* XXX - KYU callback addition */
 	/* We must unlock the mutex or we deadlock.
 	 * This is from tcp_in() via tcpdisp()
 	 * maybe there are better ways to do this?

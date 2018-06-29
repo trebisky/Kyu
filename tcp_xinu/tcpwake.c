@@ -21,7 +21,7 @@ int32	tcpwake(
 		while (tcbptr->tcb_readers > 0) {
 			signal (tcbptr->tcb_rblock);
 			tcbptr->tcb_readers--;
-        }
+		}
 	}
 
 	/* Check condition for writers and awaken */

@@ -53,8 +53,7 @@ void	tcp_in(
 	for (i = 0; i < Ntcp; i++) {
 		tcbptr = &tcbtab[i];
 		if (tcbptr->tcb_state == TCB_FREE) {
-
-			/* Skip unused emtries */
+			/* Skip unused entries */
 			continue;
 		} else if (tcbptr->tcb_state == TCB_LISTEN) {
 

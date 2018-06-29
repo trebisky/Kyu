@@ -28,12 +28,32 @@ void xinu_memb_stats ( void );
  * Note that the freemem buffers are not tied up when
  * a connection is in finwait.
  *
- * For some crazy reason all the calls were shifting it by 1,
+ * The specification is that FINWAIT is 2 * MSL.
+ * This is why the original calls were shifting it by 1,
  * making the actual timeout 30 seconds.
- * I do away with that confusing nonsense.
+ * The original 120 second MSL dates from original
+ *  ARPAnet days where packets were indeed delayed
+ *  by a minute or more.
+ * I have been setting a FINWAIT of 5 seconds, which works
+ *  just fine on a LAN for an IoT endpoint device,
+ *  but would not be appropriate for a gateway and could
+ *  have security implications.
  */
+
 // int finwait_ms = TCP_MSL<<1;
-int finwait_ms = TCP_MSL;
+int finwait_ms = TCP_MSL * 2;
+
+/* Another tunable parameter */
+/* We only have a 16 bit field in the TCP header to
+ * hold the window size, so bufsize should be 65535 or less
+ */
+#ifdef notdef
+int tcp_bufsize = 65535;
+int tcp_allocsize = 65536;
+#endif
+
+int tcp_bufsize = 4096;
+int tcp_allocsize = 4096;
 
 void
 set_finwait ( int secs )
@@ -257,9 +277,15 @@ semcreate ( int arg )
  * We get 16 of these per megabyte.
  * We need two per TCB control block, so with Ntcp = 100, we need 200
  *  which consumes 200/16 = 12.5 megabytes.
+ *
+ * If we turn this around, we could start with saying that we want
+ * to allow up to 16M to be used for TCP buffers,
+ * With 2K (2048 byte) buffers, this would be 512 buffers per M,
+ * so 16M would allow 16*512 buffers or 16*512/2 = 4096 TCB.
+ *
+ * This is now governed by a pair of global parameters,
+ * tcp_bufsize and tcp_allocsize.  6-27-2018
  */
-
-#define XINU_BSIZE 65536
 
 #define MEMB_INIT	(Ntcp * 2 + 2)
 
@@ -275,8 +301,10 @@ xinu_memb_init ( void )
 	char * buf;
 	int i;
 	int bcount = MEMB_INIT;
+	int nalloc = bcount * tcp_allocsize;
 
-	buf = (char *) ram_alloc ( bcount * XINU_BSIZE );
+	buf = (char *) ram_alloc ( nalloc );
+	printf ( " %d bytes allocated for TCP buffers\n", nalloc );
 
 	/* Create linked list */
 	memb_head = (char *) 0;
@@ -284,7 +312,7 @@ xinu_memb_init ( void )
 	for ( i=0; i < bcount; i++ ) {
 	    * (char **) buf = memb_head;
 	    memb_head = buf;
-	    buf += XINU_BSIZE;
+	    buf += tcp_allocsize;
 	    memb_count++;
 	}
 	memb_limit = memb_count;
@@ -317,7 +345,7 @@ xinu_memb_stats ( void )
 		break;
 	}
 
-	printf ( "MEMB: %d available of %d\n", count, memb_limit );
+	printf ( "%d TCP buffers (of %d bytes) available of %d\n", count, tcp_bufsize, memb_limit );
 }
 
 static void
@@ -346,7 +374,7 @@ kyu_getmem ( uint32 nbytes )
 	// printf ( "GETMEM -- %d bytes (%d available: %08x)\n", nbytes, memb_count, memb_head );
 	// xinu_memb_show ( 8 );
 
-	if ( nbytes > XINU_BSIZE )
+	if ( nbytes > tcp_allocsize )
 	    panic ( "Xinu TCP getmem allocator block too small" );
 	if ( ! memb_head )
 	    panic ( "Xinu TCP getmem allocator out of memory" );

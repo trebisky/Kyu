@@ -44,7 +44,7 @@ void	tminit(void)
 	/* Create the timer process */
 
 #ifdef KYU
-	(void) thr_new ( "xinu_timer", timer, NULL, XINU_TIMER_PRI, 0 );
+	(void) thr_new ( "tcp_timer", timer, NULL, XINU_TIMER_PRI, 0 );
 #else
 	resume (create ((int *)timer, TMSTK, TMPRIO, TMNAME, 0, 0));
 #endif

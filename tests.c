@@ -224,12 +224,13 @@ static void
 main_help ( void )
 {
 	printf ( "R - reboot board.\n" );
-	printf ( "t - show thread list.\n" );
+	printf ( "l - show thread list.\n" );
 	printf ( "x func [args] - call C function.\n" );
 	printf ( "k [num] [repeat] - Kyu thread regression tests.\n" );
 	printf ( "i [num] - IO test menu.\n" );
 	printf ( "n [num] - Network test menu.\n" );
 	printf ( "t [num] - TCP test menu.\n" );
+	printf ( "u name - details on thread by name\n" );
 }
 
 #define MAXB	64
@@ -278,7 +279,8 @@ test_main ( int xx )
 	    /* Show threads (l = "list")
 	     * this gets used a lot too
 	     */
-	    if ( **wp == 'l' && nw == 1 ) {
+	    // if ( **wp == 'l' && nw == 1 ) {
+	    if ( **wp == 'l' ) {
 	    	thr_show ();
 	    }
 

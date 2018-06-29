@@ -62,8 +62,9 @@ dots2ip ( char *s )
 	return ntohl ( nip );
 }
 
-static void
-xtest_show ( int xxx )
+/* Called from elsewhere (emergency debug) */
+void
+tcp_show ( void )
 {
 	struct tcb *tp;
 	int i;
@@ -96,6 +97,12 @@ xtest_show ( int xxx )
 
 	netbuf_show ();
 	xinu_memb_stats ();
+}
+
+static void
+xtest_show ( int xxx )
+{
+	tcp_show ();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -141,6 +148,9 @@ client_daytime ( void )
 	// printf ( "Client recv returns %d bytes\n", n );
 	if ( n >= 2 )
 	    buf[n-2] = '\0';
+
+	n = tcp_recv ( slot, buf, 100 );
+	printf ( "Bogus client recv got %d\n", n );
 
 	// printf ( "Client recv got %s\n", buf );
 	// terminated with \r\n
@@ -383,7 +393,7 @@ xtest_server_classic ( int xxx )
 	    return;
 	}
 
-	(void) thr_new ( "xinu_tester", classic_server, NULL, 30, 0 );
+	(void) thr_new ( "tcp_1234", classic_server, NULL, 30, 0 );
 }
 
 /* THE END */

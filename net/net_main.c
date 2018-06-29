@@ -344,6 +344,7 @@ net_thread ( int xxx )
 
 	    INT_lock;
 
+	    /* Do we have a packet to process ? */
 	    nbp = NULL;
 	    if ( inq_head ) {
 		nbp = inq_head;
@@ -352,13 +353,26 @@ net_thread ( int xxx )
 		    inq_tail = (struct netbuf *) 0;
 	    }
 
-	    INT_unlock;
-
-	    if ( nbp )
+	    if ( nbp ) {
+		INT_unlock;
 		net_handle ( nbp );
-	    else
-		sem_block_cpu ( inq_sem );
-		/* XXX - hopefully avoiding race and deadlock */
+		continue;
+	    }
+
+	    /* Special to block while keeping interrupts
+	     * enabled to avoid race.
+	     * The worry is that if we enable interrupts
+	     * and then use the usual sem_block(), a
+	     * packet may arrive and we have deadlock.
+	     */
+	    sem_block_cpu ( inq_sem );
+
+	    /* note that it is harmless to unlock twice
+	     * if already unlocked.
+	     * But all we are going to do is lock anyway
+	     * so this is pointless.
+	     */
+	    // INT_unlock;
 	}
 	/* NOTREACHED */
 }
@@ -582,7 +596,7 @@ netbuf_init ( void )
 	    ++count;
 	}
 
-	printf ("%d net buffers initialized\n", count );
+	printf ("%d netbuf initialized\n", count );
 	netbuf_show ();
 }
 
@@ -607,7 +621,7 @@ netbuf_show ( void )
 
 	printf ( "Netbuf head shows: %08x\n", free );
 	count = netbuf_count ();
-	printf ( "%d buffers free of %d\n", count, NUM_NETBUF );
+	printf ( "%d netbuf free of %d\n", count, NUM_NETBUF );
 }
 
 /* get a netbuf, with lock */

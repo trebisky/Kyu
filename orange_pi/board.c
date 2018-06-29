@@ -268,6 +268,8 @@ board_init ( void )
 	/* Turn on the green LED */
 	gpio_init ();
 	gpio_led_init ();
+	gpio_button_enable ();
+
 	pwr_on ();
 	wd_init ();
 

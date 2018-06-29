@@ -363,6 +363,8 @@ thr_sched ( void )
 void
 thr_one_all ( struct thread *tp, char *msg )
 {
+	unsigned int pc;
+
 	printf ( "Thread %s, dump (%s)\n", tp->name, msg );
 	thr_one ( tp );
 
@@ -385,9 +387,20 @@ thr_one_all ( struct thread *tp, char *msg )
 	/* Seems to work fine 8-14-2016 */
 
 #define ARM_FP	11
+#define ARM_PC  15
 
 	if ( tp->mode == JMP ) {
+	    show_regs ( tp->jregs.regs );
+	    pc = cur_thread->jregs.regs[ARM_PC];
+	    printf ( "PC = %08x ( %s )\n", pc, mk_symaddr(pc) );
 	    unroll_fp ( tp->jregs.regs[ARM_FP] );
+	}
+
+	if ( tp->mode == INT ) {
+	    show_regs ( tp->iregs.regs );
+	    pc = cur_thread->iregs.regs[ARM_PC];
+	    printf ( "PC = %08x ( %s )\n", pc, mk_symaddr(pc) );
+	    unroll_fp ( tp->iregs.regs[ARM_FP] );
 	}
 
 #ifdef ARCH_X86
@@ -1973,8 +1986,11 @@ sem_add ( struct sem *sem )
 /* This MUST be called holding the cpu lock.
  * rarely used directly.
  * NEVER called from interrupt code.
- * intended to fix a race with interrupt code.
- * XXX - but does it?
+ * (we should never block in interrupt code!)
+ *
+ * This is used one place outside of this file (in the net task)
+ * with the intent of fixing a race with
+ * interrupt code.
  */
 void
 sem_block_cpu ( struct sem *sem )
@@ -1987,6 +2003,8 @@ sem_block_cpu ( struct sem *sem )
 
 	/* SEM_SET */
 	sem_add ( sem );
+
+	/* interrupts are still off */
 
 	thr_block ( SWAIT );
 	/* usually does not return here,

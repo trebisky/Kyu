@@ -70,7 +70,7 @@ static struct h3_gpio * gpio_base[] = {
 #define GPIO_OUTPUT       (1)
 #define GPIO_F2           (2)
 #define GPIO_F3           (3)
-#define GPIO_EINT         (6)
+#define GPIO_EINT         (6)	/* only for A, G, and J */
 #define GPIO_DISABLE      (7)
 
 /* GPIO pin pull-up/down config (0-3)*/
@@ -406,17 +406,35 @@ button_handler ( int xx )
 {
 	printf ( "Button pushed !!\n" );
 	gpio_int_ack ( POWER_BUTTON );
+
+	thr_show ();
+	tcp_show ();
+}
+
+/* Should not hurt to call this twice.
+ * Now called on every startup, so test is
+ * not needed.
+ */
+void
+gpio_button_enable ( void )
+{
+	irq_hookup ( IRQ_PIO_J, button_handler, 0 );
+
+	gpio_int_mode ( POWER_BUTTON, INT_NEGEDGE );
+	gpio_int_enable ( POWER_BUTTON );
 }
 
 /* Called from test menu.
  * Button is normally 1, 0 when pushed.
+ * Works fine, enables the interrupt and returns.
+ * 6-26-2018
+ * Conflicts with button interrupt.
  */
 void
 gpio_test_button ( void )
 {
-	int val;
-
 #ifdef notdef
+	int val;
 	gpio_in_init ( POWER_BUTTON );
 
 	for ( ;; ) {
@@ -425,12 +443,8 @@ gpio_test_button ( void )
 	    thr_delay ( 250 );
 	}
 #endif
-
-
-	irq_hookup ( IRQ_PIO_J, button_handler, 0 );
-
-	gpio_int_mode ( POWER_BUTTON, INT_NEGEDGE );
-	gpio_int_enable ( POWER_BUTTON );
+	printf ( "Already enabled, try pushing it\n" );
+	//gpio_button_enable ();
 }
 
 #define TEST3_DELAY	100

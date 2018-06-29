@@ -2,6 +2,9 @@
 
 #include <xinu.h>
 
+// Prior to 6-27-2018 was "wired in" as 65535
+extern int tcp_bufsize;
+
 /*------------------------------------------------------------------------
  *  ckecktuple  -  Verify that a TCP connection is not already in use by
  *			checking (src IP, src port, Dst IP, Dst port)
@@ -90,22 +93,27 @@ int32	tcp_register (
 
 		/* Allocate receive buffer and initialize ptrs */
 
-		tcbptr->tcb_rbuf = (char *) kyu_getmem (65535);
+		// tcbptr->tcb_rbuf = (char *) kyu_getmem (65535);
+		tcbptr->tcb_rbuf = (char *) kyu_getmem ( tcp_bufsize );
 		if (tcbptr->tcb_rbuf == (char *)SYSERR) {
 			signal (Tcp.tcpmutex);
 			return SYSERR;
 		}
-		tcbptr->tcb_rbsize = 65535;
+		// tcbptr->tcb_rbsize = 65535;
+		tcbptr->tcb_rbsize = tcp_bufsize;
 		tcbptr->tcb_rbdata = tcbptr->tcb_rbuf;
 		tcbptr->tcb_rbend = tcbptr->tcb_rbuf + tcbptr->tcb_rbsize;
 
-		tcbptr->tcb_sbuf = (char *) kyu_getmem (65535);
+		// tcbptr->tcb_sbuf = (char *) kyu_getmem (65535);
+		tcbptr->tcb_sbuf = (char *) kyu_getmem ( tcp_bufsize );
 		if (tcbptr->tcb_sbuf == (char *)SYSERR) {
-			kyu_freemem ((char *)tcbptr->tcb_rbuf, 65535);
+			// kyu_freemem ((char *)tcbptr->tcb_rbuf, 65535);
+			kyu_freemem ((char *)tcbptr->tcb_rbuf, tcp_bufsize );
 			signal (Tcp.tcpmutex);
 			return SYSERR;
 		}
-		tcbptr->tcb_sbsize = 65535;
+		// tcbptr->tcb_sbsize = 65535;
+		tcbptr->tcb_sbsize = tcp_bufsize;
 
 		/* The following will always succeed because	*/
 		/*   the iteration covers at least Ntcp+1 port	*/

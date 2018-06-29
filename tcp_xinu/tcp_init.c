@@ -46,7 +46,7 @@ int32	tcp_init(void)
 	Tcp.tcpcmdq = mqcreate (10);
 
 #ifdef KYU
-	(void) thr_new ( "xinu_tcpout", tcp_out, NULL, XINU_TCP_OUT_PRI, 0 );
+	(void) thr_new ( "tcp_out", tcp_out, NULL, XINU_TCP_OUT_PRI, 0 );
 #else
 	resume(create(tcp_out, 8192, 500, "tcp_out", 0, NULL));
 #endif

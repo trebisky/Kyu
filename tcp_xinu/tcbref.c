@@ -56,7 +56,7 @@ void	tcbunref ( struct tcb	*ptcb )
 #ifdef notdef
 #define get_FP(x)       asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
 
-void	tcbunref(
+void	tcbunref_ ORIG (
 	  struct tcb	*ptcb		/* Ptr to a TCB			*/
        )
 {

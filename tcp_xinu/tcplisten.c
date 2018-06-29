@@ -2,6 +2,9 @@
 
 #include <xinu.h>
 
+// Prior to 6-27-2018 was "wired in" as 65535
+extern int tcp_bufsize;
+
 /*------------------------------------------------------------------------
  *  tcplisten  -  handle a segment in the LISTEN state
  *------------------------------------------------------------------------
@@ -46,23 +49,23 @@ int32	tcplisten(
 	pnewtcb->tcb_slot = i;
 	/* end of Kyu addition */
 
-	pnewtcb->tcb_rbuf = (char *) kyu_getmem (65535);
+	pnewtcb->tcb_rbuf = (char *) kyu_getmem ( tcp_bufsize );
 	if (pnewtcb->tcb_rbuf == (char *)SYSERR) {
 		signal (Tcp.tcpmutex);
 		return SYSERR;
 	}
-	pnewtcb->tcb_rbsize = 65535;
+	pnewtcb->tcb_rbsize = tcp_bufsize;
 
 	pnewtcb->tcb_rbdata = pnewtcb->tcb_rbuf;
 	pnewtcb->tcb_rbend = pnewtcb->tcb_rbuf + pnewtcb->tcb_rbsize;
 	//pnewtcb->tcb_rbsize = 25*1024;
-	pnewtcb->tcb_sbuf = (char *) kyu_getmem (65535);
+	pnewtcb->tcb_sbuf = (char *) kyu_getmem ( tcp_bufsize );
 	if (pnewtcb->tcb_sbuf == (char *)SYSERR) {
-		kyu_freemem ((char *)pnewtcb->tcb_rbuf, 65535);
+		kyu_freemem ((char *)pnewtcb->tcb_rbuf, tcp_bufsize );
 		signal (Tcp.tcpmutex);
 		return SYSERR;
 	}
-	pnewtcb->tcb_sbsize = 65535;
+	pnewtcb->tcb_sbsize = tcp_bufsize;
 
 	/* New connection is in SYN-Received State */
 
