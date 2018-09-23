@@ -15,7 +15,7 @@
 #include "kyulib.h"
 #include "thread.h"
 
-#define PRI_BOSS	30
+#define PRI_SHELL	40
 
 void test_main ( int );
 
@@ -50,7 +50,7 @@ user_init ( int xx )
 #endif
 
 	/* Run the test "shell" as the user thread */
-	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_BOSS, 0 );
+	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_SHELL, 0 );
 
 	/*
 	thr_show();

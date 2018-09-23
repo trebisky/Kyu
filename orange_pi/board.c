@@ -268,13 +268,15 @@ board_init ( void )
 	/* Turn on the green LED */
 	gpio_init ();
 	gpio_led_init ();
-	gpio_button_enable ();
 
 	pwr_on ();
 	wd_init ();
 
 	h3_spinlocks_init ();
 	gic_init ();
+
+	/* Must follow gic_init () */
+	gpio_button_enable ();
 
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
