@@ -59,12 +59,12 @@ static void test_uart ( int );
 static void test_ram1 ( int );
 static void test_ram2 ( int );
 static void test_button ( int );
+static void test_blink_s ( int );
+static void test_blink ( int );
 #endif
 
-static void test_clear ( int );
-static void test_blink ( int );
-static void test_blink_s ( int );
 static void test_blink_d ( int );
+static void test_clear ( int );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -94,12 +94,12 @@ struct test io_test_list[] = {
 	test_ram1,	"Opi low ram test",	0,
 	test_ram2,	"Opi ram test",		0,
 	test_button,	"Opi button",		0,
-#endif
 
 	test_blink,	"start LED blink test",	0,
 	test_blink_s,	"stop LED blink test",	0,
-	test_blink_d,	"LED blink test (via delay)",	0,
+#endif
 
+	test_blink_d,	"LED blink test (via delay)",	0,
 	test_clear,	"clear memory test",	0,
 
 	0,		0,			0
@@ -134,12 +134,14 @@ test_ram2 ( int xxx )
 	mem_test ( 0x10000, 0x20000 );
 }
 
+#ifdef BOARD_ORANGE_PI
 /* Test Orange Pi button */
 static void
 test_button ( int xxx )
 {
 	gpio_test_button ();
 }
+#endif
 
 static void
 test_malloc ( int xxx )
@@ -438,6 +440,7 @@ test_clear ( int arg )
 	printf ( "Done clearning ram\n" );
 }
 
+#ifdef BOARD_ORANGE_PI
 static struct thread *blink_tp;
 
 /* start the blink */
@@ -459,8 +462,9 @@ test_blink_s ( int xxx )
 
 	led_norm ();
 }
+#endif
 
-#ifdef BOARD_ORANGE_PI
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
 static void
 test_led_on ( void )
 {
@@ -474,6 +478,7 @@ test_led_off ( void )
 }
 #endif
 
+/* XXX - should have BBB provide a "status" function as above */
 #ifdef BOARD_BBB
 static void
 test_led_on ( void )

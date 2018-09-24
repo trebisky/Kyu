@@ -70,10 +70,13 @@ typedef void (*cfptr) ( int, void * );
 #define NULL (0)
 #endif
 
+#ifdef notdef
+/* This should now be done in arch/types.h */
 typedef unsigned long u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
 
 typedef volatile unsigned long vu32;
+#endif
 
 /* THE END */

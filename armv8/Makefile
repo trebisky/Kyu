@@ -10,7 +10,11 @@ include ../Makefile.inc
 # startup must be first
 OBJS =  startup.o \
 	hardware.o \
-	interrupts.o
+	interrupts.o \
+	ram.o \
+	cache.o \
+	mmu.o \
+	show_regs.o
 
 OBJS_V7 =  locore.o \
 	hardware.o \

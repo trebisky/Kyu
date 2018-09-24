@@ -136,11 +136,15 @@ kyu_startup ( void )
 	test_core ();
 #endif
 
+	puts ( "Kyu startup 1\n" );
+
+#ifdef ARMV7
 	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	get_SP ( val );
 	printf ( "Kyu starting with stack: %08x\n",  val );
 	get_CPSR ( val );
 	printf ( "Kyu starting with cpsr: %08x\n",  val );
+#endif
 
 	// fail ();
 
@@ -148,12 +152,16 @@ kyu_startup ( void )
 
 	board_hardware_init ();
 
+	puts ( "Kyu startup 2\n" );
+
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
 	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 	hardware_init ();
 	console_initialize ();
+
+	puts ( "Kyu startup 3\n" );
 
 #ifdef WANT_FLOAT
 	/* XXX -- floating point hijinks */

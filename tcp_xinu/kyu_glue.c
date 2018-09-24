@@ -9,7 +9,7 @@
 #include "kyu.h"
 #include "thread.h"
 #include "../net/net.h"
-#include "../arch/cpu.h"
+// #include "../arch/cpu.h"
 
 static void xinu_memb_init ( void );
 void xinu_memb_stats ( void );
@@ -263,7 +263,9 @@ semcreate ( int arg )
  * I got a data abort from within malloc, and thought
  * perhaps my macros are to blame.  That was not the issue.
  * Next I added INT_lock/unlock to malloc/free.  That was not it.
- * XXX - still under investigation ....
+ * It appears this is/was due to multiple calls to freemem for
+ * the same block of memory.  The original Xinu code was immune
+ * (idempotent) under this, but free() definitely is not.
  */
 
 #ifdef notdef

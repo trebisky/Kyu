@@ -203,13 +203,15 @@ board_core_startup ( int core )
 	gic_cpu_init ();
 	INT_unlock;
 
-	run_newcore ( core );
+#ifdef notyet
+	fire3_run_newcore ( core );
+#endif
 }
 
 void
 board_new_core ( int core, cfptr func, void *arg )
 {
-	h3_start_core ( core, func, arg );
+	// fire3_start_core ( core, func, arg );
 }
 
 #ifdef notdef
@@ -253,8 +255,11 @@ board_hardware_init ( void )
         printf ( "board_hardware_init - cpsr: %08x\n",  reg );
 	*/
 
+	puts ( " BHI 1\n" );
 	cache_init ();
+	puts ( " BHI 2\n" );
 	ram_init ( ram_start, ram_size );
+	puts ( " BHI 3\n" );
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
 	// stack_addr_show ();
 }
@@ -263,6 +268,7 @@ void
 board_init ( void )
 {
 	// wdt_disable ();
+
 	/*
 	cpu_clock = get_cpu_clock ();
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
@@ -273,7 +279,7 @@ board_init ( void )
 	gpio_init ();
 	gpio_led_init ();
 
-	pwr_on ();
+	//pwr_on ();
 	// wd_init ();
 
 	// h3_spinlocks_init ();
@@ -295,13 +301,13 @@ board_init ( void )
 void
 board_timer_init ( int rate )
 {
-	opi_timer_init ( rate );
+	fire3_timer_init ( rate );
 }
 
 void
 board_timer_rate_set ( int rate )
 {
-	opi_timer_rate_set ( rate );
+	fire3_timer_rate_set ( rate );
 }
 
 /* This gets called after the network is alive and well

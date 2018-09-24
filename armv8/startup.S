@@ -33,12 +33,84 @@ after:
 
 reset:
 	bl	remap_vectors
-//	bl	main
+
+	bl      clear_bss
+        dsb	sy
+
+        bl      board_mmu_init
+        dsb	sy
+
+        // bl      mmu_set_ttbr
+
 	bl	kyu_startup
+
 	b	.
+
+/* === *** resume_c
+ *
+ * This routine launches a thread from scratch.
+ *  On the ARM it gets a pointer (in x0)
+ *  to an array of 4 items:
+ *      an argument to pass
+ *      a place to start up at.
+ *      an initial stack pointer.
+ *      a place to return to (usually thr_exit)
+ * XXX danger if this is used from interrupt as we
+ *  are not doing sp and lr properly
+ */
+        .globl resume_c
+resume_c:
+	ldp	x1, x2, [x0]
+	ldp	x3, x30, [x0,16]
+	// add	sp_el2, x3, #0
+	// mov	sp_el2, x3
+	mov	sp, x3
+	mov	x0, x1
+	br	x2
+
+        .globl resume_i
+resume_i:
+	ret
+
+        .globl resume_j
+resume_j:
+	ret
+
+        .globl save_j
+save_j:
+	ret
+
+
+
+#ifdef OLD_v7
+        .globl resume_c
+resume_c:
+        ldmia   r0,{r0,ip,sp,lr}
+
+        mrs     r1, cpsr
+        bic     r1, r1, #0xff
+        orr     r1, r1, #PSR_M_SVR      /* enable both IRQ and FIQ */
+        msr     cpsr, r1
+
+        mov     fp, #0          /* added 8-13-2016 to end backtraces */
+        mov     pc, ip
+#endif
 
 /* ----------------------------------------------------------- */
 
+clear_bss:
+        ldr     x0, =__bss_start__
+        ldr     x1, =__bss_end__
+        mov     x2, #0
+1:	str     x2, [x0]
+        add     x0, x0, #8
+        cmp     x0, x1
+        b.lo    1f
+	ret
+
+/* ----------------------------------------------------------- */
+
+#ifdef notdef
 // Get our cpu ID
 // unsigned int GetCPUID(void);
 .global GetCPUID
@@ -56,6 +128,7 @@ GetCurrentSMode:
         mrs             x0, CurrentEL
         lsr             x0, x0, #2
         ret
+#endif
 
 /* ----------------------------------------------------------- */
 

@@ -18,38 +18,26 @@
 #include "board/board.h"
 #include "cpu.h"
 
-#ifdef notyet
+#define PMCR_CCNT_DIV64	0x8
+#define PMCR_CCNT_RESET	0x4
+#define PMCR_CCNT_ENA	0x1
 
-/* XXX - look into armv8 ccnt */
-
-#define PMCR_ENABLE	0x01	/* enable all counters */
-#define PMCR_RESET	0x02	/* reset all counters */
-#define PMCR_CC_RESET	0x04	/* reset CCNT */
-#define PMCR_CC_DIV	0x08	/* divide CCNT by 64 */
-#define PMCR_EXPORT	0x10	/* export events */
-#define PMCR_CC_DISABLE	0x20	/* disable CCNT in non-invasive regions */
-
-/* There are 4 counters besides the CCNT (we ignore them at present) */
-#define CENA_CCNT	0x80000000
-#define CENA_CTR3	0x00000008
-#define CENA_CTR2	0x00000004
-#define CENA_CTR1	0x00000002
-#define CENA_CTR0	0x00000001
+#define PMENSET_CCNT	0x80000000
 
 /* Called at system startup */
-void
+/* XXX - does not work yet */
+static void
 enable_ccnt ( int div64 )
 {
 	int val;
 
-	get_PMCR ( val );
-	val |= PMCR_ENABLE;
-	if ( div64 )
-	    val |= PMCR_CC_DIV;
-	set_PMCR ( val );
+	val = PMENSET_CCNT;
+        asm volatile("msr pmcntenset_el0, %0" : : "r" (val) );
 
-	set_CENA ( CENA_CCNT );
-	// set_COVR ( CENA_CCNT );
+        val = PMCR_CCNT_ENA;
+	if ( div64 )
+	    val |= PMCR_CCNT_DIV64;
+        asm volatile("msr pmcr_el0, %0" : : "r" (val) );
 }
 
 /* It does not seem necessary to disable the counter
@@ -59,19 +47,19 @@ void
 reset_ccnt ( void )
 {
 	int reg;
+	int rreg;
 
-	// set_CDIS ( CENA_CCNT );
-	get_PMCR ( reg );
-	reg |= PMCR_CC_RESET ;
-	set_PMCR ( reg );
-	// set_CENA ( CENA_CCNT );
+	asm volatile ("mrs %0, PMCR_EL0": "=r" (reg) );
+	rreg = reg | PMCR_CCNT_RESET;
+	asm volatile ("msr PMCR_EL0, %0": "=r" (rreg) );
+	asm volatile ("msr PMCR_EL0, %0": "=r" (reg) );
+	/* XXX - do we really need to clear the bit ? */
 }
-#endif
 
 void
 hardware_init ( void )
 {
-	// enable_ccnt ( 0 );
+	enable_ccnt ( 0 );
 }
 
 /* THE END */

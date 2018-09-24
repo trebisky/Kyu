@@ -2,7 +2,7 @@
 #define _BOARD_H
 
 /*
- * Copyright (C) 2017  Tom Trebisky  <tom@mmto.org>
+ * Copyright (C) 2018  Tom Trebisky  <tom@mmto.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,20 +15,14 @@
  *
  */
 
-#define BOARD_ORANGE_PI
-
-/* As far as we are concerned, the NanoPi Neo is just a flavor of Orange Pi
- *  (it is simply another Allwinner H3 board)
- * There are some minor differences (such as the status LED).
- */
-#define BOARD_ORANGE_PI_PC
-// #define BOARD_NANOPI_NEO
+#define BOARD_FIRE3
 
 #define ARCH_ARM
+#define ARCH_ARMV8
 
-#define NUM_INTS	157
+#define NUM_INTS	(32 + 72)
 
-#define NUM_CORES	4
+#define NUM_CORES	8
 
 /* Allow 16K of stack per mode */
 /* These things are used in locore.S */
@@ -54,7 +48,7 @@
 // #define BOARD_RAM_SIZE	0x40000000	/* 1G */
 #define BOARD_RAM_SIZE	0	/* Force probing */
 
-#define BOARD_RAM_MAX	0x80000000	/* 2G */
+#define BOARD_RAM_MAX	0x40000000	/* 1G */
 
 #define BOARD_RAM_START	0x40000000
 

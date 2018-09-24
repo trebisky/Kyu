@@ -47,6 +47,51 @@ struct gpio_regs {
 #define LED_BIT	(1<<12)
 
 void
+gpio_led_init ( void )
+{
+	struct gpio_regs *gp = GPIOB_BASE;
+
+	/* Configure the GPIO */
+	gp->alt0 &= ~(3<<24);
+	gp->alt0 |= 2<<24;
+	gp->oe = LED_BIT;
+
+	// gp->out = LED_BIT;	/* off */
+	gp->out = 0;		/* on */
+}
+
+void
+gpio_init ( void )
+{
+}
+
+void
+status_on ( void )
+{
+	struct gpio_regs *gp = GPIOB_BASE;
+
+	gp->out = 0;		/* on */
+}
+
+void
+status_off ( void )
+{
+	struct gpio_regs *gp = GPIOB_BASE;
+
+	gp->out = LED_BIT;	/* off */
+}
+
+/* Called from test menu */
+void
+gpio_test ( void )
+{
+}
+
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+
+#ifdef notdef
+void
 delay ( int count )
 {
 	while ( count )
@@ -112,5 +157,6 @@ blink_run (void)
 	    pulses ( count );
 	}
 }
+#endif
 
 /* THE END */

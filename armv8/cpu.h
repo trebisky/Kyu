@@ -47,6 +47,26 @@ typedef unsigned long __u32;
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
+/* Provided for the sake of syntax, the macros below will yield better code.
+ * This is a 64 bit counter in ARM v8
+ */
+static inline unsigned long
+r_CCNT ( void )
+{
+    unsigned long rv;
+
+    // Read CCNT Register
+    asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (rv) );
+    return rv;
+}
+
+/* Performance monitoring unit registers */
+#define get_CCNT(val)	asm volatile ( "mrs %0, PMCCNTR_EL0" : "=r" ( val ) )
+#define set_CCNT(val)	asm volatile ( "msr PMCCNTR_EL0, %0" : : "r" ( val ) )
+
+/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+
 /* These only go inline with gcc -O of some kind */
 static inline void
 INT_unlock ( void )
@@ -60,6 +80,23 @@ INT_lock ( void )
         asm volatile("msr DAIFSet, #3" : : : "cc");
 }
 
+/* DAIF */
+static inline unsigned int
+raw_read_daif ( void )
+{
+	unsigned int val;
+
+	__asm__ __volatile__("mrs %0, DAIF\n\t" : "=r" (val) :  : "memory");
+
+	return val;
+}
+
+static inline void
+raw_write_daif( unsigned int val )
+{
+	__asm__ __volatile__("msr DAIF, %0\n\t" : : "r" (val) : "memory");
+}
+
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
@@ -71,17 +108,6 @@ INT_lock ( void )
  * but yields some unfortunate bloat.
  */
 
-/* Provided for the sake of syntax, the macros below will yield better code.
- */
-static inline unsigned int
-r_CCNT ( void )
-{
-    unsigned int rv;
-
-    // Read CCNT Register
-    asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (rv) );
-    return rv;
-}
 /* List of fault codes */
 /* The first 8 are ARM hardware exceptions and interrupts */
 

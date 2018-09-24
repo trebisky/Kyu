@@ -50,14 +50,29 @@ struct timer {
 #define T3_ISTAT		0x100
 #define T4_ISTAT		0x200
 
-// #define LOAD_VALUE	0x80000	/* 524288 */
-#define LOAD_VALUE	1000000
+#define TIMER_CLOCK	1000000
 
 int tcount = 0;
 
+void
+fire3_timer_rate_set ( int rate )
+{
+	struct timer *tp = TIMER_BASE;
+
+	tp->control &= ~T0_RUN;
+
+	tp->timer[0].count = TIMER_CLOCK / rate;
+	tp->timer[0].cmp = 0;
+
+	/* Pulse the load bit */
+	tp->control |= T0_AUTO | T0_LOAD;
+	tp->control &= ~T0_LOAD;
+
+	tp->control |= T0_RUN;
+}
 
 void
-timer_init ( void )
+fire3_timer_init ( int rate )
 {
 	struct timer *tp = TIMER_BASE;
 
@@ -76,13 +91,19 @@ timer_init ( void )
 	// printf ( "T1 = %08x\n", tp->timer[1].obs );
 #endif
 
+	/* XXX - this stops ALL timers */
 	tp->control = 0;
-	tp->timer[0].count = LOAD_VALUE;
+
+	fire3_timer_rate_set ( rate );
+
+#ifdef notdef
+	tp->timer[0].count = TIMER_CLOCK / rate;
 	tp->timer[0].cmp = 0;
 
 	/* Pulse the load bit */
 	tp->control = T0_AUTO | T0_LOAD;
 	tp->control = T0_AUTO;
+#endif
 
 	printf ( "T0 = %08x\n", tp->timer[0].obs );
 	printf ( "T0 = %08x\n", tp->timer[0].obs );

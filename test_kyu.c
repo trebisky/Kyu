@@ -23,6 +23,26 @@
 
 #include "tests.h"
 
+#ifdef ARM64
+#define DAIF_IRQ_BIT	0x2
+#define DAIF_FIQ_BIT	0x1
+
+/* XXX - untested */
+static int
+is_irq_disabled ( void )
+{
+	unsigned int val;
+
+	val = raw_read_daif ();
+
+	if ( val & DAIF_IRQ_BIT )
+	    return 1;
+
+	return 0;
+}
+#endif
+
+#ifndef ARM64
 static int
 is_irq_disabled ( void )
 {
@@ -33,6 +53,7 @@ is_irq_disabled ( void )
 	    return 1;
 	return 0;
 }
+#endif
 
 /* Wrapper function to catch troubles when making new semaphores.
  */
@@ -1036,10 +1057,14 @@ busy79 ( int nice )
 		thr_yield ();
 	    ++t7_sum;
 	    /* if ( is_irq_disabled() ) */
-	    // psr = get_cpsr();
+#ifdef ARM64
+	    /* XXX no cpsr on armv8 */
+	    printf ("busy -- no IRQ --\n" );
+#else
 	    get_CPSR ( psr );
 	    if ( psr & 0x80 )
 		printf ("busy -- no IRQ (%08x)\n", psr );
+#endif
 	}
 }
 
