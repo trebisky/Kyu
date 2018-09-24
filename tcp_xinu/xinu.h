@@ -5,6 +5,7 @@
 /* Add these two for Kyu */
 #include <kyu_glue.h>
 #include <../net/netbuf.h>
+#include <../arch/cpu.h>
 
 // #define TCP_DEBUG
 

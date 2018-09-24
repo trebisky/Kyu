@@ -5,7 +5,7 @@
 #  Tom Trebisky  1-6-2017
 #
 
-$targets = %w( bbb orange_pi )
+$targets = %w( bbb orange_pi fire3 )
 
 def usage
     puts "Pick one of the following:"
@@ -52,7 +52,12 @@ system "make clean"
 # in some target dependent way.
 
 system "rm -f arch"
-system "ln -s arm arch"
+
+if target == "fire3"
+    system "ln -s armv8 arch"
+else
+    system "ln -s armv7 arch"
+end
 
 
 puts "Ready for " + target

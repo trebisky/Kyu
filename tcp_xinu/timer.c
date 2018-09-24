@@ -56,7 +56,7 @@ void	tminit(void)
  */
 process	timer(void)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	int32	tmp;			/* Head pointer during deletion	*/
 
 	while (1) {
@@ -81,10 +81,12 @@ process	timer(void)
 		/* If timed events remain, update pending and next */
 
 		if (tmhead != BADTIMER) {
-			mask = disable();
+			// mask = disable();
+			INT_lock ();
 			tmpending = TRUE;
 			tmnext = &tmtab[tmhead].tm_remain;
-			restore(mask);
+			// restore(mask);
+			INT_unlock ();
 		}
 		signal (tmlock);
 	}
@@ -112,7 +114,7 @@ int32	tmset (
 	  int32	msg			/* Message to be sent		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	int32	tment;			/* Entry from free list		*/
 	int32	cur;			/* Current list entry		*/
 	int32	prev;			/* Previous list entry		*/
@@ -141,7 +143,8 @@ int32	tmset (
 	/* Walk the event delta list and insert the new item */
 	prev = BADTIMER;
 	cur = tmhead;
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	while (cur != BADTIMER) {
 
 		/* Compare delay for new item to item in list */
@@ -173,7 +176,8 @@ int32	tmset (
 
 	tmpending = TRUE;
 	tmnext = &tmtab[tmhead].tm_remain;
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	signal (tmlock);
 	return OK;
 }
@@ -188,7 +192,7 @@ int32	tmdel (
 	  int32	msg			/* Message to be sent		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	int32	cur;			/* Current list entry		*/
 	int32	prev;			/* Previous list entry		*/
 	int32	next;			/* Next list entry		*/
@@ -224,10 +228,12 @@ int32	tmdel (
 			/*	item to account for deleted item	*/
 
 			if ((next = tmtab[cur].tm_next) != BADTIMER) {
-				mask = disable();
+				// mask = disable();
+				INT_lock ();
 				tmtab[next].tm_remain += 
 						tmtab[cur].tm_remain;
-				restore(mask);
+				// restore(mask);
+				INT_unlock ();
 			}
 
 			/* Put the node back on the free list */
@@ -250,7 +256,8 @@ int32	tmdel (
 
 	/* If items remain on list, reset info for clock interrupt */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (tmhead == BADTIMER) {
 
 		/* No items remain on list */
@@ -263,7 +270,8 @@ int32	tmdel (
 		tmpending = TRUE;
 		tmnext = &tmtab[tmhead].tm_remain;
 	}
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	signal (tmlock);
 	return OK;
 }

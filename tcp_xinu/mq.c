@@ -78,7 +78,7 @@ int32	mqcreate (
 	)
 {
 	int32	i;			/* Index into queue table	*/
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 
 	/* Guarantee mutual exclusion */
 
@@ -124,9 +124,13 @@ int32	mqcreate (
 		mqtab[i].mq_count = 0;
 		mqtab[i].mq_rcvrs = 0;
 		mqtab[i].mq_cookie++;
-		mask = disable();
+
+		// mask = disable();
+		INT_lock ();
 		mqtab[i].mq_state = MQ_ALLOC;
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
+
 		signal (mqsem);
 		return i;
 	}
@@ -146,7 +150,7 @@ int32	mqdelete (
 	  int32		mq		/* Message queue to use		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	struct	mqentry	*mqp;		/* ptr to queue entry		*/
 
 	/* Obtain a pointer to the specified queue */
@@ -163,9 +167,12 @@ int32	mqdelete (
 
 	/* Make the queue free and return the memory */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	mqp->mq_state = MQ_FREE;
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
+
 	semdelete (mqp->mq_sem);
 	freemem ((char *)mqp->mq_msgs, mqp->mq_qlen * sizeof(int));
 	signal (mqsem);
@@ -182,7 +189,7 @@ int32	mqsend (
 	  int32		msg		/* Message to deposit		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	struct	mqentry	*mqp;		/* ptr to message queue		*/
 
 	/* Obtain ptr to specified queue */
@@ -191,10 +198,12 @@ int32	mqsend (
 
 	/* Insure exclusive access */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC
 	    || mqp->mq_count == mqp->mq_qlen) {
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		return SYSERR;
 	}
 
@@ -205,9 +214,11 @@ int32	mqsend (
 
 	/* Make message available */
 
+	/* XXX - tjt should we unlock first ?? */
 	signal (mqp->mq_sem);
 
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	return OK;
 }
 
@@ -220,7 +231,7 @@ int32	mqrecv (
 	  int32		mq		/* Message queue to use		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	struct	mqentry	*mqp;		/* Ptr to queue			*/
 	int32	msg;			/* Extracted message		*/
 	int32	cookie;			/* Old value of cookie		*/
@@ -231,9 +242,11 @@ int32	mqrecv (
 
 	/* Insure exclusive access */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC) {
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		return SYSERR;
 	}
 
@@ -243,7 +256,8 @@ int32	mqrecv (
 	mqp->mq_rcvrs++;
 	wait(mqp->mq_sem);
 	if (cookie != mqp->mq_cookie) {	  /* queue changed */
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		return SYSERR;
 	}
 	mqp->mq_rcvrs--;
@@ -256,7 +270,8 @@ int32	mqrecv (
 	/* Decrement count of messages remaining and return msg */
 
 	mqp->mq_count--;
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	return msg;
 }
 
@@ -268,22 +283,25 @@ int32	mqpoll (
 	  int32		mq		/* Message queue to use		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	int32	msg;			/* Message to return		*/
 
 	/* Insure exclusive access */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (!MQVALID(mq) || mqtab[mq].mq_state != MQ_ALLOC
 	    || mqtab[mq].mq_count == 0) {	/* No message available	*/
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		return SYSERR;
 	}
 
 	/* Extract a message and return */
 
 	msg = mqrecv (mq);
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	return msg;
 }
 
@@ -295,7 +313,7 @@ int32	mqdisbale (
 	  int32		mq		/* Message queue to use		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	struct	mqentry	*mqp;		/* Ptr to the queue		*/
 
 	/* Obtain pointer to the queue */
@@ -308,9 +326,11 @@ int32	mqdisbale (
 
 	/* Disable interrupts for state change */
 
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC) {
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		signal (mqsem);
 		return SYSERR;
 	}
@@ -323,7 +343,8 @@ int32	mqdisbale (
 	semreset(mqp->mq_sem, 0);
 	mqp->mq_rcvrs = 0;
 
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	signal (mqsem);
 	return OK;
 }
@@ -336,13 +357,14 @@ int32	mqenable (
 	  int32		mq		/* Message queue to use		*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	int32	retval;			/* Return value			*/
 
 	/* Insure exclusive access */
 
 	wait (mqsem);
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 
 	/* Re-enable if currently disabled */
 	if (MQVALID(mq) && mqtab[mq].mq_state == MQ_DISABLE) {
@@ -351,7 +373,9 @@ int32	mqenable (
 	} else {
 		retval = SYSERR;
 	}
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
+
 	signal (mqsem);
 	return retval;
 }
@@ -365,7 +389,7 @@ int32	mqclear (
 	  int32		(*func)(int32)	/* Message disposal function	*/
 	)
 {
-	intmask	mask;			/* Saved interrupt mask		*/
+	// intmask	mask;		/* Saved interrupt mask		*/
 	struct	mqentry	*mqp;		/* Ptr to the queue		*/
 	int32	i;			/* walks through message list	*/
 
@@ -376,9 +400,11 @@ int32	mqclear (
 	/* Obtain exclusive access and insure queue is disabled */
 
 	wait (mqsem);
-	mask = disable();
+	// mask = disable();
+	INT_lock ();
 	if (!MQVALID(mq) || mqp->mq_state != MQ_DISABLE) {
-		restore(mask);
+		// restore(mask);
+		INT_unlock ();
 		signal (mqsem);
 		return SYSERR;
 
@@ -387,7 +413,8 @@ int32	mqclear (
 	/* Set the state to "clearing" during iteration */
 
 	mqp->mq_state = MQ_CLEAR;
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 	signal (mqsem);
 
 	/* Iterate through all messages and use func to dispose of each	*/
@@ -397,12 +424,15 @@ int32	mqclear (
 	}
 	mqp->mq_count = 0;
 
-	mask = disable();
-
 	/* Reset the state to disabled*/
 
+	// mask = disable();
+	INT_lock ();
 	mqp->mq_state = MQ_DISABLE;
-	restore(mask);
+	// restore(mask);
+	INT_unlock ();
 
 	return OK;
 }
+
+/* THE END */

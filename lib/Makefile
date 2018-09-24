@@ -9,9 +9,11 @@ INCS = -I. -I..
 include ../Makefile.inc
 
 OBJS =  string.o ctype.o vsprintf.o string_helpers.o \
-	hexdump.o kstrtox.o div64.o \
-	findbit.o \
-	div64asm.o
+	hexdump.o kstrtox.o div64.o
+
+# XXX do we really need these ??
+#	findbit.o \
+#	div64asm.o
 
 #AOPTS = -D__ASSEMBLY__ -include asm/unified.h
 AOPTS = -D__ASSEMBLY__

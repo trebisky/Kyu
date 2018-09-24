@@ -888,6 +888,7 @@ char *bitmap_string(char *buf, char *end, unsigned long *bitmap,
 	return buf;
 }
 
+#ifdef KYU_NOT_NEEDED
 static noinline_for_stack
 char *bitmap_list_string(char *buf, char *end, unsigned long *bitmap,
 			 struct printf_spec spec, const char *fmt)
@@ -927,6 +928,7 @@ char *bitmap_list_string(char *buf, char *end, unsigned long *bitmap,
 	}
 	return buf;
 }
+#endif
 
 /* Kyu - this could be handy */
 static noinline_for_stack
@@ -1499,6 +1501,7 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		return resource_string(buf, end, ptr, spec, fmt);
 	case 'h':
 		return hex_string(buf, end, ptr, spec, fmt);
+#ifdef KYU_NOT_NEEDED
 	case 'b':
 		switch (fmt[1]) {
 		case 'l':
@@ -1506,6 +1509,7 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		default:
 			return bitmap_string(buf, end, ptr, spec, fmt);
 		}
+#endif
 	case 'M':			/* Colon separated: 00:01:02:03:04:05 */
 	case 'm':			/* Contiguous: 000102030405 */
 					/* [mM]F (FDDI) */

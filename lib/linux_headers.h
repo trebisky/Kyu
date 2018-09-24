@@ -88,8 +88,18 @@ typedef int size_t;
 typedef int ssize_t;
 typedef int ptrdiff_t;
 
-/* XXX - this like much else here is ARM specific */
+/* XXX -
+ * For armv7 it was a quick hack to just define this
+ * here as "32", now we need something more and
+ * I am getting things done with -DARM64 on the
+ * compiler invocation.  tjt  9-23-2018
+ */
+#ifdef ARM64
+#define BITS_PER_LONG		64
+#define BITS_PER_LONG_LONG	64
+#else
 #define BITS_PER_LONG	32
+#endif
 
 /* why this ?? */
 #define PAGE_SIZE	4096
