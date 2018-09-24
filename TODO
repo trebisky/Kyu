@@ -2,3 +2,5 @@
 But this leaves me wondering why interrupt locking is needed at all here.
 It is done only in timer.c and mq.c and I don't see why a locking semaphore
 would not suffice.  Also scan this carefully for races involving Xinu wait/signal.
+
+9-23-2018 working in v8 branch for armv8 stuff
