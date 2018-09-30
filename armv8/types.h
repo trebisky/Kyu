@@ -6,6 +6,9 @@
  * so is long long.  int is 4 bytes.
  */
 
+#ifndef __TYPES_H_
+#define __TYPES_H_	1
+
 typedef	int				i32;
 typedef	unsigned int			u32;
 typedef	volatile unsigned int		vu32;
@@ -13,5 +16,9 @@ typedef	volatile unsigned int		vu32;
 typedef	long				i64;
 typedef	unsigned long			u64;
 typedef	volatile unsigned long		vu64;
+
+typedef	unsigned long			reg_t;
+
+#endif
 
 /* THE END */

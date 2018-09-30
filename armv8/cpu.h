@@ -14,7 +14,16 @@
  *  Kyu project  9-23-2018  Tom Trebisky
  */
 
-/* Almost surely we could do something ARM specific
+#ifndef __CPU_H_
+#define __CPU_H_	1
+
+#define NUM_IREGS	34
+
+/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+
+/* Byte swapping macros.
+ * Almost surely we could do something ARM specific
  * that would be better than this. XXX XXX
  * Quick and dirty for now  5-30-2015 10:45 PM
  * Stolen from u-boot include/linux/byteorder/little-endian.h
@@ -67,6 +76,9 @@ r_CCNT ( void )
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
+#define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
+#define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
+
 /* These only go inline with gcc -O of some kind */
 static inline void
 INT_unlock ( void )
@@ -80,9 +92,19 @@ INT_lock ( void )
         asm volatile("msr DAIFSet, #3" : : : "cc");
 }
 
+/* The above Clr/Set work as if DAIF is right justified, as you might expect.
+ *  Note that I am enabling/disabling both IRQ and FIQ.
+ * The following raw read/write deal with DAIF shifted left 6 bits
+ *  just as it is located in the PSR, which is different than the above.
+ */
+
 /* DAIF */
+#define get_DAIF(val)	asm volatile ( "mrs %0, DAIF" : "=r" ( val ) )
+#define set_DAIF(val)	asm volatile ( "msr DAIF, %0" : : "r" ( val ) )
+
+#ifdef notdef
 static inline unsigned int
-raw_read_daif ( void )
+raw_read_DAIF ( void )
 {
 	unsigned int val;
 
@@ -92,15 +114,20 @@ raw_read_daif ( void )
 }
 
 static inline void
-raw_write_daif( unsigned int val )
+raw_write_DAIF( unsigned int val )
 {
 	__asm__ __volatile__("msr DAIF, %0\n\t" : : "r" (val) : "memory");
 }
+#endif
+
+#endif
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
 #ifdef notdef
+
+/* ARM v7 stuff parked below here */
 
 /* These functions don't get compiled inline unless some level of
  * optimization is enabled.  By default they become just static functions
@@ -163,18 +190,8 @@ raw_write_daif( unsigned int val )
 #define set_TLB_INV_MVA(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 1" : : "r" ( val ) )
 #define set_TLB_INV_ASID(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 2" : : "r" ( val ) )
 
-/* Note that macros of the "get_XXX" type do not allow expressions like
- * var = get_XXX();
- * For that, we need inline functions, and we give them distinct names,
- *  such as r_XXX() to avoid collision with these macros.
- */
-#define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
-#define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
-#define get_PC(x)	asm volatile ("add %0, pc, #0\n" :"=r" ( x ) )
-
 #define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
 #define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
-
 
 #endif
 

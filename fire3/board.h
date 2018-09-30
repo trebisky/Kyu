@@ -31,22 +31,8 @@
 
 #define STACK_PER_CORE    MODE_STACK_SIZE * NUM_MODES
 
-#ifdef notdef
-#define SVR_STACK         MODE_STACK_SIZE
-#define IRQ_STACK         MODE_STACK_SIZE * 1
-#define FIQ_STACK         MODE_STACK_SIZE * 2
-#define SYSTEM_STACK      MODE_STACK_SIZE * 3
-#define ABORT_STACK       MODE_STACK_SIZE * 4
-#define UNDEFINED_STACK   MODE_STACK_SIZE * 5
-#endif
-
-/* XXX - This is 1G of RAM as I have on my PC and PC plus boards.
- * There are H3 based boards with 1/2 G (the Lite and One)
- * as well as H3 based boards with 2 G (the PC 2),
- *  but I am not working with any of those.
- */
-// #define BOARD_RAM_SIZE	0x40000000	/* 1G */
-#define BOARD_RAM_SIZE	0	/* Force probing */
+#define BOARD_RAM_SIZE	0x40000000	/* 1G */
+// #define BOARD_RAM_SIZE	0	/* Force probing */
 
 #define BOARD_RAM_MAX	0x40000000	/* 1G */
 

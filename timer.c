@@ -27,11 +27,21 @@ static int timer_rate;
 static volatile long timer_count_t;
 static volatile long timer_count_s;
 
+// XXX - gets corrupted when static
 static vfptr timer_hook;
+// vfptr timer_hook;
 
 #ifdef WANT_NET_TIMER
 static vfptr net_timer_hook;
 #endif
+
+/* XXX bogus debug-- */
+void
+timer_bogus ( void )
+{
+	printf ( "timer_hook: %016x = %016x\n", &timer_hook, timer_hook );
+	printf ( "net_timer_hook: %016x = %016x\n", &net_timer_hook, net_timer_hook );
+}
 
 /* XXX - needed by imported linux code.
  */
@@ -74,6 +84,8 @@ timer_tick ( void )
 {
 	static int subcount;
 
+	serial_puts ( "timer_tick 1\n" );
+
 	// ++jiffies;
 
 	/* These counts are somewhat bogus,
@@ -94,19 +106,27 @@ timer_tick ( void )
 	if ( ! cur_thread )
 	    panic ( "timer, cur_thread" );
 
+	serial_puts ( "timer_tick 2\n" );
+
 	++cur_thread->prof;
 
 	thread_tick ();
+	serial_puts ( "timer_tick 3\n" );
+
+	printf ( "timer_hook: %08x\n", timer_hook );
+	timer_bogus ();
 
 	if ( timer_hook ) {
 	    (*timer_hook) ();
 	}
+	serial_puts ( "timer_tick 4\n" );
 
 #ifdef WANT_NET_TIMER
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
 #endif
+	serial_puts ( "timer_tick 5\n" );
 }
 
 /* Public entry point.

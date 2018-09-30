@@ -16,6 +16,8 @@
  *	memory dump routines.
  *	string routines
  */
+
+#include "arch/types.h"
 #include "kyu.h"
 #include "thread.h"
 #include "kyulib.h"
@@ -278,10 +280,10 @@ dump_w ( void *addr, int n )
 void
 dump_l ( void *addr, int n )
 {
-	unsigned long *p;
+	u32 *p;
 	int i;
 
-	p = (unsigned long *) addr;
+	p = (u32 *) addr;
 
 	while ( n-- ) {
 	    printf ( "%08x  ", (long) addr );
@@ -297,7 +299,9 @@ dump_l ( void *addr, int n )
 /* For sanity when testing */
 #define LIMITS
 
-/* Dump this many words */
+/* Dump this many words,
+ * where a "word" is a 4 byte object.
+ */
 void
 dump_ln ( void *addr, int nw )
 {
@@ -310,10 +314,10 @@ dump_ln ( void *addr, int nw )
 }
 
 void
-fill_l ( void *addr, long data, int n )
+fill_l ( void *addr, u32 data, int n )
 {
-	unsigned long *p =
-	    (unsigned long *) addr;
+	u32 *p =
+	    (u32 *) addr;
 
 	while ( n-- )
 	    *p++ = data;

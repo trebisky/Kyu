@@ -185,7 +185,9 @@ board_mmu_init ( void )
 	// ram_size = BOARD_RAM_SIZE;
 
 	printf ( "Probing for amount of ram\n" );
-	ram_size = ram_probe ( ram_start );
+
+	// ram_size = ram_probe ( ram_start );
+	ram_size = BOARD_RAM_SIZE;
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
 
 	mmu_initialize ( ram_start, ram_size );
@@ -255,11 +257,9 @@ board_hardware_init ( void )
         printf ( "board_hardware_init - cpsr: %08x\n",  reg );
 	*/
 
-	puts ( " BHI 1\n" );
 	cache_init ();
-	puts ( " BHI 2\n" );
 	ram_init ( ram_start, ram_size );
-	puts ( " BHI 3\n" );
+
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
 	// stack_addr_show ();
 }

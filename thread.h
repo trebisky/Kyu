@@ -5,10 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* thread.h
+ *
+ * thread.h
  * T. Trebisky  8/25/2002
  */
+
+#include "arch/types.h"
+#include "arch/cpu.h"
 
 #ifndef NULL
 #define NULL	(0)
@@ -99,14 +102,14 @@ void cpu_signal ( struct sem * );
  * is always done from synchronous calls
  */
 struct jmp_regs {
-	int regs[17];
+	reg_t regs[NUM_IREGS];
 };
 
 /* We have to save all registers here, since
  * an interrupt is entirely unpredictable.
  */
 struct int_regs {
-	int regs[17];
+	reg_t regs[NUM_IREGS];
 };
 
 /* These aren't really registers.
@@ -117,7 +120,7 @@ struct int_regs {
  * to be retroed to the x86 someday.
  */
 struct cont_regs {
-	int regs[4];
+	reg_t regs[4];
 };
 #endif
 

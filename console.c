@@ -229,6 +229,7 @@ puts ( char *buf )
 	    serial_putc ( '\n' );
 	}
 #endif
+
 #ifdef ARCH_X86
 	if ( cur_thread->con_mode == SIO_0 ) {
 	    sio_puts ( 0, buf );
@@ -272,9 +273,15 @@ console_puts ( char *buf )
 	h3_spin_unlock ( 3 );
 #endif
 #endif
+
+#ifdef BOARD_FIRE3
+	serial_puts ( buf );
+#endif
+
 #ifdef BOARD_BBB
 	serial_puts ( buf );
 #endif
+
 #ifdef ARCH_X86
 	if ( cur_thread->con_mode == SIO_0 )
 	    sio_puts ( 0, buf );

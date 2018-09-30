@@ -84,7 +84,7 @@ net_debug_arm ( void )
  * on the ARM with the cpsw, sometimes the boot hangs with
  * the message "Waiting for PHY auto negotiation to complete".
  * I decided it would be much nicer to have this hung in its own
- * thread and have he Kyu shell to help debug the situation.
+ * thread and have the Kyu shell available to help debug the situation.
  */
 void
 net_hw_init ( int bogus )

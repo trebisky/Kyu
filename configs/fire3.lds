@@ -1,7 +1,9 @@
-/* ld script to make kyu for the orange_pi
+/* ld script to make kyu for the ARMv8 fire3 samsung s5p6818
+ *
  * Modified from the linux .lds script, 8/2002 tjt
  * Modified from the skidoo .lds script, 9/2015 tjt
  * Modified from the BBB .lds script, 1/2017 tjt
+ * Modified from the OrangePI .lds script, 9/2018 tjt
  *
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
@@ -30,7 +32,12 @@ SECTIONS
 
   _edata = .;			/* End of data section */
 
-  . = ALIGN(4096);		/* Init code and data */
+  /* Init code and data */
+  /* This business is Linux specific,
+   *   and we don't need it.
+   */
+  /*
+  . = ALIGN(4096);
   __init_begin = .;
   .text.init : { *(.text.init) }
   .data.init : { *(.data.init) }
@@ -46,6 +53,7 @@ SECTIONS
   . = ALIGN(4096);
 
   __init_end = .;
+  */
 
   __bss_start__ = .;		/* BSS */
   .bss : {

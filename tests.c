@@ -254,6 +254,8 @@ test_main ( int xx )
 	 */
 	thr_yield ();
 
+	printf ( "TJT in test_main\n" );
+
 	for ( ;; ) {
 
 	    printf ( "Kyu, ready> " );

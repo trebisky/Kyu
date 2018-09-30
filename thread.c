@@ -345,7 +345,7 @@ thr_sched ( void )
 	/* launch the system by running the
 	 * current thread
 	 */
-	 printf ( "thr_sched launching first thread %08x\n", &cur_thread->cregs ); 
+	 printf ( "thr_sched launching first thread %08x (%s)\n", &cur_thread->cregs, cur_thread->name );
 
 #ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );

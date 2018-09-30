@@ -15,6 +15,7 @@
 
 #include "types.h"
 #include "cpu.h"
+
 #include "board/board.h"
 #include "board/fire3_ints.h"
 
@@ -54,6 +55,36 @@ irq_hookup ( int irq, irq_fptr func, void *arg )
 	}
 }
 
+void
+resume_c ( void *p )
+{
+	printf ( "Resume_c called: %08x (%s --> ---)\n", p, cur_thread->name );
+	resume_cc ( p );
+}
+
+static int icount = 0;
+
+void
+resume_i ( void *p )
+{
+	struct thread *tp = (struct thread *) p;
+
+	// Mystery - turn this on and things work.
+	if ( icount < 1000 ) {
+	    printf ( "Resume_i called: %08x (%s --> %s)\n", p, cur_thread->name, tp->name );
+	    icount++;
+	}
+	resume_ii ( p );
+}
+
+void
+resume_j ( void *p )
+{
+	struct thread *tp = (struct thread *) p;
+
+	printf ( "Resume_j called: %08x (%s --> %s)\n", p, cur_thread->name, tp->name );
+	resume_jj ( p );
+}
 
 /* Interrupt handler, called at interrupt level
  * when the IRQ line indicates an interrupt.
@@ -62,47 +93,67 @@ void
 do_irq ( void )
 {
 	int nint;
-	struct thread *tp;
+	// struct thread *tp;
+
+	serial_puts ( "IN do_irq 1\n" );
 
 	if ( ! cur_thread )
 	    panic ( "irq int, cur_thread" );
 
-#ifdef notdef
-	/* XXX */
-	printf ( "\n" );
-	printf ("Interrupt debug, sp = %08x\n", get_sp() );
-
-	show_thread_regs ( cur_thread, 0 );
-	printf ( "\n" );
-	show_stack ( get_sp (), 0 );
-	for ( ;; ) ;
-#endif
+	serial_puts ( "IN do_irq 2\n" );
 
 	/* Tell Kyu thread system we are in an interrupt */
 	start_interrupt ();
+	serial_puts ( "IN do_irq 3\n" );
 
 	nint = intcon_irqwho ();
 
-	/* Always swamps output, but useful in
+	serial_puts ( "IN do_irq 4\n" );
+
+// #define DEBUG_IRQ
+#ifdef DEBUG_IRQ
+	/* XXX */
+	printf ( "\n" );
+	printf ("Interrupt debug, irq %d\n", nint );
+
+	printf ( "cur_thread: %08x (%s)\n", cur_thread, cur_thread->name );
+	// dump_ln ( cur_thread, 40 );
+
+	show_thread_regs ( cur_thread, 64 );
+	/*
+	for ( ;; )
+	    ;
+	*/
+
+	/* Swamps output, but useful in
 	 * dire debugging situations.
 	printf ( "Interrupt %d\n", nint );
 	printf ( "#" );
 	*/
+#endif
+	serial_puts ( "IN do_irq 5\n" );
 
 	if ( ! irq_table[nint].func ) {
 	    /* Probably unrelated to current thread.
 	     * This is pretty severe - XXX
 	     */
 	    printf ("Unknown interrupt request: %d\n", nint );
-	    show_thread_regs ( cur_thread, 0 );
+	    show_thread_regs ( cur_thread, 64 );
 	    for ( ;; ) ;
 	}
+	serial_puts ( "IN do_irq 6\n" );
+
+	printf ( "IRQ table: nint: %d\n", nint );
+	printf ( "IRQ table: func: %08x\n", irq_table[nint].func );
+	printf ( "IRQ table: arg: %d\n", irq_table[nint].arg );
 
 	/* call the user handler
 	 */
 	(irq_table[nint].func)( irq_table[nint].arg );
+	serial_puts ( "IN do_irq 7\n" );
 
 	intcon_irqack ( nint );
+	serial_puts ( "IN do_irq 8\n" );
 
 	/* Tell Kyu thread system we are done with an interrupt.
 	 * This will return from interrupt via resume_i()
@@ -114,15 +165,12 @@ do_irq ( void )
 }
 
 /* exc is offset of the exception
- * esr is the esr (exception syndrome register)
- * regs is the regs
  */
 void
-sync_handler ( unsigned exc, unsigned esr, unsigned long *regs )
+fault_handler ( unsigned exc )
 {
-	unsigned int class = esr >> 26;		/* 31:26 */
-	unsigned int syndrome = esr & 0x1ffffff;	/* 24:0 */
 
+#ifdef notdef
 	switch( exc ) {
 	    case 0x280:     // IRQ
 		do_irq ();
@@ -136,15 +184,32 @@ sync_handler ( unsigned exc, unsigned esr, unsigned long *regs )
 		    }
 		}
 	}
+#endif
+	if ( ! cur_thread )
+	    panic ( "fault, invalid cur_thread" );
 
-	printf("\n--- PANIC! exception 0x%x, class=0x%x syndrome=0x%x\n",
-            exc, class, syndrome );
+	printf ( "\n" );
 
-	/*
-	printf("\n--- PANIC! exception 0x%x on CPU%d EL %d, class=0x%x syndrome=0x%x\n",
-            exc, GetCPUID(), GetCurrentSMode(), class, syndrome );
-	    */
+	if ( exc == 0x200 ) {	/* Synchronous Abort */
+	    printf ( "Synchronous Abort\n" );
+	} else {
+	    unsigned int esr, class, syndrome;
 
+	    /* ESR is the exception syndrome register */
+	    asm volatile ( "mrs %0, esr_el2" : "=r" ( esr ) );
+	    class = esr >> 26;		/* 31:26 */
+	    syndrome = esr & 0x1ffffff;	/* 24:0 */
+
+	    printf("\n--- PANIC! exception 0x%x, class=0x%x syndrome=0x%x\n",
+		exc, class, syndrome );
+	}
+
+	printf ( "cur_thread: %08x (%s)\n", cur_thread, cur_thread->name );
+	// dump_ln ( cur_thread, 40 );
+	show_thread_regs ( cur_thread, 64 );
+	show_vectors ();
+
+	printf ( "Spinning in fault_handler\n" );
 	for ( ;; )
 	    ;
 
@@ -229,7 +294,7 @@ evil_exception ( char *msg, int code )
 	}
 
 	printf ( "%s in thread %s\n", msg, cur_thread->name );
-	show_thread_regs ( cur_thread, 0 );
+	show_thread_regs ( cur_thread, 64 );
 
 	// printf ( "cur_thread = %08x\n", cur_thread );
 

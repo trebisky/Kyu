@@ -117,7 +117,61 @@ new_core ( int core, cfptr func, void *arg )
 	board_new_core ( core, func, arg );
 }
 
-/* This is the first bit of C code that runs in 32 bit mode.
+extern char __bss_start__;
+extern char __bss_end__;
+
+/* Nanopi Fire3 */
+struct sc_reset {
+	vu32	reg0;
+	vu32	reg1;
+	vu32	reg2;
+};
+
+#define SC_RESET_BASE	((struct sc_reset *) 0xC0012000)
+
+#define SC_GMAC_RESET	0x80000000	/* in reg1 */
+
+void
+check_bss ( void )
+{
+	char *p;
+	int bad;
+	struct sc_reset *scp = SC_RESET_BASE;
+
+	printf ( "BSS start: %016x\n", &__bss_start__ );
+	printf ( "BSS end: %016x\n", &__bss_end__ );
+
+	printf ( "SC reset reg1 = %08x\n", scp->reg1 );
+	/* We see 0x0c0402b0 -- so the GMAC is indeed reset */
+
+	bad = 0;
+	p = &__bss_start__;
+	for ( ; p < &__bss_end__; p++ ) {
+	    if ( *p ) {
+		printf ( "BSS bad: %016x %x\n", p, *p );
+		*p = 0;
+		printf ( "BSS verify: %016x %x\n", p, *p );
+		bad++;
+	    }
+	}
+
+	if ( bad ) {
+	    printf ( "%d BSS bytes corrupted\n", bad );
+	    printf ( " -- GAME over\n" );
+	    printf ( " *******************\n" );
+	    printf ( " *******************\n" );
+	    printf ( " *******************\n" );
+	    printf ( " *******************\n" );
+	    printf ( " *******************\n" );
+	    printf ( " *******************\n" );
+	    for ( ;; )
+		;
+	}
+
+}
+
+/* This is --almost-- the first bit of C code that runs in 32 bit mode.
+ *  almost, because we call board_mmu_init() before calling this.
  *
  * It runs with whatever stack we inherit from U-boot.
  * We abandon this as soon as we can (namely when this routine exits).
@@ -127,7 +181,7 @@ void
 kyu_startup ( void )
 {
 	unsigned long malloc_base;
-	int val;
+	reg_t val;
 
 #ifdef notdef
 	// ensure core stack pointer valid
@@ -136,7 +190,32 @@ kyu_startup ( void )
 	test_core ();
 #endif
 
-	puts ( "Kyu startup 1\n" );
+	get_SP ( val );
+	printf ( "Kyu starting with stack: %08x\n",  val );
+	get_DAIF ( val );
+	printf ( "Kyu starting with DAIF: %08x\n",  val );
+
+	// check_bss ();
+	timer_bogus ();
+
+#ifdef ARM64_TEST
+	/* The following yields this:
+	    Kyu starting with stack: 7b63bab0
+	    Kyu starting with DAIF: 000003c0
+	    So DAIF all are set to "1" (everything masked off)
+	    DAIF is shifted left 6 bits.
+	*/
+
+	get_SP ( val );
+	printf ( "Kyu starting with stack: %08x\n",  val );
+	get_DAIF ( val );
+	printf ( "Kyu starting with DAIF: %08x\n",  val );
+	/*
+	INT_unlock ();
+	get_DAIF ( val );
+	printf ( "Kyu starting with DAIF: %08x\n",  val );
+	*/
+#endif
 
 #ifdef ARMV7
 	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
@@ -152,16 +231,12 @@ kyu_startup ( void )
 
 	board_hardware_init ();
 
-	puts ( "Kyu startup 2\n" );
-
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
 	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
 	hardware_init ();
 	console_initialize ();
-
-	puts ( "Kyu startup 3\n" );
 
 #ifdef WANT_FLOAT
 	/* XXX -- floating point hijinks */
@@ -197,6 +272,9 @@ kyu_startup ( void )
 	/*
 	printf ( "Stack at %08x\n", get_sp() );
 	*/
+	// show_my_regs ();
+
+	// timer_bogus (); OK
 
 	thr_init ();	/* prep thread system */
 	thr_sched ();	/* set threads running */
@@ -207,6 +285,71 @@ kyu_startup ( void )
 	 */
 	panic ( "thr_sched" );
 }
+
+#define BASIC_CHECKOUT
+#ifdef BASIC_CHECKOUT
+
+void
+thr_checkout ( int arg )
+{
+	// INT_lock ();
+	printf ( "Checkout thread: %d\n", arg );
+	timer_bogus ();
+}
+
+// extern vfptr timer_hook;
+
+static unsigned long last_addr;
+void
+thr_cexit ( void )
+{
+	printf ( "Checkout thread exit, spinning\n" );
+	timer_bogus ();
+	// printf ( "timer_hook: %016x = %016x\n", &timer_hook, timer_hook );
+	// last_addr = timer_hook;
+	for ( ;; )
+	    ;
+}
+
+extern long vectors[16];
+
+void
+show_vectors ( void )
+{
+	printf ( "Vectors\n" );
+	dump_ln ( vectors, 64 );
+}
+
+extern struct thread *cur_thread;
+
+#define BASIC_STACK_SIZE 1024
+static int basic_stack[BASIC_STACK_SIZE];
+
+static void
+basic_checkout ( void )
+{
+	reg_t cregs[4];
+	reg_t val;
+
+	get_SP ( val );
+	printf ( "in basic_checkout with stack: %016x\n",  val );
+
+	printf ( "Start basic checkout\n" );
+	printf ( "  cur_thread = %08x\n", cur_thread );
+	// show_vectors ();
+	timer_bogus ();
+
+	cregs[0] = (long) 7;
+	cregs[1] = (long) thr_checkout;
+	cregs[2] = (unsigned long) &basic_stack[BASIC_STACK_SIZE];
+	cregs[3] = (long) thr_cexit;
+
+	printf ( "Launch basic checkout\n" );
+	timer_bogus ();
+
+	resume_c ( cregs );
+}
+#endif
 
 /* This is the first thread.
  * (many things expect to run with a valid current_thread).
@@ -242,19 +385,33 @@ sys_init ( int xxx )
 	printf ( "sys_init thread running\n" );
 	printf ( "Stack at %08x\n", get_sp() );
 	*/
-
 	console_init ();
 	// hardware_debug ();
 
 	board_init ();
 
+	// timer_bogus (); OK to here
+
 	// now done in board_init();
 	// timer_init ( DEFAULT_TIMER_RATE );
 
+	// See if this fixes our interrupt race on startup
+	// (it does NOT)
+	// delay_ms ( 2000 );
+
 	/* enable interrupts */
+
+	/* Added 9-28-2018 -- not interesting */
+	// check_bss ();
+
+	// validate resume_c
+	basic_checkout ();
+
+	// Actually this is bogus because every thread is
+	//   launched with interrupts enabled.
 	printf ( "Enabling interrupts\n" );
-	// cpu_leave ();
 	INT_unlock;
+	// printf ( "BOGUS: Interrupts NOT enabled\n");
 
 	/* display the MMU setup handed us by U-Boot */
 	// mmu_scan ( "From U-Boot " );
@@ -284,7 +441,7 @@ sys_init ( int xxx )
 #endif
 
 #ifdef WANT_NET
-	net_init ();
+	// net_init ();
 #endif
 
 /* These things must be after net_init() because
@@ -316,6 +473,8 @@ sys_init ( int xxx )
 	// test_core (); works here
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
+
+	printf ( "TJT done with sys_init\n" );
 }
 
 /* The usual case is that this is not defined and

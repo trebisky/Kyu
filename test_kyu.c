@@ -24,16 +24,16 @@
 #include "tests.h"
 
 #ifdef ARM64
-#define DAIF_IRQ_BIT	0x2
-#define DAIF_FIQ_BIT	0x1
+/* DAIF comes shifted left 6 bits as in the PSR */
+#define DAIF_IRQ_BIT	0x80
+#define DAIF_FIQ_BIT	0x40
 
-/* XXX - untested */
 static int
 is_irq_disabled ( void )
 {
 	unsigned int val;
 
-	val = raw_read_daif ();
+	get_DAIF ( val );
 
 	if ( val & DAIF_IRQ_BIT )
 	    return 1;

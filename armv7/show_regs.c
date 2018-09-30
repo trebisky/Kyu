@@ -36,9 +36,12 @@
 #include <kyulib.h>
 #include <thread.h>
 
+#include "cpu.h"
+
 struct thread *cur_thread;
 
-#define ARM_REGS	17	/* include psr */
+// now use NUM_IREGS from cpu.h
+// #define ARM_REGS	17	/* include psr */
 
 #define USR26_MODE	0x00
 #define FIQ26_MODE	0x01
@@ -67,7 +70,7 @@ struct thread *cur_thread;
    stack during a system call. */
 
 struct arm_regs {
-	long uregs[ARM_REGS];
+	long uregs[NUM_IREGS];
 };
 
 #define ARM_cpsr	uregs[16]

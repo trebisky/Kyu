@@ -4,6 +4,7 @@
  */
 
 #include "arch/types.h"
+#include "arch/cpu.h"
 #include "fire3_ints.h"
 
 #define N_TIMERS	5
@@ -52,8 +53,6 @@ struct timer {
 
 #define TIMER_CLOCK	1000000
 
-int tcount = 0;
-
 void
 fire3_timer_rate_set ( int rate )
 {
@@ -61,7 +60,9 @@ fire3_timer_rate_set ( int rate )
 
 	tp->control &= ~T0_RUN;
 
-	tp->timer[0].count = TIMER_CLOCK / rate;
+	printf ( "BOGUS slow timer rate set\n" );
+	tp->timer[0].count = TIMER_CLOCK * 2;
+	// tp->timer[0].count = TIMER_CLOCK / rate;
 	tp->timer[0].cmp = 0;
 
 	/* Pulse the load bit */
@@ -71,8 +72,8 @@ fire3_timer_rate_set ( int rate )
 	tp->control |= T0_RUN;
 }
 
-void
-fire3_timer_init ( int rate )
+static void
+timer_start ( int rate )
 {
 	struct timer *tp = TIMER_BASE;
 
@@ -95,6 +96,8 @@ fire3_timer_init ( int rate )
 	tp->control = 0;
 
 	fire3_timer_rate_set ( rate );
+	// printf ( "BOGUS slow timer rate set\n" );
+	// fire3_timer_rate_set ( 1 );
 
 #ifdef notdef
 	tp->timer[0].count = TIMER_CLOCK / rate;
@@ -105,18 +108,16 @@ fire3_timer_init ( int rate )
 	tp->control = T0_AUTO;
 #endif
 
-	printf ( "T0 = %08x\n", tp->timer[0].obs );
-	printf ( "T0 = %08x\n", tp->timer[0].obs );
-	printf ( "--\n" );
+	// printf ( "T0 = %08x\n", tp->timer[0].obs );
+	// printf ( "T0 = %08x\n", tp->timer[0].obs );
+	// printf ( "--\n" );
 
 	tp->int_cstat |= T0_IENABLE;
 
 	intcon_ena ( IRQ_TIMER0 );
 	tp->control |= T0_RUN;
 
-	/* We don't yet initialize the BSS */
-	tcount = 0;
-	printf ( "Go\n" );
+	// printf ( "Go\n" );
 
 	/*
 	for ( ;; ) {
@@ -135,20 +136,74 @@ fire3_timer_init ( int rate )
 	*/
 }
 
-void
-timer_handler ( void )
+static void
+timer_ack ( void )
 {
 	struct timer *tp = TIMER_BASE;
 
 	tp->int_cstat |= T0_ISTAT;
-	tcount++;
-	printf ( "Timer count = %d\n", tcount );
+}
 
-	/*
-	serial_putc ( '.' );
-	if ( tcount % 10 == 0 )
-	    printf ( "Tcount = %d\n", tcount );
-	*/
+static int tcount;
+
+/* Handle a timer interrupt */
+/* Called at interrupt level */
+static void
+timer_handler ( int junk )
+{
+	serial_puts ( "timer_handler\n" );
+        timer_tick ();
+	tcount++;
+	printf ( "DING ---------------- %d %016x\n", tcount, &tcount );
+
+/*
+	if ( tcount % 1000 == 0 )
+	    printf ( "DING ---------------- %d\n", tcount );
+*/
+
+        timer_ack ();
+}
+
+static int last_count;
+
+/* There are some problems with this.
+ * This is really too early in initialization to
+ * enable interrupts and some race conditions
+ * will cause this to fail at the usual 1000 Hz rate.
+ * It works fine with a 1 Hz rate.
+ */
+static void
+timer_checkout ( void )
+{
+	last_count = -1;
+	printf ( "Spinning in timer_init\n" );
+	INT_unlock ();
+
+	// for now Kyu startup will hang here
+	// until we get interrupts working.
+	for ( ;; ) {
+	    // if ( tcount == 1 || (tcount % 1000) == 0 )
+	    if ( tcount != last_count ) {
+		printf (" *****\n" );
+		printf (" ***** Tcount = %d\n", tcount );
+		printf (" *****\n" );
+		last_count = tcount;
+	    }
+	}
+
+	printf ( "Done spinning in timer_init\n" );
+}
+
+/* Called during Kyu startup */
+void
+fire3_timer_init ( int rate )
+{
+        irq_hookup ( IRQ_TIMER0, timer_handler, 0 );
+
+        timer_start ( rate );
+
+	// timer_checkout ();
+
 }
 
 /* THE END */

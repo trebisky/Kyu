@@ -15,6 +15,11 @@
  *     Tom Trebisky  1/7/2017
  */
 
+#ifndef __CPU_H_
+#define __CPU_H_	1
+
+#define NUM_IREGS	17
+
 /* List of fault codes */
 /* The first 8 are ARM hardware exceptions and interrupts */
 
@@ -215,5 +220,7 @@ static inline int splfiq ( void )
     return rv;
 }
 #endif
+
+#endif /* __CPU_H_ */
 
 /* THE END */

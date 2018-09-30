@@ -31,11 +31,25 @@ asm_startup:
 after:
 #endif
 
+/* ----------------------------------------------------------- */
+
 reset:
+	msr DAIFSet, #0xf
 	bl	remap_vectors
 
 	bl      clear_bss
         dsb	sy
+
+	/*
+	ldr	x0, =0x400f4100
+	ldr	x1, =0xdeadbeef
+	str	x1, [x0]
+
+	ldr	x0, =0x400f4104
+	str	x1, [x0]
+	ldr	x0, =0x400f4108
+	str	x1, [x0]
+	*/
 
         bl      board_mmu_init
         dsb	sy
@@ -46,67 +60,371 @@ reset:
 
 	b	.
 
-/* === *** resume_c
- *
- * This routine launches a thread from scratch.
- *  On the ARM it gets a pointer (in x0)
- *  to an array of 4 items:
- *      an argument to pass
- *      a place to start up at.
- *      an initial stack pointer.
- *      a place to return to (usually thr_exit)
- * XXX danger if this is used from interrupt as we
- *  are not doing sp and lr properly
- */
-        .globl resume_c
-resume_c:
-	ldp	x1, x2, [x0]
-	ldp	x3, x30, [x0,16]
-	// add	sp_el2, x3, #0
-	// mov	sp_el2, x3
-	mov	sp, x3
-	mov	x0, x1
-	br	x2
-
-        .globl resume_i
-resume_i:
-	ret
-
-        .globl resume_j
-resume_j:
-	ret
-
-        .globl save_j
-save_j:
-	ret
-
-
-
-#ifdef OLD_v7
-        .globl resume_c
-resume_c:
-        ldmia   r0,{r0,ip,sp,lr}
-
-        mrs     r1, cpsr
-        bic     r1, r1, #0xff
-        orr     r1, r1, #PSR_M_SVR      /* enable both IRQ and FIQ */
-        msr     cpsr, r1
-
-        mov     fp, #0          /* added 8-13-2016 to end backtraces */
-        mov     pc, ip
-#endif
-
 /* ----------------------------------------------------------- */
 
 clear_bss:
         ldr     x0, =__bss_start__
         ldr     x1, =__bss_end__
+
         mov     x2, #0
-1:	str     x2, [x0]
-        add     x0, x0, #8
+	mov	x3, #0
+// 1:	str     x2, [x0]
+1:	stp     x2, x3, [x0]
+        add     x0, x0, #16
         cmp     x0, x1
-        b.lo    1f
+        b.lo    1b
 	ret
+
+/* ----------------------------------------------------------- */
+
+#define PSR_MODE	0x9	/* EL2h */
+#define PSR_D_BIT	0x200
+#define PSR_A_BIT	0x100
+#define PSR_I_BIT	0x080
+#define PSR_F_BIT	0x040
+
+/* New threads fire up with interrupts enabled */
+// #define INITIAL_PSR	(PSR_D_BIT | PSR_A_BIT | PSR_MODE)
+#define INITIAL_PSR	0x309
+
+// This needs to have DAIF added.
+// #define BARE_PSR	(PSR_MODE)
+#define BARE_PSR	0x009
+
+/* resume_c ( cregs )
+ *
+ * This routine launches a thread from scratch.
+ *  On the ARM it gets a pointer (in x0)
+ *  to an array of 4 items:
+ *      1 - an argument to pass
+ *      2 - a place to start up at.
+ *      3 - an initial stack pointer.
+ *      4 - a place to return to (usually thr_exit)
+ */
+        .globl resume_cc
+resume_cc:
+	ldp	x1, x2, [x0]
+	ldp	x3, x30, [x0,16]
+	mov	sp, x3
+
+        msr     elr_el2, x2
+	// ldr	x2, =INITIAL_PSR
+	mov	x2, #INITIAL_PSR
+        msr     spsr_el2, x2
+
+	mov	fp, #0		/* to end backtraces */
+	mov	x0, x1
+	eret
+
+// for testing and experimentation.
+	.globl get_regs
+get_regs:
+	stp	x0, x1, [x0]
+        stp     x2, x3, [x0, 16]
+        stp     x4, x5, [x0, 32]
+        stp     x6, x7, [x0, 48]
+        stp     x8, x9, [x0, 64]
+        stp     x10, x11, [x0, 80]
+        stp     x12, x13, [x0, 96]
+        stp     x14, x15, [x0, 112]
+        stp     x16, x17, [x0, 128]
+        stp     x18, x19, [x0, 144]
+        stp     x20, x21, [x0, 160]
+        stp     x22, x23, [x0, 176]
+        stp     x24, x25, [x0, 192]
+        stp     x26, x27, [x0, 208]
+        stp     x28, x29, [x0, 224]
+
+	mov	x1, sp
+        stp     x30, x1, [x0, 240]
+        stp     xzr, xzr, [x0, 256]
+	ret
+
+// resume_i ( iregs )
+// resume_j ( iregs )
+
+        .globl resume_ii
+        .globl resume_jj
+resume_ii:
+resume_jj:
+        ldp     x4, x5, [x0, 32]
+        ldp     x6, x7, [x0, 48]
+        ldp     x8, x9, [x0, 64]
+        ldp     x10, x11, [x0, 80]
+        ldp     x12, x13, [x0, 96]
+        ldp     x14, x15, [x0, 112]
+        ldp     x16, x17, [x0, 128]
+        ldp     x18, x19, [x0, 144]
+        ldp     x20, x21, [x0, 160]
+        ldp     x22, x23, [x0, 176]
+        ldp     x24, x25, [x0, 192]
+        ldp     x26, x27, [x0, 208]
+        ldp     x28, x29, [x0, 224]
+
+        ldp     x30, x1, [x0, 240]
+        mov     sp, x1
+
+        ldp     x1, x2, [x0, 256]
+        msr     elr_el2, x1
+        msr     spsr_el2, x2
+
+	ldp     x2, x3, [x0, 16]
+	ldp     x0, x1, [x0]
+	eret
+
+// save_j ( iregs )
+
+        .globl save_j
+save_j:
+	stp	x0, x1, [sp,-16]!	// push for now
+
+	stp	x2, x3, [x0, 16]
+	stp	x4, x5, [x0, 32]
+	stp	x6, x7, [x0, 48]
+	stp	x8, x9, [x0, 64]
+	stp	x10, x11, [x0, 80]
+	stp	x12, x13, [x0, 96]
+	stp	x14, x15, [x0, 112]
+	stp	x16, x17, [x0, 128]
+	stp	x18, x19, [x0, 144]
+	stp	x20, x21, [x0, 160]
+	stp	x22, x23, [x0, 176]
+	stp	x24, x25, [x0, 192]
+	stp	x26, x27, [x0, 208]
+	stp	x28, x29, [x0, 224]
+
+	mov	x1, sp
+	stp	x30, x1, [x0, 240]
+
+	// Here x1 will become elr_el2
+	// and x2 will become spsr_el2
+	mov	x2, #INITIAL_PSR
+	mrs	x2, DAIF
+	orr	x2, x2, x1
+
+	mov	x1, lr
+	stp	x1, x2, [x0, 256]
+
+	ldp	x1, x2, [sp], 16	// pop x0, x1
+	stp	x1, x2, [x0]		// save x0, x1
+
+	ret
+
+/* ----------------------------------------------------------- */
+
+remap_vectors:
+        adr     x3, vectors_el2
+        msr     VBAR_EL2, x3
+        ret
+
+.globl	cur_thread
+
+// Comes here with vector offset in x1 that needs
+// to end up in x0 as argument to fault_handler
+new_fault:
+
+	// stp	x0, x1, [sp,-16]!	// push for now
+	ldr	x0, =cur_thread
+	ldr	x0, [x0]
+
+	stp	x2, x3, [x0, 16]
+	stp	x4, x5, [x0, 32]
+	stp	x6, x7, [x0, 48]
+	stp	x8, x9, [x0, 64]
+	stp	x10, x11, [x0, 80]
+	stp	x12, x13, [x0, 96]
+	stp	x14, x15, [x0, 112]
+	stp	x16, x17, [x0, 128]
+	stp	x18, x19, [x0, 144]
+	stp	x20, x21, [x0, 160]
+	stp	x22, x23, [x0, 176]
+	stp	x24, x25, [x0, 192]
+	stp	x26, x27, [x0, 208]
+	stp	x28, x29, [x0, 224]
+
+	mov	x2, sp
+	stp	x30, x2, [x0, 240]
+
+	mrs	x2, elr_el2
+	mrs	x3, spsr_el2
+	stp	x2, x3, [x0, 256]
+
+	ldp	x2, x3, [sp], 16	// pop x0, x1
+	stp	x2, x3, [x0]		// save x0, x1
+
+	mov	x0, x1
+	b	fault_handler
+
+// identical to the above, but calls the IRQ handler
+new_irq:
+
+	stp	x0, x1, [sp,-16]!	// push for now
+	ldr	x0, =cur_thread
+	ldr	x0, [x0]
+	stp	x2, x3, [x0, 16]
+	stp	x4, x5, [x0, 32]
+	stp	x6, x7, [x0, 48]
+	stp	x8, x9, [x0, 64]
+	stp	x10, x11, [x0, 80]
+	stp	x12, x13, [x0, 96]
+	stp	x14, x15, [x0, 112]
+	stp	x16, x17, [x0, 128]
+	stp	x18, x19, [x0, 144]
+	stp	x20, x21, [x0, 160]
+	stp	x22, x23, [x0, 176]
+	stp	x24, x25, [x0, 192]
+	stp	x26, x27, [x0, 208]
+	stp	x28, x29, [x0, 224]
+
+	mov	x1, sp
+	stp	x30, x1, [x0, 240]
+
+	mrs	x1, elr_el2
+	mrs	x2, spsr_el2
+	stp	x1, x2, [x0, 256]
+
+	ldp	x1, x2, [sp], 16	// pop x0, x1
+	stp	x1, x2, [x0]		// save x0, x1
+
+	b	do_irq
+
+#ifdef notdef
+.fault:
+    stp     x27, x28, [sp, -16]!
+    stp     x25, x26, [sp, -16]!
+    stp     x23, x24, [sp, -16]!
+    stp     x21, x22, [sp, -16]!
+    stp     x19, x20, [sp, -16]!
+    stp     x17, x18, [sp, -16]!
+    stp     x15, x16, [sp, -16]!
+    stp     x13, x14, [sp, -16]!
+    stp     x11, x12, [sp, -16]!
+    stp     x9,  x10, [sp, -16]!
+    stp     x7,  x8,  [sp, -16]!
+    stp     x5,  x6,  [sp, -16]!
+    stp     x3,  x4,  [sp, -16]!
+    stp     x1,  x2,  [sp, -16]!
+    stp     xzr, x0,  [sp, -16]!
+
+    mov     x0, x29
+    // add     x1, sp, 8
+    // add     x1, sp, 0
+    mov     x1, sp
+    bl      fault_handler
+
+    ldp     xzr, x0,  [sp], 16
+    ldp     x1,  x2,  [sp], 16
+    ldp     x3,  x4,  [sp], 16
+    ldp     x5,  x6,  [sp], 16
+    ldp     x7,  x8,  [sp], 16
+    ldp     x9,  x10, [sp], 16
+    ldp     x11, x12, [sp], 16
+    ldp     x13, x14, [sp], 16
+    ldp     x15, x16, [sp], 16
+    ldp     x17, x18, [sp], 16
+    ldp     x19, x20, [sp], 16
+    ldp     x21, x22, [sp], 16
+    ldp     x23, x24, [sp], 16
+    ldp     x25, x26, [sp], 16
+    ldp     x27, x28, [sp], 16
+    ldp     x29, x30, [sp], 16
+    eret
+
+
+.irq:
+1:  stp     x29, x30, [sp, -16]!
+    stp     x27, x28, [sp, -16]!
+    stp     x25, x26, [sp, -16]!
+    stp     x23, x24, [sp, -16]!
+    stp     x21, x22, [sp, -16]!
+    stp     x19, x20, [sp, -16]!
+    stp     x17, x18, [sp, -16]!
+    stp     x15, x16, [sp, -16]!
+    stp     x13, x14, [sp, -16]!
+    stp     x11, x12, [sp, -16]!
+    stp     x9,  x10, [sp, -16]!
+    stp     x7,  x8,  [sp, -16]!
+    stp     x5,  x6,  [sp, -16]!
+    stp     x3,  x4,  [sp, -16]!
+    stp     x1,  x2,  [sp, -16]!
+    stp     xzr, x0,  [sp, -16]!
+
+    bl      do_irq
+
+    ldp     xzr, x0,  [sp], 16
+    ldp     x1,  x2,  [sp], 16
+    ldp     x3,  x4,  [sp], 16
+    ldp     x5,  x6,  [sp], 16
+    ldp     x7,  x8,  [sp], 16
+    ldp     x9,  x10, [sp], 16
+    ldp     x11, x12, [sp], 16
+    ldp     x13, x14, [sp], 16
+    ldp     x15, x16, [sp], 16
+    ldp     x17, x18, [sp], 16
+    ldp     x19, x20, [sp], 16
+    ldp     x21, x22, [sp], 16
+    ldp     x23, x24, [sp], 16
+    ldp     x25, x26, [sp], 16
+    ldp     x27, x28, [sp], 16
+    ldp     x29, x30, [sp], 16
+    eret
+
+.macro OLDpanic
+        .align  7
+1:  stp     x29, x30, [sp, -16]!
+    mov     x29, 1b - vectors_el2
+    // b .fault
+    b	new_fault
+.endm
+#endif
+
+.macro panic
+        .align  7
+1:	stp	x0, x1, [sp,-16]!	// push for now
+	mov     x1, 1b - vectors_el2
+	b	new_fault
+	.word	0xdeadbeef
+.endm
+
+
+/* Vector table entries are 128 bytes in size, i.e. 32 instructions.
+ *  (armv7 had 4 bytes per entry (1 instruction)).
+ * There are 16 entries in the table.
+ * This is 4 types of exceptions from 4 sources.
+ * The 4 sources are:
+ *  Same exception level when source SP = SP_EL0
+ *  Same exception level when source SP = SP_ELx
+ *  Lower exception level running on AArch64
+ *  Lower exception level running on AArch32
+ */
+
+.globl vectors
+
+        .text
+        .align 11
+vectors:
+vectors_el2:
+	panic 		/* 0x000 Current EL w/ SP0 - Synchronous Thread */
+	panic 		/* 0x080 Current EL w/ SP0 - IRQ Thread */
+        panic 		/* 0x100 Current EL w/ SP0 - FIQ Thread */
+        panic 		/* 0x180 Current EL w/ SP0 - Error Thread */
+
+        panic 		/* 0x200 Current EL w/ SPx - Synchronous Handler */
+        .align  7	/* 0x280 Current EL w/ SPx - IRQ Handler */
+        b	new_irq
+        // b	.irq
+        panic 		/* 0x300 Current EL w/ SPx - FIQ Handler */
+        panic 		/* 0x380 Current EL w/ SPx - Error Handler */
+
+        panic 		/* 0x400 Lower EL 64 bit - Synch */
+	panic 		/* 0x480 Lower EL 64 bit - IRQ */
+	panic 		/* 0x500 Lower EL 64 bit - FIQ */
+	panic 		/* 0x580 Lower EL 64 bit - Error */
+
+	panic 		/* 0x600 Lower EL 32 bit - Synch */
+	panic 		/* 0x680 Lower EL 32 bit - IRQ */
+	panic 		/* 0x700 Lower EL 32 bit - FIQ */
+	panic 		/* 0x780 Lower EL 32 bit - Error */
 
 /* ----------------------------------------------------------- */
 
@@ -129,108 +447,6 @@ GetCurrentSMode:
         lsr             x0, x0, #2
         ret
 #endif
-
-/* ----------------------------------------------------------- */
-
-remap_vectors:
-        adr     x3, vectors_el2
-        msr     VBAR_EL2, x3
-        ret
-
-.Lpanic:
-    stp     x27, x28, [sp, -16]!
-    stp     x25, x26, [sp, -16]!
-    stp     x23, x24, [sp, -16]!
-    stp     x21, x22, [sp, -16]!
-    stp     x19, x20, [sp, -16]!
-    stp     x17, x18, [sp, -16]!
-    stp     x15, x16, [sp, -16]!
-    stp     x13, x14, [sp, -16]!
-    stp     x11, x12, [sp, -16]!
-    stp     x9,  x10, [sp, -16]!
-    stp     x7,  x8,  [sp, -16]!
-    stp     x5,  x6,  [sp, -16]!
-    stp     x3,  x4,  [sp, -16]!
-    stp     x1,  x2,  [sp, -16]!
-    stp     xzr, x0,  [sp, -16]!
-
-    mrs         x1, currentEl
-    ubfx        x1, x1, 2, 2
-    cmp         x1, 3
-    b.eq    3f
-    cmp         x1, 2
-    b.eq    2f
-    mrs         x1, esr_el1
-    b       1f
-3:  mrs     x1, esr_el3
-    b       1f
-2:  mrs     x1, esr_el2
-
-1:  mov     x0, x29
-    add     x2, sp, 8
-    bl      sync_handler
-
-    ldp     xzr, x0,  [sp], 16
-    ldp     x1,  x2,  [sp], 16
-    ldp     x3,  x4,  [sp], 16
-    ldp     x5,  x6,  [sp], 16
-    ldp     x7,  x8,  [sp], 16
-    ldp     x9,  x10, [sp], 16
-    ldp     x11, x12, [sp], 16
-    ldp     x13, x14, [sp], 16
-    ldp     x15, x16, [sp], 16
-    ldp     x17, x18, [sp], 16
-    ldp     x19, x20, [sp], 16
-    ldp     x21, x22, [sp], 16
-    ldp     x23, x24, [sp], 16
-    ldp     x25, x26, [sp], 16
-    ldp     x27, x28, [sp], 16
-    ldp     x29, x30, [sp], 16
-    eret
-
-
-.macro panic
-        .align  7
-1:  stp     x29, x30, [sp, -16]!
-    mov     x29, 1b - vectors_el2
-    b .Lpanic
-//    ldp     x29, x30, [sp], 16
-//    eret
-.endm
-
-/* Vector table entries are 128 bytes in size, i.e. 32 instructions.
- *  (armv7 had 4 bytes per entry (1 instruction)).
- * There are 16 entries in the table.
- * This is 4 types of exceptions from 4 sources.
- * The 4 sources are:
- *  Same exception level when source SP = SP_EL0
- *  Same exception level when source SP = SP_ELx
- *  Lower exception level running on AArch64
- *  Lower exception level running on AArch32
- */
-
-        .text
-        .align 11
-vectors_el2:
-	panic /* 0x000 Current EL w/ SP0 - Synchronous Thread */
-	panic /* 0x080 Current EL w/ SP0 - IRQ Thread */
-        panic /* 0x100 Current EL w/ SP0 - FIQ Thread */
-        panic /* 0x180 Current EL w/ SP0 - Error Thread */
-
-        panic /* 0x200 Current EL w/ SPx - Synchronous Handler */
-        panic /* 0x280 Current EL w/ SPx - IRQ Handler */
-        panic /* 0x300 Current EL w/ SPx - FIQ Handler */
-        panic /* 0x380 Current EL w/ SPx - Error Handler */
-
-        panic /* 0x400 Lower EL 64 bit - Synch */
-	panic /* 0x480 Lower EL 64 bit - IRQ */
-	panic /* 0x500 Lower EL 64 bit - FIQ */
-	panic /* 0x580 Lower EL 64 bit - Error */
-
-	panic /* 0x600 Lower EL 32 bit - Synch */
-	panic /* 0x680 Lower EL 32 bit - IRQ */
-	panic /* 0x700 Lower EL 32 bit - FIQ */
-	panic /* 0x780 Lower EL 32 bit - Error */
 
 
 // THE END
