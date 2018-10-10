@@ -35,13 +35,15 @@ static vfptr timer_hook;
 static vfptr net_timer_hook;
 #endif
 
+#ifdef notdef
 /* XXX bogus debug-- */
 void
 timer_bogus ( void )
 {
-	printf ( "timer_hook: %016x = %016x\n", &timer_hook, timer_hook );
-	printf ( "net_timer_hook: %016x = %016x\n", &net_timer_hook, net_timer_hook );
+	printf ( "timer_hook: %016x = %016lx\n", &timer_hook, timer_hook );
+	printf ( "net_timer_hook: %016x = %016lx\n", &net_timer_hook, net_timer_hook );
 }
+#endif
 
 /* XXX - needed by imported linux code.
  */
@@ -83,8 +85,7 @@ void
 timer_tick ( void )
 {
 	static int subcount;
-
-	serial_puts ( "timer_tick 1\n" );
+	reg_t sp;
 
 	// ++jiffies;
 
@@ -106,27 +107,29 @@ timer_tick ( void )
 	if ( ! cur_thread )
 	    panic ( "timer, cur_thread" );
 
-	serial_puts ( "timer_tick 2\n" );
-
 	++cur_thread->prof;
 
 	thread_tick ();
-	serial_puts ( "timer_tick 3\n" );
 
-	printf ( "timer_hook: %08x\n", timer_hook );
+	/*
+	printf ( "timer_hook: %016lx\n", timer_hook );
+	printf ( "timer_count_t: %016lx\n", timer_count_t );
+	printf ( "timer_count_s: %016lx\n", timer_count_s );
 	timer_bogus ();
+	get_SP ( sp );
+	printf ( "In timer_tick, SP = %016lx\n", sp );
+	printf ( "timer_hook: %016x = %016lx\n", &timer_hook, timer_hook );
+	*/
 
 	if ( timer_hook ) {
 	    (*timer_hook) ();
 	}
-	serial_puts ( "timer_tick 4\n" );
 
 #ifdef WANT_NET_TIMER
 	if ( net_timer_hook ) {
 	    (*net_timer_hook) ();
 	}
 #endif
-	serial_puts ( "timer_tick 5\n" );
 }
 
 /* Public entry point.

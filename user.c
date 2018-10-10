@@ -49,7 +49,7 @@ user_init ( int xx )
 	timer_rate_set ( 100 );
 #endif
 
-	printf ( "In user_init\n" );
+	// printf ( "In user_init\n" );
 
 	/* Run the test "shell" as the user thread */
 	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_SHELL, 0 );

@@ -23,6 +23,7 @@
 
 #include "tests.h"
 
+/* XXX should just move to arch/cpu.h */
 #ifdef ARM64
 /* DAIF comes shifted left 6 bits as in the PSR */
 #define DAIF_IRQ_BIT	0x80
@@ -180,7 +181,7 @@ struct test_info static_info;
 /* This gets launched as a thread to run
  * each of the basic tests */
 void
-basic_wrapper ( int arg )
+basic_wrapper ( long arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
 
@@ -312,6 +313,7 @@ test_basic ( int xx )
  *
  * Gets ugly if we have a serial console and try
  * to do printf from interrupt level!
+ * (unless we have a simple polled serial output).
  *
  */
 static volatile int ticks;
@@ -359,6 +361,7 @@ test_timer ( int count )
  */
 
 /* This test is not so hard.
+ * (but it revealed broken INT_lock on armv8 10-2018)
  * We do expect activations from interrupt timer events,
  * but the purpose here is to test the thr_delay() call.
  */
@@ -379,6 +382,44 @@ test_delay ( int count )
 
 	printf ( " ... OK!\n" );
 }
+
+#ifdef DEBUG_2018
+/* A modified form */
+void
+test_delay ( int count )
+{
+	int tick = 0;
+	int i;
+
+	printf ( "Now let's test thread delays.\n" );
+
+	for ( i=0; i<count; i++) {
+	    printf ( "Start delay\n" );
+	    thr_delay ( 1000 );
+	    tick++;
+	    printf ( "Delay done: %d\n", tick );
+	}
+
+	printf ( " ... OK!\n" );
+}
+
+/* A simple form */
+/* Used 10-10-2018 when tracking down broken INT_lock */
+void
+test_delay ( int count )
+{
+	printf ( "Let's test thread delays.\n" );
+
+	printf ( "Start delay\n" );
+	// thr_delay ( 1 );
+	thr_delay ( 5000 );
+	printf ( "Delay done\n" );
+
+	printf ( " ... OK!\n" );
+}
+
+
+#endif
 
 /* --------------------------------------------
  * Single continuation test.
@@ -1056,15 +1097,8 @@ busy79 ( int nice )
 	    if ( nice )
 		thr_yield ();
 	    ++t7_sum;
-	    /* if ( is_irq_disabled() ) */
-#ifdef ARM64
-	    /* XXX no cpsr on armv8 */
-	    printf ("busy -- no IRQ --\n" );
-#else
-	    get_CPSR ( psr );
-	    if ( psr & 0x80 )
-		printf ("busy -- no IRQ (%08x)\n", psr );
-#endif
+	    if ( is_irq_disabled() )
+		printf ("busy -- no IRQ --\n" );
 	}
 }
 

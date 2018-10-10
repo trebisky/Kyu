@@ -82,11 +82,11 @@ process	timer(void)
 
 		if (tmhead != BADTIMER) {
 			// mask = disable();
-			INT_lock ();
+			INT_lock;
 			tmpending = TRUE;
 			tmnext = &tmtab[tmhead].tm_remain;
 			// restore(mask);
-			INT_unlock ();
+			INT_unlock;
 		}
 		signal (tmlock);
 	}
@@ -144,7 +144,7 @@ int32	tmset (
 	prev = BADTIMER;
 	cur = tmhead;
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	while (cur != BADTIMER) {
 
 		/* Compare delay for new item to item in list */
@@ -177,7 +177,7 @@ int32	tmset (
 	tmpending = TRUE;
 	tmnext = &tmtab[tmhead].tm_remain;
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	signal (tmlock);
 	return OK;
 }
@@ -229,11 +229,11 @@ int32	tmdel (
 
 			if ((next = tmtab[cur].tm_next) != BADTIMER) {
 				// mask = disable();
-				INT_lock ();
+				INT_lock;
 				tmtab[next].tm_remain += 
 						tmtab[cur].tm_remain;
 				// restore(mask);
-				INT_unlock ();
+				INT_unlock;
 			}
 
 			/* Put the node back on the free list */
@@ -257,7 +257,7 @@ int32	tmdel (
 	/* If items remain on list, reset info for clock interrupt */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (tmhead == BADTIMER) {
 
 		/* No items remain on list */
@@ -271,7 +271,7 @@ int32	tmdel (
 		tmnext = &tmtab[tmhead].tm_remain;
 	}
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	signal (tmlock);
 	return OK;
 }

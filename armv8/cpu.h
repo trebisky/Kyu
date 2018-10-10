@@ -19,6 +19,15 @@
 
 #define NUM_IREGS	34
 
+/* Offsets into iregs and jregs in the thread structure */
+#define ARMV8_X0                0
+#define ARMV8_X30               30
+#define ARMV8_LR                30
+
+#define ARMV8_SP                31
+#define ARMV8_ELR               32
+#define ARMV8_SPSR              33
+
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
@@ -79,6 +88,17 @@ r_CCNT ( void )
 #define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
 #define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
 
+#define INT_unlock 	asm volatile("msr DAIFClr, #3" : : : "cc")
+#define INT_lock 	asm volatile("msr DAIFSet, #3" : : : "cc")
+
+#ifdef notdef
+/* These bit me with a horrible and hard to track down bug.
+ * If I just type INT_lock; the compiler accepts the line, but
+ * generates no code!!  I have no idea why, but am switching to
+ * the above syntax.  If I type INT_lock(); with the above macros,
+ * I get a compile error, which is better than a silent bug.
+ * tjt 10-10-2018
+ */
 /* These only go inline with gcc -O of some kind */
 static inline void
 INT_unlock ( void )
@@ -91,6 +111,7 @@ INT_lock ( void )
 {
         asm volatile("msr DAIFSet, #3" : : : "cc");
 }
+#endif
 
 /* The above Clr/Set work as if DAIF is right justified, as you might expect.
  *  Note that I am enabling/disabling both IRQ and FIQ.

@@ -345,7 +345,7 @@ thr_sched ( void )
 	/* launch the system by running the
 	 * current thread
 	 */
-	 printf ( "thr_sched launching first thread %08x (%s)\n", &cur_thread->cregs, cur_thread->name );
+	// printf ( "thr_sched launching first thread %08x (%s)\n", &cur_thread->cregs, cur_thread->name );
 
 #ifdef ARCH_X86
 	resume_c ( cur_thread->regs.esp );
@@ -383,8 +383,8 @@ thr_one_all ( struct thread *tp, char *msg )
 	else
 	    printf ( " unknown mode: %d\n", tp->mode );
 
-	/* XXX - ARM specific, register 11 is fp */
-	/* Seems to work fine 8-14-2016 */
+	/* XXX - ARMv7 specific, register 11 is fp */
+	/* works fine on armv7 8-14-2016 */
 
 #define ARM_FP	11
 #define ARM_PC  15
@@ -674,7 +674,7 @@ thr_alloc ( void )
 #ifdef notdef
 	/* XXX */
 	fill_l ( stack, 0x0f0f0e0e, STACK_SIZE/sizeof(long) );
-	printf ( "thr_new: stack at %08x\n", stack );
+	printf ( "thr_new: stack at %016lx (tp = %016lx)\n", stack, tp );
 #endif
 
 	tp->stack = stack;
@@ -856,6 +856,8 @@ thr_new ( char *name, tfptr func, void *arg, int prio, int flags )
 	    return (struct thread *) 0;
 	}
 
+	// printf ( "thr_new %s -- stack at %016lx (tp = %016lx)\n", name, tp->stack, tp );
+
 	initialize_thread ( tp, name, func, arg, prio, flags );
 	return tp;
 }
@@ -907,7 +909,8 @@ thr_exit ( void )
 
 	if ( thread_debug ) {
 	    printf ( "exit of %s\n", cur_thread->name );
-	    printf ( "exit, prof = %d\n", cur_thread->prof );
+	    // "prof" is the number of timer ticks while this thread was running.
+	    // printf ( "exit, prof = %d\n", cur_thread->prof );
 	}
 
 	if ( cur_thread->flags & TF_REPEAT ) {
@@ -1284,6 +1287,13 @@ sem_unblock_all ( struct sem *sp )
 
 /* put a thread on a waiting list till
  * a certain number of clock ticks elapses.
+ *
+ * Moved the INT_lock here 10-5-2018
+ * after discovering race where an interrupt hit
+ * after adding the wait, but before the block.
+ * This led to deadlock with the delay event
+ * removed from the list, but the unblock hitting
+ * before the block and being ignored.
  */
 void
 thr_delay ( int nticks )
@@ -1292,8 +1302,10 @@ thr_delay ( int nticks )
 	    printf ( "thr_delay(%d) for %s\n", nticks, cur_thread->name );
 
 	if ( nticks > 0 ) {
+	    INT_lock;
 	    timer_add_wait ( cur_thread, nticks );
 	    thr_block ( DELAY );
+	    INT_unlock;
 	}
 }
 
@@ -1594,6 +1606,11 @@ change_thread ( struct thread *new_tp, int options )
 	 *  not how it should be saved.
 	 */
 
+	/* We need to lock before setting cur_thread or
+	 * we may take an interrupt in the wrong thread
+	 * structure.
+	 */
+	INT_lock;
 	cur_thread = new_tp;
 
 	/* We need to stay locked between deciding how to resume
@@ -1601,7 +1618,6 @@ change_thread ( struct thread *new_tp, int options )
 	 * Otherwise a bad race results.
 	 * Note that each resume reenables interrupts.
 	 */
-	INT_lock;
 	switch ( cur_thread->mode ) {
 	    case JMP:
 		if ( thread_debug )
@@ -1612,7 +1628,11 @@ change_thread ( struct thread *new_tp, int options )
 	    case INT:
 		if ( thread_debug )
 		    printf ("change_thread_resume_i\n");
-		resume_i ( &new_tp->iregs );
+
+		// XXX - tjt for debug
+		// resume_i ( &new_tp->iregs );
+		// resume_id ( &new_tp->iregs );
+		resume_idx ( new_tp );
 		panic ( "change_thread, switch_i" );
 		break;
 	    case CONT:
@@ -2385,11 +2405,11 @@ cancel_repeat ( struct thread *tp )
 static void
 timer_add_wait ( struct thread *tp, int delay )
 {
-	INT_lock;
+	// INT_lock;
 
 	timer_add_wait_int ( tp, delay );
 
-	INT_unlock;
+	// INT_unlock;
 }
 
 static void

@@ -22,16 +22,6 @@
 
 struct thread *cur_thread;
 
-#define ARMV8_X0		0
-#define ARMV8_X30		30
-#define ARMV8_LR		30
-
-#define ARMV8_SP		31
-#define ARMV8_ELR		32
-#define ARMV8_SPSR		33
-
-//#define ARMV8_REGS		34
-
 #define DUMP_BYTES	512
 // #define LONG_LIMIT	1024
 // #define LONG_LIMIT	256

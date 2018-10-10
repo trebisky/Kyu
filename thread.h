@@ -92,7 +92,8 @@ void cpu_signal ( struct sem * );
 #endif
 
 /* This was 6 in Skidoo */
-#define MAX_TNAME	10
+// #define MAX_TNAME	10
+#define MAX_TNAME	16
 
 #ifdef ARCH_ARM
 /* XXX - move this */
@@ -119,8 +120,10 @@ struct int_regs {
  * trying to keep this in the jmp_regs, so this ought
  * to be retroed to the x86 someday.
  */
+#define NUM_CREGS	4
+
 struct cont_regs {
-	reg_t regs[4];
+	reg_t regs[NUM_CREGS];
 };
 #endif
 
@@ -161,8 +164,6 @@ enum thread_mode { JMP, INT, CONT };
 /* The iregs structure is referenced from the assembly language
  * interrupt handling code which expects to find a place to store
  * the interrupt context at the start of this structure.
- * It is not clear that the position of "regs" is constrained
- * in any way, but comments from x86 skidoo code suggest so.
  */
 
 struct thread {

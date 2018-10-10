@@ -126,10 +126,10 @@ int32	mqcreate (
 		mqtab[i].mq_cookie++;
 
 		// mask = disable();
-		INT_lock ();
+		INT_lock;
 		mqtab[i].mq_state = MQ_ALLOC;
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 
 		signal (mqsem);
 		return i;
@@ -168,10 +168,10 @@ int32	mqdelete (
 	/* Make the queue free and return the memory */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	mqp->mq_state = MQ_FREE;
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 
 	semdelete (mqp->mq_sem);
 	freemem ((char *)mqp->mq_msgs, mqp->mq_qlen * sizeof(int));
@@ -199,11 +199,11 @@ int32	mqsend (
 	/* Insure exclusive access */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC
 	    || mqp->mq_count == mqp->mq_qlen) {
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		return SYSERR;
 	}
 
@@ -218,7 +218,7 @@ int32	mqsend (
 	signal (mqp->mq_sem);
 
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	return OK;
 }
 
@@ -243,10 +243,10 @@ int32	mqrecv (
 	/* Insure exclusive access */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC) {
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		return SYSERR;
 	}
 
@@ -257,7 +257,7 @@ int32	mqrecv (
 	wait(mqp->mq_sem);
 	if (cookie != mqp->mq_cookie) {	  /* queue changed */
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		return SYSERR;
 	}
 	mqp->mq_rcvrs--;
@@ -271,7 +271,7 @@ int32	mqrecv (
 
 	mqp->mq_count--;
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	return msg;
 }
 
@@ -289,11 +289,11 @@ int32	mqpoll (
 	/* Insure exclusive access */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (!MQVALID(mq) || mqtab[mq].mq_state != MQ_ALLOC
 	    || mqtab[mq].mq_count == 0) {	/* No message available	*/
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		return SYSERR;
 	}
 
@@ -301,7 +301,7 @@ int32	mqpoll (
 
 	msg = mqrecv (mq);
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	return msg;
 }
 
@@ -327,10 +327,10 @@ int32	mqdisbale (
 	/* Disable interrupts for state change */
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (!MQVALID(mq) || mqp->mq_state != MQ_ALLOC) {
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		signal (mqsem);
 		return SYSERR;
 	}
@@ -344,7 +344,7 @@ int32	mqdisbale (
 	mqp->mq_rcvrs = 0;
 
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	signal (mqsem);
 	return OK;
 }
@@ -364,7 +364,7 @@ int32	mqenable (
 
 	wait (mqsem);
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 
 	/* Re-enable if currently disabled */
 	if (MQVALID(mq) && mqtab[mq].mq_state == MQ_DISABLE) {
@@ -374,7 +374,7 @@ int32	mqenable (
 		retval = SYSERR;
 	}
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 
 	signal (mqsem);
 	return retval;
@@ -401,10 +401,10 @@ int32	mqclear (
 
 	wait (mqsem);
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	if (!MQVALID(mq) || mqp->mq_state != MQ_DISABLE) {
 		// restore(mask);
-		INT_unlock ();
+		INT_unlock;
 		signal (mqsem);
 		return SYSERR;
 
@@ -414,7 +414,7 @@ int32	mqclear (
 
 	mqp->mq_state = MQ_CLEAR;
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 	signal (mqsem);
 
 	/* Iterate through all messages and use func to dispose of each	*/
@@ -427,10 +427,10 @@ int32	mqclear (
 	/* Reset the state to disabled*/
 
 	// mask = disable();
-	INT_lock ();
+	INT_lock;
 	mqp->mq_state = MQ_DISABLE;
 	// restore(mask);
-	INT_unlock ();
+	INT_unlock;
 
 	return OK;
 }

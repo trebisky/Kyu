@@ -48,7 +48,7 @@ struct test_info {
  *  It repeats the test as indicated.
  */
 static void
-r_wrapper ( int arg )
+r_wrapper ( long arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
 	int i;
@@ -246,6 +246,7 @@ test_main ( int xx )
 	int n, nw, nl;
 	int i;
 	char *p;
+	reg_t val;
 
 	/* Allow the lower priority user thread to
 	 * run (and exit), not that this matters all
@@ -254,7 +255,11 @@ test_main ( int xx )
 	 */
 	thr_yield ();
 
+	/*
 	printf ( "TJT in test_main\n" );
+	get_SP ( val );
+	printf ( " test_main() starting with stack: %016lx\n",  val );
+	*/
 
 	for ( ;; ) {
 

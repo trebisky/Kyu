@@ -172,7 +172,11 @@ resume_jj:
 	ldp     x0, x1, [x0]
 	eret
 
-// save_j ( iregs )
+// save_j ( jregs )
+// This returns 0 on the setup call.
+// This will return 1 when resume_j uses
+// what we save (because resume_j restores
+// x0 with the value of 1 we save below.
 
         .globl save_j
 save_j:
@@ -193,21 +197,23 @@ save_j:
 	stp	x26, x27, [x0, 208]
 	stp	x28, x29, [x0, 224]
 
-	mov	x1, sp
+	add	x1, sp, #16
 	stp	x30, x1, [x0, 240]
 
 	// Here x1 will become elr_el2
 	// and x2 will become spsr_el2
 	mov	x2, #INITIAL_PSR
-	mrs	x2, DAIF
+	mrs	x1, DAIF
 	orr	x2, x2, x1
 
 	mov	x1, lr
 	stp	x1, x2, [x0, 256]
 
 	ldp	x1, x2, [sp], 16	// pop x0, x1
+	mov	x1, #1			// resume_j will return 1
 	stp	x1, x2, [x0]		// save x0, x1
 
+	mov	x0, #0			// return 0 now.
 	ret
 
 /* ----------------------------------------------------------- */
@@ -256,6 +262,7 @@ new_fault:
 	b	fault_handler
 
 // identical to the above, but calls the IRQ handler
+// This is what we actually use.
 new_irq:
 
 	stp	x0, x1, [sp,-16]!	// push for now
@@ -276,7 +283,8 @@ new_irq:
 	stp	x26, x27, [x0, 208]
 	stp	x28, x29, [x0, 224]
 
-	mov	x1, sp
+	// mov	x1, sp
+	add	x1, sp, #16
 	stp	x30, x1, [x0, 240]
 
 	mrs	x1, elr_el2

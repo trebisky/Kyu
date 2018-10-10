@@ -190,13 +190,8 @@ kyu_startup ( void )
 	test_core ();
 #endif
 
-	get_SP ( val );
-	printf ( "Kyu starting with stack: %08x\n",  val );
-	get_DAIF ( val );
-	printf ( "Kyu starting with DAIF: %08x\n",  val );
-
 	// check_bss ();
-	timer_bogus ();
+	// timer_bogus ();
 
 #ifdef ARM64_TEST
 	/* The following yields this:
@@ -211,7 +206,7 @@ kyu_startup ( void )
 	get_DAIF ( val );
 	printf ( "Kyu starting with DAIF: %08x\n",  val );
 	/*
-	INT_unlock ();
+	INT_unlock;
 	get_DAIF ( val );
 	printf ( "Kyu starting with DAIF: %08x\n",  val );
 	*/
@@ -286,15 +281,55 @@ kyu_startup ( void )
 	panic ( "thr_sched" );
 }
 
-#define BASIC_CHECKOUT
-#ifdef BASIC_CHECKOUT
+#define BASIC_CHECKOUT_J
+#ifdef BASIC_CHECKOUT_J
+
+static void 
+j_spin ( char *msg )
+{
+	printf ( " -- spinning: %s\n", msg );
+
+	for ( ;; )
+	    ;
+}
+
+static void
+basic_checkout_j ( void )
+{
+	reg_t j_regs[NUM_IREGS];
+	struct thread *ztp;
+
+	ztp = (struct thread *) 0;
+	printf ( "I regs: %016lx\n", &ztp->iregs );
+	printf ( "J regs: %016lx\n", &ztp->jregs );
+	printf ( "C regs: %016lx\n", &ztp->cregs );
+
+	if ( save_j ( j_regs ) ) {
+	    printf ( "J regs resumed\n" );
+	    j_spin ( "J resumed" );
+	    // return;
+	}
+
+	printf ( "J regs saved\n" );
+	show_regs ( j_regs );
+
+	resume_jj ( j_regs );
+	/* Should not get here */
+
+	j_spin ( "J saved" );
+}
+
+#endif /* BASIC_CHECKOUT_J */
+
+// #define BASIC_CHECKOUT_C
+#ifdef BASIC_CHECKOUT_C
 
 void
 thr_checkout ( int arg )
 {
-	// INT_lock ();
+	// INT_lock;
 	printf ( "Checkout thread: %d\n", arg );
-	timer_bogus ();
+	// timer_bogus ();
 }
 
 // extern vfptr timer_hook;
@@ -304,7 +339,7 @@ void
 thr_cexit ( void )
 {
 	printf ( "Checkout thread exit, spinning\n" );
-	timer_bogus ();
+	// timer_bogus ();
 	// printf ( "timer_hook: %016x = %016x\n", &timer_hook, timer_hook );
 	// last_addr = timer_hook;
 	for ( ;; )
@@ -326,26 +361,27 @@ extern struct thread *cur_thread;
 static int basic_stack[BASIC_STACK_SIZE];
 
 static void
-basic_checkout ( void )
+basic_checkout_c ( void )
 {
 	reg_t cregs[4];
 	reg_t val;
 
 	get_SP ( val );
-	printf ( "in basic_checkout with stack: %016x\n",  val );
+	printf ( "in basic_checkout_c with stack: %016x\n",  val );
 
-	printf ( "Start basic checkout\n" );
+	printf ( "Start basic checkout_c\n" );
 	printf ( "  cur_thread = %08x\n", cur_thread );
+
 	// show_vectors ();
-	timer_bogus ();
+	// timer_bogus ();
 
 	cregs[0] = (long) 7;
 	cregs[1] = (long) thr_checkout;
 	cregs[2] = (unsigned long) &basic_stack[BASIC_STACK_SIZE];
 	cregs[3] = (long) thr_cexit;
 
-	printf ( "Launch basic checkout\n" );
-	timer_bogus ();
+	printf ( "Launch basic checkout_c\n" );
+	// timer_bogus ();
 
 	resume_c ( cregs );
 }
@@ -380,6 +416,7 @@ sys_init ( int xxx )
 	 * be disabled anway.
 	 */
 	// cpu_enter ();
+	INT_lock;
 
 	/*
 	printf ( "sys_init thread running\n" );
@@ -405,10 +442,15 @@ sys_init ( int xxx )
 	// check_bss ();
 
 	// validate resume_c
-	basic_checkout ();
+	// basic_checkout_c ();
+
+	// validate save_j / resume_j 
+	// basic_checkout_j ();
 
 	// Actually this is bogus because every thread is
 	//   launched with interrupts enabled.
+	//   i.e. interrupts will already be on just
+	//   by virtue of this thread being launched.
 	printf ( "Enabling interrupts\n" );
 	INT_unlock;
 	// printf ( "BOGUS: Interrupts NOT enabled\n");
@@ -474,7 +516,9 @@ sys_init ( int xxx )
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 
-	printf ( "TJT done with sys_init\n" );
+	//thr_show ();
+	//printf ( "TJT done with sys_init\n" );
+	// thr_debug ( 1 );
 }
 
 /* The usual case is that this is not defined and

@@ -60,9 +60,11 @@ fire3_timer_rate_set ( int rate )
 
 	tp->control &= ~T0_RUN;
 
-	printf ( "BOGUS slow timer rate set\n" );
-	tp->timer[0].count = TIMER_CLOCK * 2;
-	// tp->timer[0].count = TIMER_CLOCK / rate;
+	// printf ( "BOGUS slow timer rate set\n" );
+	// tp->timer[0].count = TIMER_CLOCK * 2;
+	// tp->timer[0].count = TIMER_CLOCK / 100;
+
+	tp->timer[0].count = TIMER_CLOCK / rate;
 	tp->timer[0].cmp = 0;
 
 	/* Pulse the load bit */
@@ -144,26 +146,40 @@ timer_ack ( void )
 	tp->int_cstat |= T0_ISTAT;
 }
 
+#ifdef notdef
 static int tcount;
+
+static void
+timer_debug ( void )
+{
+	reg_t sp;
+
+	tcount++;
+
+	// get_SP ( sp );
+	// printf ( "DING ---------------- %d %016lx\n", tcount, &tcount );
+	// printf ( "DING ---------------- %d, sp = %016lx\n", tcount, sp);
+
+	if ( tcount % 1000 == 0 ) {
+	    get_SP ( sp );
+	    printf ( "DING ---------------- %d, sp = %016lx\n", tcount, sp);
+	}
+}
+#endif
 
 /* Handle a timer interrupt */
 /* Called at interrupt level */
 static void
 timer_handler ( int junk )
 {
-	serial_puts ( "timer_handler\n" );
         timer_tick ();
-	tcount++;
-	printf ( "DING ---------------- %d %016x\n", tcount, &tcount );
 
-/*
-	if ( tcount % 1000 == 0 )
-	    printf ( "DING ---------------- %d\n", tcount );
-*/
+	// timer_debug ();
 
         timer_ack ();
 }
 
+#ifdef notdef
 static int last_count;
 
 /* There are some problems with this.
@@ -193,6 +209,7 @@ timer_checkout ( void )
 
 	printf ( "Done spinning in timer_init\n" );
 }
+#endif
 
 /* Called during Kyu startup */
 void

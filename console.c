@@ -304,6 +304,9 @@ console_puts ( char *buf )
 static void
 kyu_panic ( char *msg, int spin )
 {
+	// keep messages tidy.
+	INT_lock;
+
 	if ( msg )
 	    printf ( "PANIC: %s\n", msg );
 	else

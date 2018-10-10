@@ -58,11 +58,13 @@ irq_hookup ( int irq, irq_fptr func, void *arg )
 void
 resume_c ( void *p )
 {
-	printf ( "Resume_c called: %08x (%s --> ---)\n", p, cur_thread->name );
+	// printf ( "Resume_c called: %08x ( launching %s )\n", p, cur_thread->name );
 	resume_cc ( p );
 }
 
-static int icount = 0;
+// static int icount = 0;
+// Debug here is problematic given that our timer interrupt calls this
+//  at 1000 Hz.  
 
 void
 resume_i ( void *p )
@@ -70,19 +72,83 @@ resume_i ( void *p )
 	struct thread *tp = (struct thread *) p;
 
 	// Mystery - turn this on and things work.
+	/*
 	if ( icount < 1000 ) {
 	    printf ( "Resume_i called: %08x (%s --> %s)\n", p, cur_thread->name, tp->name );
 	    icount++;
 	}
+	*/
+	resume_ii ( p );
+
+	/*
+	thr_show ();
+	printf ( "do_irq: finish_interrupt: %s\n", cur_thread->name );
+	show_thread_regs ( cur_thread, 64 );
+	*/
+
+	printf ( "Oops, should never happen\n" );
+	printf ( " return from resume_i\n" );
+	printf ( " cur_thread = %s\n", cur_thread->name );
+	printf ( " resume thread = %s\n", tp->name );
+}
+
+/* XXX temporary, this is the call during a thread switch */
+void
+resume_id ( void *p )
+{
+	struct thread *tp = (struct thread *) p;
+
+#ifdef DEBUG_2018
+	// printf ( "Resume_id called: %08x (%s --> %s %016lx)\n", p, cur_thread->name, tp->name, tp->jregs.regs[ARMV8_ELR] );
+	printf ( "Resume_id called: %08x (%s --> %s, ELR = %016lx)\n", p, cur_thread->name, tp->name, tp->iregs.regs[ARMV8_ELR] );
+#endif
+
 	resume_ii ( p );
 }
+
+/* XXX temporary, this is the call during a thread switch, but with debug */
+void
+resume_idx ( struct thread *new )
+{
+	// struct thread *tp = (struct thread *) p;
+	// resume_id ( &new->iregs );
+
+#ifdef DEBUG_2018
+	printf ( "Resume_idx called: %08x (%s, ELR --> %s %016lx)\n", new, cur_thread->name, new->name, new->iregs.regs[ARMV8_ELR] );
+	printf ( " Stack: %016lx, %d, %016lx\n", new->stack, new->stack_size, &new->stack[new->stack_size] );
+	show_regs ( &new->iregs );
+#endif
+
+	// resume_ii ( p );
+	resume_id ( &new->iregs );
+}
+
+#ifdef notdef
+/* This does not tell us what we want.
+ *  the jregs are stored in cur_thread, but who knows what
+ *  they will resume.
+ */
+static struct thread * 
+get_jthread ( char *jp )
+{
+	char *p;
+
+	p = jp - sizeof(struct int_regs);
+	return (struct thread *) p;
+}
+#endif
 
 void
 resume_j ( void *p )
 {
-	struct thread *tp = (struct thread *) p;
+	// struct thread *tp = get_jthread ( p );
+	struct jmp_regs *jp;
+	char *pp;
 
-	printf ( "Resume_j called: %08x (%s --> %s)\n", p, cur_thread->name, tp->name );
+	pp = p + sizeof(struct int_regs);
+	jp = (struct jmp_regs *) pp;
+
+	// printf ( "Resume_j called: %08x (%s, ELR --> %016lx)\n", p, cur_thread->name, jp->regs[ARMV8_ELR] );
 	resume_jj ( p );
 }
 
@@ -95,20 +161,23 @@ do_irq ( void )
 	int nint;
 	// struct thread *tp;
 
-	serial_puts ( "IN do_irq 1\n" );
-
 	if ( ! cur_thread )
 	    panic ( "irq int, cur_thread" );
 
-	serial_puts ( "IN do_irq 2\n" );
-
 	/* Tell Kyu thread system we are in an interrupt */
 	start_interrupt ();
-	serial_puts ( "IN do_irq 3\n" );
+
+#ifdef DEBUG_2018
+	/* XXX */
+	nint = get_timer_count_t ();
+	if ( nint == 10 ) {
+	    printf ( "Interrupt in %s (%08x): %d\n", cur_thread->name, cur_thread->stack, get_timer_count_t() );
+	    show_thread_regs ( cur_thread, 80 );
+	    for ( ;; ) ;
+	}
+#endif
 
 	nint = intcon_irqwho ();
-
-	serial_puts ( "IN do_irq 4\n" );
 
 // #define DEBUG_IRQ
 #ifdef DEBUG_IRQ
@@ -131,8 +200,6 @@ do_irq ( void )
 	printf ( "#" );
 	*/
 #endif
-	serial_puts ( "IN do_irq 5\n" );
-
 	if ( ! irq_table[nint].func ) {
 	    /* Probably unrelated to current thread.
 	     * This is pretty severe - XXX
@@ -141,19 +208,18 @@ do_irq ( void )
 	    show_thread_regs ( cur_thread, 64 );
 	    for ( ;; ) ;
 	}
-	serial_puts ( "IN do_irq 6\n" );
 
+	/*
 	printf ( "IRQ table: nint: %d\n", nint );
 	printf ( "IRQ table: func: %08x\n", irq_table[nint].func );
 	printf ( "IRQ table: arg: %d\n", irq_table[nint].arg );
+	*/
 
 	/* call the user handler
 	 */
 	(irq_table[nint].func)( irq_table[nint].arg );
-	serial_puts ( "IN do_irq 7\n" );
 
 	intcon_irqack ( nint );
-	serial_puts ( "IN do_irq 8\n" );
 
 	/* Tell Kyu thread system we are done with an interrupt.
 	 * This will return from interrupt via resume_i()
@@ -161,6 +227,7 @@ do_irq ( void )
 	 */
 	finish_interrupt ();
 
+	// finish should do the panic, we never see this.
 	panic ( "do_irq, resume" );
 }
 
@@ -169,6 +236,7 @@ do_irq ( void )
 void
 fault_handler ( unsigned exc )
 {
+	u32 cel;
 
 #ifdef notdef
 	switch( exc ) {
@@ -188,6 +256,13 @@ fault_handler ( unsigned exc )
 	if ( ! cur_thread )
 	    panic ( "fault, invalid cur_thread" );
 
+	// probably not needed
+	INT_lock;
+
+	asm volatile ( "mrs %0, CurrentEL" : "=r" ( cel ) );
+	cel >>= 2;
+	printf ( "Current EL = %d\n", cel );
+
 	printf ( "\n" );
 
 	if ( exc == 0x200 ) {	/* Synchronous Abort */
@@ -200,14 +275,16 @@ fault_handler ( unsigned exc )
 	    class = esr >> 26;		/* 31:26 */
 	    syndrome = esr & 0x1ffffff;	/* 24:0 */
 
-	    printf("\n--- PANIC! exception 0x%x, class=0x%x syndrome=0x%x\n",
+	    printf ( "\n" );
+	    printf ( "--- armv8 FAULT!\n" );
+	    printf ( " exception 0x%x, class=0x%x syndrome=0x%x\n",
 		exc, class, syndrome );
 	}
 
 	printf ( "cur_thread: %08x (%s)\n", cur_thread, cur_thread->name );
 	// dump_ln ( cur_thread, 40 );
 	show_thread_regs ( cur_thread, 64 );
-	show_vectors ();
+	// show_vectors ();
 
 	printf ( "Spinning in fault_handler\n" );
 	for ( ;; )
