@@ -18,7 +18,7 @@
 #include "arch/cpu.h"
 
 void kern_startup ( void );
-void user_init ( int );
+void user_init ( long );
 void net_init ( void );
 
 extern char *kyu_version;
@@ -395,7 +395,7 @@ basic_checkout_c ( void )
  * we turn on interrupts.
  */
 void
-sys_init ( int xxx )
+sys_init ( long xxx )
 {
 	// works here, but two changes needed.
 	// must use _udelay() not thr_delay()

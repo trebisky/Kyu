@@ -289,7 +289,7 @@ extern char * stack_start;
 /* Do a stack traceback -- ARM specific
  */
 void
-unroll_fp ( int *fp )
+unroll_fp ( reg_t *fp )
 {
 	int limit;
 	char *msg;
@@ -301,10 +301,10 @@ unroll_fp ( int *fp )
 	    if ( (unsigned long) fp[0] < (unsigned long) stack_start ) {
 		msg = mk_symaddr ( fp[0] );
 		printf ( "Called from %s -- %08x\n", msg, fp[0] );
-		fp = (int *) fp[-1];
+		fp = (reg_t *) fp[-1];
 	    } else {
 		printf ( "Leaf routine\n" );
-		fp = (int *) fp[0];
+		fp = (reg_t *) fp[0];
 	    }
 	    // printf ( "Called from %s -- %08x, (next fp = %08x)\n", msg, fp[0], fp[-1] );
 	    limit--;
@@ -319,7 +319,7 @@ unroll_fp ( int *fp )
 void
 unroll_cur ( void )
 {
-	int *fp;
+	reg_t *fp;
 	unsigned int sp;
 	char stbuf[16];
 	struct thread *cp;

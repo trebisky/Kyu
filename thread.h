@@ -19,7 +19,7 @@
 
 enum console_mode { SERIAL, VGA, SIO_0, SIO_1 };
 
-typedef void (*tfptr) ( int );
+typedef void (*tfptr) ( long );
 typedef void (*vfptr) ( void );
 
 /* priorities >= MAGIC are for special use.

@@ -31,12 +31,12 @@
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 
-static void xtest_show ( int );
-static void xtest_client_echo ( int );
-static void xtest_client_echo2 ( int );
-static void xtest_client_daytime ( int );
-static void xtest_server_daytime ( int );
-static void xtest_server_classic ( int );
+static void xtest_show ( long );
+static void xtest_client_echo ( long );
+static void xtest_client_echo2 ( long );
+static void xtest_client_daytime ( long );
+static void xtest_server_daytime ( long );
+static void xtest_server_classic ( long );
 
 /* Exported to main test code */
 /* Arguments are now ignored */
@@ -100,7 +100,7 @@ tcp_show ( void )
 }
 
 static void
-xtest_show ( int xxx )
+xtest_show ( long xxx )
 {
 	tcp_show ();
 }
@@ -161,7 +161,7 @@ client_daytime ( void )
 }
 
 static void
-xtest_client_daytime ( int count )
+xtest_client_daytime ( long count )
 {
 	char *msg;
 	int i;
@@ -235,7 +235,7 @@ client_echo ( void )
  * Bumping it up to 10 per second, will yield 50 in FINWAIT.
  */
 static void
-xtest_client_echo ( int count )
+xtest_client_echo ( long count )
 {
 	int i;
 
@@ -255,7 +255,7 @@ xtest_client_echo ( int count )
  * running at 20 Hz for 99,999 repetitions.
  */
 static void
-xtest_client_echo2 ( int repeat )
+xtest_client_echo2 ( long repeat )
 {
 	int port = ECHO_PORT;
 	int slot;
@@ -316,7 +316,7 @@ daytime_func ( int slot )
  *  have no thread associated with this server.
  */
 static void
-xtest_server_daytime ( int xxx )
+xtest_server_daytime ( long xxx )
 {
 	int port = DAYTIME_PORT;
 	int rv;
@@ -353,7 +353,7 @@ tcp_send_string ( int slot, char *msg )
 }
 
 static void
-classic_server ( int bogus )
+classic_server ( long bogus )
 {
 	int lslot;
 	int cslot;
@@ -386,7 +386,7 @@ classic_server ( int bogus )
 }
 
 static void
-xtest_server_classic ( int xxx )
+xtest_server_classic ( long xxx )
 {
 	if ( classic_is_running ) {
 	    printf ( "Classic server is already running on port %d\n", CLASSIC_PORT );

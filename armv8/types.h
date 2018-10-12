@@ -18,6 +18,7 @@ typedef	unsigned long			u64;
 typedef	volatile unsigned long		vu64;
 
 typedef	unsigned long			reg_t;
+typedef	unsigned long			addr_t;
 
 #endif
 

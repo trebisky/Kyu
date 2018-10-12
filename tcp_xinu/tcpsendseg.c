@@ -29,9 +29,14 @@ void	tcpsendseg(
 	nbp = tcpalloc (tcbptr, len);
 	pkt = (struct netpacket *) nbp->eptr;
 
+#ifndef KYU
+	/* In Kyu, the above never fails, but panics if we run
+	 * out of buffers.
+	 */
 	if ((int32)pkt == SYSERR) {
 		return;
 	}
+#endif
 
 	pkt->net_tcpseq = tcbptr->tcb_suna + offset;
 	pkt->net_tcpcode |= code;

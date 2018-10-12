@@ -145,7 +145,7 @@ help_tests ( struct test *tp, int nt )
  *  The test will do its own repeats if it implements that.
  */
 static void
-n_wrapper ( int arg )
+n_wrapper ( long arg )
 {
 	struct test_info *ip = (struct test_info *) arg;
 
@@ -239,7 +239,7 @@ main_help ( void )
 /* This normally gets run as the test thread.
  */
 void
-test_main ( int xx )
+test_main ( long xx )
 {
 	char buf[MAXB];
 	char *wp[MAXW];

@@ -125,8 +125,8 @@ static void sem_add_wait_int ( struct sem *, int );
 static void sem_add_wait ( struct sem *, int );
 static void sem_cancel_wait ( struct sem * );
 
-void sys_init ( int );
-void thr_idle ( int );
+void sys_init ( long );
+void thr_idle ( long );
 
 void thr_show ( void );
 
@@ -372,7 +372,7 @@ thr_one_all ( struct thread *tp, char *msg )
 	thr_show_state ( tp );
 	printf ( "\n" );
 
-	printf ( " stack: %8x\n", (int) tp->stack );
+	printf ( " stack: %08x\n", (reg_t) tp->stack );
 
 	if ( tp->mode == JMP )
 	    printf ( " mode: JMP\n" );
@@ -1829,7 +1829,7 @@ resched ( int options )
  * This is the idle thread.
  */
 void
-thr_idle ( int xxx )
+thr_idle ( long xxx )
 {
 	for ( ;; )
 	    ;

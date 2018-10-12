@@ -113,7 +113,7 @@ static int tftp_state = TFS_IDLE;
  * retransmits.  Not that hard, but we are lazy.
  */
 static void
-tftp_wdog ( int bogus )
+tftp_wdog ( long bogus )
 {
 	int delay;
 	int hz = timer_rate_get();

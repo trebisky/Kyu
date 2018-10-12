@@ -3,6 +3,7 @@
 /* Kyu introduces this ifdef thing because these conflict with
  * macros in arch/cpu.h  --  and we need to include both files.
  */
+
 #ifndef __SWAP_H
 #define __SWAP_H 1
 /* These macros are for a little endian machine */
@@ -113,6 +114,9 @@ extern	int32	tcpwake(struct tcb *, int32);
 /* in file tcpxmit.c */
 extern	int32	tcpxmit(struct tcb *, tcpseq);
 
+/* in kyu_glue.c */
+extern	char	* kyu_getmem(int);
+extern	int	kyu_freemem(char *, int);
 
 #ifndef KYU
 /* in file addargs.c */
@@ -236,9 +240,6 @@ extern  void exception(int32, int32*);
 
 /* in file freebuf.c */
 extern	syscall	freebuf(char *);
-
-extern	char	*kyu_getmem(uint32);
-extern	int	kyu_freemem(char *, uint32);
 
 /* in file getbuf.c */
 extern	char	*getbuf(bpid32);

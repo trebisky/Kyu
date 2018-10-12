@@ -101,13 +101,13 @@ r_CCNT ( void )
  */
 /* These only go inline with gcc -O of some kind */
 static inline void
-INT_unlock ( void )
+INT_unlock_f ( void )
 {
         asm volatile("msr DAIFClr, #3" : : : "cc");
 }
 
 static inline void
-INT_lock ( void )
+INT_lock_f ( void )
 {
         asm volatile("msr DAIFSet, #3" : : : "cc");
 }

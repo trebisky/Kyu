@@ -24,15 +24,15 @@ int32	tcpreset(
 	/* Allocate a buffer */
 #ifdef KYU
 	// pkt = (struct netpacket *) get_netpacket ();
+	// Kyu never fails (it panics if it runs out of buffers)
 	nbp = (struct netbuf *) netbuf_alloc ();
 	pkt = (struct netpacket *) nbp->eptr;
 #else
 	pkt = (struct netpacket *)getbuf(netbufpool);
-#endif
-
 	if ((int32)pkt == SYSERR) {
 		return SYSERR;
 	}
+#endif
 
 	/* Compute length of TCP data (needed for ACK) */
 

@@ -80,30 +80,30 @@ safe_sem_signal_new ( void )
 
 /* First automatic test follows ... */
 
-static void test_basic ( int );
+static void test_basic ( long );
 
 #ifdef WANT_SETJMP
-static void test_setjmp ( int );
+static void test_setjmp ( long );
 #endif
 
-static void test_timer ( int );
-static void test_delay ( int );
-static void test_contin1 ( int );
-static void test_contin2 ( int );
+static void test_timer ( long );
+static void test_delay ( long );
+static void test_contin1 ( long );
+static void test_contin2 ( long );
 
-static void test_thread0 ( int );
-static void test_thread1 ( int );
-static void test_thread2 ( int );
-static void test_thread3 ( int );
-static void test_thread4 ( int );
-static void test_thread5 ( int );
-static void test_fancy ( int );
-static void test_easy ( int );
-static void test_cv1 ( int );
-static void test_hard ( int );
-static void test_join ( int );
-static void test_mutex ( int );
-static void test_cancel ( int );
+static void test_thread0 ( long );
+static void test_thread1 ( long );
+static void test_thread2 ( long );
+static void test_thread3 ( long );
+static void test_thread4 ( long );
+static void test_thread5 ( long );
+static void test_fancy ( long );
+static void test_easy ( long );
+static void test_cv1 ( long );
+static void test_hard ( long );
+static void test_join ( long );
+static void test_mutex ( long );
+static void test_cancel ( long );
 
 /* These are the tests we run in the automatic regression set
  * Don't put anything ugly in here we cannot run in a loop.
@@ -161,7 +161,7 @@ set_delay_user ( void )
 
 static volatile int ez;
 
-void f_ez ( int arg )
+void f_ez ( long arg )
 {
 	ez = arg;
 }
@@ -231,10 +231,10 @@ run_test ( tfptr func, int arg )
  *     (which uses semaphores)
  */
 static void
-test_basic ( int xx )
+test_basic ( long xx )
 {
 	int i;
-	int arg = 123;
+	long arg = 123;
 
 	/*
 	cpu_enter ();
@@ -343,7 +343,7 @@ static void my_tick1 ( void )
 }
 
 static void
-test_timer ( int count )
+test_timer ( long count )
 {
 	printf ("Now let's test the timer.\n");
 
@@ -367,7 +367,7 @@ test_timer ( int count )
  */
 
 void
-test_delay ( int count )
+test_delay ( long count )
 {
 	int tick = 0;
 	int i;
@@ -386,7 +386,7 @@ test_delay ( int count )
 #ifdef DEBUG_2018
 /* A modified form */
 void
-test_delay ( int count )
+test_delay ( long count )
 {
 	int tick = 0;
 	int i;
@@ -406,7 +406,7 @@ test_delay ( int count )
 /* A simple form */
 /* Used 10-10-2018 when tracking down broken INT_lock */
 void
-test_delay ( int count )
+test_delay ( long count )
 {
 	printf ( "Let's test thread delays.\n" );
 
@@ -425,9 +425,9 @@ test_delay ( int count )
  * Single continuation test.
  */
 
-static void alarm ( int );
-static void slave1 ( int );
-static void slave2 ( int );
+static void alarm ( long );
+static void slave1 ( long );
+static void slave2 ( long );
 
 // static struct thread *cont_thread;
 static struct thread *cont_slave;
@@ -438,14 +438,14 @@ static volatile int ready;
  * continuation at the other thread.
  */
 static void
-alarm ( int xx )
+alarm ( long xx )
 {
 	thr_delay ( usual_delay );
 	thr_unblock ( cont_slave );
 }
 
 static void
-slave1 ( int xx )
+slave1 ( long xx )
 {
 	ready = 1;
 	thr_block_c ( WAIT, slave2, 0 );
@@ -463,7 +463,7 @@ slave1 ( int xx )
 }
 
 static void
-slave2 ( int yy )
+slave2 ( long yy )
 {
 	printf ( " OK, cool -- got a continuation." );
 
@@ -480,7 +480,7 @@ slave2 ( int yy )
  * usual delay is 10 on single test, 1 when looping.
  */
 static void
-test_contin1 ( int xx )
+test_contin1 ( long xx )
 {
 	// cont_thread = thr_self ();
 
@@ -511,11 +511,11 @@ test_contin1 ( int xx )
 static volatile int c2_count;
 static volatile int c2_done;
 
-static void c2_s1 ( int );
-static void c2_s2 ( int );
+static void c2_s1 ( long );
+static void c2_s2 ( long );
 
 static void
-c2_s1 ( int limit )
+c2_s1 ( long limit )
 {
 	/*
 	thr_show ();
@@ -541,7 +541,7 @@ c2_s1 ( int limit )
  * Bounces control to the above.
  */
 static void
-c2_slave1 ( int limit )
+c2_slave1 ( long limit )
 {
 	/*
 	thr_show ();
@@ -555,7 +555,7 @@ c2_slave1 ( int limit )
 /* -- */
 
 static void
-c2_s2 ( int limit )
+c2_s2 ( long limit )
 {
 	++c2_count;
 	printf ( " %d", c2_count );
@@ -569,13 +569,13 @@ c2_s2 ( int limit )
  *  starts here -- bounces control to the above.
  */
 static void
-c2_slave2 ( int limit )
+c2_slave2 ( long limit )
 {
 	thr_delay_c ( usual_delay, c2_s2, limit );
 }
 
 static void
-test_contin2 ( int limit )
+test_contin2 ( long limit )
 {
 
 	c2_count = 0;
@@ -610,15 +610,15 @@ test_contin2 ( int limit )
 static volatile int t0;
 
 static void
-t0_func ( int arg )
+t0_func ( long arg )
 {
 	t0 = arg;
 }
 
 static void
-test_thread0 ( int xx )
+test_thread0 ( long xx )
 {
-	int arg = 789;
+	long arg = 789;
 
 	t0 = 0;
 
@@ -646,7 +646,7 @@ static volatile int t1_count;
 static volatile int done1;
 
 static void
-t1_f1 ( int max )
+t1_f1 ( long max )
 {
 	for ( ;; ) {
 	    ++t1_count;
@@ -659,7 +659,7 @@ t1_f1 ( int max )
 }
 
 static void
-t1_f2 ( int max )
+t1_f2 ( long max )
 {
 	for ( ;; ) {
 	    ++t1_count;
@@ -672,7 +672,7 @@ t1_f2 ( int max )
 }
 
 void
-test_thread1 ( int count )
+test_thread1 ( long count )
 {
 	done1 = 0;
 	t1_count = 0;
@@ -700,7 +700,7 @@ static volatile int t2_count;
 static volatile int done2;
 
 void
-t2_func ( int id )
+t2_func ( long id )
 {
 	while ( t2_count++ < 5 ) {
 	    printf ( " f%d(%d)", id, t2_count );
@@ -710,7 +710,7 @@ t2_func ( int id )
 }
 
 static void
-test_thread2 ( int xx )
+test_thread2 ( long xx )
 {
 	done2 = 0;
 	t2_count = 0;
@@ -765,19 +765,19 @@ t3_func ( int id, struct sem *self, struct sem *peer )
 }
 
 static void
-t3_f1 ( int xx )
+t3_f1 ( long xx )
 {
 	t3_func ( 1, sem1, sem2 );
 }
 
 static void
-t3_f2 ( int xx )
+t3_f2 ( long xx )
 {
 	t3_func ( 2, sem2, sem1 );
 }
 
 void
-test_thread3 ( int xx )
+test_thread3 ( long xx )
 {
 	t3_done = 0;
 	t3_count = 0;
@@ -819,7 +819,7 @@ test_thread3 ( int xx )
 static int t4_count = 0;
 
 static void
-t4_func ( int count )
+t4_func ( long count )
 {
 	/*
 	int x = getsp ();
@@ -843,7 +843,7 @@ t4_func ( int count )
 }
 
 void
-test_thread4 ( int count )
+test_thread4 ( long count )
 {
 	printf ( "Running silly thread test.\n" );
 
@@ -880,7 +880,7 @@ t5_ticker ( void )
 }
 
 void
-t5_slave ( int id )
+t5_slave ( long id )
 {
 	for ( ;; ) {
 	    sem_block ( t5_sem );
@@ -900,7 +900,7 @@ tdelay ( void )
 }
 
 void
-t5_master ( int count )
+t5_master ( long count )
 {
 	int i;
 
@@ -919,7 +919,7 @@ t5_master ( int count )
 }
 
 void
-test_thread5 ( int count )
+test_thread5 ( long count )
 {
 	printf ( "Running multi semaphore test.\n" );
 
@@ -973,7 +973,7 @@ t6_ticker ( void )
 }
 
 void
-t6_slave ( int id )
+t6_slave ( long id )
 {
 	for ( ;; ) {
 	    sem_block ( t6_sem );
@@ -985,7 +985,7 @@ t6_slave ( int id )
 }
 
 void
-test_fancy ( int count )
+test_fancy ( long count )
 {
 	printf ( "Running fancy multi semaphore test.\n" );
 
@@ -1068,7 +1068,7 @@ t7_ticker ( void )
 }
 
 static void
-slim79 ( int count )
+slim79 ( long count )
 {
 	/*
 	printf ( "slim starting\n" );
@@ -1086,7 +1086,7 @@ slim79 ( int count )
 }
 
 static void
-busy79 ( int nice )
+busy79 ( long nice )
 {
 	unsigned int psr;
 
@@ -1103,7 +1103,7 @@ busy79 ( int nice )
 }
 
 static void
-test_79 ( int count, int nice )
+test_79 ( long count, long nice )
 {
 	t7_run = 1;
 	t7_tick = 0;
@@ -1132,7 +1132,7 @@ test_79 ( int count, int nice )
 }
 
 static void
-test_easy ( int count )
+test_easy ( long count )
 {
 	printf ( "Easy interrupt activation test.\n" );
 
@@ -1142,7 +1142,7 @@ test_easy ( int count )
 }
 
 static void
-test_hard ( int count )
+test_hard ( long count )
 {
 	printf ( "Hard interrupt activation test.\n" );
 
@@ -1160,7 +1160,7 @@ static struct cv *cv1;
 static struct sem *cv1_mutex;
 
 static void
-cv1_func ( int x )
+cv1_func ( long x )
 {
 	int m;
 
@@ -1182,7 +1182,7 @@ cv1_func ( int x )
 }
 
 static void
-test_cv1 ( int count )
+test_cv1 ( long count )
 {
 	struct thread *tp;
 
@@ -1215,7 +1215,7 @@ test_cv1 ( int count )
 #define JDELAY 10
 
 static void
-join_func ( int time )
+join_func ( long time )
 {
 	if ( time )
 	    thr_delay ( time );
@@ -1223,7 +1223,7 @@ join_func ( int time )
 }
 
 static void
-test_join ( int count )
+test_join ( long count )
 {
 	struct thread *new;
 
@@ -1250,7 +1250,7 @@ test_join ( int count )
 static struct sem *mutex;
 
 static void
-mutex_func ( int time )
+mutex_func ( long time )
 {
 	printf ( "Thread " );
 	sem_block ( mutex );
@@ -1263,7 +1263,7 @@ mutex_func ( int time )
 }
 
 static void
-test_mutex ( int count )
+test_mutex ( long count )
 {
 	struct thread *new;
 
@@ -1296,7 +1296,7 @@ static struct thread *waiter;
 static struct sem *waiter_sem;
 
 static void
-cancel_func ( int type )
+cancel_func ( long type )
 {
 	thr_delay ( 50 );
 
@@ -1309,7 +1309,7 @@ cancel_func ( int type )
 
 /* Test timer cancels and sem with timeout */
 static void
-test_cancel ( int count )
+test_cancel ( long count )
 {
 	struct thread *new;
 	int start_time;
@@ -1399,7 +1399,7 @@ jmp_test2 ( void )
 }
 
 static void
-test_setjmp ( int xx )
+test_setjmp ( long xx )
 {
 	printf ( "Running setjmp test\n" );
 	jmp_test1 ();

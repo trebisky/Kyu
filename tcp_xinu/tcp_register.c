@@ -95,6 +95,7 @@ int32	tcp_register (
 
 		// tcbptr->tcb_rbuf = (char *) kyu_getmem (65535);
 		tcbptr->tcb_rbuf = (char *) kyu_getmem ( tcp_bufsize );
+
 		if (tcbptr->tcb_rbuf == (char *)SYSERR) {
 			signal (Tcp.tcpmutex);
 			return SYSERR;

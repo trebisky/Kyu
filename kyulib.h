@@ -36,7 +36,9 @@ void dump_l ( void *, int );
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 
-typedef unsigned int size_t;
+// Making this long rather than int cleans up the compile
+// of dlmalloc.c on 64 bit armv8
+typedef unsigned long size_t;
 
 #ifdef USE_GCC_BUILTINS
 #define memcpy(a,b,c)   __builtin_memcpy((a),(b),(c))

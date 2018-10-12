@@ -17,7 +17,7 @@
 
 #define PRI_SHELL	40
 
-void test_main ( int );
+void test_main ( long );
 
 #ifdef notdef
 volatile double q;
@@ -42,7 +42,7 @@ floater ( void )
  * system for his application.
  */
 void
-user_init ( int xx )
+user_init ( long xx )
 {
 
 #ifdef notdef
@@ -66,7 +66,7 @@ user_init ( int xx )
  * system for his application.
  */
 void
-user_init ( int val )
+user_init ( long val )
 {
 	printf ( "toot = %d\n", val );
 	thr_delay_a ( 1, user_init, val+1 );
@@ -83,7 +83,7 @@ static int tooter = 0;
  * system for his application.
  */
 void
-user_init ( int xx )
+user_init ( long xx )
 {
 	++tooter;
 	printf ( "toot = %d\n", tooter );

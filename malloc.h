@@ -302,6 +302,7 @@ extern "C" {
 
 #ifndef INTERNAL_SIZE_T
 #define INTERNAL_SIZE_T size_t
+// #define INTERNAL_SIZE_T unsigned int
 #endif
 
 /*

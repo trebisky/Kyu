@@ -14,6 +14,8 @@
  *
  */
 
+#include "protos.h"
+
 #define MAX_THREADS	32
 // #define MAX_SEM		64
 #define MAX_SEM		512
@@ -68,15 +70,6 @@ typedef void (*cfptr) ( int, void * );
 
 #ifndef NULL
 #define NULL (0)
-#endif
-
-#ifdef notdef
-/* This should now be done in arch/types.h */
-typedef unsigned long u32;
-typedef unsigned short u16;
-typedef unsigned char u8;
-
-typedef volatile unsigned long vu32;
 #endif
 
 /* THE END */

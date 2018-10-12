@@ -432,7 +432,7 @@ panic_debug ( void )
  * but it avoids a bunch of annoying data aborts.
  */
 static void *
-arm_address_fix ( unsigned int addr )
+arm_address_fix ( unsigned long addr )
 {
 	if ( ! valid_ram_address ( addr ) )
 	    return (void *) 0;
@@ -498,7 +498,7 @@ mem_verify ( unsigned long *start, unsigned long *end )
 void
 mem_dumper ( int type, char *a_start, char *a_lines )
 {
-	unsigned int addr;
+	unsigned long addr;
 	void *start;
 	int lines;
 
@@ -523,7 +523,7 @@ mem_dumper ( int type, char *a_start, char *a_lines )
 	    }
 
 	    /* check end address too */
-	    addr = (unsigned int) start + 16 * lines - 1;
+	    addr = (unsigned long) start + 16 * lines - 1;
 	    if ( ! valid_ram_address ( addr ) ) {
 		printf ( "End address not in RAM\n" );
 		return;

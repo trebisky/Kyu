@@ -369,7 +369,7 @@ xinu_memb_show ( int limit )
 
 /* XXX - the following need locks */
 char *
-kyu_getmem ( uint32 nbytes )
+kyu_getmem ( int nbytes )
 {
 	char *rv;
 
@@ -389,7 +389,7 @@ kyu_getmem ( uint32 nbytes )
 }
 
 int
-kyu_freemem ( char *buf, uint32 xxx_nbytes )
+kyu_freemem ( char *buf, int xxx_nbytes )
 {
 	// printf ( "FREEMEM -- %08x\n", buf );
 

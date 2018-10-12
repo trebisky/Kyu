@@ -34,21 +34,21 @@ void pkt_arm ( void );
 void pkt_arrive ( void );
 
 #ifdef WANT_NET
-static void test_netshow ( int );
-static void test_netarp ( int );
-static void test_bootp ( int );
-static void test_dhcp ( int );
-static void test_icmp ( int );
-static void test_dns ( int );
-static void test_arp ( int );
- void test_tftp ( int );
-static void test_udp ( int );
-static void test_netdebug ( int );
-static void test_udp_echo ( int );
+static void test_netshow ( long );
+static void test_netarp ( long );
+static void test_bootp ( long );
+static void test_dhcp ( long );
+static void test_icmp ( long );
+static void test_dns ( long );
+static void test_arp ( long );
+ void test_tftp ( long );
+static void test_udp ( long );
+static void test_netdebug ( long );
+static void test_udp_echo ( long );
 
 #ifdef notdef
 void
-test_tcp ( int xxx )
+test_tcp ( long xxx )
 {
 #ifdef WANT_TCP_XINU
 	printf ( "Testing Xinu TCP\n" );
@@ -82,7 +82,7 @@ struct test net_test_list[] = {
 #ifdef WANT_NET
 
 static void
-test_netshow ( int test )
+test_netshow ( long test )
 {
 	net_show ();
 }
@@ -90,37 +90,37 @@ test_netshow ( int test )
 extern unsigned long test_ip;
 
 static void
-test_netarp ( int test )
+test_netarp ( long test )
 {
 	show_arp_ping ( test_ip );
 }
 
 static void
-test_icmp ( int test )
+test_icmp ( long test )
 {
 	ping ( test_ip );
 }
 
 static void
-test_bootp ( int test )
+test_bootp ( long test )
 {
 	bootp_test();
 }
 
 static void
-test_dhcp ( int test )
+test_dhcp ( long test )
 {
 	dhcp_test();
 }
 
 static void
-test_dns ( int test )
+test_dns ( long test )
 {
 	dns_test();
 }
 
 static void
-test_arp ( int count )
+test_arp ( long count )
 {
 	int i;
 
@@ -195,7 +195,7 @@ static char udp_test_buf[UDP_TEST_SIZE];
  */
 
 static void
-test_udp ( int xxx )
+test_udp ( long xxx )
 {
 	int i;
 	// char *msg = "hello";
@@ -351,7 +351,7 @@ endless_rcv ( struct netbuf *nbp )
  * Suprisingly, this seems to work just fine.
  */
 void
-endless_watch ( int xxx )
+endless_watch ( long xxx )
 {
 	int count;
 	int tmo = 0;
@@ -382,7 +382,7 @@ endless_watch ( int xxx )
  * Call this to start the test.
  */
 static void
-test_udp_echo ( int test )
+test_udp_echo ( long test )
 {
 
 	// check_clock ();
@@ -416,7 +416,7 @@ test_udp_echo ( int test )
 /* Hook for board specific network statistics
  */
 static void
-test_netdebug ( int test )
+test_netdebug ( long test )
 {
 	board_net_debug ();
 

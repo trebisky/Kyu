@@ -35,36 +35,36 @@
  * Don't run these tests automatically.
  * Don't run them in a repeat loop either.
  */
-static void test_sort ( int );
-static void test_ran ( int );
-static void test_malloc ( int );
-static void test_wait ( int );
-static void test_unroll ( int );
-static void test_fault ( int );
-static void test_zdiv ( int );
-static void test_gpio ( int );
-static void test_clock ( int );
-static void test_regs ( int );
+static void test_sort ( long );
+static void test_ran ( long );
+static void test_malloc ( long );
+static void test_wait ( long );
+static void test_unroll ( long );
+static void test_fault ( long );
+static void test_zdiv ( long );
+static void test_gpio ( long );
+static void test_clock ( long );
+static void test_regs ( long );
 
 #ifdef BOARD_BBB
-static void test_adc ( int );
-static void test_fault2 ( int );
+static void test_adc ( long );
+static void test_fault2 ( long );
 #endif
 
 #ifdef BOARD_ORANGE_PI
-static void test_wdog ( int );
-static void test_cores ( int );
-static void test_thermal ( int );
-static void test_uart ( int );
-static void test_ram1 ( int );
-static void test_ram2 ( int );
-static void test_button ( int );
-static void test_blink_s ( int );
-static void test_blink ( int );
+static void test_wdog ( long );
+static void test_cores ( long );
+static void test_thermal ( long );
+static void test_uart ( long );
+static void test_ram1 ( long );
+static void test_ram2 ( long );
+static void test_button ( long );
+static void test_blink_s ( long );
+static void test_blink ( long );
 #endif
 
-static void test_blink_d ( int );
-static void test_clear ( int );
+static void test_blink_d ( long );
+static void test_clear ( long );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -137,14 +137,14 @@ test_ram2 ( int xxx )
 #ifdef BOARD_ORANGE_PI
 /* Test Orange Pi button */
 static void
-test_button ( int xxx )
+test_button ( long xxx )
 {
 	gpio_test_button ();
 }
 #endif
 
 static void
-test_malloc ( int xxx )
+test_malloc ( long xxx )
 {
 	char *p;
 
@@ -164,7 +164,7 @@ test_malloc ( int xxx )
  * which can be interesting.
  */
 static void
-test_wait ( int secs )
+test_wait ( long secs )
 {
 	printf ( "Waiting ...\n" );
 	thr_delay ( secs * timer_rate_get() );
@@ -175,7 +175,7 @@ test_wait ( int secs )
 
 /* test ARM stack backtrace */
 static void
-test_unroll ( int xxx )
+test_unroll ( long xxx )
 {
 	unroll_cur();
 }
@@ -266,14 +266,14 @@ fault_align ( void )
 }
 
 void
-test_fault ( int xxx )
+test_fault ( long xxx )
 {
 	fault_addr_zero ();
 	fault_align ();
 }
 
 static void
-test_zdiv ( int xxx )
+test_zdiv ( long xxx )
 {
 	volatile int a = 1;
 	int b = 0;
@@ -300,7 +300,7 @@ prober ( unsigned int addr )
 }
 
 void
-test_fault2 ( int xxx )
+test_fault2 ( long xxx )
 {
 	unsigned long s;
 	char *p;
@@ -327,7 +327,7 @@ test_fault2 ( int xxx )
 
 #ifdef BOARD_ORANGE_PI
 void
-test_cores ( int xxx )
+test_cores ( long xxx )
 {
 	/* official test */
 	test_core ();
@@ -337,7 +337,7 @@ test_cores ( int xxx )
 }
 
 void
-test_thermal ( int xxx )
+test_thermal ( long xxx )
 {
 	// test_ths ();
 }
@@ -401,7 +401,7 @@ led_norm ( void )
 #define X_UART	3
 
 static void
-test_uart ( int arg )
+test_uart ( long arg )
 {
 	uart_init ( X_UART, 115200 );
 
@@ -415,8 +415,11 @@ test_uart ( int arg )
 }
 #endif
 
+unsigned long ram_next ( void );
+unsigned long ram_size ( void );
+
 static void
-test_clear ( int arg )
+test_clear ( long arg )
 {
 	unsigned long *start;
 	unsigned long size;
@@ -445,7 +448,7 @@ static struct thread *blink_tp;
 
 /* start the blink */
 static void
-test_blink ( int xxx )
+test_blink ( long xxx )
 {
 	printf ( "Start the blink\n" );
 	blink_tp = thr_new_repeat ( "blinker", led_blinker, 0, 10, 0, BLINK_RATE );
@@ -455,7 +458,7 @@ test_blink ( int xxx )
 
 /* stop the blink */
 static void
-test_blink_s ( int xxx )
+test_blink_s ( long xxx )
 {
 	printf ( "Stop the blink\n" );
 	thr_repeat_stop ( blink_tp );
@@ -497,7 +500,7 @@ test_led_off ( void )
  * Should blink two quick pulses, 1 second apart.
  */
 static void
-test_blink_d ( int arg )
+test_blink_d ( long arg )
 {
 	int a = 100;
 	int b = 1000;
@@ -586,22 +589,22 @@ check_clock ( void )
 }
 
 
-static void test_clock ( int count ) {
+static void test_clock ( long count ) {
 	check_clock ();
 }
 
 /* Test gpio on BBB or Orange Pi */
-static void test_gpio ( int count ) { gpio_test (); }
+static void test_gpio ( long count ) { gpio_test (); }
 
 #ifdef BOARD_ORANGE_PI
 /* Test watchdog on Orange Pi */
-static void test_wdog ( int count ) { wd_test (); }
+static void test_wdog ( long count ) { wd_test (); }
 #endif
 
 #ifdef BOARD_BBB
 
 /* Test adc on BBB */
-static void test_adc ( int count ) { adc_test (); }
+static void test_adc ( long count ) { adc_test (); }
 #endif
 
 /* -------------------------------------------- */
@@ -612,7 +615,7 @@ static void test_adc ( int count ) { adc_test (); }
 #define MAXB 64
 
 static void
-test_ran ( int count )
+test_ran ( long count )
 {
 	int i, n, x;
 	char buf[MAXB];
@@ -647,17 +650,19 @@ test_ran ( int count )
 
 /* -------------------------------------------- */
 
-static void f_croak ( int junk )
+static void f_croak ( long junk )
 {
-	printf ( "thr_sort: Gone!\n");
+	printf ( "thr_sort: going bye bye (OK)!\n");
 }
 
-static void f_linger ( int time )
+static void f_linger ( long time )
 {
 	/*
 	thr_delay ( time * timer_rate_get() );
 	*/
 	thr_delay_c ( time * timer_rate_get(), f_croak, 0 );
+
+	/* Should never see this */
 	printf ( "thr_sort: Exit!\n");
 }
 
@@ -666,6 +671,9 @@ static void f_linger ( int time )
  * At first we just left the threads blocked and there
  * was no way to get rid of them.  Then I got the idea
  * of using thr_delay to have them go away after a while.
+ * A "while" is 9 seconds.  Use the "l" command to look at
+ * the ready list before this happens and visually confirm
+ * proper order.
  *
  * This exposed a bug (the keyboard no longer worked after
  * the timeout, well at least not from the prompt, the
@@ -675,7 +683,7 @@ static void f_linger ( int time )
  * This bug was fixed 8/22/2002 (it was in thr_unblock)
  */
 static void
-test_sort ( int xxx )
+test_sort ( long xxx )
 {
 	/*
 	(void) safe_thr_new ( 0, f_ez, (void *) 0, 13, TF_BLOCK );
@@ -695,7 +703,7 @@ test_sort ( int xxx )
 }
 
 static void
-test_regs ( int xxx )
+test_regs ( long xxx )
 {
 	show_my_regs ();
 }

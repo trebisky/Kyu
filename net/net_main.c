@@ -37,10 +37,10 @@ unsigned long test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-static void slow_net ( int );
+static void slow_net ( long );
 // static void fast_net ( void );
 
-static void net_thread ( int );
+static void net_thread ( long );
 static void netbuf_init ( void );
 void netbuf_show ( void );
 void net_show ( void );
@@ -87,7 +87,7 @@ net_debug_arm ( void )
  * thread and have the Kyu shell available to help debug the situation.
  */
 void
-net_hw_init ( int bogus )
+net_hw_init ( long bogus )
 {
     num_eth = board_net_init ();
     board_net_activate ();
@@ -278,7 +278,7 @@ net_init ( void )
 
 /* This runs as a thread on a repeat at 1 Hz */
 static void
-slow_net ( int xxx )
+slow_net ( long xxx )
 {
 	arp_tick ();
 	dns_tick ();
@@ -336,7 +336,7 @@ net_rcv ( struct netbuf *nbp )
 
 /* Thread to process queue of arriving packets */
 static void
-net_thread ( int xxx )
+net_thread ( long xxx )
 {
     	struct netbuf *nbp;
 
@@ -380,7 +380,7 @@ net_thread ( int xxx )
 #ifdef oldway
 /* Thread to process queue of arriving packets */
 static void
-net_thread ( int arg )
+net_thread ( long arg )
 {
     	struct netbuf *nbp;
 
