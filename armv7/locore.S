@@ -111,7 +111,7 @@
  */
 
 /* Providing this symbol here is really unnecessary, but it gives us
- * a way to tell the linker to use as a start address in the ELF file.
+ * a way to tell the linker what to use as a start address in the ELF file.
  * The only purpose this serves is to keep the linker quiet, but
  * that is worth something, perhaps.
  */
@@ -253,6 +253,7 @@ primary_start:
         beq     2f
 	    // r0 holds core number,
 	    // which becomes argument to kyu_newcore
+	    // bl	spin_alt
 	    bl	kyu_newcore
 1:	    b	1b
 2:
@@ -851,12 +852,37 @@ sanity:
 
 #ifdef BOARD_ORANGE_PI
 
+.globl go_red
+.globl spin_red
+.globl spin_alt
+
 // Turn on RED led on Orange Pi
 go_red:
 	ldr	r12,=0x01c20810
 	ldr	r11,=0xffffffff
 	str	r11, [r12]
 	bx	lr
+
+// turn on RED led and spin
+spin_red:
+	ldr	r12,=0x01c20810
+	ldr	r11,=0xffffffff
+	str	r11, [r12]
+1:	b	1b
+
+// return unless alt core
+// if so, turn on RED led and spin
+spin_alt:
+        read_MPID ( r11 )
+        and     r11, r11, #0x03
+        cmp     r11, #0
+        bne     1f
+	bx	lr
+
+1:	ldr	r12,=0x01c20810
+	ldr	r11,=0xffffffff
+	str	r11, [r12]
+1:	b	1b
 
 #endif /* BOARD_ORANGE_PI */
 

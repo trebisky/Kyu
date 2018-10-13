@@ -130,8 +130,13 @@ void
 show_regs (struct arm_regs *regs)
 {
 	unsigned long flags;
+	int mpid;
 
 	flags = condition_codes (regs);
+
+	// find out what core faulted.
+	get_MPID ( mpid );
+	printf ( "CPU: %d\n", mpid & 0x3 );
 
 	printf ("pc : [<%08lx>]	   lr : [<%08lx>]\n"
 		"sp : %08lx  ip : %08lx	 fp : %08lx\n",

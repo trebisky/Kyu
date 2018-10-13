@@ -95,6 +95,7 @@ evil_exception ( char *msg, int code )
 	    for ( ;; ) ;
 	}
 
+
 	printf ( "%s in thread %s\n", msg, cur_thread->name );
 	show_thread_regs ( cur_thread, 0 );
 

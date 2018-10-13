@@ -127,6 +127,9 @@ typedef unsigned long __u32;
 #define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
 #define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
 
+/* Multiprocessor affinity register */
+#define get_MPID(val)	asm volatile ( "mrc p15, 0, %0, c0, c0, 5" : "=r" ( val ) )
+
 /* Disable interrupts to lock section */
 #define INT_lock	\
 	asm volatile (	"mrs     r0, cpsr; \

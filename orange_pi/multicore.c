@@ -88,6 +88,8 @@ extern void secondary_start ( void );
 
 /* ------------ */
 
+static void start_test0 ( void );
+static void start_test00 ( void );
 static void start_test1 ( void );
 static void start_test2 ( void );
 // static void start_test3 ( void );
@@ -123,13 +125,18 @@ h3_start_core ( int core, cfptr func, void *arg )
 	/* We won't try to restart core 0 */
 	if ( core < 1 || core >= NUM_CORES )
 	    return;
+
 	if ( core_run[core] )
 	    return;
 
 	*SENTINEL = 0xdeadbeef;
 
-	// printf ( "Starting core %d ...\n", core );
+	/* Added 10-13-2018 */
+	core_func[core] = func;
+
+	printf ( "Starting core %d ...\n", core );
 	launch_core ( core );
+	printf ( "Waiting for core %d ...\n", core );
 
 	// watch_core ();
 	stat = wait_core ();
@@ -155,6 +162,7 @@ run_newcore ( int core )
 	/* Clear flag to indicate we are running */
 	sent = SENTINEL;
 	*sent = 0;
+	// spin_red ();
 
 	(*core_func[core]) ( core, core_arg[core]  );
 }
@@ -172,7 +180,7 @@ wait_core ( void )
 
 	for ( i=0; i<MAX_CORE; i++ ) {
 	    if ( *sent == 0 ) {
-		// printf ( "Core started in %d\n", i );
+		printf ( "Core started in %d\n", i );
 		return 1;
 	    }
 	}
@@ -215,9 +223,13 @@ launch_core ( int core )
 void
 test_core ( void )
 {
-	int reg;
+	printf ( "Testing multicore startup\n" );
+	// printf ( "Testing multicore startup 1\n" );
+	// thr_delay ( 1000 );
+	// printf ( "Testing multicore startup 2\n" );
 
 #ifdef notdef
+	int reg;
 	get_CPSR ( reg );
 	printf ( "CPSR  = %08x\n", reg );
 
@@ -235,6 +247,8 @@ test_core ( void )
 	printf ( "Spin: %d\n", reg );
 #endif
 
+	// start_test0 ();
+	start_test00 ();
 	// start_test1 ();
 
 	// test H3 spin locks
@@ -248,7 +262,37 @@ test_core ( void )
 	// has unsolved problems.
 	// start_test4 ();
 
-	start_test5 ();
+	// 10-12-2018
+	// start_test5 ();
+}
+
+/* -------------------------------------------------------------------------------- */
+/* Demo 0, test LED blink */
+/* Works fine 10-13-2018, 4 sec period, 2 blinks */
+
+static void
+start_test0 ( void )
+{
+	run_blink ( 2, 100, 4000 );
+	for ( ;; )
+	    ;
+}
+
+/* --- */
+
+static void
+core_demo00 ( int core, void *xxx )
+{
+	// printf ( "Core %d blinking\n", core );
+
+	/* Blink red status light */
+	run_blink ( core+1, 100, 4000 );
+}
+
+static void
+start_test00 ( void )
+{
+	h3_start_core ( CORE_1, core_demo00, NULL );
 }
 
 /* -------------------------------------------------------------------------------- */

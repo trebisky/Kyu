@@ -64,7 +64,7 @@
 void mmu_nocache ( unsigned long );
 void mmu_invalid ( unsigned long );
 
-void mmu_initialize ( unsigned long, unsigned long );
+// void mmu_initialize ( unsigned long, unsigned long );
 
 addr_t ram_alloc ( int );
 

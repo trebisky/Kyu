@@ -195,8 +195,8 @@ board_mmu_init ( void )
 void
 board_core_startup ( int core )
 {
-	// int sp;
-	// get_SP ( sp );
+	int sp;
+	get_SP ( sp );
 	// garbled without lock
 	// printf ( "Core %d starting with sp = %08x\n", core, sp );
 
@@ -206,6 +206,7 @@ board_core_startup ( int core )
 	run_newcore ( core );
 }
 
+/* This is called to start a new core */
 void
 board_new_core ( int core, cfptr func, void *arg )
 {
