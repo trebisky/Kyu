@@ -117,6 +117,7 @@ new_core ( int core, cfptr func, void *arg )
 	board_new_core ( core, func, arg );
 }
 
+#ifdef BOARD_FIRE3
 extern char __bss_start__;
 extern char __bss_end__;
 
@@ -169,6 +170,7 @@ check_bss ( void )
 	}
 
 }
+#endif
 
 /* This is --almost-- the first bit of C code that runs in 32 bit mode.
  *  almost, because we call board_mmu_init() before calling this.
@@ -313,7 +315,8 @@ basic_checkout_j ( void )
 	printf ( "J regs saved\n" );
 	show_regs ( j_regs );
 
-	resume_jj ( j_regs );
+	// resume_jj ( j_regs );
+	resume_j ( j_regs );
 	/* Should not get here */
 
 	j_spin ( "J saved" );
@@ -483,7 +486,7 @@ sys_init ( long xxx )
 #endif
 
 #ifdef WANT_NET
-	// net_init ();
+	net_init ();
 #endif
 
 /* These things must be after net_init() because

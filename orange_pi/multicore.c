@@ -92,6 +92,7 @@ static void start_test1 ( void );
 static void start_test2 ( void );
 // static void start_test3 ( void );
 static void start_test4 ( void );
+static void start_test5 ( void );
 
 static void pulses ( int, int );
 static void run_blink ( int, int, int );
@@ -244,7 +245,10 @@ test_core ( void )
 	// start_test3 ();
 
 	// test interrupt between cores 
-	start_test4 ();
+	// has unsolved problems.
+	// start_test4 ();
+
+	start_test5 ();
 }
 
 /* -------------------------------------------------------------------------------- */
@@ -396,6 +400,8 @@ core_demo4 ( int core, void *xxx )
 {
 	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
 
+	printf ( "Core %d started\n", core );
+
 	for ( ;; ) {
 	    delay_ms ( 1000 );
 	}
@@ -426,6 +432,44 @@ start_test4 ( void )
 	    gic_soft ( SGI_3, CORE_1 );
 	    thr_delay ( 100 );
 	}
+}
+
+volatile int test5_flag;
+
+static void
+core_demo5 ( int core, void *xxx )
+{
+	test5_flag = 1;
+	puts ( "x" );
+	puts ( "x" );
+	puts ( "x" );
+	puts ( "x" );
+	for ( ;; )
+	    ;
+}
+
+/* Basic core startup */
+
+static void
+start_test5 ( void )
+{
+	int count;
+
+	test5_flag = 0;
+	printf ( "Waiting for core to start\n" );
+
+	h3_start_core ( CORE_1, core_demo5, NULL );
+
+	count = 1000;
+	while ( count-- ) {
+	    thr_delay ( 2 );
+	    if ( test5_flag ) {
+		printf ( "Core %d has started\n", CORE_1 );
+		return;
+	    }
+	}
+
+	printf ( "Core %d failed to start\n", CORE_1 );
 }
 
 /* -------------------------------------------------------------------------------- */

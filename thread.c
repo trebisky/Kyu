@@ -511,7 +511,7 @@ thr_show ( void )
 {
 	struct thread *tp;
 
-	printf ( "  Thread:       name (  &tp   )    state     esp     pri\n");
+	printf ( "  Thread:       name (  &tp   )    state      sp     pri\n");
 	/*
 	thr_one ( thread0 );
 	*/
@@ -1629,10 +1629,10 @@ change_thread ( struct thread *new_tp, int options )
 		if ( thread_debug )
 		    printf ("change_thread_resume_i\n");
 
-		// XXX - tjt for debug
-		// resume_i ( &new_tp->iregs );
+		// tjt:  for debug (armv8)
 		// resume_id ( &new_tp->iregs );
-		resume_idx ( new_tp );
+		// resume_idx ( new_tp );
+		resume_i ( &new_tp->iregs );
 		panic ( "change_thread, switch_i" );
 		break;
 	    case CONT:

@@ -114,14 +114,14 @@ struct test io_test_list[] = {
 
 /* I swear this worked once on the Orange Pi */
 static void
-test_ram1 ( int xxx )
+test_ram1 ( long xxx )
 {
 	printf ( "Memory test - verify 0 to 0x10000\n" );
 	mem_verify ( 0x0, 0x10000 );
 }
 
 static void
-test_ram2 ( int xxx )
+test_ram2 ( long xxx )
 {
 	/* Orange Pi SRAM A1 */
 	printf ( "Memory test 0 to 0x10000\n" );
@@ -353,7 +353,7 @@ test_thermal ( long xxx )
 #define BLINK_RATE	1000
 
 static void
-led_blinker ( int xx )
+led_blinker ( long xx )
 {
 	/* Writing a "1" does turn the LED on */
 	gpio_led_set ( 1 );
@@ -374,7 +374,7 @@ int led_state = 0;
 #define BLINK_RATE	500
 
 static void
-led_blinker ( int xx )
+led_blinker ( long xx )
 {
 	printf ( "Blink: %d\n", led_state );
 	if ( led_state ) {

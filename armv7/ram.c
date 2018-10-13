@@ -66,7 +66,7 @@ void mmu_invalid ( unsigned long );
 
 void mmu_initialize ( unsigned long, unsigned long );
 
-unsigned long ram_alloc ( long );
+addr_t ram_alloc ( int );
 
 extern char _end;
 
@@ -209,8 +209,8 @@ valid_ram_address ( unsigned long addr )
 /* We never ever expect to free anything we allocate
  *  using this facility
  */
-unsigned long
-ram_alloc ( long arg )
+addr_t
+ram_alloc ( int arg )
 {
 	unsigned long rv;
 	unsigned long size;
@@ -233,7 +233,7 @@ ram_alloc ( long arg )
 }
 
 /* Allocate some number of 1M sections */
-unsigned long
+addr_t
 ram_section ( int arg )
 {
 	unsigned long count;
@@ -251,7 +251,7 @@ ram_section ( int arg )
 /* Allocate some number of 1M sections
  *  with caching turned off.
  */
-unsigned long
+addr_t
 ram_section_nocache ( int arg )
 {
 	unsigned long rv;
@@ -261,13 +261,13 @@ ram_section_nocache ( int arg )
 	return rv;
 }
 
-unsigned long
+addr_t
 ram_next ( void )
 {
 	return next_ram;
 }
 
-unsigned long
+addr_t
 ram_size ( void )
 {
 	return last_ram - next_ram;
