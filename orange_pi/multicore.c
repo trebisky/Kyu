@@ -134,9 +134,9 @@ h3_start_core ( int core, cfptr func, void *arg )
 	/* Added 10-13-2018 */
 	core_func[core] = func;
 
-	printf ( "Starting core %d ...\n", core );
+	// printf ( "Starting core %d ...\n", core );
 	launch_core ( core );
-	printf ( "Waiting for core %d ...\n", core );
+	// printf ( "Waiting for core %d ...\n", core );
 
 	// watch_core ();
 	stat = wait_core ();
@@ -180,7 +180,7 @@ wait_core ( void )
 
 	for ( i=0; i<MAX_CORE; i++ ) {
 	    if ( *sent == 0 ) {
-		printf ( "Core started in %d\n", i );
+		// printf ( "Core started in %d\n", i );
 		return 1;
 	    }
 	}
@@ -248,7 +248,7 @@ test_core ( void )
 #endif
 
 	// start_test0 ();
-	start_test00 ();
+	// start_test00 ();
 	// start_test1 ();
 
 	// test H3 spin locks
@@ -259,10 +259,10 @@ test_core ( void )
 	// start_test3 ();
 
 	// test interrupt between cores 
-	// has unsolved problems.
-	// start_test4 ();
+	// OK 10-13-2018
+	start_test4 ();
 
-	// 10-12-2018
+	// 10-12-2018 OK
 	// start_test5 ();
 }
 
@@ -278,7 +278,9 @@ start_test0 ( void )
 	    ;
 }
 
-/* --- */
+/* -------------------------------------------------------------------------------- */
+/* Demo 00 - sort of simplest possible core launch */
+/* Used 10-13-2018 to fix regression bug */
 
 static void
 core_demo00 ( int core, void *xxx )
@@ -296,7 +298,9 @@ start_test00 ( void )
 }
 
 /* -------------------------------------------------------------------------------- */
-/* Demo 1, hard delay loop to blink LED patterns */
+/* Demo 1, hard delay loop to blink LED patterns.
+ * Starts all 3 extra cores, and they blink 2 3 4 2 3 4 ....
+ */
 
 static void
 core_demo1 ( int core, void *xxx )
@@ -444,13 +448,21 @@ core_demo4 ( int core, void *xxx )
 {
 	irq_hookup ( IRQ_SGI_3, test4_handler_3, 0 );
 
-	printf ( "Core %d started\n", core );
+	// printf ( "Core %d started\n", core );
 
+	/* Spin */
 	for ( ;; ) {
 	    delay_ms ( 1000 );
 	}
 }
 
+/* Set up core 0 to receive BANG and BOOM.
+ *  Core 0 interupts itself (BANG)
+ *  Core 0 interupts itself (BOOM)
+ * Start core 1
+ *  Core 0 sends 10 interrupts to core 1 (BONK ...)
+ *  Leaves core 1 spinning.
+ */
 static void
 start_test4 ( void )
 {
@@ -470,8 +482,7 @@ start_test4 ( void )
 	h3_start_core ( CORE_1, core_demo4, NULL );
 	thr_delay ( 500 );
 
-	/* see if we can interrupt core 1 */
-	// XXX - currently under test
+	/* Interrupt core 1 */
 	for ( i=0; i<10; i++ ) {
 	    gic_soft ( SGI_3, CORE_1 );
 	    thr_delay ( 100 );
@@ -484,10 +495,6 @@ static void
 core_demo5 ( int core, void *xxx )
 {
 	test5_flag = 1;
-	puts ( "x" );
-	puts ( "x" );
-	puts ( "x" );
-	puts ( "x" );
 	for ( ;; )
 	    ;
 }
