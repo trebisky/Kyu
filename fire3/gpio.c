@@ -40,10 +40,6 @@ struct gpio_regs {
 
 #define GPIOB_BASE	((struct gpio_regs *) 0xC001B000)
 
-#define LONG  800000
-#define MEDIUM  200000
-#define SHORT 100000
-
 #define LED_BIT	(1<<12)
 
 void
@@ -81,16 +77,21 @@ status_off ( void )
 	gp->out = LED_BIT;	/* off */
 }
 
-/* Called from test menu */
-void
-gpio_test ( void )
-{
-}
-
 /* -------------------------------------------------------- */
 /* -------------------------------------------------------- */
 
-#ifdef notdef
+/*
+ * These may have been OK with D cache disabled.
+#define LONG  800000
+#define MEDIUM  200000
+#define SHORT 100000
+*/
+
+/* The above, times 100 seems about right */
+#define LONG  80000000
+#define MEDIUM  20000000
+#define SHORT 10000000
+
 void
 delay ( int count )
 {
@@ -117,6 +118,19 @@ pulses ( int num )
 	    pulse ();
 }
 
+/* Called from test menu */
+void
+gpio_test ( void )
+{
+	printf ( "Use reset button to end test\n" );
+
+	for ( ;; ) {
+	    delay ( LONG );
+	    pulses ( 2 );
+	}
+}
+
+#ifdef notdef
 /* This is an experiment to find out what EL the first
  * bit of 64 bit code runs at.
  * see u-boot: arch/arm/include/asm/system.h
@@ -129,19 +143,6 @@ get_el(void)
 
         asm volatile("mrs %0, CurrentEL" : "=r" (val) : : "cc");
         return val >> 2;
-}
-
-void
-blink_init ( void )
-{
-	struct gpio_regs *gp = GPIOB_BASE;
-
-	/* Configure the GPIO */
-	gp->alt0 &= ~(3<<24);
-	gp->alt0 |= 2<<24;
-	gp->oe = LED_BIT;
-
-	gp->out = LED_BIT;	/* off */
 }
 
 void

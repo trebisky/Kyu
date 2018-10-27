@@ -85,6 +85,14 @@ r_CCNT ( void )
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
+/* Multiprocessor ID register (affinity register)
+ * only available as MPIDR_EL1.
+ * low byte gives core (0-3)
+ * next byte (0xff00) gives cluster (0 or 1)
+ * top bit is set (reserved) to 0x80000000 -- who knows what that is.
+ */
+#define get_MPIDR(val)	asm volatile ( "mrs %0, MPIDR_EL1" : "=r" ( val ) )
+
 #define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
 #define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
 
@@ -147,73 +155,73 @@ raw_write_DAIF( unsigned int val )
 /* ------------------------------------------------------------------ */
 
 #ifdef notdef
-
-/* ARM v7 stuff parked below here */
-
-/* These functions don't get compiled inline unless some level of
- * optimization is enabled.  By default they become just static functions
- * and get duplicated in more than one place in the code, which is harmless
- * but yields some unfortunate bloat.
- */
-
-/* List of fault codes */
-/* The first 8 are ARM hardware exceptions and interrupts */
-
-#define F_NONE	0
-#define F_UNDEF	1
-#define F_SWI	2
-#define F_PABT	3
-#define F_DABT	4
-#define F_NU	5
-#define F_FIQ	6	/* not a fault */
-#define F_IRQ	7	/* not a fault */
-
-#define F_DIVZ	8	/* pseudo for linux library */
-#define F_PANIC	9	/* pseudo for Kyu, user panic */
-
-
-/* Added 6-14-2018
- * A collection of inline assembly for ARM control register access
- * Above all, this makes code more readable and less error prone.
- *  (as long as we get these macros right)
- */
-#define get_SCTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 0" : "=r" ( val ) )
-#define set_SCTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 0" : : "r" ( val ) )
-#define get_ACTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 1" : "=r" ( val ) )
-#define set_ACTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 1" : : "r" ( val ) )
-
-#define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
-#define get_TTBR0(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 0" : "=r" ( val ) )
-
-#define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
-#define get_TTBR1(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 1" : "=r" ( val ) )
-#define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
-#define get_TTBCR(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 2" : "=r" ( val ) )
-
-#define set_DACR(val)	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
-
-#define get_VBAR(val)	asm volatile ( "mrc p15, 0, %0, c12, c0, 0" : "=r" ( val ) )
-#define set_VBAR(val)	asm volatile ( "mcr p15, 0, %0, c12, c0, 0" : : "r" ( val ) )
-
-/* Performance monitoring unit registers */
-#define get_CCNT(val)	asm volatile ( "mrc p15, 0, %0, c9, c13, 0" : "=r" ( val ) )
-#define set_CCNT(val)	asm volatile ( "mcr p15, 0, %0, c9, c13, 0" : : "r" ( val ) )
-
-#define get_PMCR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 0" : "=r" ( val ) )
-#define set_PMCR(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 0" : : "r" ( val ) )
-#define get_CENA(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 1" : "=r" ( val ) )
-#define set_CENA(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 1" : : "r" ( val ) )
-#define get_CDIS(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 2" : "=r" ( val ) )
-#define set_CDIS(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 2" : : "r" ( val ) )
-#define get_COVR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 3" : "=r" ( val ) )
-
-#define set_TLB_INV(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 0" : : "r" ( val ) )
-#define set_TLB_INV_MVA(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 1" : : "r" ( val ) )
-#define set_TLB_INV_ASID(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 2" : : "r" ( val ) )
-
-#define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
-#define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
-
+XX  
+XX  /* ARM v7 stuff parked below here */
+XX  
+XX  /* These functions don't get compiled inline unless some level of
+XX   * optimization is enabled.  By default they become just static functions
+XX   * and get duplicated in more than one place in the code, which is harmless
+XX   * but yields some unfortunate bloat.
+XX   */
+XX  
+XX  /* List of fault codes */
+XX  /* The first 8 are ARM hardware exceptions and interrupts */
+XX  
+XX  #define F_NONE	0
+XX  #define F_UNDEF	1
+XX  #define F_SWI	2
+XX  #define F_PABT	3
+XX  #define F_DABT	4
+XX  #define F_NU	5
+XX  #define F_FIQ	6	/* not a fault */
+XX  #define F_IRQ	7	/* not a fault */
+XX  
+XX  #define F_DIVZ	8	/* pseudo for linux library */
+XX  #define F_PANIC	9	/* pseudo for Kyu, user panic */
+XX  
+XX  
+XX  /* Added 6-14-2018
+XX   * A collection of inline assembly for ARM control register access
+XX   * Above all, this makes code more readable and less error prone.
+XX   *  (as long as we get these macros right)
+XX   */
+XX  #define get_SCTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 0" : "=r" ( val ) )
+XX  #define set_SCTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 0" : : "r" ( val ) )
+XX  #define get_ACTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 1" : "=r" ( val ) )
+XX  #define set_ACTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 1" : : "r" ( val ) )
+XX  
+XX  #define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
+XX  #define get_TTBR0(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 0" : "=r" ( val ) )
+XX  
+XX  #define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
+XX  #define get_TTBR1(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 1" : "=r" ( val ) )
+XX  #define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
+XX  #define get_TTBCR(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 2" : "=r" ( val ) )
+XX  
+XX  #define set_DACR(val)	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
+XX  
+XX  #define get_VBAR(val)	asm volatile ( "mrc p15, 0, %0, c12, c0, 0" : "=r" ( val ) )
+XX  #define set_VBAR(val)	asm volatile ( "mcr p15, 0, %0, c12, c0, 0" : : "r" ( val ) )
+XX  
+XX  /* Performance monitoring unit registers */
+XX  #define get_CCNT(val)	asm volatile ( "mrc p15, 0, %0, c9, c13, 0" : "=r" ( val ) )
+XX  #define set_CCNT(val)	asm volatile ( "mcr p15, 0, %0, c9, c13, 0" : : "r" ( val ) )
+XX  
+XX  #define get_PMCR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 0" : "=r" ( val ) )
+XX  #define set_PMCR(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 0" : : "r" ( val ) )
+XX  #define get_CENA(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 1" : "=r" ( val ) )
+XX  #define set_CENA(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 1" : : "r" ( val ) )
+XX  #define get_CDIS(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 2" : "=r" ( val ) )
+XX  #define set_CDIS(val)	asm volatile ( "mcr p15, 0, %0, c9, c12, 2" : : "r" ( val ) )
+XX  #define get_COVR(val)	asm volatile ( "mrc p15, 0, %0, c9, c12, 3" : "=r" ( val ) )
+XX  
+XX  #define set_TLB_INV(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 0" : : "r" ( val ) )
+XX  #define set_TLB_INV_MVA(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 1" : : "r" ( val ) )
+XX  #define set_TLB_INV_ASID(val)	asm volatile ( "mcr p15, 0, %0, c8, c7, 2" : : "r" ( val ) )
+XX  
+XX  #define get_CPSR(val)	asm volatile ( "mrs %0, cpsr" : "=r" ( val ) )
+XX  #define set_CPSR(val)	asm volatile ( "msr cpsr, %0" : : "r" ( val ) )
+XX  
 #endif
 
 /* THE END */

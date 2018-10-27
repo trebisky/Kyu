@@ -51,9 +51,12 @@ static void test_adc ( long );
 static void test_fault2 ( long );
 #endif
 
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+static void test_cores ( long );
+#endif
+
 #ifdef BOARD_ORANGE_PI
 static void test_wdog ( long );
-static void test_cores ( long );
 static void test_thermal ( long );
 static void test_uart ( long );
 static void test_ram1 ( long );
@@ -86,9 +89,12 @@ struct test io_test_list[] = {
 	test_fault2,	"data abort probe",	0,
 #endif
 
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+	test_cores,	"Multiple core test",	0,
+#endif
+
 #ifdef BOARD_ORANGE_PI
 	test_wdog,	"Watchdog test",	0,
-	test_cores,	"Opi cores test",	0,
 	test_thermal,	"H3 thermal test",	0,
 	test_uart,	"uart test",		0,
 	test_ram1,	"Opi low ram test",	0,
@@ -325,7 +331,7 @@ test_fault2 ( long xxx )
 }
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
 void
 test_cores ( long xxx )
 {
@@ -335,7 +341,9 @@ test_cores ( long xxx )
 	/* the crazy business */
 	// check_core ();
 }
+#endif
 
+#ifdef BOARD_ORANGE_PI
 void
 test_thermal ( long xxx )
 {
@@ -593,7 +601,6 @@ static void test_clock ( long count ) {
 	check_clock ();
 }
 
-/* Test gpio on BBB or Orange Pi */
 static void test_gpio ( long count ) { gpio_test (); }
 
 #ifdef BOARD_ORANGE_PI

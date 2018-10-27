@@ -24,6 +24,7 @@
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
 
+#ifdef ORANGE_PI
 // This is for the standard 1008 Mhz CPU clock
 // This value can be adjusted at run time if
 //  we change the CPU clock frequency.
@@ -44,7 +45,11 @@ static int cpu_clock_mhz;
 //  is not enabled.
 
 #define CPU_CLOCK_STD	1008
+#endif
+
+/* Pretty close for Fire3 10-14-2018 */
 #define DELAY_COUNT_STD	201
+
 static int us_delay_count = DELAY_COUNT_STD;
 
 /* These are good for ballpark timings,
@@ -61,15 +66,17 @@ delay_us ( int delay )
 }
 
 // 1003 gives 1.000 ms
+#define DELAY_MS	1003
 void
 delay_ms ( int delay )
 {
 	unsigned int n;
 
 	for ( n=delay; n; n-- )
-	    delay_us ( 1003 );
+	    delay_us ( DELAY_MS );
 }
 
+#ifdef ORANGE_PI
 static void
 delay_calib ( void )
 {
@@ -99,6 +106,7 @@ delay_calib ( void )
 	}
 #endif
 }
+#endif
 
 #ifdef NOTSAFE
 // works OK, but assumes 1Ghz cpu clock
@@ -213,7 +221,7 @@ board_core_startup ( int core )
 void
 board_new_core ( int core, cfptr func, void *arg )
 {
-	// fire3_start_core ( core, func, arg );
+	fire3_start_core ( core, func, arg );
 }
 
 #ifdef notdef
@@ -291,7 +299,7 @@ board_init ( void )
 	serial_init ( CONSOLE_BAUD );
 	timer_init ( DEFAULT_TIMER_RATE );
 
-	delay_calib ();
+	// delay_calib ();
 
 	/* CPU interrupts on */
 	INT_unlock;

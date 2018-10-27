@@ -1,1 +1,1 @@
-configs/Makefile.inc.orange_pi
+configs/Makefile.inc.fire3
