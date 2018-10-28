@@ -1,1 +1,1 @@
-configs/Makefile.fire3
+configs/Makefile.bbb

@@ -214,7 +214,7 @@ kyu_startup ( void )
 	*/
 #endif
 
-#ifdef ARMV7
+#ifdef ARCH_ARM
 	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	get_SP ( val );
 	printf ( "Kyu starting with stack: %08x\n",  val );
@@ -227,13 +227,17 @@ kyu_startup ( void )
 	// emac_probe (); /* XXX */
 
 	board_hardware_init ();
+	printf ( "call hardware init 0\n" );
 
 	malloc_base = ram_alloc ( MALLOC_SIZE );
+	printf ( "call hardware init 00\n" );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
 	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
+	printf ( "call hardware init 1\n" );
 	hardware_init ();
 	console_initialize ();
+	printf ( "call hardware init 2\n" );
 
 #ifdef WANT_FLOAT
 	/* XXX -- floating point hijinks */

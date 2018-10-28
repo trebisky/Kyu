@@ -592,8 +592,6 @@ static void malloc_bin_reloc(void)
 	for (i = 2; i < ARRAY_SIZE(av_); ++i, ++p)
 		*p = (mbinptr)((ulong)*p + gd->reloc_off);
 }
-#else
-static inline void malloc_bin_reloc(void) {}
 #endif
 
 #ifdef KYU
@@ -631,8 +629,10 @@ sbrk(ptrdiff_t increment)
 }
 
 void
-mem_malloc_init(ulong start, ulong size)
+mem_malloc_init ( ulong start, ulong size )
 {
+	ulong val;
+
 	mem_malloc_start = start;
 	mem_malloc_end = start + size;
 	mem_malloc_brk = start;
@@ -642,9 +642,25 @@ mem_malloc_init(ulong start, ulong size)
 	      mem_malloc_end);
 	      */
 
-	memset((void *)mem_malloc_start, 0, size);
+	get_SP ( val );
+        printf ( " stack: %08x\n",  val );
 
+	printf ("using memory %#lx-%#lx for malloc()\n", mem_malloc_start,
+	      mem_malloc_end);
+
+	printf ( "TJT  --  mem_malloc_init 1 %08x - %08x, %d\n", start, start+size-1, size );
+	memset((void *)mem_malloc_start, 0, size);
+	get_SP ( val );
+        printf ( " stack: %08x\n",  val );
+	printf ( "TJT  --  mem_malloc_init 2\n" );
+
+#ifdef CONFIG_NEEDS_MANUAL_RELOC
+printf ( " *****  calling malloc_bin_reloc *****\n" );
 	malloc_bin_reloc();
+#endif
+	get_SP ( val );
+        printf ( " stack: %08x\n",  val );
+	printf ( "TJT  --  mem_malloc_init 3\n" );
 }
 #endif
 
