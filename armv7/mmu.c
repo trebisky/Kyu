@@ -97,6 +97,7 @@ mmu_set_ttbr ( void )
 
 	set_TTBCR ( 0 );
 
+	printf ( "TJT in mmu_set_ttbr: %08x\n", page_table );
 	new_ttbr = (unsigned int) page_table;
 	new_ttbr |= TTBR_BITS;
 
@@ -192,6 +193,7 @@ invalidate_tlb ( void )
 // including PDE_S  will make ldrex/strex data abort
 #define PDE_MARCO_RAM_S	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5	| PDE_S )
 
+// I think these are what I used for the bbb XXX
 #define PDE_TOM_IO	( MMU_SEC | MMU_XN | MMU_RW )
 #define PDE_TOM_RAM	( MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW )
 
@@ -200,6 +202,8 @@ invalidate_tlb ( void )
 
 // #define MMU_TICK	0x100000
 #define MMU_TICK	MEG
+
+static int is_bbb = 1;
 
 static void
 mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
@@ -216,8 +220,10 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 	addr = 0;
 	for ( i=0; i<MMU_SIZE; i++ ) {
 	    // mmu[i] = addr | MMU_SEC | MMU_XN | MMU_RW;
-	    // mmu[i] = PDE_TOM_IO | addr;
-	    mmu[i] = PDE_MARCO_IO | addr;
+	    if ( is_bbb )
+		mmu[i] = PDE_TOM_IO | addr;
+	    else
+		mmu[i] = PDE_MARCO_IO | addr;
 	    addr += MMU_TICK;
 	}
 
@@ -245,7 +251,10 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 	    // mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
 	    // mmu[start+i] = PDE_TOM_RAM | addr;
 	    // mmu[start+i] = PDE_MARCO_RAM | addr;
-	    mmu[start+i] = PDE_MARCO_RAM_S | addr;
+	    if ( is_bbb )
+		mmu[start+i] = PDE_TOM_RAM | addr;
+	    else
+		mmu[start+i] = PDE_MARCO_RAM_S | addr;
 	    addr += MMU_TICK;
 	}
 

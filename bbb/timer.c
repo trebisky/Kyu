@@ -395,8 +395,8 @@ static int
 dmtimer_checkrate ( void )
 {
 	struct dmtimer *tmr = (struct dmtimer *) TIMER_BASE;
-	unsigned long v1, v2;
 	unsigned long c1, c2;
+	unsigned long v1, v2;
 
 	// printf ( "Timer control reg = %08x\n", tmr->ctrl );
 
@@ -443,7 +443,8 @@ dmtimer_checkrate ( void )
 
 	// printf ( "CCNT = %d\n", r_CCNT() );
 	// printf ( "Checkrate: %d %d -- %d\n", v1, v2, v2-v1 );
-	printf ( "32K timer running at ~%d Hz\n", v2-v1 );
+	// We expect 24 Mhz
+	printf ( "32K timer running at ~ %u Hz\n", v2-v1 );
 
 	return v2-v1;
 }

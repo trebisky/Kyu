@@ -227,17 +227,13 @@ kyu_startup ( void )
 	// emac_probe (); /* XXX */
 
 	board_hardware_init ();
-	printf ( "call hardware init 0\n" );
 
 	malloc_base = ram_alloc ( MALLOC_SIZE );
-	printf ( "call hardware init 00\n" );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
 	// mem_malloc_init ( MALLOC_BASE, MALLOC_SIZE );
 
-	printf ( "call hardware init 1\n" );
 	hardware_init ();
 	console_initialize ();
-	printf ( "call hardware init 2\n" );
 
 #ifdef WANT_FLOAT
 	/* XXX -- floating point hijinks */
@@ -248,8 +244,12 @@ kyu_startup ( void )
 
 	// test_core ();  works here
 
-	// printf ( "Kyu starting with stack: %08x\n",  get_sp() );
-	// printf ( "Kyu starting with cpsr: %08x\n",  get_cpsr() );
+	/*
+	get_SP ( val );
+	printf ( "Kyu starting with stack: %08x\n",  val );
+	get_CPSR ( val );
+	printf ( "Kyu starting with cpsr: %08x\n",  val );
+	*/
 
 	/* A sanity thing in case printf is broken */
 	// puts ( "Kyu starting" );
@@ -404,15 +404,17 @@ basic_checkout_c ( void )
 void
 sys_init ( long xxx )
 {
+	reg_t val;
+
 	// works here, but two changes needed.
 	// must use _udelay() not thr_delay()
 	// printf in core is not synchronized, so avoid
 	// test_core ();
 
-	/*
-	printf ( "Sys thread starting with stack: %08x\n",  get_sp() );
-	printf ( "Sys thread starting with cpsr: %08x\n",  get_cpsr() );
-	*/
+	get_SP ( val );
+	printf ( "Sys thread starting with stack: %08x\n",  val );
+	get_CPSR ( val );
+	printf ( "Sys thread starting with cpsr: %08x\n",  val );
 
 	/* XXX - a race! (maybe?)
 	 * On the x86 threads are always launched with interrupts enabled.
@@ -460,6 +462,7 @@ sys_init ( long xxx )
 	//   by virtue of this thread being launched.
 	printf ( "Enabling interrupts\n" );
 	INT_unlock;
+
 	// printf ( "BOGUS: Interrupts NOT enabled\n");
 
 	/* display the MMU setup handed us by U-Boot */

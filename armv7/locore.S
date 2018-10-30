@@ -118,10 +118,6 @@
 	.globl asm_startup
 asm_startup:
 
-#ifdef BOARD_BBB
-	b primary_start_bbb
-#endif
-
 /* Secondary cores will start up here.
  */
 .globl	secondary_start
@@ -132,6 +128,14 @@ secondary_start:
 /* Working 6-15-2018 for main and extra cores */
 
 primary_start:
+
+#ifdef BOARD_BBB
+
+	// b primary_start_bbb
+
+#endif
+
+
 	// switch to SVR mode and disable interrupts
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
 	msr cpsr, r0
@@ -349,7 +353,7 @@ setup_stacks_kyu:
  */
 primary_start_bbb:
 	mrs	r0, cpsr		/* disable interrupts */
-	orr	r0, r0, #PSR_INT_DIS
+	orr	r0, r0, #PSR_INT_DIS	/* both IRQ and FIQ */
 	msr	cpsr, r0
 
 	movw	r0, #:lower16:vectors

@@ -100,7 +100,8 @@ char *core_stacks = stack_area;
 /* Called very early in initialization
  *  (now from locore.S to set up MMU)
  *
- * The BBB always has 512M of RAM ??
+ * The BBB always has 512M of RAM.
+ *  at 0x80000000 -- 0x9fffffff
  */
 void
 board_mmu_init ( void )
@@ -161,14 +162,16 @@ board_init ( void )
 
 	// delay_calib ();
 
+	// printf ( "TJT turn int on\n" );
 	/* CPU interrupts on */
-	INT_unlock;
+	// INT_unlock;
 
 	dma_init ();
 	gpio_init ();
 	i2c_init ();
 
 	adc_init ();
+	// printf ( "board_init done\n" );
 }
 
 /* Called by timer_init () */
