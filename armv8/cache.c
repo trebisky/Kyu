@@ -54,5 +54,11 @@ get_cache_line_size ( void )
 	return cache_line_size;
 }
 
+/* Called from IO test menu */
+void
+arch_cache_test ( void )
+{
+	printf ( "Not yet implemented for armv8\n" );
+}
 
 /* THE END */

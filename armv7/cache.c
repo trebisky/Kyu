@@ -16,6 +16,8 @@
 #include "kyulib.h"
 #include "board/board.h"
 
+#include "cpu.h"
+
 /* CCSIDR */
 #define CCSIDR_LINE_SIZE_OFFSET         0
 #define CCSIDR_LINE_SIZE_MASK           0x7
@@ -49,5 +51,62 @@ get_cache_line_size ( void )
 	return cache_line_size;
 }
 
+#define SCTLR_I_CACHE	0x1000
+#define SCTLR_D_CACHE	4
+#define SCTLR_ALIGN	2
+#define SCTLR_MMU	1
+
+static void
+sctlr_show ( void )
+{
+        int scr;
+
+        get_SCTLR ( scr );
+
+        if ( scr & 0x01 )
+            printf ( "MMU enabled\n" );
+        if ( ! (scr & 0x02) )
+            printf ( "A alignment check disabled\n" );
+        if ( scr & 0x04 )
+            printf ( "D cache enabled\n" );
+        if ( scr & 0x1000 )
+            printf ( "I cache enabled\n" );
+}
+
+
+/* Called from IO test menu */
+void
+arch_cache_test ( void )
+{
+	reg_t cpsr;
+	reg_t sctlr;
+	reg_t new_sctlr;
+
+	printf ( "Cache test\n" );
+
+	get_CPSR ( cpsr );
+	printf ( " CPSR  = %08x\n", cpsr );
+
+	get_SCTLR ( sctlr );
+	printf ( " SCTLR = %08x\n", sctlr );
+	sctlr_show ();
+
+	/* takes 5 sec */
+	printf ( "Start 1 second delay\n" );
+	delay_us ( 1000 * 1000 );
+	printf ( " Delay finished\n" );
+
+	new_sctlr = sctlr;
+	new_sctlr &= ~SCTLR_I_CACHE;
+	set_SCTLR ( new_sctlr );
+	printf ( "I cache disabled\n" );
+
+	/* takes 10 sec */
+	printf ( "Start 1 second delay\n" );
+	delay_us ( 1000 * 1000 );
+	printf ( " Delay finished\n" );
+
+	set_SCTLR ( sctlr );
+}
 
 /* THE END */

@@ -194,8 +194,9 @@ invalidate_tlb ( void )
 #define PDE_MARCO_RAM_S	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5	| PDE_S )
 
 // I think these are what I used for the bbb XXX
-#define PDE_TOM_IO	( MMU_SEC | MMU_XN | MMU_RW )
-#define PDE_TOM_RAM	( MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW )
+#define PDE_TOM_IO		( MMU_SEC | MMU_XN | MMU_RW )
+#define PDE_TOM_RAM_ORIG	( MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW )
+#define PDE_TOM_RAM		( MMU_SEC | PDE_TEX7 | MMU_BUF | MMU_CACHE | MMU_RW )
 
 /* Use this to black out a page so it gives data aborts */
 #define	MMU_INVALID	0
@@ -612,14 +613,13 @@ void
 mmu_status ( void )
 {
 	int scr;
-	int mmu_base;
 
 	get_SCTLR ( scr );
 
 	if ( scr & 0x01 )
 	    printf ( "MMU enabled\n" );
-	if ( scr & 0x02 )
-	    printf ( "A alignment enabled\n" );
+	if ( ! (scr & 0x02) )
+	    printf ( "A alignment check disabled\n" );
 	if ( scr & 0x04 )
 	    printf ( "D cache enabled\n" );
 	if ( scr & 0x1000 )

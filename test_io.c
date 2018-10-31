@@ -68,6 +68,7 @@ static void test_blink ( long );
 
 static void test_blink_d ( long );
 static void test_clear ( long );
+static void test_cache ( long );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -107,6 +108,7 @@ struct test io_test_list[] = {
 
 	test_blink_d,	"LED blink test (via delay)",	0,
 	test_clear,	"clear memory test",	0,
+	test_cache,	"cache test",		0,
 
 	0,		0,			0
 };
@@ -449,6 +451,12 @@ test_clear ( long arg )
 	    *p++ = 0xdeadbeef;
 
 	printf ( "Done clearning ram\n" );
+}
+
+static void
+test_cache ( long arg )
+{
+	arch_cache_test ();
 }
 
 #ifdef BOARD_ORANGE_PI
