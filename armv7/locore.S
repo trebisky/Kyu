@@ -131,7 +131,7 @@ primary_start:
 
 #ifdef BOARD_BBB
 
-	// b primary_start_bbb
+	b primary_start_bbb
 
 #endif
 
@@ -355,6 +355,15 @@ primary_start_bbb:
 	mrs	r0, cpsr		/* disable interrupts */
 	orr	r0, r0, #PSR_INT_DIS	/* both IRQ and FIQ */
 	msr	cpsr, r0
+
+	// bug fix 11-1-2018
+	// -- somehow this got left out of the BBB initialization.
+	//
+	// clear this bit to
+	// allow unaligned data access
+	read_SCTLR ( r0 )
+	bic      r0, r0, #CTLR_ALIGN
+	write_SCTLR ( r0 )
 
 	movw	r0, #:lower16:vectors
 	movt	r0, #:upper16:vectors
