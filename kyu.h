@@ -35,6 +35,8 @@
  */
 #define DEFAULT_TIMER_RATE	1000
 
+#define WANT_MMT_PADDLE
+
 #ifdef notdef
 #define WANT_DELAY
 #define WANT_PCI

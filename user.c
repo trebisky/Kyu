@@ -51,6 +51,10 @@ user_init ( long xx )
 
 	// printf ( "In user_init\n" );
 
+#ifdef WANT_MMT_PADDLE
+	mmt_paddle_init ();
+#endif
+
 	/* Run the test "shell" as the user thread */
 	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_SHELL, 0 );
 

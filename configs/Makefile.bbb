@@ -25,6 +25,7 @@ OBJS =  machine.o \
     timer.o \
     main.o \
     user.o \
+    mmt_paddle.o \
     tests.o \
     test_kyu.o \
     test_io.o \

@@ -172,6 +172,13 @@ gpio_read_bit ( int bit )
 	return gpio_bases[gpio]->datain & (1 << (bit % 32));
 }
 
+/* For debugging */
+int
+gpio_read ( int gpio )
+{
+	return gpio_bases[gpio]->datain;
+}
+
 /* Call this before trying to set or clear a gpio */
 void
 gpio_out_init ( int bit )
@@ -180,13 +187,30 @@ gpio_out_init ( int bit )
 	gpio_dir_out ( bit );
 }
 
-/* Call this before trying to read from a bit */
+/* Call this before trying to read from a bit.
+ * This enables neither pullup or pulldown
+ *   (see below for that)
+ */
 void
 gpio_in_init ( int bit )
 {
 	setup_gpio_in ( gpio_to_mux[bit] );
-	// setup_gpio_in_up ( gpio_to_mux[bit] );
-	// setup_gpio_in_down ( gpio_to_mux[bit] );
+	gpio_dir_in ( bit );
+}
+
+/* As above, but enable pullup */
+void
+gpio_in_up ( int bit )
+{
+	setup_gpio_in_up ( gpio_to_mux[bit] );
+	gpio_dir_in ( bit );
+}
+
+/* As above, but enable pulldown */
+void
+gpio_in_down ( int bit )
+{
+	setup_gpio_in_down ( gpio_to_mux[bit] );
 	gpio_dir_in ( bit );
 }
 

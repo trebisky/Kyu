@@ -1,0 +1,16 @@
+Some notes on stuff plugged into my BBB via the breadboard 11-1-2018
+(when I stripped it all off).
+
+MCP4725
+    VCC = 3.3 from BBB
+    SDA, SCL -- shared with HDC100x
+
+HDC100x - Humidity and temp
+    Vin = 3.3 from BBB
+    SDA, SCL -- shared with BMP180
+
+BMP180 - Pressure sensor
+    Vin = 3.3 from BBB
+    SDA - from BBB pin 18
+    SCL - from BBB pin 17
+    

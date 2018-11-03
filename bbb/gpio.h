@@ -191,8 +191,8 @@
 #define GPIO_P8_18	GPIO_2_1
 #define GPIO_P8_7	GPIO_2_2
 #define GPIO_P8_8	GPIO_2_3
-#define GPIO_P8_9	GPIO_2_4
-#define GPIO_P8_10	GPIO_2_5
+#define GPIO_P8_9	GPIO_2_5
+#define GPIO_P8_10	GPIO_2_4
 #define GPIO_P8_45	GPIO_2_6
 #define GPIO_P8_46	GPIO_2_7
 #define GPIO_P8_43	GPIO_2_8
