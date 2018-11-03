@@ -16,10 +16,14 @@
 #define PADDLE_P52	GPIO_P8_9	/* white (u) */
 #define PADDLE_P53	GPIO_P8_10	/* yellow (d) */
 
-/* Note that MMT reverses UDLR from schematic.
+/* This uses a Sparkfun COM-10411 "Wearable Keypad" for
+ * a telescope paddle.
+ *
+ * Note that the MMT reverses UDLR from schematic.
  * This code uses nomenclature as per schematic.
  * This is correct with cable exiting top of pad.
- * MMT lingo is with cable exiting bottom of pad.
+ * MMT lingo is with cable exiting bottom of pad,
+ *  which is apparently how the operator likes to use it.
  */
 
 /* Currently the shell runs at 40 and polls the uart,
@@ -28,7 +32,7 @@
 #define PADDLE_PRI	35
 
 /* Note that gpio_read_bit() either returns 0,
- *  or something non-zero (but not necessarily 1
+ *  or something non-zero (but not necessarily 1)
  */
 void
 get_button_bits ( int *bits )
