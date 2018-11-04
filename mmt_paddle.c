@@ -1,6 +1,7 @@
 #include "kyu.h"
 #include "thread.h"
 
+#include "netbuf.h"
 #include "board/gpio.h"
 
 /* mmt_paddle.c
@@ -26,10 +27,19 @@
  *  which is apparently how the operator likes to use it.
  */
 
+#define FLAME	0
+
 /* Currently the shell runs at 40 and polls the uart,
  * so we get starved unless we run at a higher priority.
  */
 #define PADDLE_PRI	35
+#define CHECK_PRI	36
+
+#define MOUNT_HOST	"192.168.0.5"
+#define MOUNT_PORT	1234
+
+/* Our port to receive UDP */
+#define PADDLE_PORT	1234
 
 /* Note that gpio_read_bit() either returns 0,
  *  or something non-zero (but not necessarily 1)
@@ -86,13 +96,18 @@ show_bits ( int *bits )
 	printf ( " %s\n", stat );
 }
 
+static unsigned long mount_ip;
+
 void
 mmt_paddle ( long xxx )
 {
 	int bits[5];
 
+	(void) net_dots ( MOUNT_HOST, &mount_ip );
+
 	gpio_out_init ( PADDLE_LED );
 
+#ifdef STARTUP_BLINK
 	/* Blink the LED twice on startup */
 	gpio_set_bit ( PADDLE_LED );
 	thr_delay ( 500 );
@@ -103,6 +118,7 @@ mmt_paddle ( long xxx )
 	gpio_set_bit ( PADDLE_LED );
 	thr_delay ( 500 );
 	gpio_clear_bit ( PADDLE_LED );
+#endif
 
 	/* Turn off the LED */
 	gpio_clear_bit ( PADDLE_LED );
@@ -121,11 +137,38 @@ mmt_paddle ( long xxx )
 	for ( ;; ) {
 	    get_button_bits ( bits );
 	    show_bits ( bits );
+	    if ( bits[FLAME] ) {
+		printf ( "Send\n" );
+		udp_send ( mount_ip, PADDLE_PORT, MOUNT_PORT, "ping", 4 );
+	    }
 	    thr_delay ( 500 );
 	}
 
 	// blink the LED
 	// thr_new_repeat ( "blinker", blinker, 0, 10, 0, 1000 );
+}
+
+static int mmt_alive = 1;
+
+/* Any UDP packet received will indicate life */
+void
+heartbeat ( struct netbuf *nbp )
+{
+	mmt_alive = 1;
+}
+
+/* This runs once every few seconds to do the heartbeat check
+ */
+void
+mmt_check ( long xxx )
+{
+	if ( mmt_alive ) {
+	    gpio_set_bit ( PADDLE_LED );
+	} else {
+	    gpio_clear_bit ( PADDLE_LED );
+	}
+	mmt_alive = 0;
+	udp_send ( mount_ip, PADDLE_PORT, MOUNT_PORT, "ping", 4 );
 }
 
 /* This is called from user_init when the paddle is configured.
@@ -134,6 +177,9 @@ mmt_paddle ( long xxx )
 void
 mmt_paddle_init ( void )
 {
+	udp_hookup ( PADDLE_PORT, heartbeat );
+
+	(void) thr_new_repeat ( "mmt_check", mmt_check, 0, CHECK_PRI, 0, 2000 );
 	(void) thr_new ( "mmt_paddle", mmt_paddle, (void *) 0, PADDLE_PRI, 0 );
 }
 
@@ -254,6 +300,5 @@ diag ( void )
 	}
 }
 #endif
-
 
 /* THE END */
