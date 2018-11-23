@@ -13,6 +13,7 @@ OBJS =  startup.o \
 	interrupts.o \
 	ram.o \
 	cache.o \
+	cache_v8.o \
 	mmu.o \
 	show_regs.o
 

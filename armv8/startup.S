@@ -35,6 +35,7 @@ after:
 
 reset:
 	msr DAIFSet, #0xf
+
 	bl	remap_vectors
 
 	bl      clear_bss
@@ -53,6 +54,7 @@ reset:
 
         bl      board_mmu_init
         dsb	sy
+	// bl	tjt_startup
 
         // bl      mmu_set_ttbr
 
@@ -456,5 +458,65 @@ GetCurrentSMode:
         ret
 #endif
 
+/* ----------------------------------------------------------- */
+/* Here are some library routines.
+ */
+
+/*
+ * void __asm_flush_dcache_range(start, end)
+ * From U-Boot sources, u-boot-2018.09/arch/arm/cpu/armv8/cache.S
+ *
+ * clean & invalidate data cache over a range
+ *
+ * x0: start address
+ * x1: end address
+ */
+
+.global __asm_flush_dcache_range
+__asm_flush_dcache_range:
+
+        mrs     x3, ctr_el0
+        lsr     x3, x3, #16
+        and     x3, x3, #0xf
+        mov     x2, #4
+        lsl     x2, x2, x3              /* cache line size */
+
+        /* x2 <- minimal cache line size in cache system */
+        sub     x3, x2, #1
+        bic     x0, x0, x3
+1:      dc      civac, x0       /* clean & invalidate data or unified cache */
+        add     x0, x0, x2
+        cmp     x0, x1
+        b.lo    1b
+        dsb     sy
+        ret
+
+/*
+ * void __asm_invalidate_dcache_range(start, end)
+ * From U-Boot sources, u-boot-2018.09/arch/arm/cpu/armv8/cache.S
+ *
+ * invalidate data cache in the range
+ *
+ * x0: start address
+ * x1: end address
+ */
+
+.global  __asm_invalidate_dcache_range
+__asm_invalidate_dcache_range:
+
+        mrs     x3, ctr_el0
+        ubfm    x3, x3, #16, #19
+        mov     x2, #4
+        lsl     x2, x2, x3              /* cache line size */
+
+        /* x2 <- minimal cache line size in cache system */
+        sub     x3, x2, #1
+        bic     x0, x0, x3
+1:      dc      ivac, x0        /* invalidate data or unified cache */
+        add     x0, x0, x2
+        cmp     x0, x1
+        b.lo    1b
+        dsb     sy
+        ret
 
 // THE END

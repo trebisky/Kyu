@@ -1,0 +1,53 @@
+I began the port of Kyu to the Allwinner H5 chip on 11-11-2018.
+I did a bit of bare metal coding, to confirm that the H5 chip is
+virtually the same as the H3, but with a 64 bit A53 core in lieu
+of the 32 bit A7 core on the H3.
+
+The first thing was to modify the config script.
+Then entries for Makefile, Makefile.inc, and orange_pi64.lds
+in the configs directory are exact copies of the Fire3 files.
+
+Then the orange_pi64 directory was created and populated with
+a copy of ALL files from the orange_pi directory.
+The intent is that as files here are changed, I will
+replace the files in the orange_pi directory with links.
+The main anticipated change is the introduction of types
+such as i32, vu32 and such from types.h  This should yield
+portable code.
+
+I comment out multicore.c for now.
+
+And I add types.h to serial.c, gpio.c -- searching above all
+for longs in device templates that have now become 8 byte
+objects.  I comb through all the board driver files looking
+for long.
+
+Dumb bug in console.c has bitten me twice.  I had a sequence
+of ifdef for each board with no else clause.  So there was
+no case for a new board until specifically added.  This caused
+printf to be a NOOP.  I fixed this once and for all.
+
+With this fixed, we get lots of output, including the report of
+a Synchronous Abort in the network initialization code.
+It turns out there is a host of needless long declarations
+in the network code (we never got networking to work on the only
+previous aarch64 port, the Fire3, so this is new territory).
+Well, we know what to do.  Notice that accessing an 8 byte
+object (namely a long) must be done on 8 byte aligned addresses.
+So many sweeping changes have been done, it is hard to believe
+that bugs have not been introduced.
+
+After cleaning up the network code, the next issue is that the
+network driver emac.c calls cache flush/invalidate routines
+that don't exist yet.  These can be found in assembly
+language form in U-Boot.
+
+The next thing is that we aren't getting timer interrupts.
+This causes a timeout loop in network initialization to hang.
+We bypass the network for now, which gets us to the Kyu prompt
+and shell for the first time!  And now we write a new diagnostic
+to test the timer -- and it is running, so apparently our
+problem is that we aren't handling interrupts properly.
+Getting to the Kyu prompt in less than 24 hours is a pretty
+amazing thing for a new board though.
+

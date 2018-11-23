@@ -17,7 +17,7 @@
 #include "cpu.h"
 
 #include "board/board.h"
-#include "board/fire3_ints.h"
+#include "board/ints.h"
 
 extern struct thread static_thread[NUM_CORES];
 extern struct thread *cur_thread;
@@ -163,6 +163,8 @@ do_irq ( void )
 
 	if ( ! cur_thread )
 	    panic ( "irq int, cur_thread" );
+
+	puts ( "TJT - irq" );
 
 	/* Tell Kyu thread system we are in an interrupt */
 	start_interrupt ();

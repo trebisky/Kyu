@@ -5,8 +5,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/*
+ *
+ *
  * (C) Copyright 2010
  * Texas Instruments, <www.ti.com>
  * Aneesh V <aneesh@ti.com>
@@ -324,7 +324,7 @@ void flush_dcache_all(void)
  * Invalidates range in all levels of D-cache/unified cache used:
  * Affects the range [start, stop - 1]
  */
-void invalidate_dcache_range(unsigned long start, unsigned long stop)
+void invalidate_dcache_range(u32 start, u32 stop)
 {
 	v7_dcache_maint_range(start, stop, ARMV7_DCACHE_INVAL_RANGE);
 
@@ -336,7 +336,7 @@ void invalidate_dcache_range(unsigned long start, unsigned long stop)
  * cache used:
  * Affects the range [start, stop - 1]
  */
-void flush_dcache_range(unsigned long start, unsigned long stop)
+void flush_dcache_range(u32 start, u32 stop)
 {
 	v7_dcache_maint_range(start, stop, ARMV7_DCACHE_CLEAN_INVAL_RANGE);
 
@@ -350,7 +350,7 @@ void arm_init_before_mmu(void)
 	v7_inval_tlb();
 }
 
-void mmu_page_table_flush(unsigned long start, unsigned long stop)
+void mmu_page_table_flush(u32 start, u32 stop)
 {
 	flush_dcache_range(start, stop);
 	v7_inval_tlb();
@@ -360,7 +360,7 @@ void mmu_page_table_flush(unsigned long start, unsigned long stop)
  * Flush range from all levels of d-cache/unified-cache used:
  * Affects the range [start, start + size - 1]
  */
-void  flush_cache(unsigned long start, unsigned long size)
+void  flush_cache(u32 start, u32 size)
 {
 	flush_dcache_range(start, start + size);
 }
@@ -373,11 +373,11 @@ void flush_dcache_all(void)
 {
 }
 
-void invalidate_dcache_range(unsigned long start, unsigned long stop)
+void invalidate_dcache_range(u32 start, u32 stop)
 {
 }
 
-void flush_dcache_range(unsigned long start, unsigned long stop)
+void flush_dcache_range(u32 start, u32 stop)
 {
 }
 
@@ -385,11 +385,11 @@ void arm_init_before_mmu(void)
 {
 }
 
-void  flush_cache(unsigned long start, unsigned long size)
+void  flush_cache(u32 start, u32 size)
 {
 }
 
-void mmu_page_table_flush(unsigned long start, unsigned long stop)
+void mmu_page_table_flush(u32 start, u32 stop)
 {
 }
 

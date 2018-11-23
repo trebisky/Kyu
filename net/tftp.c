@@ -5,11 +5,12 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* tftp.c
+ *
+ * tftp.c
  * T. Trebisky  9-12-2015
  */
 
+#include <arch/types.h>
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
@@ -32,7 +33,7 @@
 
 #define TFTP_BSIZE	512
 
-static unsigned long tftp_ip;
+static u32 tftp_ip;
 
 static int tftp_verbose = 0;
 

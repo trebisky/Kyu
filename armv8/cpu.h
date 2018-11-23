@@ -99,6 +99,12 @@ r_CCNT ( void )
 #define INT_unlock 	asm volatile("msr DAIFClr, #3" : : : "cc")
 #define INT_lock 	asm volatile("msr DAIFSet, #3" : : : "cc")
 
+// Returns the EL but in bits [3:2]
+#define get_EL(val)	asm volatile ( "mrs %0, CurrentEL" : "=r" ( val ) )
+
+#define get_SCTLR(val)	asm volatile ( "mrs %0, SCTLR_EL2" : "=r" ( val ) )
+#define set_SCTLR(val)	asm volatile ( "msr SCTLR_EL2, %0" : : "r" ( val ) )
+
 #ifdef notdef
 /* These bit me with a horrible and hard to track down bug.
  * If I just type INT_lock; the compiler accepts the line, but

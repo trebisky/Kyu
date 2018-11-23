@@ -49,6 +49,7 @@ static unsigned int page_table[MMU_SIZE] __attribute__ ((aligned (16384)));
 void
 mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 {
+	puts ( "XXX mmu_initialize still pending for ARM v8" );
 }
 
 /* Just a stub for now - this was an experiment for the armv7,
@@ -58,6 +59,7 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 void
 mmu_nocache ( unsigned long addr )
 {
+	panic ( "mmu_nocache not implemented yet for ARM v8" );
 }
 
 #ifdef OLD_v7_code

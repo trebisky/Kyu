@@ -5,13 +5,14 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* dhcp.h
+ *
+ * dhcp.h
  * Used by both bootp.c and dhcp.c
  *
  * T. Trebisky  4-11-2005
  * T. Trebisky  6-2-2015 8-10-2016
  */
+#include <arch/types.h>
 
 #define BOOTP_SERVER	67	/* receive on this */
 #define BOOTP_CLIENT	68	/* send on this */
@@ -24,15 +25,15 @@ struct bootp {
     	unsigned char hlen;
     	unsigned char hops;
 	/* -- */
-	unsigned long xid;
+	u32 xid;
 	/* -- */
 	unsigned short secs;
 	unsigned short flags;	/* only for DHCP */ 
 	/* -- */
-	unsigned long client_ip;
-	unsigned long your_ip;
-	unsigned long server_ip;
-	unsigned long gateway_ip;
+	u32 client_ip;
+	u32 your_ip;
+	u32 server_ip;
+	u32 gateway_ip;
 	/* -- */
 	char chaddr[16];
 	char server_name[64];

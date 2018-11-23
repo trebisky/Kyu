@@ -5,12 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_icmp
+ *
+ * net_icmp
  * Handle an ICMP packet.
  * T. Trebisky  4-8-2005
  */
 
+#include <arch/types.h>
 #include <kyu.h>
 #include <kyulib.h>
 
@@ -86,9 +87,9 @@ icmp_rcv ( struct netbuf *nbp )
 	     */
 	} else if ( icp->type == TY_ECHO_REPLY ) {
 	    // printf ( "ICMP echo reply: code = %d, id/seq = %d/%d\n", icp->code, icp->id, icp->seq );
-	    // printf ( " BOGUS: %s is alive\n", ip2strl(nbp->iptr->src) );
+	    // printf ( " BOGUS: %s is alive\n", ip2str32(nbp->iptr->src) );
 	    if ( wait_for_seq && wait_for_seq == icp->seq && wait_for_id == icp->id ) {
-		printf ( " %s is alive\n", ip2strl(nbp->iptr->src) );
+		printf ( " %s is alive\n", ip2str32(nbp->iptr->src) );
 		wait_for_seq = 0;
 	    }
 	} else {
@@ -115,7 +116,7 @@ static int icmp_id = 1;
 #define BOGUS_SEQ	0x12ab
 
 void
-icmp_ping ( unsigned long target_ip )
+icmp_ping ( u32 target_ip )
 {
 	struct netbuf *nbp;
 	struct icmp_hdr *icp;
@@ -156,12 +157,12 @@ icmp_ping ( unsigned long target_ip )
  * This fires off the echo packet.
  */
 void
-ping ( unsigned long arg )
+ping ( u32 arg_ip )
 {
 	wait_for_seq = BOGUS_SEQ;
 	wait_for_id = icmp_id;
 
-    	icmp_ping ( htonl(arg) );
+    	icmp_ping ( htonl(arg_ip) );
 }
 
 /* THE END */

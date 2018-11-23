@@ -172,6 +172,15 @@ check_bss ( void )
 }
 #endif
 
+#ifdef notdef
+void
+tjt_startup ( void )
+{
+	puts ( "Zorro!" );
+	for ( ;; ) ;
+}
+#endif
+
 /* This is --almost-- the first bit of C code that runs in 32 bit mode.
  *  almost, because we call board_mmu_init() before calling this.
  *
@@ -195,6 +204,7 @@ kyu_startup ( void )
 	// check_bss ();
 	// timer_bogus ();
 
+// #define ARM64_TEST
 #ifdef ARM64_TEST
 	/* The following yields this:
 	    Kyu starting with stack: 7b63bab0
@@ -214,7 +224,7 @@ kyu_startup ( void )
 	*/
 #endif
 
-#ifdef ARCH_ARM
+#ifdef ARCH_ARM32
 	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	get_SP ( val );
 	printf ( "Kyu starting with stack: %08x\n",  val );
@@ -227,6 +237,7 @@ kyu_startup ( void )
 	// emac_probe (); /* XXX */
 
 	board_hardware_init ();
+
 
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
@@ -267,6 +278,8 @@ kyu_startup ( void )
 	 */
 	// printf ( "\n" );
 	printf ( "Kyu %s starting\n", kyu_version );
+	// puts ( "Marco 3 !!" );
+	// tjt_startup ();
 
 	/* This will get 0x8ffce on the x86 */
 	/* Gets 0x9E72E768 on the ARM (from U-boot) */
@@ -411,10 +424,12 @@ sys_init ( long xxx )
 	// printf in core is not synchronized, so avoid
 	// test_core ();
 
+#ifdef ARCH_ARM32
 	get_SP ( val );
 	printf ( "Sys thread starting with stack: %08x\n",  val );
 	get_CPSR ( val );
 	printf ( "Sys thread starting with cpsr: %08x\n",  val );
+#endif
 
 	/* XXX - a race! (maybe?)
 	 * On the x86 threads are always launched with interrupts enabled.
@@ -493,7 +508,9 @@ sys_init ( long xxx )
 #endif
 
 #ifdef WANT_NET
+	puts ( "TJT - start net_init" );
 	net_init ();
+	puts ( "TJT - finished net_init" );
 #endif
 
 /* These things must be after net_init() because
@@ -546,7 +563,9 @@ XXuser_init ( int xx )
 
 	get_regs ( dregs );
 	// dregs[16] = get_cpsr ();
+#ifdef ARCH_ARM32
 	get_CPSR ( val )
+#endif
 	dregs[16] = val;
 
 	show_regs ( dregs );
@@ -559,7 +578,9 @@ XXuser_init ( int xx )
 
 	get_regs ( dregs );
 	// dregs[16] = get_cpsr ();
+#ifdef ARCH_ARM32
 	get_CPSR ( val )
+#endif
 	dregs[16] = val;
 	show_regs ( dregs );
 

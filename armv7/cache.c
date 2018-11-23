@@ -6,7 +6,7 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * cache.c for Kyu for the ARM processor
+ * cache.c for Kyu for the ARM v7 processor
  *
  * Tom Trebisky  5/30/2017
  *

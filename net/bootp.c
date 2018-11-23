@@ -71,10 +71,10 @@ bootp_rcv ( struct netbuf *nbp )
 	if ( bootp_debug ) {
 	    strcpy ( dst, ether2str ( nbp->eptr->dst ) );
 	    printf (" Server %s (%s) to %s (xid = %08x)\n",
-		ip2strl ( bpp->server_ip ),
+		ip2str32 ( bpp->server_ip ),
 		ether2str ( nbp->eptr->src ), dst,
 		bpp->xid );
-	    printf (" gives my IP as: %s\n", ip2strl ( bootp_ip ) );
+	    printf (" gives my IP as: %s\n", ip2str32 ( bootp_ip ) );
 	}
 }
 
@@ -128,7 +128,7 @@ bootp_test ( int arg )
 	if ( ip == 0 )
 	    printf ( "BOOTP test failed\n" );
 	else
-	    printf ( "BOOTP got IP of %s\n", ip2strl ( ip ) );
+	    printf ( "BOOTP got IP of %s\n", ip2str32 ( ip ) );
 }
 
 /* THE END */

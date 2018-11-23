@@ -66,6 +66,10 @@ static void test_blink_s ( long );
 static void test_blink ( long );
 #endif
 
+#if defined(BOARD_ORANGE_PI64)
+static void test_timer ( long );
+#endif
+
 static void test_blink_d ( long );
 static void test_clear ( long );
 static void test_cache ( long );
@@ -104,6 +108,10 @@ struct test io_test_list[] = {
 
 	test_blink,	"start LED blink test",	0,
 	test_blink_s,	"stop LED blink test",	0,
+#endif
+
+#if defined(BOARD_ORANGE_PI64)
+	test_timer,	"Timer test",		0,
 #endif
 
 	test_blink_d,	"LED blink test (via delay)",	0,
@@ -483,7 +491,29 @@ test_blink_s ( long xxx )
 }
 #endif
 
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+#if defined(BOARD_ORANGE_PI64)
+static void
+test_timer ( long xxx )
+{
+	reg_t val;
+
+	get_DAIF ( val );
+	printf ( "DAIF = %08x\n", val );
+
+	timer_check1 ();
+	timer_check2 ();
+
+	INT_lock;
+	get_DAIF ( val );
+	printf ( "DAIF (locked) = %08x\n", val );
+
+	INT_unlock;
+	get_DAIF ( val );
+	printf ( "DAIF (unlocked) = %08x\n", val );
+}
+#endif
+
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3) || defined(BOARD_ORANGE_PI64)
 static void
 test_led_on ( void )
 {

@@ -284,7 +284,7 @@ void pkt_send ()
 }
 
 // Called at interrupt level */
-void pkt_finish ()
+void pkt_finish ( void )
 {
 	pk.finish = r_CCNT ();
 
@@ -423,6 +423,12 @@ test_netdebug ( long test )
 	printf ( "last endless count = %d\n", last_endless );
 }
 
+#else
+/* Stubs to match calls in driver. */
+void pkt_finish ( void ) {}
+void pkt_arrive ( void ) {}
+void pkt_send ( void ) {}
+void pkt_dispatch ( void ) {}
 #endif	/* WANT_NET */
 
 /* THE END */

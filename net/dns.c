@@ -5,12 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* dns.c
+ *
+ * dns.c
  * Handle a DNS cache and resolver.
  * T. Trebisky  5-24-2005
  */
 
+#include <arch/types.h>
 #include <kyu.h>
 #include <kyulib.h>
 
@@ -58,7 +59,7 @@ struct dns_info {
 struct rr_info {
 	unsigned short type;
 	unsigned short class;
-	unsigned long ttl;
+	u32 ttl;
 	unsigned short len;
 	char buf[4];
 };
@@ -96,17 +97,17 @@ static int dns_id = 1;
 
 struct dns_data {
     	char name[64];
-	unsigned long ip_addr;
+	u32 ip_addr;
 	int flags;
 	int id;
 	struct sem *sem;
 	int ttl;
 } dns_cache[MAX_DNS_CACHE];
 
-unsigned long dns_lookup_t ( char *, int );
-unsigned long dns_lookup ( char * );
+u32 dns_lookup_t ( char *, int );
+u32 dns_lookup ( char * );
 static struct dns_data * dns_alloc ( void );
-static unsigned long dns_cache_lookup ( char * );
+static u32 dns_cache_lookup ( char * );
 void dns_show ( char * );
 void dns_cache_show ( void );
 
@@ -181,7 +182,7 @@ dns_unpack ( char *pkt, char *data, char *buf )
 	return  rv;
 }
 
-static unsigned long dns_ip;
+static u32 dns_ip;
 
 /*
 #define REPLY_PORT	32770
@@ -213,21 +214,21 @@ dns_test ( void )
 void
 dns_show ( char *host )
 {
-	unsigned long ip;
+	u32 ip;
 
 	if ( ip = dns_lookup_t ( host, 2 ) )
-	    printf ( "DNS lookup: %s --> %s\n", host, ip2strl ( ip ) );
+	    printf ( "DNS lookup: %s --> %s\n", host, ip2str32 ( ip ) );
 	else
 	    printf ( "DNS lookup: %s --> FAILED!\n", host );
 }
 
-unsigned long
+u32
 dns_lookup_t ( char *host, int timeout )
 {
 	char dns_buf[128];
 	struct dns_info *dp;
 	char *np;
-	unsigned long ipnum;
+	u32 ipnum;
 	struct dns_data *dcp;
 	unsigned short val;
 
@@ -283,7 +284,7 @@ dns_lookup_t ( char *host, int timeout )
 	dcp->sem = sem_signal_new ( SEM_FIFO );
 
 	/*
-	printf ("DNS udp, sending to %s\n", ip2strl ( dns_ip ) );
+	printf ("DNS udp, sending to %s\n", ip2str32 ( dns_ip ) );
 	*/
 
 	udp_send ( dns_ip, REPLY_PORT, DNS_PORT, (char *) dp, (char *)np - dns_buf );
@@ -297,7 +298,7 @@ dns_lookup_t ( char *host, int timeout )
 
 	if ( dcp->flags & F_VALID ) {
 	    /*
-	    printf ("DNS got it: %s\n", ip2strl ( dcp->ip_addr ) );
+	    printf ("DNS got it: %s\n", ip2str32 ( dcp->ip_addr ) );
 	    */
 	    return dcp->ip_addr;
 	}
@@ -310,7 +311,7 @@ dns_lookup_t ( char *host, int timeout )
 	return 0;
 }
 
-unsigned long
+u32
 dns_lookup ( char *host )
 {
 	return dns_lookup_t ( host, LOOKUP_TIMEOUT );
@@ -324,9 +325,9 @@ dns_resp_show ( struct netbuf *nbp )
 	char buf[128];
 	int rcode;
 	char *cp;
-	unsigned long ip;
+	u32 ip;
 	unsigned short sval;
-	unsigned long lval;
+	u32 lval;
 
 	dp = (struct dns_info *) nbp->dptr;
 
@@ -356,7 +357,7 @@ dns_resp_show ( struct netbuf *nbp )
 
 	printf ("ttl = %d\n", ntohl(lval));
 	printf ("rlen = %d\n", ntohs(sval));
-	printf ("IP = %s\n", ip2strl ( ip ) );
+	printf ("IP = %s\n", ip2str32 ( ip ) );
 }
 
 static struct dns_data *
@@ -382,9 +383,9 @@ dns_rcv ( struct netbuf *nbp )
 	struct dns_data *ap;
 	char buf[128];
 	char *cp;
-	unsigned long ip;
+	u32 ip;
 	int len;
-	unsigned long ttl;
+	u32 ttl;
 
 	/*
 	dns_resp_show ( nbp );
@@ -427,18 +428,18 @@ dns_rcv ( struct netbuf *nbp )
 	// len = rp->len;
 	if ( ntohs(rp->len) != 4 )
 	    return;
-	ip = *(unsigned long *) rp->buf;
+	ip = *(u32 *) rp->buf;
 #endif
-	// printf ("IP = %s\n", ip2strl(ip) );
+	// printf ("IP = %s\n", ip2str32(ip) );
 
 	ap = find_pending ( ntohs ( dp->id ) );
 	if ( ap ) {
 	    ap->flags = F_VALID;
-	    memcpy ( &ttl, (char *) &rp->ttl, sizeof(long) );
+	    memcpy ( &ttl, (char *) &rp->ttl, sizeof(u32) );
 	    ap->ttl = ntohl(ttl);
 	    ap->ip_addr = ip;
 	    /*
-	    printf ( "Adding entry for %s\n", ip2strl ( ip ) );
+	    printf ( "Adding entry for %s\n", ip2str32 ( ip ) );
 	    */
 	    sem_unblock ( ap->sem );
 	}
@@ -483,7 +484,7 @@ dns_tick ( void )
 	}
 }
 
-static unsigned long
+static u32
 dns_cache_lookup ( char *name )
 {
 	int i;
@@ -509,7 +510,7 @@ dns_cache_show ( void )
 		continue;
 
 	    printf ( "dns: %s at %s (ttl= %d)", ap->name,
-		ip2strl ( ap->ip_addr ), ap->ttl );
+		ip2str32 ( ap->ip_addr ), ap->ttl );
 	    printf ( " %04x\n", ap->flags );
 	}
 }

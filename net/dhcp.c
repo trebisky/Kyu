@@ -226,7 +226,7 @@ dhcp_show_pkt ( struct bootp *bpp, struct netbuf *nbp )
 	p = find_option ( bpp, OP_TYPE );
 	t = dhcp_type_string[p[2]];
 	printf ("Received DHCP reply from %s (xid = %08x, %d bytes), type = %s\n",
-	    ip2strl ( bpp->server_ip ), bpp->xid, nbp->dlen, t );
+	    ip2str32 ( bpp->server_ip ), bpp->xid, nbp->dlen, t );
 
 	// printf (" From macs %s to %s\n",
 	    // ether2str ( nbp->eptr->src ), ether2str ( nbp->eptr->dst ) );
@@ -284,9 +284,9 @@ dhcp_rcv ( struct netbuf *nbp )
 	    // memcpy ( &server_ip2, &p[2], 4 );
 	    server_ip2 = server_ip1;
 	    if ( dhcp_debug ) {
-		printf ( "OFFER your ip = %s\n", ip2strl ( your_ip ) );
-		printf ( "OFFER server ip 1 = %s\n", ip2strl ( server_ip1 ) );
-		// printf ( "OFFER server ip 2 = %s\n", ip2strl ( server_ip2 ) );
+		printf ( "OFFER your ip = %s\n", ip2str32 ( your_ip ) );
+		printf ( "OFFER server ip 1 = %s\n", ip2str32 ( server_ip1 ) );
+		// printf ( "OFFER server ip 2 = %s\n", ip2str32 ( server_ip2 ) );
 	    }
 
 	    dhcp_state = ST_OWAIT2;
@@ -393,7 +393,7 @@ dhcp_test ( int arg )
 	if ( dhcp_get()  == 0 )
 	    printf ( "DHCP test failed\n" );
 	else  {
-	    printf ( "DHCP got IP of %s\n", ip2strl ( hip->my_ip ) );
+	    printf ( "DHCP got IP of %s\n", ip2str32 ( hip->my_ip ) );
 	    printf ( "DHCP got netmask of  %08x\n", ntohl ( hip->net_mask ) );
 	}
 

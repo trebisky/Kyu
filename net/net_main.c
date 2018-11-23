@@ -9,13 +9,13 @@
  * net_main.c
  * T. Trebisky  3-24-2005
  * T. Trebisky  6-1-2015
- */
-
-/* Some notes on testing.
+ *
+ * Some notes on testing.
  * Wireshark is very helpful
  * Use a capture filter like "host 192.168.0.61"
  */
 
+#include <arch/types.h>
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
@@ -24,16 +24,16 @@
 #include "arch/cpu.h"
 
 #ifdef notdef
-unsigned long agate_ip = 0x0100000a;	/* agate: 10.0.0.1 */
-unsigned long trona_ip = 0x3600000a;	/* trona: 10.0.0.54 */
-unsigned long mmt_ip = 0x3264c480;	/* mmt: 128.196.100.50 */
-unsigned long caliente_ip = 0x3364c480;	/* caliente: 128.196.100.51 */
-unsigned long cholla_ip = 0x3464c480;	/* cholla: 128.196.100.52 */
+u32 agate_ip = 0x0100000a;	/* agate: 10.0.0.1 */
+u32 trona_ip = 0x3600000a;	/* trona: 10.0.0.54 */
+u32 mmt_ip = 0x3264c480;	/* mmt: 128.196.100.50 */
+u32 caliente_ip = 0x3364c480;	/* caliente: 128.196.100.51 */
+u32 cholla_ip = 0x3464c480;	/* cholla: 128.196.100.52 */
 #endif
 
 /* Some machine that will respond to ping and arp */
 /* Best if this is a linux machine that can run Wireshark */
-unsigned long test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
+u32 test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
@@ -90,7 +90,9 @@ void
 net_hw_init ( long bogus )
 {
     num_eth = board_net_init ();
+    puts ( "TJT after board_net_init" );
     board_net_activate ();
+    puts ( "TJT after board_net_activate" );
 
     if ( num_eth > 0 )
 	net_state = NET_RUN;
@@ -162,10 +164,10 @@ host_info_init ( void )
 
 	host_info.my_net = host_info.my_ip & host_info.net_mask;
 
-	printf ( "My IP = %s, netmask = %08x\n", ip2strl(host_info.my_ip), ntohl(host_info.net_mask) );
-	printf ( "My network = %s\n", ip2strl(host_info.my_net) );
+	printf ( "My IP = %s, netmask = %08x\n", ip2str32(host_info.my_ip), ntohl(host_info.net_mask) );
+	printf ( "My network = %s\n", ip2str32(host_info.my_net) );
 	printf ( "My MAC address is: %s\n", ether2str(host_info.our_mac) );
-	printf ( "My gateway: %s\n", ip2strl ( host_info.gate_ip ) );
+	printf ( "My gateway: %s\n", ip2str32 ( host_info.gate_ip ) );
 }
 
 /* Introduced for Xinu TCP */
@@ -250,12 +252,15 @@ net_init ( void )
  */
 #define NET_STARTUP_WAIT	12
 
+    puts ( "TJT -in net wait" );
     count = 0;
     // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
     while ( net_state == NET_INIT && count++ < NET_STARTUP_WAIT ) {
 	// printf ( "Net wait %d\n", count );
 	thr_delay ( system_clock_rate/2 );
+	puts ( "TJT -tick" );
     }
+    puts ( "TJT -after net wait" );
 
     if ( num_eth == 0 ) {
 	net_state = NET_IDLE;
@@ -468,9 +473,9 @@ net_handle ( struct netbuf *nbp )
 void
 net_show ( void )
 {
-	printf ( "My IP address is: %s (%08x)\n", ip2strl ( host_info.my_ip ), host_info.my_ip );
+	printf ( "My IP address is: %s (%08x)\n", ip2str32 ( host_info.my_ip ), host_info.my_ip );
 	printf ( "My MAC address is: %s\n", ether2str(host_info.our_mac) );
-	printf ( "Gateway: %s\n", ip2strl ( host_info.gate_ip ) );
+	printf ( "Gateway: %s\n", ip2str32 ( host_info.gate_ip ) );
 
 	printf ( "Packets processed: %d total (%d oddballs)\n", total_count, oddball_count );
 
@@ -498,8 +503,8 @@ net_show_packet ( char *msg, struct netbuf *nbp )
 	if ( nbp->eptr->type == ETH_ARP_SWAP ) {
 	    printf ( "ARP packet\n" );
 	} else if ( nbp->eptr->type == ETH_IP_SWAP ) {
-	    printf ( "ip src: %s (%08x)\n", ip2strl(nbp->iptr->src), nbp->iptr->src );
-	    printf ( "ip dst: %s (%08x)\n", ip2strl(nbp->iptr->dst), nbp->iptr->dst );
+	    printf ( "ip src: %s (%08x)\n", ip2str32(nbp->iptr->src), nbp->iptr->src );
+	    printf ( "ip dst: %s (%08x)\n", ip2str32(nbp->iptr->dst), nbp->iptr->dst );
 	    printf ( "ip proto: %d\n", nbp->iptr->proto );
 	} else
 	    printf ( "unknown packet type\n" );
@@ -670,7 +675,7 @@ netbuf_alloc_i ( void )
 	memset ( rv->data, 0xAB, NETBUF_MAX );
 
 #ifdef ARM_ALIGNMENT_HACK
-	if ( ((unsigned long) rv->iptr) & 0x3 )
+	if ( ((u32) rv->iptr) & 0x3 )
 	    panic ( "Bad alignment for netbuf" );
 #endif
 
@@ -729,17 +734,17 @@ ip2str ( unsigned char *ip_arg )
 }
 
 char *
-ip2strl ( unsigned long ip_arg )
+ip2str32 ( u32 ip_arg )
 {
     	static char buf[20];
 	int i, len;
 	char *p;
 	union { 
-	    unsigned long ip_long;
+	    u32 ip_32;
 	    unsigned char ip_buf[4]; 
 	} ip_un;
 
-	ip_un.ip_long = ip_arg;
+	ip_un.ip_32 = ip_arg;
 
 	len = 4;
 	p = buf;

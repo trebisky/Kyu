@@ -7,11 +7,13 @@
  * more details.
  */
 
+#include <arch/types.h>
+
 /* portable, naive, but simple */
 unsigned short
 in_cksum ( unsigned short *data, int len )
 {
-	long sum = 0;
+	i32 sum = 0;
 
 	while ( len > 1 ) {
 	    /* sum += * ((unsigned short *) data)++; */
@@ -34,7 +36,7 @@ in_cksum ( unsigned short *data, int len )
 unsigned short
 in_cksum_i ( unsigned short *data, int len, unsigned short init )
 {
-	long sum = init;
+	i32 sum = init;
 
 	while ( len > 1 ) {
 	    /* sum += * ((unsigned short *) data)++; */

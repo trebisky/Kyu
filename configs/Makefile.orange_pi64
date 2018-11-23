@@ -1,0 +1,123 @@
+# Makefile for Kyu on the ARM processor
+#
+# Tom Trebisky  4-15-2015
+
+# Here is where you set the Kyu version number.
+# 0.7.1 introduces Orange Pi
+# 0.7.5 introduces Multicore stuff from Marco/Xinu
+#VERSION = 0.7.5
+# now get version number from file VERSION
+
+INCS = -I. -Iarch
+
+include Makefile.inc
+
+# This is clean with no dependencies
+#    linux/linux-mm.o \
+# from below
+#    linux/linux-lib.o
+
+# machine.o must come first
+
+OBJS =  machine.o \
+    board.o \
+    version.o \
+    timer.o \
+    main.o \
+    user.o \
+    tests.o \
+    test_net.o \
+    test_kyu.o \
+    test_io.o \
+    console.o \
+    thread.o \
+    prf.o \
+    symbols.o \
+    dlmalloc.o \
+    random.o \
+    net.o \
+    tcp_xinu.o \
+    kyulib.o \
+    lib.o
+
+all: install dump sym tags
+
+ver:
+	@echo $(GCCVERSION)
+	@echo $(ABI)
+	$(CC) --version
+	$(CC) --target-help
+
+dump: kyu.dump
+
+sym: kyu.sym
+
+term:
+	picocom -b 115200 /dev/ttyUSB0
+
+.PHONY:	tags
+tags:
+	ctags -R
+
+machine.o:	bogus
+	cd arch ; make
+	cd board ; make
+	cd net ; make
+	cd lib ; make
+	cd tcp_xinu ; make
+#	cd linux ; make
+
+bogus:
+
+dlmalloc.o:	malloc.h
+
+thread.e:	thread.c
+	$(CC) -E thread.c -o thread.e
+
+# This is a weird make idiom to cause this to be rebuilt every time.
+FORCE:
+
+version.c:	FORCE
+	rm -f version.c
+	./mkversion >version.c
+
+#.PHONY: subdirs $(SUBDIRS)
+#
+#subdirs: $(SUBDIRS)
+#
+#$(SUBDIRS):
+#	$(MAKE) -C $@
+
+install: kyu.bin kyu.sym
+	cp kyu.bin /var/lib/tftpboot/h5.bin
+	cp kyu.sym /var/lib/tftpboot/kyu.sym
+	ls -l /var/lib/tftpboot/kyu.sym
+
+kyu.dump:	kyu
+	$(DUMP) kyu >kyu.dump
+
+kyu.sym:	kyu
+	$(NM) kyu >kyu.sym
+
+help:
+	$(CC) --help=optimizers
+
+kyu:	kyu.lds
+
+kyu: $(OBJS)
+	$(LD) -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
+
+kyu.bin: kyu
+	$(BIN) kyu kyu.bin
+
+clean:
+	rm -f *.o *.s kyu kyu.bin kyu.dump kyu.sym
+	rm -f tags
+	cd arch ; make clean
+	cd board ; make clean
+	cd net ; make clean
+	cd lib ; make clean
+	cd tcp_xinu ; make clean
+#	cd linux ; make clean
+
+# THE END

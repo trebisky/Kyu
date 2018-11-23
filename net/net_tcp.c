@@ -5,12 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_tcp.c
+ *
+ * net_tcp.c
  * Handle a TCP packet.
  * T. Trebisky  4-20-2005
  */
 
+#include <arch/types.h>
 #include <kyu.h>
 #include <kyulib.h>
 #include <malloc.h>
@@ -36,11 +37,11 @@ enum tcp_state { FREE, BORASCO, CWAIT, CONNECT, FWAIT };
 /* One of these for every connection */
 struct tcp_io {
 	struct tcp_io *next;
-	unsigned long remote_ip;
+	u32 remote_ip;
 	int remote_port;
 	int local_port;
-	unsigned long local_seq;
-	unsigned long remote_seq;
+	u32 local_seq;
+	u32 remote_seq;
 	void (*rcv_func) ( struct tcp_io *, char *, int);
 	enum tcp_state state;
 	struct sem *sem;
@@ -63,7 +64,7 @@ static void tcp_send_data ( struct tcp_io *, int, char *, int );
 /* Public entry points */
 
 void tcp_server ( int, tcp_cptr, tcp_fptr );
-struct tcp_io * tcp_connect ( unsigned long, int, tcp_fptr );
+struct tcp_io * tcp_connect ( u32, int, tcp_fptr );
 void tcp_send_pk ( struct tcp_io *, char *, int );
 void tcp_shutdown ( struct tcp_io * );
 
@@ -79,8 +80,8 @@ struct tcp_hdr {
 	unsigned short	sport;
 	unsigned short	dport;
 	/* - */
-	unsigned long seq;
-	unsigned long ack;
+	u32 seq;
+	u32 ack;
 	/* - */
 	unsigned char _pad0:4,
 		      hlen:4;	/* header length (in words) (off in BSD) */
@@ -154,7 +155,7 @@ tcp_tester ( struct tcp_io *tp, char *buf, int count )
 static void
 test_tcp_daytime ( void )
 {
-	unsigned long ip;
+	u32 ip;
 	struct tcp_io *tio;
 
 	(void) net_dots ( TEST_SERVER, &ip );
@@ -166,7 +167,7 @@ static char echo_buf[1024];
 static void
 test_tcp_echo ( void )
 {
-	unsigned long ip;
+	u32 ip;
 	struct tcp_io *tio;
 	int i;
 
@@ -283,7 +284,7 @@ tcp_send_pk ( struct tcp_io *tp, char *buf, int count )
 static void
 tcp_io_receive ( struct tcp_io *tp, struct netbuf *nbp )
 {
-	unsigned long seq;
+	u32 seq;
 	struct tcp_hdr *tcp;
 	int len;
 
@@ -383,7 +384,7 @@ static void dump_tcp ( struct netbuf *nbp )
 	tcp = (struct tcp_hdr *) nbp->pptr;
 
 	printf ( "TCP from %s: src/dst = %d/%d, size = %d",
-		ip2strl ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
+		ip2str32 ( nbp->iptr->src ), ntohs(tcp->sport), ntohs(tcp->dport), nbp->plen );
 	printf ( " hlen = %d (%d bytes), seq = %lu (%08x), ack = %lu (%08x)\n",
 		tcp->hlen, tcp->hlen * 4,
 		ntohl(tcp->seq), ntohl(tcp->seq),
@@ -401,7 +402,7 @@ static void dump_tcp ( struct netbuf *nbp )
  * We may need a new primitive to block with a timeout.
  */
 struct tcp_io *
-tcp_connect ( unsigned long ip, int port, tcp_fptr rfunc )
+tcp_connect ( u32 ip, int port, tcp_fptr rfunc )
 {
 	struct tcp_io *tp;
 
@@ -589,8 +590,8 @@ tcp_reply_rst ( struct netbuf *xbp )
 }
 
 struct tcp_pseudo {
-	unsigned long src;
-	unsigned long dst;
+	u32 src;
+	u32 dst;
 	unsigned short proto;
 	unsigned short len;
 };

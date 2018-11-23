@@ -5,8 +5,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_arp
+ *
+ * net_arp
  * Handle an ARP packet.
  * T. Trebisky  3-21-2005
  */
@@ -24,6 +24,8 @@
 /* ARP messages are 42 bytes, padded to 60 for ethernet.
  * 14 bytes for ether header, 28 bytes for the following:
  */
+
+#include <arch/types.h>
 #include "kyu.h"
 #include "kyulib.h"
 #include "thread.h"
@@ -55,10 +57,10 @@ struct eth_arp {
 	unsigned short op;
 	unsigned char sha[ETH_ADDR_SIZE];
 	// unsigned char spa[4];
-	unsigned long spa;
+	u32 spa;
 	unsigned char tha[ETH_ADDR_SIZE];
 	// unsigned char tpa[4];
-	unsigned long tpa;
+	u32 tpa;
 };
 #pragma pack()
 
@@ -89,8 +91,8 @@ struct arp_data {
 
 // static int arp_save ( char *, unsigned char * );
 // void arp_save_icmp ( char *, unsigned char * );
-static int arp_save ( char *, unsigned long );
-void arp_save_icmp ( char *, unsigned long );
+static int arp_save ( char *, u32 );
+void arp_save_icmp ( char *, u32 );
 
 void arp_show ( void );
 void arp_reply ( struct netbuf * );
@@ -111,7 +113,7 @@ arp_show_stuff ( char *str, struct eth_arp *eap )
 }
 
 struct arp_data *
-arp_lookup_e ( unsigned long ip_addr )
+arp_lookup_e ( u32 ip_addr )
 {
 	int i;
 	struct arp_data *ap;
@@ -196,11 +198,11 @@ arp_reply ( struct netbuf *nbp )
 #define ARP_ETHER_SWAP	0x0100
 
 void
-arp_request ( unsigned long target_ip )
+arp_request ( u32 target_ip )
 {
 	struct netbuf *nbp;
 	struct eth_arp *eap;
-	// unsigned long unknown = target_ip;
+	// u32 unknown = target_ip;
 
 	/* get a netbuf for this */
 	if ( ! (nbp = netbuf_alloc ()) )
@@ -235,7 +237,7 @@ void
 ip_arp_send ( struct netbuf *nbp )
 {
 	struct arp_data *ap;
-	unsigned long dest_ip = nbp->iptr->dst;
+	u32 dest_ip = nbp->iptr->dst;
 
 	nbp->eptr->type = ETH_IP_SWAP;
 
@@ -258,7 +260,7 @@ ip_arp_send ( struct netbuf *nbp )
 	    memcpy ( nbp->eptr->dst, ap->ether, ETH_ADDR_SIZE );
 	    net_send ( nbp );
 #ifdef DEBUG_ARP
-	    printf ( "IP arp send -- sent packet to %s\n", ip2strl ( dest_ip ) );
+	    printf ( "IP arp send -- sent packet to %s\n", ip2str32 ( dest_ip ) );
 #endif
 	    return;
 	}
@@ -271,7 +273,7 @@ ip_arp_send ( struct netbuf *nbp )
 	ap->flags = F_PENDING;
 
 #ifdef DEBUG_ARP
-	printf ("IP arp send: ARP request sent for %s\n", ip2strl ( dest_ip ) );
+	printf ("IP arp send: ARP request sent for %s\n", ip2str32 ( dest_ip ) );
 #endif
 
 	/* We only wait 20 seconds.
@@ -283,7 +285,7 @@ ip_arp_send ( struct netbuf *nbp )
 	ap->outq = nbp;
 
 #ifdef DEBUG_ARP
-	printf ("Pending packet queued for %s\n", ip2strl ( ap->ip_addr ) );
+	printf ("Pending packet queued for %s\n", ip2str32 ( ap->ip_addr ) );
 #endif
 
 	arp_request ( dest_ip );
@@ -295,7 +297,7 @@ ip_arp_send ( struct netbuf *nbp )
  * This must take care if there already is an entry in the cache.
  */
 int
-arp_ping ( unsigned long target_ip, char *ether )
+arp_ping ( u32 target_ip, char *ether )
 {
 	static int busy = 0;	/* paranoid */
 	struct arp_data *ap;
@@ -313,7 +315,7 @@ arp_ping ( unsigned long target_ip, char *ether )
 	ap->flags = F_PING;
 
 	/*
-	printf ("ARP ping request sent for %s\n", ip2strl ( target_ip ) );
+	printf ("ARP ping request sent for %s\n", ip2str32 ( target_ip ) );
 	*/
 
 	/* We only wait 10 seconds.
@@ -341,15 +343,15 @@ arp_ping ( unsigned long target_ip, char *ether )
  * of this network setup
  */
 void
-show_arp_ping ( unsigned long target_ip )
+show_arp_ping ( u32 target_ip )
 {
     	unsigned char ether[ETH_ADDR_SIZE];
-	unsigned long net_ip = htonl(target_ip);
+	u32 net_ip = htonl(target_ip);
 
 	if ( arp_ping ( net_ip, ether ) )
-	    printf ("%s is at %s\n", ip2strl ( net_ip ), ether2str (ether) );
+	    printf ("%s is at %s\n", ip2str32 ( net_ip ), ether2str (ether) );
 	else
-	    printf ("No response from: %s\n", ip2strl ( net_ip ) );
+	    printf ("No response from: %s\n", ip2str32 ( net_ip ) );
 }
 
 /* emit a gratuitous ARP message.
@@ -402,7 +404,7 @@ arp_expire ( struct arp_data *ap )
 	struct netbuf *nbp, *xbp;
 
 	/*
-	printf ( "ARP entry for %s expired\n", ip2strl ( ap->ip_addr ) );
+	printf ( "ARP entry for %s expired\n", ip2str32 ( ap->ip_addr ) );
 	*/
 
 	ap->ip_addr = 0;
@@ -462,7 +464,7 @@ arp_show ( void )
 		continue;
 
 	    printf ( "arp: %s at %s (ttl= %d)",
-		ip2strl ( ap->ip_addr ),
+		ip2str32 ( ap->ip_addr ),
 		ether2str( ap->ether), ap->ttl );
 	    if ( ap->flags )
 		printf ( " %04x", ap->flags );
@@ -501,7 +503,7 @@ arp_alloc ( void )
 }
 
 static int
-arp_save ( char *ether, unsigned long ip_addr )
+arp_save ( char *ether, u32 ip_addr )
 {
 	int i;
 	struct arp_data *ap;
@@ -524,7 +526,7 @@ arp_save ( char *ether, unsigned long ip_addr )
 
 		if ( ap->flags & F_PENDING ) {
 		    /*
-		    printf ("Pending ARP for %s satisfied\n", ip2strl ( ap->ip_addr ) );
+		    printf ("Pending ARP for %s satisfied\n", ip2str32 ( ap->ip_addr ) );
 		    */
 		    ap->flags &= ~F_PENDING;
 
@@ -568,7 +570,7 @@ arp_save ( char *ether, unsigned long ip_addr )
  * Same as above, but allows debug.
  */
 void
-arp_save_icmp ( char *ether, unsigned long ip_addr )
+arp_save_icmp ( char *ether, u32 ip_addr )
 {
 	if ( arp_save ( ether, ip_addr ) ) {
 	    /*

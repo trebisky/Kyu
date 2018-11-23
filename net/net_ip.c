@@ -5,12 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_ip
+ *
+ * net_ip
  * Handle an IP packet.
  * T. Trebisky  3-21-2005
  */
 
+#include <arch/types.h>
 #include <kyu.h>
 #include <kyulib.h>
 
@@ -31,14 +32,14 @@ ip_rcv ( struct netbuf *nbp )
 
 	if ( cksum ) {
 	    printf ( "bad IP packet from %s (%d) proto = %d, sum= %04x\n",
-		    ip2strl ( ipp->src ), nbp->ilen, ipp->proto, cksum );
+		    ip2str32 ( ipp->src ), nbp->ilen, ipp->proto, cksum );
 	    netbuf_free ( nbp );
 	    return;
 	}
 
 	if ( ipp->offset & IP_OFFMASK_SWAP ) {
 	    printf ( "Fragmented (%04x) IP packet from %s (%d) proto = %d, sum= %04x\n",
-		    ipp->offset, ip2strl ( ipp->src ), nbp->ilen, ipp->proto, cksum );
+		    ipp->offset, ip2str32 ( ipp->src ), nbp->ilen, ipp->proto, cksum );
 	    netbuf_free ( nbp );
 	    return;
 	}
@@ -50,9 +51,9 @@ ip_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_THIS
 
-	printf ( " IP packet: Source: %s", ip2strl ( ipp->src ) );
+	printf ( " IP packet: Source: %s", ip2str32 ( ipp->src ) );
 	printf ( "   " );
-	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
+	printf ( "Dest: %s", ip2str32 ( ipp->dst ) );
 	if ( ipp->proto == IPPROTO_ICMP )
 	    printf ( " ICMP" );
 	else if ( ipp->proto == IPPROTO_UDP ) {
@@ -95,7 +96,7 @@ ip_rcv ( struct netbuf *nbp )
 #endif
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",
-		    ip2strl ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );
+		    ip2str32 ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );
 	    netbuf_free ( nbp );
 	}
 
@@ -110,9 +111,9 @@ ip_rcv ( struct netbuf *nbp )
 	    printf ( "IP packet (size:%d) proto = %d, sum= %04x", nbp->plen, ipp->proto, ipp->sum );
 	}
 
-	printf ( " Source: %s", ip2strl ( ipp->src ) );
+	printf ( " Source: %s", ip2str32 ( ipp->src ) );
 	printf ( "   " );
-	printf ( "Dest: %s", ip2strl ( ipp->dst ) );
+	printf ( "Dest: %s", ip2str32 ( ipp->dst ) );
 	printf ( "\n" );
 #endif
 }
@@ -126,7 +127,7 @@ void
 ip_reply ( struct netbuf *nbp )
 {
 	struct ip_hdr *ipp;
-	unsigned long tmp;
+	u32 tmp;
 
 	ipp = (struct ip_hdr *) nbp->iptr;
 
@@ -140,7 +141,7 @@ ip_reply ( struct netbuf *nbp )
 static int ip_id = 1;
 
 void
-ip_send ( struct netbuf *nbp, unsigned long dest_ip )
+ip_send ( struct netbuf *nbp, u32 dest_ip )
 {
 	struct ip_hdr *ipp;
 
@@ -152,7 +153,7 @@ ip_send ( struct netbuf *nbp, unsigned long dest_ip )
 	nbp->ilen = nbp->plen + sizeof(struct ip_hdr);
 	// printf ( "IP SEND: ilen = %d\n", nbp->ilen );
 
-	ipp->hl = sizeof(struct ip_hdr) / sizeof(long);
+	ipp->hl = sizeof(struct ip_hdr) / sizeof(u32);
 	ipp->ver = 4;
 
 	ipp->tos = 0;

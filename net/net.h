@@ -19,6 +19,8 @@
 #define DEBUG_UDP
 #define DEBUG_TCP
 */
+
+#include <arch/types.h>
 #include "netbuf.h"
 
 #define DEBUG_TCP
@@ -43,7 +45,7 @@
 typedef void (*ufptr) ( struct netbuf * );
 
 char * ip2str ( unsigned char * );
-char * ip2strl ( unsigned long );
+char * ip2str32 ( u32 );
 char * ether2str ( unsigned char * );
 
 void udp_hookup ( int, ufptr );
@@ -53,10 +55,10 @@ int get_ephem_port ( void );
  * or obtained via DHCP (except mac address)
  */
 struct host_info {
-	unsigned long my_ip;
-	unsigned long net_mask;
-	unsigned long my_net;
-	unsigned long gate_ip;
+	u32 my_ip;
+	u32 net_mask;
+	u32 my_net;
+	u32 gate_ip;
 	unsigned char our_mac[ETH_ADDR_SIZE];
 };
 
@@ -82,8 +84,8 @@ struct ip_hdr {
 	unsigned char proto;	/* protocol */
 	unsigned short sum;
 	/* - */
-	unsigned long src;
-	unsigned long dst;
+	u32 src;
+	u32 dst;
 };
 
 #define IP_OFFMASK		0x1fff

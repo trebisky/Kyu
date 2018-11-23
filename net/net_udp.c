@@ -5,12 +5,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
- */
-/* net_udp.c
+ *
+ * net_udp.c
  * Handle an UDP packet.
  * T. Trebisky  4-11-2005
  */
 
+#include <arch/types.h>
 #include <kyu.h>
 #include <kyulib.h>
 #include <malloc.h>
@@ -149,7 +150,7 @@ udp_rcv ( struct netbuf *nbp )
 
 #ifdef DEBUG_UDP
 	printf ( "UDP from %s: src/dst = %d/%d\n",
-		ip2strl ( nbp->iptr->src ), ntohs(udp->sport), ntohs(udp->dport) );
+		ip2str32 ( nbp->iptr->src ), ntohs(udp->sport), ntohs(udp->dport) );
 #endif
 
 	/* XXX - validate checksum of received packets
@@ -174,19 +175,19 @@ udp_rcv ( struct netbuf *nbp )
 }
 
 struct bogus_ip {
-    	unsigned long x1;
-    	unsigned long x2;
+    	u32 x1;
+    	u32 x2;
 	/* */
 	unsigned char x3;
 	unsigned char proto;
 	unsigned short len;
 	/* */
-	unsigned long src;
-	unsigned long dst;
+	u32 src;
+	u32 dst;
 };
 
 void
-udp_send ( unsigned long dest_ip, int sport, int dport, char *buf, int size )
+udp_send ( u32 dest_ip, int sport, int dport, char *buf, int size )
 {
 	struct udp_hdr *udp;
 	struct netbuf *nbp;
