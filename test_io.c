@@ -64,10 +64,12 @@ static void test_ram2 ( long );
 static void test_button ( long );
 static void test_blink_s ( long );
 static void test_blink ( long );
+static void test_i2c ( long );
 #endif
 
 #if defined(BOARD_ORANGE_PI64)
 static void test_timer ( long );
+static void test_gic ( long );
 #endif
 
 static void test_blink_d ( long );
@@ -108,15 +110,18 @@ struct test io_test_list[] = {
 
 	test_blink,	"start LED blink test",	0,
 	test_blink_s,	"stop LED blink test",	0,
-#endif
-
-#if defined(BOARD_ORANGE_PI64)
-	test_timer,	"Timer test",		0,
+	test_i2c,	"i2c test",		0,
 #endif
 
 	test_blink_d,	"LED blink test (via delay)",	0,
 	test_clear,	"clear memory test",	0,
 	test_cache,	"cache test",		0,
+
+#if defined(BOARD_ORANGE_PI64)
+	test_timer,	"Timer test",		0,
+	test_gic,	"GIC test",		0,
+#endif
+
 
 	0,		0,			0
 };
@@ -156,6 +161,13 @@ static void
 test_button ( long xxx )
 {
 	gpio_test_button ();
+}
+
+/* Test Orange Pi TWI (i2c) */
+static void
+test_i2c ( long xxx )
+{
+	twi_test ();
 }
 #endif
 
@@ -496,12 +508,16 @@ static void
 test_timer ( long xxx )
 {
 	reg_t val;
-
-	get_DAIF ( val );
-	printf ( "DAIF = %08x\n", val );
+	reg_t el;
 
 	timer_check1 ();
 	timer_check2 ();
+
+	get_EL(el);
+        printf ( "Current EL = %d\n", el>>2 );
+
+	get_DAIF ( val );
+	printf ( "DAIF (initial) = %08x\n", val );
 
 	INT_lock;
 	get_DAIF ( val );
@@ -510,6 +526,12 @@ test_timer ( long xxx )
 	INT_unlock;
 	get_DAIF ( val );
 	printf ( "DAIF (unlocked) = %08x\n", val );
+}
+
+static void
+test_gic ( long xxx )
+{
+	intcon_test ();
 }
 #endif
 

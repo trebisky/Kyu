@@ -494,6 +494,32 @@ gpio_test ( void )
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 
+/* For the BBB we have mux.c to handle the gpio/pinmux
+ * Maybe we should have something like that for the H3?
+ */
+
+void
+setup_twi0_mux ( void )
+{
+    // BBB stuff
+    // int *psp = (int *) MUX_BASE;
+    // psp[MUX_I2C0_SDA] = MODE(0) | RXACTIVE | SLEWCTRL;
+    // psp[MUX_I2C0_SCL] = MODE(0) | RXACTIVE | SLEWCTRL;
+    gpio_config ( GPIO_A_11, GPIO_F2 );
+    gpio_config ( GPIO_A_12, GPIO_F2 );
+    // gpio_pull ( GPIO_A_x, GPIO_PULL_UP );
+}
+
+void
+setup_twi1_mux ( void )
+{
+    gpio_config ( GPIO_A_18, GPIO_F3 );
+    gpio_config ( GPIO_A_19, GPIO_F3 );
+}
+
+/* -------------------------------------------------- */
+/* -------------------------------------------------- */
+
 
 /* XXX XXX this CCM stuff doesn't belong here,
  *  but here it is for now.

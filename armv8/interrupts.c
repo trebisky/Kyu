@@ -164,7 +164,8 @@ do_irq ( void )
 	if ( ! cur_thread )
 	    panic ( "irq int, cur_thread" );
 
-	puts ( "TJT - irq" );
+	// For H5 desperation debugging.
+	// puts ( "TJT - irq" );
 
 	/* Tell Kyu thread system we are in an interrupt */
 	start_interrupt ();

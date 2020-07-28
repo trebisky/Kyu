@@ -1,0 +1,52 @@
+1-9-2019
+
+I am putting aside Kyu work for a while in order to give attention to a
+variety of other things in my life.  House maintenance, micromounts,
+shop cleanup, etc.
+
+I want to give a summary of the state of things, with especial attention
+to active and yet unfinished problems.
+
+1) A timer lock is needed.  A test failed when I was running one thread
+doing timed delays and then ran my diagnostic sequence at the same time.
+I had thought that having int locks was enough, but it is not.
+Disabling interrupts locks normal code against interrupt races, but if
+two threads fiddle with timers the list can get corrupted, as they
+are not locked one versus the other, so a mutex lock is needed.
+This may very likely be needed for other resources also.
+
+2) TCP code -- there are some issues in the Xinu TCP code.
+I fixed one where a block of memory was being deallocated twice,
+but Comer thinks this should never have happened in the first place.
+The reference counts are not being handled correctly.
+What I think is that the new API is/was not done properly.
+Some time ago, Xinu used an "eth" device, and I'll bet that
+was done properly.  I could either find old Xinu code and take
+a look at the API using the "eth" device, or just make a careful
+study of the code and figure out how to do things right.
+
+BBB port -- no known problems
+
+Orange Pi H3 port -- no problems with single core.
+Integrating multicore into Kyu is a big future project.
+
+Fire3 port -- no problems single core.
+Needs a network driver.
+Never have started additional cores.
+I should allow extra cores to be started with the
+same API as the H3 port -- this will involve some
+study of the arm64 mmu and cache.   One of the boot
+utilities has code to start cores.
+See /u1/Projects/Fire3/Fire3-bl1/src
+
+Orange Pi H5 port -- in progress.
+Amazingly, all the H3 drivers seem to port over with only
+a recompile needed.  There are some known difference
+(allegedly some pinmux setting stuff is different),
+but the driver stuff is really identical.
+
+The big problem on the H5 is that I can never get an interrupt
+to happen!  What I absolutely need to do is to get away from
+Kyu to sort this out and write a standalone simple program
+with the minimum code to make an interrupt happen.
+Once I get that working, I can move the code back into Kyu.

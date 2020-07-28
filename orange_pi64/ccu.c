@@ -74,7 +74,9 @@ get_cpu_clock ( void )
 
 /* See section 4.4 in H5 user manual */
 
-struct h3_cpu_config {
+#define NUM_H5_CPU	4
+
+struct h5_cpu_config {
         vu32 cluster0;		/* 00 */
         vu32 cluster1;		/* 04 */
         vu32 cache0;		/* 08 */
@@ -96,23 +98,57 @@ struct h3_cpu_config {
 	struct {
 	    vu32  lo;
 	    vu32  hi;
-	} rvb[4];		/* A0 */
+	} vbase[NUM_H5_CPU];		/* A0 */
 };
 
-#define CPU_CONFIG_BASE (struct h3_cpu_config *) 0x01700000
+#define CPU_CONFIG_BASE (struct h5_cpu_config *) 0x01700000
 
 #define GIC_BYPASS	0x10
 
+/* page 156 of H5 Manual, "set this bit to disable the GIC
+ * and route external signals directly to the processor.
+ */
 void
 gic_bypass ( void )
 {
-	struct h3_cpu_config *ccp = CPU_CONFIG_BASE;
-	struct h3_cpu_config *zcp = 0;
+	struct h5_cpu_config *ccp = CPU_CONFIG_BASE;
+	struct h5_cpu_config *zcp = 0;
 
-	printf ( "TJT gic bypass, gctrl = %08x\n", &zcp->gctrl );
-	printf ( "TJT gic bypass, rvb = %08x\n", &zcp->rvb[0] );
+	printf ( "TJT gic bypass, addr of vbase[0] = %08x\n", &zcp->vbase[0] );
+	printf ( "TJT gic bypass, addr of gctrl = %08x\n", &zcp->gctrl );
+	printf ( "TJT gic bypass, gctrl = %08x\n", ccp->gctrl );
 
 	ccp->gctrl = GIC_BYPASS;
+
+	printf ( "TJT gic bypass, gctrl = %08x\n", ccp->gctrl );
+}
+
+void
+gic_unbypass ( void )
+{
+	struct h5_cpu_config *ccp = CPU_CONFIG_BASE;
+
+	printf ( "TJT gic bypass, gctrl = %08x\n", ccp->gctrl );
+
+	ccp->gctrl &= ~GIC_BYPASS;
+
+	printf ( "TJT gic bypass, gctrl = %08x\n", ccp->gctrl );
+}
+
+void
+ccu_gic_setup ( u32 vecbase )
+{
+	struct h5_cpu_config *ccp = CPU_CONFIG_BASE;
+	int cpu;
+
+	for ( cpu=0; cpu<NUM_H5_CPU; cpu++ ) {
+	    ccp->vbase[cpu].lo = vecbase;
+	    ccp->vbase[cpu].hi = 0;
+
+	}
+
+	/* unbypass the GIC */
+	ccp->gctrl &= ~GIC_BYPASS;
 }
 
 /* THE END */

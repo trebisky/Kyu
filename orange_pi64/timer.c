@@ -171,83 +171,13 @@ timer_ack ( void )
 
 void _udelay ( int );
 
-#ifdef ARCH_ARM64
+#ifdef ARCH_ARMV8
 /* These are called from the IO test menu */
-
-#define CORE_0  0
-#define CORE_1  1
-#define CORE_2  2
-#define CORE_3  3
-
-static void
-test4_handler_1 ( int xxx )
-{
-        printf ( "BANG!\n" );
-}
-
-static void
-test4_handler_2 ( int xxx )
-{
-        printf ( "BOOM!\n" );
-}
 
 void
 timer_check1 ( void )
 {
-	reg_t el;
-	reg_t sc;
-	reg_t zero;
-	char *p;
-	long *lp;
-	int i;
-
-	irq_hookup ( IRQ_SGI_1, test4_handler_1, 0 );
-        irq_hookup ( IRQ_SGI_2, test4_handler_2, 0 );
-
-	get_EL(el);
-	printf ( "Current EL = %d\n", el>>2 );
-
-#ifdef CHECK_FAULT1
-	/* This does NOT yield a fault */
-	printf ( "Try to provoke a fault 1\n" );
-#ifdef notdef
-	/* This just locks things up.
-	 * We really need to flush the cache first.
-	 */
-	// turn off D cache
-	get_SCTLR(sc);
-	sc &= ~4;
-	set_SCTLR(sc);
-	printf ( "D cache is now off\n" );
-#endif
-
-	p = (char *) 0x40000000;
-	for ( i=0; i<8; i++ ) {
-	    lp = (long *) p;
-	    printf ( "Fetch long: %016x = %016x\n", lp, *lp );
-	    p += 1;
-	}
-
-#ifdef notdef
-	// turn D cache back on
-	get_SCTLR(sc);
-	sc |= 4;
-	set_SCTLR(sc);
-#endif
-#endif /* CHECK_FAULT1 */
-
-#ifdef CHECK_FAULT2
-	/* This definitely yields a fault */
-	printf ( "Try to provoke a fault 2\n" );
-	/* Writing to a register at a higher EL should yield a fault */
-	zero = 0;
-	asm volatile ( "msr SCTLR_EL3, %0" : : "r" ( zero ) );
-#endif /* CHECK_FAULT2 */
-
-	printf ( "Try to interrupt ourself\n" );
-        gic_soft_self ( SGI_1 );
-        gic_soft ( SGI_2, CORE_0 );
-	printf ( "Done\n" );
+	/* XXX */
 }
 
 void
@@ -261,11 +191,12 @@ timer_check2 ( void )
 	    _udelay ( 10 );
 	}
 	printf ( "Timer - IRQ status: %08x\n", hp->irq_status );
-	hp->irq_status = IE_T0;
+	// hp->irq_status = IE_T0;
+	timer_ack ();
 	printf ( "Timer - IRQ status: %08x\n", hp->irq_status );
 
 	// does nothing
-	gic_bypass ();
+	// gic_bypass ();
 }
 #endif	/* ARCH_ARM64 */
 
@@ -418,6 +349,7 @@ timer_handler ( int junk )
 void
 opi_timer_init ( int rate )
 {
+	printf ( "Timer Initialized !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" );
 	irq_hookup ( IRQ_TIMER0, timer_handler, 0 );
 
 	timer_start ( rate );

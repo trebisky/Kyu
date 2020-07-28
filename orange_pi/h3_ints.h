@@ -53,8 +53,14 @@
 
 #define IRQ_UART0	32
 
+#define IRQ_TWI0	39
+#define IRQ_TWI1	40
+#define IRQ_TWI2	41
+
 #define IRQ_PIO_A	43
 #define IRQ_PIO_E	49
+
+#define IRQ_TWI_R	76	/* R_TWI */
 #define IRQ_PIO_J	77	/* aka pio "L" */
 
 #define IRQ_TIMER0	50

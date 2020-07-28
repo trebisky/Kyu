@@ -17,6 +17,7 @@ OBJS =  board.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
+	i2c_hw.o \
 	emac.o \
 	timer.o \
 	h3_spinlocks.o \

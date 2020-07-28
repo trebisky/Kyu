@@ -61,6 +61,13 @@
 
 #define IRQ_EMAC	114	/* Ethernet */
 
+#define IRQ_AXI		156
+
+/* On the H4 anyway, there are 16 SGI and 16 PPI
+ *  and then 125 "SPI" for 157 total interrupt sources.
+ *  i.e. 0 - 156
+ */
+
 /* Software generated interrupt channels */
 #define SGI_0	0
 #define SGI_1	1
