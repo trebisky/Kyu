@@ -269,7 +269,9 @@ board_init ( void )
 	/* Turn on the green LED */
 	gpio_init ();
 	gpio_led_init ();
-	i2c_init ();
+
+	/* This will NEVER work before gic_init() */
+	// i2c_init ();
 
 	pwr_on ();
 	wd_init ();
@@ -281,6 +283,10 @@ board_init ( void )
 	gpio_button_enable ();
 
 	serial_init ( CONSOLE_BAUD );
+	serial_aux_init ();
+
+	i2c_init ();
+
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	delay_calib ();

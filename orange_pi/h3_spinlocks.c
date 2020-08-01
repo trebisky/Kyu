@@ -23,6 +23,10 @@ struct h3_spinlocks {
 	volatile unsigned long lock[NLOCKS];
 };
 
+/* XXX - should move this to ccu.c someday.
+ *  along with other such stuff scattered around.
+ *  Grep for CCU and BUS and RESET and GAT
+ */
 #define CCU_BASE		0x01c20000
 
 #define BUS_GATING_REG1     	0x64

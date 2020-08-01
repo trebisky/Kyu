@@ -14,39 +14,74 @@
  *
  * The GIC is the ARM "Generic Interrupt Controller"
  * It has two sections, "cpu" and "dist"
+ *
+ * A document is entitled "Corelink GIC-400 Generic
+ *			Interrupt controller, r0p1, 2012" 59 pages.
+ * This seems to be what you need to get started, but ...
+ * Another document, "ARM Generic Interrupt Controller,
+ *			Architecture specification, 2013", 214 pages
+ * This document provides details the first does not.
  */
 #include <arch/types.h>
 
-#define NUM_CONFIG	10
-#define NUM_TARGET	40
-#define NUM_PRIO	40
-#define NUM_MASK	5
+#define NUM_ISR		16	/* 1 bit fields, 0x40 */
+#define NUM_CONFIG	32	/* 2 bit fields, 0x80 */
+#define NUM_PRIO	128	/* 8 bit fields, 0x200 */
 
 struct h3_gic_dist {
 	vu32 ctrl;			/* 0x00 */
 	vu32 type;			/* 0x04 */
 	vu32 iidr;			/* 0x08 */
-	u32 __pad0[61];
-	vu32 eset[NUM_MASK];		/* BG - 0x100 */
-	u32 __pad1[27];
-	vu32 eclear[NUM_MASK];		/* BG - 0x180 */
-	u32 __pad2[27];
-	vu32 pset[NUM_MASK];		/* BG - 0x200 */
-	u32 __pad3[27];
-	vu32 pclear[NUM_MASK];		/* BG - 0x280 */
-	u32 __pad4[27];
-	vu32 aset[NUM_MASK];		/* BG - 0x300 */
-	u32 __pad5[27];
-	vu32 aclear[NUM_MASK];		/* BG - 0x300 */
-	u32 __pad55[27];
+	u32 		__pad0[61];
+
+	/* enable */
+	vu32 eset[NUM_ISR];		/* BG - 0x100 */
+	u32 		__pad1[16];
+	vu32 eclear[NUM_ISR];		/* BG - 0x180 */
+	u32 		__pad2[16];
+
+	/* pending */
+	vu32 pset[NUM_ISR];		/* BG - 0x200 */
+	u32 		__pad3[16];
+	vu32 pclear[NUM_ISR];		/* BG - 0x280 */
+	u32 		__pad4[16];
+
+	/* active */
+	vu32 aset[NUM_ISR];		/* BG - 0x300 */
+	u32 		__pad5[16];
+	vu32 aclear[NUM_ISR];		/* BG - 0x300 */
+	u32 		__pad55[16];
+
+	/* 8 bit fields */
 	vu32 prio[NUM_PRIO];		/* BG - 0x400 */
-	u32 __pad6[216];
-	vu32 target[NUM_TARGET];	/* 0x800 */
-	u32 __pad7[216];
+	u32 		__pad6[128];
+
+	/* 8 bit fields */
+	vu32 target[NUM_PRIO];		/* 0x800 */
+	u32 		__pad7[128];
+
+	/* 2 bit fields */
 	vu32 config[NUM_CONFIG];	/* 0xc00 */
-	u32 __pad8[182];
+	u32 		__pad77[32];
+
+	/* single bits */
+	vu32 isr[NUM_ISR];		/* 0xd00 */
+	u32 		__pad8[112];
+
 	vu32 soft;			/* 0xf00 */
 };
+
+/* In theory, a GIC can support up to 480 spi's,
+ * but actual GIC are configured for less in most cases.
+ * 480/32 = 15, adding a first word for ppi's
+ * explains why NUM_ISRis 16.
+ * The config registers give 2 bits per interrupt,
+ * so we need 32 words of 32 bits to handle the 512
+ * (512 once we add 480 spi + 32 ppi).
+ *
+ * The H3 uses interrupt numbers up to 157,
+ *  skipping the first 32 (sgi and ppi)
+ */
 
 struct h3_gic_cpu {
 	vu32 ctrl;		/* 0x00 */
@@ -64,12 +99,22 @@ struct h3_gic_cpu {
 #define	G0_ENABLE	0x01
 #define	G1_ENABLE	0x02
 
+static int gic_initialized = 0;
+
 void
 intcon_ena ( int irq )
 {
 	struct h3_gic_dist *gp = GIC_DIST_BASE;
 	int x = irq / 32;
 	u32 mask = 1 << (irq%32);
+
+	/* Avoid bugs when we initialize hardware prior
+	 * to initializing the GIC.
+	 */
+	if ( ! gic_initialized )
+	    panic ( "GIC not yet initialized" );
+
+	// printf ( "GIC enable IRQ %d e[%d] = %08x\n", irq, x, mask );
 
 	gp->eset[x] = mask;
 }
@@ -159,15 +204,6 @@ intcon_irqack ( int irq )
 	gic_unpend ( irq );
 }
 
-#ifdef notdef
-XXX - for some diagnostic, never written
-void
-intcon_check ( void )
-{
-	struct h3_gic_cpu *cp = GIC_CPU_BASE;
-}
-#endif
-
 /* Initialize the "banked" registers that are unique to each core
  * This needs to be called by each core when it starts up.
  */
@@ -179,8 +215,12 @@ gic_cpu_init ( void )
 	int i;
 
 	printf ( "GIC cpu_init called\n" );
-	/* enable all SGI, disable all PPI */
-	gp->eclear[0] = 0xffff0000;
+
+	/* disable and clear all PPI and SGI */
+	gp->eclear[0] = 0xffffffff;
+	gp->pclear[0] = 0xffffffff;
+
+	/* enable all SGI */
 	gp->eset[0]   = 0x0000ffff;
 
 	/* priority for PPI and SGI */
@@ -198,6 +238,8 @@ gic_init ( void )
 	int i;
 
 	printf ( "GIC init called\n" );
+	gic_initialized = 1;
+
 	/* Initialize the distributor */
 	gp->ctrl = 0;
 
@@ -205,22 +247,50 @@ gic_init ( void )
 	for ( i=2; i<NUM_CONFIG; i++ )
 	    gp->config[i] = 0;
 
-	for ( i=8; i<NUM_TARGET; i++ )
+	/* 8 bit fields */
+	for ( i=8; i<NUM_PRIO; i++ )
 	    gp->target[i] = 0x01010101;
 
+	/* 8 bit fields */
 	for ( i=8; i<NUM_PRIO; i++ )
 	    gp->prio[i] = 0xa0a0a0a0;
 
-	for ( i=1; i<NUM_MASK; i++ )
+	/* clear all enables */
+	for ( i=1; i<NUM_ISR; i++ )
 	    gp->eclear[i] = 0xffffffff;
 
-	for ( i=0; i<NUM_MASK; i++ )
+	/* clear all pending bits */
+	for ( i=0; i<NUM_ISR; i++ )
 	    gp->pclear[i] = 0xffffffff;
 
 	gp->ctrl = G0_ENABLE;
 
 	/* Initialize banked registers for core 0 */
 	gic_cpu_init ();
+}
+
+/* While working on the TWI drive, the ISR display
+ * had these values.  1 is IRQ 32 (the uart).
+ * 0x40 is IRQ 38 -- the TWI !!
+ *
+ * GIC isr[0] = 00000000
+ * GIC isr[1] = 00000041
+ */
+
+void
+gic_show ( void )
+{
+	struct h3_gic_dist *gp = GIC_DIST_BASE;
+	int i;
+
+	printf ( "GIC isr at %08x\n", gp->isr );
+	printf ( "GIC soft at %08x\n", &gp->soft );
+	for ( i=0; i<NUM_ISR; i++ )
+	    printf ( "GIC isr[%d] = %08x\n", i, gp->isr[i] );
+	for ( i=0; i<NUM_ISR; i++ )
+	    printf ( "GIC eset[%d] = %08x\n", i, gp->eset[i] );
+	for ( i=0; i<NUM_ISR; i++ )
+	    printf ( "GIC eclear[%d] = %08x\n", i, gp->eclear[i] );
 }
 
 /* THE END */

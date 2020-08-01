@@ -22,6 +22,8 @@
 
 #include "h3_ints.h"
 
+/* Two timers share some registers */
+
 struct h3_timer {
 	vu32 irq_ena;		/* 00 */
 	vu32 irq_status;	/* 04 */
@@ -345,14 +347,57 @@ timer_handler ( int junk )
 	timer_ack ();
 }
 
+void
+xtimer_ack ( void )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->irq_status = IE_T1;
+}
+
+/* Handle a timer interrupt */
+/* Called at interrupt level */
+static void
+xtimer_handler ( int junk )
+{
+	printf ( "X timer tick\n" );
+
+	xtimer_ack ();
+}
+
+static void
+xtimer_start ( int hz )
+{
+	struct h3_timer *hp = TIMER_BASE;
+
+	hp->t1_ival = CLOCK_24M / hz;
+
+	hp->t1_ctrl = 0;	/* stop the timer */
+	hp->irq_ena |= IE_T1;	/* !! or this on */
+
+	hp->t1_ctrl = CTL_SRC_24M;
+	hp->t1_ctrl |= CTL_RELOAD;
+	while ( hp->t1_ctrl & CTL_RELOAD )
+	    ;
+
+	hp->t1_ctrl |= CTL_ENABLE;
+}
+
+/* Experiments with Timer 1 "xtimer" 7-28-2020
+ *  it works just fine.
+ */
+
 /* Called during Kyu startup */
 void
 opi_timer_init ( int rate )
 {
-	printf ( "Timer Initialized !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" );
+	// printf ( "Timer Initialized !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" );
+	printf ( "Timer Initialized !\n" );
 	irq_hookup ( IRQ_TIMER0, timer_handler, 0 );
+	// irq_hookup ( IRQ_TIMER1, xtimer_handler, 0 );
 
 	timer_start ( rate );
+	// xtimer_start ( rate );
 }
 
 /* THE END */

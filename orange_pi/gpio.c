@@ -313,8 +313,9 @@ void gpio_init ( void )
 {
 	struct h3_gpio *gp = (struct h3_gpio *) 0;
 
-	printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
+	// printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
 }
+
 /* This is the green LED */
 void
 pwr_on ( void )
@@ -404,11 +405,11 @@ gpio_blink_green ( void )
 void
 button_handler ( int xx )
 {
-	printf ( "Button pushed !!\n" );
+	printf ( "So called \"power\" button pushed !!\n" );
 	gpio_int_ack ( POWER_BUTTON );
 
 	thr_show ();
-	tcp_show ();
+	// tcp_show ();
 }
 
 /* Should not hurt to call this twice.
@@ -520,6 +521,7 @@ setup_twi1_mux ( void )
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 
+/* XXX XXX XXX - move this to CCU.c */
 
 /* XXX XXX this CCM stuff doesn't belong here,
  *  but here it is for now.

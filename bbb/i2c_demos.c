@@ -6,6 +6,22 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  */
+
+/* These are various top level demos of the i2c code in Kyu.
+ *  you could call them "drivers", but that would be a stretch.
+ *  I simply wired up various gadgets I had on hand and got them
+ *  to function, at least in a limited way.
+ * These were developed and tested on the BBB, but ought to be
+ *  immediately portable to other boards with i2c drivers.
+ *
+ * Here is the list of devices I have worked with so far:
+ *
+ *  BMP180 pressure and temperature sensor (uses the software iic module)
+ *  MCP23008 8 bit IO expander
+ *  MCP23017 16 bit expander should be easy given the above.
+ *  MCP4725 DAC
+ *  HDC1008 temperature and humidity sensor
+ */
 #include <kyu.h>
 #include "i2c.h"
 
@@ -22,6 +38,15 @@
 #define ICACHE_FLASH_ATTR
 #define os_delay_us(x)	delay_us ( (x) )
 #endif
+
+/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------- */
+/* BMP 180 Pressure and Temperature sensor (Bosch)
+ *  This code was first developed for the ESP8266 using
+ *  a bit-bang software iic scheme.  That iic code was
+ *  then moved to Kyu.  */
+/* ------------------------------------------------------------- */
+/* ------------------------------------------------------------- */
 
 #define  BMP_ADDR 0x77
 

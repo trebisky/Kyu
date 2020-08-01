@@ -1,0 +1,19 @@
+A quick "state of the H3" report
+
+7-31-2020
+
+I am back working on this after setting it aside for about a year and a half.
+Here is what works:
+
+-- Basic Kyu works, with timer interrupts.
+-- A second timer has been tested in a simple way.
+-- UART0 is working as a simple polled console driver.
+-- UART1,2,3 work in a preliminary way with interrupts.
+-- The "power button" can generate a GPIO interrupt.
+-- an i2c (TWI) driver has been started.
+-- Additional cores can be started, but are not integrated
+   with the Kyu scheduler
+-- an EMAC (network) driver has been started, but there are
+   unsolved issues with the PHY.
+
+

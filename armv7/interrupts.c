@@ -316,11 +316,18 @@ do_irq ( void )
 
 	nint = intcon_irqwho ();
 
+#ifdef notdef
 	/* Always swamps output, but useful in
 	 * dire debugging situations.
 	printf ( "Interrupt %d\n", nint );
 	printf ( "#" );
 	*/
+
+	/* XXX - 50 is clock(timer0) on H3 chip */
+	/* 33 is uart1 */
+	if ( nint != 50 && nint != 33 )
+	    printf ( "Interrupt %d\n", nint );
+#endif
 
 	if ( ! irq_table[nint].func ) {
 	    /* Probably unrelated to current thread.

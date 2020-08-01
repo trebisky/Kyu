@@ -52,18 +52,23 @@
 #define IRQ_PPI_15	31
 
 #define IRQ_UART0	32
+#define IRQ_UART1	33
+#define IRQ_UART2	34
+#define IRQ_UART3	35
 
-#define IRQ_TWI0	39
-#define IRQ_TWI1	40
-#define IRQ_TWI2	41
+#define IRQ_TWI0	38
+#define IRQ_TWI1	39
+#define IRQ_TWI2	40
 
 #define IRQ_PIO_A	43
 #define IRQ_PIO_E	49
 
+#define IRQ_TIMER0	50
+#define IRQ_TIMER1	51
+
 #define IRQ_TWI_R	76	/* R_TWI */
 #define IRQ_PIO_J	77	/* aka pio "L" */
 
-#define IRQ_TIMER0	50
 #define IRQ_EMAC	114	/* Ethernet */
 
 /* Software generated interrupt channels */

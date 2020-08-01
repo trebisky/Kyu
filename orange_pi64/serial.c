@@ -30,6 +30,9 @@
  * All of these were tested with just 3 wires (Tx,Rx,Gnd) on 5-29-2018
  */
 #include <arch/types.h>
+#include "h3_ints.h"
+
+#define NUM_UART	4
 
 #define UART0_BASE	0x01C28000
 #define UART1_BASE	0x01C28400
@@ -62,7 +65,11 @@ static struct h3_uart * uart_base[] = {
 /* It looks like the basic clock is 24 Mhz
  * We need 16 clocks per character.
  */
-#define BAUD_115200    (0xD) /* 24 * 1000 * 1000 / 16 / 115200 = 13 */
+#define BAUD_115200   13 /* 24 * 1000 * 1000 / 16 / 115200 = 13 */
+#define BAUD_38400    39 /* 24 * 1000 * 1000 / 16 / 38400 = 39 */
+#define BAUD_19200    78 /* 24 * 1000 * 1000 / 16 / 19200 = 78 */
+#define BAUD_9600    156 /* 24 * 1000 * 1000 / 16 / 9600 = 156 */
+
 
 /* bits in the lsr */
 #define RX_READY	0x01
@@ -74,7 +81,7 @@ static struct h3_uart * uart_base[] = {
 #define IE_TXE		0x02	/* Tx register empty */
 #define IE_LS		0x04	/* Line status */
 #define IE_MS		0x08	/* Modem status */
-
+#define IE_THRE		0x80	/* Modem status */
 
 #define LCR_DATA_5	0x00	/* 5 data bits */
 #define LCR_DATA_6	0x01	/* 6 data bits */
@@ -113,7 +120,8 @@ uart_init ( int uart, int baud )
 
 	up->lcr = LCR_SETUP;
 
-	up->ier = IE_RDA | IE_TXE;
+	// No sense if we aren't using interrupts.
+	// up->ier = IE_RDA | IE_TXE;
 }
 
 // Polling loops like this could use a timeout maybe.
@@ -153,6 +161,7 @@ uart_getc ( int uart )
 
 /* These are the "standard" entry points used for the Kyu console */
 
+/* Called from board.c */
 void
 serial_init ( int baud )
 {
@@ -177,36 +186,126 @@ serial_getc ( void )
 	return uart_getc ( 0 );
 }
 
+/* Code below added for interrupt experiment, 7-29-2020 */
+
+static struct serial_softc {
+        struct h3_uart *base;
+        int irq;
+} serial_soft[NUM_UART];
+
+static void
+serial_handler ( int devnum )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+        struct h3_uart *base = sc->base;
+	int x;
+
+	/* poll data ready */
+	while ( base->lsr & 0x1 ) {
+	    x = base->data;
+	    putchar ( x & 0x7f );
+	}
+
+	/* Disable any more interrupts.
+	 * OK for some testing,
+	 * but needs to be more fancy in the future
+	 */
+	// base->ier &= ~(IE_TXE | IE_THRE);
+	base->ier &= IE_RDA;
+	// printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
+}
+
+/* This series of routines are for
+ * some quick testing to see if we can get UART interrupts,
+ * we can simply enable TXE and we do get interrupts.
+ * We can also nicely listen via interrupts to a port (works great)
+ */
+
+static void
+serial_listen ( int devnum )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+        struct h3_uart *base = sc->base;
+
+	base->ier = IE_RDA;
+}
+
+static void
+aux_uart_init ( int devnum, int baud )
+{
+	struct h3_uart *up = uart_base[devnum];
+
+	up->ier = 0;
+	up->lcr = LCR_DLAB;
+
+	up->divisor_msb = 0;
+	up->divisor_lsb = baud;
+
+	up->lcr = LCR_SETUP;
+
+	// up->ier = IE_RDA | IE_TXE;
+	up->ier = IE_TXE;
+}
+
+
+static void
+serial_setup ( int devnum, int irq, int baud )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+
+	// printf ( "UART irq %d for device %d hookup\n", irq, devnum );
+        irq_hookup ( irq, serial_handler, devnum );
+
+	sc->base = uart_base[devnum];
+	sc->irq = irq;
+
+	aux_uart_init ( devnum, baud );
+	uart_gpio_init ( devnum );
+}
+
+/* Called from board.c */
+void
+serial_aux_init ( void )
+{
+	/* XXX - redundant with uart_clock_init () in gpio.c */
+	serial_clocks_on ();
+
+        // serial_setup ( 0, IRQ_UART0, BAUD_115200 );
+        serial_setup ( 1, IRQ_UART1, BAUD_9600 );
+        serial_setup ( 2, IRQ_UART2, BAUD_9600 );
+        serial_setup ( 3, IRQ_UART3, BAUD_9600 );
+
+	// serial_listen ( 1 );
+}
 
 #ifdef notdef
-
-/* OLD */
-#define UART_BASE	((struct h3_uart *) UART0_BASE)
-
-int
-serial_rx_status ( void )
-{
-	struct h3_uart *up = UART_BASE;
-
-	return up->lsr & RX_READY;
-}
-
-int
-serial_read ( void )
-{
-	struct h3_uart *up = UART_BASE;
-
-	return up->data;
-}
-
-void
-serial_check ( int num )
-{
-	struct h3_uart *up = UART_BASE;
-
-	printf ( " Uart: lsr/ier/iir %02x %02x %02x  %d\n", up->lsr, up->ier, up->iir, num );
-}
+ ## 
+ ## /* OLD */
+ ## #define UART_BASE	((struct h3_uart *) UART0_BASE)
+ ## 
+ ## int
+ ## serial_rx_status ( void )
+ ## {
+ ## 	struct h3_uart *up = UART_BASE;
+ ## 
+ ## 	return up->lsr & RX_READY;
+ ## }
+ ## 
+ ## int
+ ## serial_read ( void )
+ ## {
+ ## 	struct h3_uart *up = UART_BASE;
+ ## 
+ ## 	return up->data;
+ ## }
+ ## 
+ ## void
+ ## serial_check ( int num )
+ ## {
+ ## 	struct h3_uart *up = UART_BASE;
+ ## 
+ ## 	printf ( " Uart: lsr/ier/iir %02x %02x %02x  %d\n", up->lsr, up->ier, up->iir, num );
+ ## }
 #endif
-
 
 /* THE END */

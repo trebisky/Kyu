@@ -134,6 +134,17 @@ split ( char *buf, char **bufp, int max )
 	return i;
 }
 
+/* We are always needing to display registers when
+ * writing and debugging drivers, so this makes things
+ * a little easier.
+ * XXX - we will need something more for 64 bit machines.
+ */
+void
+show_reg ( char *msg, unsigned int *areg )
+{
+	printf ( "%s %08x --> %08x\n", msg, areg, *areg );
+}
+
 /* Take a string of the form 128.196.100.52
  * and convert it to a packed integer in network
  * byte order.
