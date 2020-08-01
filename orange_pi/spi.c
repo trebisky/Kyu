@@ -23,4 +23,19 @@
 /* See p. 107 in the datasheet for gating */
 /* See p. 135 in the datasheet for reset control */
 
+/* Only SPI0 is routed to the Orange Pi connector */
+#define SPI0_BASE	0x01c68000
+#define SPI1_BASE	0x01c69000
+
+/* i2s belongs elsewhere, but for now ... */
+/* i2s is all about audio stuff */
+
+#define I2S0_BASE	0x01c22000
+#define I2S1_BASE	0x01c22400
+#define I2S2_BASE	0x01c22800
+
+/* pwm belongs elsewhere, but for now ... */
+
+#define PWM_BASE	0x01c21400
+
 /* THE END */

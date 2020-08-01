@@ -39,6 +39,16 @@
  * A typo in the ccu.c file caused the release of reset for this
  *  unit to be misdirected.  Once that was fixed, we got results.
  * Another typo with a wrong interrupt number caused trouble.
+ * A third big mistake was calling twi_init before gic_init.
+ *
+ * I was pulling my hair out with the unit stuck giving a 0xf9 status,
+ * which is undefined/reserved.  Reset would not clear it, but a
+ * power cycle straightened things out.
+ * Perhaps the 9pulse trick would turn the trick.
+ */
+
+/*
+#define USE_POLLING
  */
 
 #include "kyu.h"
@@ -51,16 +61,16 @@
 #define TWI3_BASE      0x01f02400	/* called R_TWI */
 
 struct twi_dev {
-        volatile unsigned int addr;           /* 00 */
-        volatile unsigned int xaddr;          /* 04 */
-        volatile unsigned int data;           /* 08 */
-        volatile unsigned int ctrl;           /* 0C */
-        volatile unsigned int status;         /* 10 */
-        volatile unsigned int ccr;            /* 14 */
-        volatile unsigned int reset;          /* 18 */
-        volatile unsigned int efr;            /* 1c */
-        volatile unsigned int lcr;            /* 20 */
-        volatile unsigned int dvfs;           /* 24 */
+        volatile unsigned long addr;           /* 00 */
+        volatile unsigned long xaddr;          /* 04 */
+        volatile unsigned long data;           /* 08 */
+        volatile unsigned long ctrl;           /* 0C */
+        volatile unsigned long status;         /* 10 */
+        volatile unsigned long ccr;            /* 14 */
+        volatile unsigned long reset;          /* 18 */
+        volatile unsigned long efr;            /* 1c */
+        volatile unsigned long lcr;            /* 20 */
+        volatile unsigned long dvfs;           /* 24 */
 };
 
 /* The addr and xaddr registers would only be used if we put ourselves into
@@ -79,6 +89,13 @@ struct twi_dev {
 #define	CCR_CLOCK_N	0x07	/* 3 bits */
 
 #define LCR_IDLE	0x3a
+
+#define LCR_SDA_EN	0x01
+#define LCR_SDA_LEVEL	0x02	/* force this level */
+#define LCR_SCL_EN	0x04
+#define LCR_SCL_LEVEL	0x08	/* force this level */
+#define LCR_SDA_STATE	0x10	/* current level */
+#define LCR_SCL_STATE	0x20	/* current level */
 
 /* Pins ---
  * TWI0_sck	PA11	fn 2
@@ -110,7 +127,7 @@ static struct twi_softc {
 } twi_soft[NUM_TWI];
 
 static void twi_stop ( struct twi_dev * );
-static void twi_start ( struct twi_dev * );
+static int twi_start ( struct twi_dev * );
 
 /* -------------------------------------------------------------- */
 /* -------------------------------------------------------------- */
@@ -134,6 +151,8 @@ twi_clear_irq ( struct twi_dev *base )
 /* I see 0x48 after sending an address with nothing on the bus.
  */
 
+#define TWI_STATUS_IDLE 0xf8
+
 static void
 twi_engine ( struct twi_softc *sc )
 {
@@ -142,8 +161,12 @@ twi_engine ( struct twi_softc *sc )
 
 	state = base->status;
         printf ( " twi_engine  (stat): %08x\n", state );
+
+#ifdef USE_POLLING
+	/* This extra delay seems important */
 	state = base->status;
         printf ( " twi_engine+ (stat): %08x\n", state );
+#endif
 
 	switch ( state ) {
 	case 0xf8: /* Bus is idle (does not interrupt) */
@@ -154,8 +177,51 @@ twi_engine ( struct twi_softc *sc )
 	    break;
 	case 0x08: /* start successful, ready for address */
         case 0x10: /* repeated start */
+	    printf ( "TWI send addr: %02x\n", sc->addr );
 	    base->data = sc->addr;
 	    twi_clear_irq ( base );
+	    break;
+	case 0x18: /* address has been ACKed for write */
+	    /* send second part of 10 bit address or first data byte */
+	case 0x28: /* data has been ACKed for write */
+	    if ( sc->tcount ) {
+		printf ( "TWI send: %02x\n", *sc->tbufp );
+		base->data = *sc->tbufp++;
+		twi_clear_irq ( base );
+		sc->tcount--;
+		break;
+	    }
+	    /* No more data -- if we sent a byte that
+	     * the device isn't expecting, the next state
+	     * will be 0x30 (we won't get an ACK)
+	     */
+	    printf ( "TWI all done sending\n" );
+	    sc->status = TWI_DONE;
+	    break;
+	case 0x20: /* address failed to ACK for write */
+	case 0x30: /* data sent, failed to ACK */
+	    sc->status = TWI_DONE;
+	    break;
+	case 0x40: /* address has been ACKed for read */
+	    /* enable the ACK to receive */
+	    base->ctrl |= CTRL_A_ACK;
+	    twi_clear_irq ( base );
+	    break;
+	    /* next will be 0x50 */
+	case 0x50: /* data received, ACK has been sent */
+	    *sc->rbufp++ = base->data;
+	    sc->rcount--;
+	    /* Don't ACK the last byte */
+	    if ( sc->rcount == 1 )
+		base->ctrl &= ~CTRL_A_ACK;
+	    twi_clear_irq ( base );
+	    break;
+	case 0x58: /* data received, no ACK was sent */
+	    *sc->rbufp++ = base->data;
+	    sc->rcount--;
+	    // twi_clear_irq ( base );
+	    printf ( "TWI all done receiving\n" );
+	    sc->status = TWI_DONE;
 	    break;
 	case 0x48: /* no ACK after sending data (error) */
 	    sc->status = TWI_DONE;
@@ -167,7 +233,9 @@ twi_engine ( struct twi_softc *sc )
 	if ( sc->status == TWI_DONE ) {
 	    twi_stop ( base );
 	    sc->status = TWI_IDLE;;
+#ifndef USE_POLLING
             sem_unblock ( sc->sem );
+#endif
 	}
 
 }
@@ -179,14 +247,15 @@ twi_handler ( int devnum )
         struct twi_dev *base = sc->base;
 
 	/* ACK the interrupt */
-	base->ctrl &= ~CTRL_INT_ENA;
+	/* does it really --  This just disables it */
+	// base->ctrl &= ~CTRL_INT_ENA;
 
-        // printf ( " *** twi_handler (ctrl): %08x\n", base->ctrl );
+        printf ( " *** twi_handler (ctrl): %08x\n", base->ctrl );
 
 	twi_engine ( sc );
 }
 
-#ifdef notdef
+#ifdef USE_POLLING
 /* We use this until we get interrupts working.
  */
 void
@@ -198,13 +267,26 @@ twi_poll ( struct twi_softc *sc )
 
 	// for ( ;; ) {
 	for ( limit = 0; limit < 10; limit++ ) {
+
 	    timeout = 1000;
 	    while ( ( (base->ctrl & CTRL_INT_FLAG) == 0 ) && timeout-- )
 		;
 	    printf ( "twi_poll %d\n", timeout );
-	    twi_engine ( sc );
-	    if ( sc->status == TWI_DONE )
+
+	    /* We see this bogus status when we do unexpected things.
+	     * The only fix I have found is a power cycle.
+	     */
+	    if ( base->status == 0xf9 ) {
+		printf ( "TWI poll, nasty status: %02x\n", base->status );
 		break;
+	    }
+
+	    twi_engine ( sc );
+
+	    if ( sc->status == TWI_DONE || sc->status == TWI_IDLE ) {
+		printf ( "TWI poll, finished\n" );
+		break;
+	    }
 	}
 	sc->status = TWI_IDLE;
 }
@@ -235,8 +317,11 @@ twi_reinit ( struct twi_dev *base )
 {
 	/* XXX - do soft reset */
         // base->ctrl |= CTRL_INT_ENA;
-	twi_clock ( base, 0 );
+	//twi_clock ( base, 0 );
 }
+
+/* Called from in the interrupt routine.
+ */
 static void
 twi_stop ( struct twi_dev *base )
 {
@@ -266,23 +351,82 @@ twi_stop ( struct twi_dev *base )
 	    printf ( "Stop failed to return bus to Idle\n" );
 }
 
+/* The bus is not idle, but it should be.
+ * send 9 pulses on SDA an see if that releases it.
+ */
 static void
+twi_kick_butt ( struct twi_dev *base )
+{
+	int repeat;
+	int is_high;
+
+	base->lcr |= LCR_SDA_EN;
+
+	for ( repeat=0; repeat < 9; repeat++ ) {
+	    is_high = base->lcr & LCR_SDA_STATE;
+	    is_high &= base->lcr & LCR_SDA_STATE;
+	    is_high &= base->lcr & LCR_SDA_STATE;
+	    if ( is_high )
+		break;
+
+	    base->lcr &= ~LCR_SCL_LEVEL;
+	    delay_us ( 1000 );
+	    base->lcr |= LCR_SCL_LEVEL;
+	    delay_us ( 1000 );
+	}
+
+	base->lcr &= ~LCR_SDA_EN;
+
+	if ( ! base->lcr & LCR_SDA_STATE ) {
+	    printf ( "TWI sda still stuck low\n" );
+	    printf ( " TWI status: %02x\n", base->status );
+	    printf ( " TWI lcr: %02x\n", base->lcr );
+	}
+}
+
+static int
 twi_start ( struct twi_dev *base )
 {
 	int timeout;
+	int creg;
 
 	printf ( " --- twi_start\n" );
 	base->reset = 1;
-	twi_reinit ( base );
+	base->ctrl = CTRL_BUS_ENA;
 
-	base->ctrl &= ~(CTRL_A_ACK | CTRL_INT_FLAG);
+	delay_us ( 100 );
+
+	if ( base->status != TWI_STATUS_IDLE ) {
+	    printf ( "TWI start, not idle (kicking it), status: %02x\n", base->status );
+	    twi_kick_butt ( base );
+	    if ( base->status != TWI_STATUS_IDLE ) {
+		printf ( "TWI cannot start, not idle, status: %02x\n", base->status );
+		return 1;
+	    }
+	}
+
+	twi_clock ( base, 0 );
+
 	base->efr = 0;
 	base->lcr = LCR_IDLE;
-        base->ctrl |= CTRL_INT_ENA;
-        base->ctrl |= CTRL_BUS_ENA;
-	base->ctrl |= CTRL_M_START;
 
-	// show_reg ( "Starting TWI (ctrl) ", &base->ctrl );
+	creg = base->ctrl;
+	creg &= ~(CTRL_A_ACK | CTRL_INT_FLAG);
+#ifndef USE_POLLING
+        creg |= CTRL_BUS_ENA | CTRL_INT_ENA;
+#else
+        creg |= CTRL_BUS_ENA;
+#endif
+	base->ctrl = creg;
+	creg |= CTRL_M_START;
+	base->ctrl = creg;
+
+	/* With interrupts, the following messages are
+	 * basically useless.  Everything happens and then
+	 * we see them when everthing finishes
+	 */
+#ifdef USE_POLLING
+	show_reg ( "Starting TWI (ctrl) ", &base->ctrl );
 
 	/* This did timeout before we set BUS_ENA */
 	timeout = 10000;
@@ -290,8 +434,10 @@ twi_start ( struct twi_dev *base )
 	    ;
 	if ( timeout < 500 )
 	    printf ( "TWI start, timeout: %d\n", timeout );
+	show_reg ( "Started TWI (ctrl) ", &base->ctrl );
+#endif
 
-	// show_reg ( "Started TWI (ctrl) ", &base->ctrl );
+	return 0;
 }
 
 static void
@@ -307,44 +453,14 @@ twi_devinit ( int devnum, struct twi_dev *base, int irq )
 	sc->status = TWI_IDLE;
 	sc->dev = devnum;
 
-#ifdef notyet
-        twi_reset_i ( base );
-
-        base->psc = PSC_2;
-        base->scll = 120;
-        base->sclh = 120;
-        base->buf = BUF_RX_CLR | BUF_TX_CLR;
-#endif
-
 	// printf ( "TWI irq %d for device %d setup\n", irq, devnum );
         irq_hookup ( irq, twi_handler, devnum );
 
+	// twi_clock ( base, 0 );
+
+	printf ( "i2c device %d initialized\n", devnum );
+
         // base->ctrl |= CTRL_INT_ENA;
-}
-
-static void
-twi0_setup ( void )
-{
-        setup_twi0_mux ();
-        twi_devinit ( 0, (struct twi_dev *) TWI0_BASE, IRQ_TWI0 );
-}
-
-/* Uses mode 2 to put these on P9-17 and P9-18
- *  P9-17 is SCL
- *  P9-18 is SDA
- */
-static void
-twi1_setup ( void )
-{
-        setup_twi1_mux ();
-        twi_devinit ( 1, (struct twi_dev *) TWI1_BASE, IRQ_TWI1 );
-}
-
-static void
-twi2_setup ( void )
-{
-        // setup_twi2_mux ();
-        twi_devinit ( 2, (struct twi_dev *) TWI2_BASE, IRQ_TWI2 );
 }
 
 /* Called during system startup.
@@ -357,14 +473,12 @@ void
 i2c_init ( void )
 {
 	twi_clocks_on ();
+        setup_twi_mux ();
 
-        twi0_setup ();
-        twi1_setup ();
-        twi2_setup ();
-
-	twi_reinit ( twi_soft[0].base );
-	twi_reinit ( twi_soft[1].base );
-	twi_reinit ( twi_soft[2].base );
+        twi_devinit ( 0, (struct twi_dev *) TWI0_BASE, IRQ_TWI0 );
+        twi_devinit ( 1, (struct twi_dev *) TWI1_BASE, IRQ_TWI1 );
+	// TWI 2 is not routed to a connector
+        // twi_devinit ( 2, (struct twi_dev *) TWI2_BASE, IRQ_TWI2 );
 }
 
 /* -------------------------------------------------------- */
@@ -430,9 +544,17 @@ i2c_hw_send ( void *ii, int addr, char *buf, int count )
 	sc->addr = addr<<1;	/* 7 bits addr, write */
 	sc->status = TWI_RUN;
 
-	twi_start ( sc->base );
-	// twi_poll ( sc );
+	printf ( "-- TWI start for send\n" );
+	if ( twi_start ( sc->base ) ) {
+	    printf ( "i2c cannot start send\n" );
+	    sc->status = TWI_IDLE;
+	}
+
+#ifdef USE_POLLING
+	twi_poll ( sc );
+#else
 	sem_block ( sc->sem );
+#endif
 }
 
 int
@@ -451,16 +573,24 @@ i2c_hw_recv ( void *ii, int addr, char *buf, int count )
 	sc->addr = addr<<1 | 1;	/* 7 bits addr, read */
 	sc->status = TWI_RUN;
 
-	twi_start ( sc->base );
-	// twi_poll ( sc );
+	printf ( "-- TWI start for recv\n" );
+	if ( twi_start ( sc->base ) ) {
+	    printf ( "i2c cannot start recv\n" );
+	    sc->status = TWI_IDLE;
+	}
+
+#ifdef USE_POLLING
+	twi_poll ( sc );
+#else
 	sem_block ( sc->sem );
+#endif
 }
 
 /* -------------------------------------------------------- */
 /* -------------------------------------------------------- */
 /* Test and debug follows */
 
-#define TEST_DEV	2
+#define TEST_DEV	0
 
 static void
 twi_show ( void )
@@ -483,9 +613,12 @@ twi_test ( void )
 	/* Do this again, so we can hand trigger it */
 	// i2c_init ();
 
+	// twi_show ();
+
 	// twi_start ( twi_soft[TEST_DEV].base );
 	// twi_show ();
-	// gic_show ();
+
+	hdc_test ();
 }
 
 /* THE END */

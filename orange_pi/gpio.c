@@ -500,22 +500,27 @@ gpio_test ( void )
  */
 
 void
-setup_twi0_mux ( void )
+setup_twi_mux ( void )
 {
     // BBB stuff
     // int *psp = (int *) MUX_BASE;
     // psp[MUX_I2C0_SDA] = MODE(0) | RXACTIVE | SLEWCTRL;
     // psp[MUX_I2C0_SCL] = MODE(0) | RXACTIVE | SLEWCTRL;
+
+    /* TWI 0 */
     gpio_config ( GPIO_A_11, GPIO_F2 );
     gpio_config ( GPIO_A_12, GPIO_F2 );
+    // ?? How do we set the pullups ?
     // gpio_pull ( GPIO_A_x, GPIO_PULL_UP );
-}
 
-void
-setup_twi1_mux ( void )
-{
+    /* TWI 1 */
     gpio_config ( GPIO_A_18, GPIO_F3 );
     gpio_config ( GPIO_A_19, GPIO_F3 );
+
+    /* TWI 2 */
+    /* Not routed to connector on Orange Pi */
+    // gpio_config ( GPIO_E_12, GPIO_F3 );
+    // gpio_config ( GPIO_E_13, GPIO_F3 );
 }
 
 /* -------------------------------------------------- */

@@ -168,7 +168,6 @@ static void
 test_i2c ( long xxx )
 {
 	twi_test ();
-	hdc_test ();
 }
 #endif
 

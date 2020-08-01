@@ -26,9 +26,11 @@
  */
 #define HDC_ADDR	0x40
 
+/* These are the registers in the device */
 #define HDC_TEMP	0x00
 #define HDC_HUM		0x01
 #define HDC_CON		0x02
+
 #define HDC_SN1		0xFB
 #define HDC_SN2		0xFC
 #define HDC_SN3		0xFD
@@ -53,7 +55,15 @@
 
 #define CONV_BOTH	12700
 
-/* Read gets both T then H */
+/* We either read or write some register on the device.
+ * to write, there is one i2c transaction
+ *  we send 3 bytes (one is the register, then next two the value)
+ * to read, there are two i2c transations
+ *  The first sends one byte (the register number)
+ *  The second reads two bytes (the register value)
+ */
+
+/* Write to the config register -- tell it to do both conversions */
 static void
 hdc_con_both ( struct i2c *ip )
 {
@@ -64,6 +74,8 @@ hdc_con_both ( struct i2c *ip )
 	buf[1] = HDC_BOTH >> 8;
 	buf[2] = HDC_BOTH & 0xff;
 	i2c_send ( ip, HDC_ADDR, buf, 3 );
+
+	/* unfinished */
 }
 
 /* Read gets either T or H */
@@ -77,10 +89,93 @@ hdc_con_single ( struct i2c *ip )
 	buf[1] = 0;
 	buf[2] = 0;
 	i2c_send ( ip, HDC_ADDR, buf, 3 );
+
+	/* unfinished */
 }
 
+/* Get the contents of the config register
+ * After reset, the value seems to be 0x1000
+ *  which is HDC_BOTH
+ */
 static void
-hdc_read_both ( struct i2c *ip, unsigned short *buf )
+hdc_con_get ( struct i2c *ip )
+{
+	unsigned char buf[2];
+	int val;
+
+	buf[0] = HDC_CON;
+	i2c_send ( ip, HDC_ADDR, buf, 1 );
+
+	i2c_recv ( ip, HDC_ADDR, buf, 2 );
+	val = buf[0] << 8 | buf[1];
+
+	printf ( "HDC1008 config = %04x\n", val );
+}
+
+#ifdef notdef
+/* Let's see if this autoincrements across 3 registers
+ * it does not:
+ * I get: 023c ffff ffff
+ */
+static void
+hdc_xserial_get ( struct i2c *ip )
+{
+	unsigned char buf[6];
+	int s1, s2, s3;
+
+	buf[0] = HDC_SN1;
+	i2c_send ( ip, HDC_ADDR, buf, 1 );
+
+	i2c_recv ( ip, HDC_ADDR, buf, 6 );
+
+	s1 = buf[0] << 8 | buf[1];
+	s2 = buf[2] << 8 | buf[3];
+	s3 = buf[4] << 8 | buf[5];
+
+	printf ( "HDC1008 X serial = %04x %04x %04x\n", s1, s2, s3 );
+}
+#endif
+
+/* Get the 3 bytes of serial information.
+ * I get: 023c ecab ee00
+ */
+static void
+hdc_serial_get ( struct i2c *ip )
+{
+	unsigned char buf[2];
+	int s1, s2, s3;
+
+	buf[0] = HDC_SN1;
+	i2c_send ( ip, HDC_ADDR, buf, 1 );
+	i2c_recv ( ip, HDC_ADDR, buf, 6 );
+	s1 = buf[0] << 8 | buf[1];
+
+	buf[0] = HDC_SN2;
+	i2c_send ( ip, HDC_ADDR, buf, 1 );
+	i2c_recv ( ip, HDC_ADDR, buf, 6 );
+	s2 = buf[0] << 8 | buf[1];
+
+	buf[0] = HDC_SN3;
+	i2c_send ( ip, HDC_ADDR, buf, 1 );
+	i2c_recv ( ip, HDC_ADDR, buf, 6 );
+	s3 = buf[0] << 8 | buf[1];
+
+	printf ( "HDC1008 serial = %04x %04x %04x\n", s1, s2, s3 );
+}
+
+/* Read both T and H */
+/* Here we write the register pointer to 0 (HDC_TEMP)
+ * then read 4 bytes (two registers).  This back to back read
+ * is described in the datasheet.  Apparently the internal
+ * register pointer increments automatically to the next
+ * register.  Perhaps we could read 6 bytes and also read
+ * the config register, which comes next.
+ *
+ * The device seems to power up in HDC_BOTH mode.
+ */
+
+static void
+hdc_read_both ( struct i2c *ip, unsigned int *buf )
 {
 	unsigned char bbuf[4];
 
@@ -90,6 +185,7 @@ hdc_read_both ( struct i2c *ip, unsigned short *buf )
 	delay_us ( CONV_BOTH );
 
 	i2c_recv ( ip, HDC_ADDR, bbuf, 4 );
+
 	buf[0] = bbuf[0] << 8 | bbuf[1];
 	buf[1] = bbuf[2] << 8 | bbuf[3];
 }
@@ -101,7 +197,7 @@ hdc_read_both ( struct i2c *ip, unsigned short *buf )
 static void
 hdc_once ( struct i2c *ip )
 {
-	unsigned short iobuf[2];
+	unsigned int iobuf[2];
 	int t, h;
 	int tf;
 
@@ -117,14 +213,16 @@ hdc_once ( struct i2c *ip )
 
 	t = ((iobuf[0] * 165) / 65536)- 40;
 	tf = t * 18 / 10 + 32;
-	// printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
+
+	printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
 
 	//h = ((iobuf[1] * 100) / 65536);
 	//printf ( "HDC t, tf, h = %d  %d %d\n", t, tf, h );
 
 	h = ((iobuf[1] * 100) / 65536);
 	// printf ( " -- hraw, h = %04x %d    %d\n", iobuf[1], iobuf[1], h );
-	printf ( "HDC t,f = %d %d\n", tf, h );
+
+	printf ( "HDC temp(F), humid = %d %d\n", tf, h );
 }
 
 #define I2C_PORT	0
@@ -138,6 +236,8 @@ hdc_test ( void )
 
 	// thr_new_repeat ( "hdc", hdc_once, ip, 13, 0, 1000 );
 	hdc_once ( ip );
+	hdc_con_get ( ip );
+	hdc_serial_get ( ip );
 }
 
 /* The tests are run via the shell "x" command, i.e.
