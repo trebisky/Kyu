@@ -8,10 +8,24 @@
  *
  * emac.c for the Orange Pi PC and PC Plus
  *
- * Tom Trebisky  3/20/2017
+ * Tom Trebisky  3/20/2017  8/2/2020
  *
  * emac.c
  * Ethernet driver for the Allwinner H3 emac
+ *
+ * The Orange PI PC and the PC Plus both use the PHY internal to the
+ *   H3 chip and thus support only 10/100 ethernet.
+ *
+ * The Orange Pi Plus (not the PC Plus) also uses the H3 chip,
+ *   but has an external PHY and thus can do gigabit.
+ * I don't have a plus (and probably never will), so this driver
+ *   does not support the external gigabit PHY on that board.
+ *
+ * The PC Plus board is easy to tell apart from the PC
+ *  -- it has a Wifi antenna (next to the micro-USB connector).
+ *  -- it has the RTL8189 Wifi chip (near the Wifi antenna).
+ *  -- it has one RAM chip on each side of the board
+ *   (the PC has both RAM chips neatly on the top side.)
  */
 
 #include <kyu.h>

@@ -214,7 +214,7 @@ hdc_once ( struct i2c *ip )
 	t = ((iobuf[0] * 165) / 65536)- 40;
 	tf = t * 18 / 10 + 32;
 
-	printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
+	// printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
 
 	//h = ((iobuf[1] * 100) / 65536);
 	//printf ( "HDC t, tf, h = %d  %d %d\n", t, tf, h );
@@ -234,10 +234,11 @@ hdc_test ( void )
 
 	ip = i2c_hw_new ( I2C_PORT );
 
-	// thr_new_repeat ( "hdc", hdc_once, ip, 13, 0, 1000 );
-	hdc_once ( ip );
-	hdc_con_get ( ip );
-	hdc_serial_get ( ip );
+	thr_new_repeat ( "hdc", hdc_once, ip, 13, 0, 1000 );
+
+	// hdc_once ( ip );
+	// hdc_con_get ( ip );
+	// hdc_serial_get ( ip );
 }
 
 /* The tests are run via the shell "x" command, i.e.

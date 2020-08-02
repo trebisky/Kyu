@@ -74,6 +74,16 @@ i2c_recv ( struct i2c *ip, int addr, char *buf, int count )
 	}
 }
 
+int
+i2c_error ( struct i2c *ip )
+{
+	if ( ip->type == I2C_HW ) {
+	    return i2c_hw_error ( ip->hw );
+	} else {
+	    return 0;
+	}
+}
+
 /* ----------------------------------------------------- */
 /* Handy routines */
 
