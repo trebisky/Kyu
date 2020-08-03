@@ -10,10 +10,9 @@ Here is what works:
 -- UART0 is working as a simple polled console driver.
 -- UART1,2,3 work in a preliminary way with interrupts.
 -- The "power button" can generate a GPIO interrupt.
--- an i2c (TWI) driver has been started.
 -- Additional cores can be started, but are not integrated
    with the Kyu scheduler
--- an EMAC (network) driver has been started, but there are
-   unsolved issues with the PHY.
-
-
+-- an i2c (TWI) driver is working.
+-- an EMAC (network) driver is working.
+    There are unsolved issues with the PHY that
+    I am just bypassing.

@@ -308,12 +308,12 @@ test_main ( long xx )
 	    if ( **wp == 'i' )
 		submenu ( io_test_list, wp, nw );
 
-#ifdef WANT_NET
 	    /* network test submenu
 	     */
 	    if ( **wp == 'n' )
 		submenu ( net_test_list, wp, nw );
 
+#ifdef WANT_NET
 	    if ( **wp == 't' )
 		submenu ( tcp_test_list, wp, nw );
 #endif

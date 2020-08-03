@@ -53,8 +53,13 @@
 #define WANT_HOST_DHCP
 #define WANT_SYMBOLS
 
-// XXX - while bringing up PC2
+// XXX - while bringing up PC2 and Fire3
+#if defined(BOARD_FIRE3) || defined(BOARD_ORANGE_PI64)
 // #define WANT_NET
+#else
+#define WANT_NET
+#endif
+
 #define WANT_USER
 #define WANT_SHELL
 

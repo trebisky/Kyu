@@ -1568,8 +1568,8 @@ emac_init_new ( void )
 	//syscon_setup ();
 	// show_sid ();
 
-	// printf ( "Emac init\n" );
-	// printf ( " *************************** Hello from the Emac driver\n" );
+	printf ( "Emac init\n" );
+	printf ( " *************************** Hello from the Emac driver\n" );
 
 	// emac_reset ();
 
@@ -1865,31 +1865,6 @@ emac_show_last ( int show_bufs )
 	    dump_buf ( last_buf, last_len );
 }
 
-/* Displayed as "n x" command output.
- *  more details than the above.
- */
-void
-emac_debug ( void )
-{
-	struct emac *ep = EMAC_BASE;
-
-	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
-	printf ( "Emac rx_count / tx_count: %d / %d\n", rx_count, tx_count );
-
-	printf ( " Tx list\n" );
-	tx_list_show ( tx_list, NUM_TX );
-
-	printf ( " Rx list\n" );
-	rx_list_show ( rx_list, NUM_RX );
-
-	printf ( "emac RX CTL0 = %08x\n", ep->rx_ctl0 );
-	printf ( "emac RX CTL1 = %08x\n", ep->rx_ctl1 );
-	printf ( "emac TX CTL0 = %08x\n", ep->tx_ctl0 );
-	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
-
-	emac_show_last ( 1 );
-}
-
 void
 emac_send ( struct netbuf *nbp )
 {
@@ -1948,6 +1923,31 @@ emac_send ( struct netbuf *nbp )
 	INT_unlock;
 
 	tx_poll ();
+}
+
+/* Displayed as "n x" command output.
+ *  more details than the above.
+ */
+void
+emac_debug ( void )
+{
+	struct emac *ep = EMAC_BASE;
+
+	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
+	printf ( "Emac rx_count / tx_count: %d / %d\n", rx_count, tx_count );
+
+	printf ( " Tx list\n" );
+	tx_list_show ( tx_list, NUM_TX );
+
+	printf ( " Rx list\n" );
+	rx_list_show ( rx_list, NUM_RX );
+
+	printf ( "emac RX CTL0 = %08x\n", ep->rx_ctl0 );
+	printf ( "emac RX CTL1 = %08x\n", ep->rx_ctl1 );
+	printf ( "emac TX CTL0 = %08x\n", ep->tx_ctl0 );
+	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
+
+	emac_show_last ( 1 );
 }
 
 /* THE END */

@@ -43,8 +43,11 @@ static void test_dns ( long );
 static void test_arp ( long );
  void test_tftp ( long );
 static void test_udp ( long );
-static void test_netdebug ( long );
 static void test_udp_echo ( long );
+
+#endif
+
+static void test_netdebug ( long );
 
 #ifdef notdef
 void
@@ -60,9 +63,12 @@ test_tcp ( long xxx )
 }
 #endif
 
+
 /* Exported to main test code */
 /* Arguments are now ignored */
 struct test net_test_list[] = {
+
+#ifdef WANT_NET
 	test_netshow,	"Net show",		0,
 	test_netarp,	"ARP ping",		0,
 	test_bootp,	"test BOOTP",		0,
@@ -74,10 +80,10 @@ struct test net_test_list[] = {
 	test_udp,	"Test UDP",		0,
 	test_udp_echo,	"Endless UDP echo",	0,
 	// test_tcp,	"Test TCP",		0,
+#endif
 	test_netdebug,	"Debug interface",	0,
 	0,		0,			0
 };
-#endif
 
 #ifdef WANT_NET
 
@@ -413,16 +419,6 @@ test_udp_echo ( long test )
 	/* No thread needed, the rest happens via interrupts */
 }
 
-/* Hook for board specific network statistics
- */
-static void
-test_netdebug ( long test )
-{
-	board_net_debug ();
-
-	printf ( "last endless count = %d\n", last_endless );
-}
-
 #else
 /* Stubs to match calls in driver. */
 void pkt_finish ( void ) {}
@@ -430,5 +426,16 @@ void pkt_arrive ( void ) {}
 void pkt_send ( void ) {}
 void pkt_dispatch ( void ) {}
 #endif	/* WANT_NET */
+
+/* Hook for board specific network statistics
+ */
+static void
+test_netdebug ( long test )
+{
+	board_net_debug ();
+
+	// printf ( "last endless count = %d\n", last_endless );
+}
+
 
 /* THE END */
