@@ -286,6 +286,8 @@ board_init ( void )
 	gpio_button_enable ();
 
 	serial_init ( CONSOLE_BAUD );
+	serial_aux_init ();
+
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	delay_calib ();

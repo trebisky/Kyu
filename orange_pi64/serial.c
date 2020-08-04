@@ -212,7 +212,7 @@ serial_handler ( int devnum )
 	 */
 	// base->ier &= ~(IE_TXE | IE_THRE);
 	base->ier &= IE_RDA;
-	// printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
+	printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
 }
 
 /* This series of routines are for
@@ -253,7 +253,7 @@ serial_setup ( int devnum, int irq, int baud )
 {
         struct serial_softc *sc = &serial_soft[devnum];
 
-	// printf ( "UART irq %d for device %d hookup\n", irq, devnum );
+	printf ( "UART irq %d for device %d hookup\n", irq, devnum );
         irq_hookup ( irq, serial_handler, devnum );
 
 	sc->base = uart_base[devnum];

@@ -169,25 +169,25 @@ gic_soft_self ( int sgi_num )
 }
 
 #ifdef notdef
-void
-gic_handler ( void )
-{
-	struct gic400_cpu *cp = GIC_CPU_BASE;
-	int irq;
-
-	irq = cp->iack;
-
-	/* Do we need to EOI a spurious interrupt ? */
-	if ( irq == 1023 ) {
-	    return;
-	}
-
-	if ( irq == IRQ_TIMER0 )
-	    timer_handler ( 0 );
-
-	cp->eoi = irq;
-	gic_unpend ( IRQ_TIMER0 );
-}
+/*-*/ void
+/*-*/ gic_handler ( void )
+/*-*/ {
+/*-*/ 	struct gic400_cpu *cp = GIC_CPU_BASE;
+/*-*/ 	int irq;
+/*-*/ 
+/*-*/ 	irq = cp->iack;
+/*-*/ 
+/*-*/ 	/* Do we need to EOI a spurious interrupt ? */
+/*-*/ 	if ( irq == 1023 ) {
+/*-*/ 	    return;
+/*-*/ 	}
+/*-*/ 
+/*-*/ 	if ( irq == IRQ_TIMER0 )
+/*-*/ 	    timer_handler ( 0 );
+/*-*/ 
+/*-*/ 	cp->eoi = irq;
+/*-*/ 	gic_unpend ( IRQ_TIMER0 );
+/*-*/ }
 #endif
 
 int

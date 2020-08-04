@@ -393,6 +393,7 @@ opi_timer_init ( int rate )
 {
 	// printf ( "Timer Initialized !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" );
 	printf ( "Timer Initialized !\n" );
+	printf ( "TIMER irq %d for device %d hookup\n", IRQ_TIMER0, 0 );
 	irq_hookup ( IRQ_TIMER0, timer_handler, 0 );
 	// irq_hookup ( IRQ_TIMER1, xtimer_handler, 0 );
 

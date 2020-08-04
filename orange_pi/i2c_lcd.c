@@ -223,6 +223,37 @@ lcd_init ( struct i2c *ip )
 	delay_us ( DELAY_INIT );
 }
 
+void
+lcd_loop ( struct i2c *ip )
+{
+	char msg[17];
+	int i;
+
+	for ( i=0; i<LCD_WIDTH; i++ )
+	    msg[i] = ' ';
+	msg[LCD_WIDTH] = '\0';
+
+	msg[0] = '*';
+	lcd_msg2 ( ip, msg );
+	thr_delay ( 200 );
+
+	for ( ;; ) {
+	    for ( i=1; i<LCD_WIDTH; i++ ) {
+		if ( i > 0 )
+		    msg[i-1] = ' ';
+		msg[i] = '*';
+		lcd_msg2 ( ip, msg );
+		thr_delay ( 200 );
+	    }
+	    for ( i=LCD_WIDTH-2; i >= 0; i-- ) {
+		msg[i+1] = ' ';
+		msg[i] = '*';
+		lcd_msg2 ( ip, msg );
+		thr_delay ( 200 );
+	    }
+	}
+}
+
 /* ---------------------------------------------- */
 /* ---------------------------------------------- */
 
@@ -239,7 +270,8 @@ lcd_test ( void )
 	lcd_init ( ip );
 
 	lcd_msg ( ip, "Eat more fish" );
-	lcd_msg2 ( ip, "GPS 5244" );
+	// lcd_msg2 ( ip, "GPS 5244" );
+	// lcd_loop ( ip );
 
 	// lcd_xxx ( ip );
 	printf ( "Done testing LCD\n" );
