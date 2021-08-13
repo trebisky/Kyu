@@ -257,6 +257,29 @@ lcd_loop ( struct i2c *ip )
 /* ---------------------------------------------- */
 /* ---------------------------------------------- */
 
+void
+lcd_test_loop ( struct i2c *ip )
+{
+	static int test_state = 0;
+	int count;
+	char buf[32];
+
+	count = 0;
+	for ( ;; ) {
+	    thr_delay ( 1000 );
+	    count++;
+	    if ( test_state ) {
+		lcd_msg ( ip, "Be nice" );
+		test_state = 0;
+	    } else {
+		lcd_msg ( ip, "Pray more often" );
+		test_state = 1;
+	    }
+	    sprintf ( buf, "  %d", count );
+	    lcd_msg2 ( ip, buf );
+	}
+}
+
 #define I2C_PORT	0
 
 void
@@ -264,13 +287,16 @@ lcd_test ( void )
 {
 	struct i2c *ip;
 
+	printf ( "\n" );
 	printf ( "Testing LCD\n" );
 	ip = i2c_hw_new ( I2C_PORT );
 
 	lcd_init ( ip );
 
-	lcd_msg ( ip, "Eat more fish" );
-	// lcd_msg2 ( ip, "GPS 5244" );
+	lcd_test_loop ( ip );
+
+	// lcd_msg ( ip, "Eat more fish" );
+	lcd_msg2 ( ip, "GPS 5244" );
 	// lcd_loop ( ip );
 
 	// lcd_xxx ( ip );

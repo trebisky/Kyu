@@ -40,6 +40,26 @@ OBJS =  machine.o \
     kyulib.o \
     lib.o
 
+# Get rid of network stuff to check resulting size
+NO_NET_OBJS =  machine.o \
+    board.o \
+    version.o \
+    timer.o \
+    main.o \
+    user.o \
+    tests.o \
+    test_net.o \
+    test_kyu.o \
+    test_io.o \
+    console.o \
+    thread.o \
+    prf.o \
+    symbols.o \
+    dlmalloc.o \
+    random.o \
+    kyulib.o \
+    lib.o
+
 all: install dump sym tags
 
 ver:

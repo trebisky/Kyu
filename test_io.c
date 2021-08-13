@@ -70,6 +70,7 @@ static void test_i2c ( long );
 #if defined(BOARD_ORANGE_PI64)
 static void test_timer ( long );
 static void test_gic ( long );
+static void test_led_t ( long );
 #endif
 
 static void test_blink_d ( long );
@@ -113,6 +114,9 @@ struct test io_test_list[] = {
 	test_i2c,	"i2c test",		0,
 #endif
 
+#if defined(BOARD_ORANGE_PI64)
+	test_led_t,	"toggle LEDs",		0,
+#endif
 	test_blink_d,	"LED blink test (via delay)",	0,
 	test_clear,	"clear memory test",	0,
 	test_cache,	"cache test",		0,
@@ -535,17 +539,23 @@ test_gic ( long xxx )
 }
 #endif
 
+/* Nothing happens on H5 board */
+/* XXX - doing both for now, why trying to sort out why
+ * the H5 board won't blink status (it does blink pwr now)
+ */
 #if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3) || defined(BOARD_ORANGE_PI64)
 static void
 test_led_on ( void )
 {
 	status_on ();
+	pwr_on ();
 }
 
 static void
 test_led_off ( void )
 {
 	status_off ();
+	pwr_off ();
 }
 #endif
 
@@ -564,8 +574,32 @@ test_led_off ( void )
 }
 #endif
 
+
+/* toggle the state of BOTH led's */
+#if defined(BOARD_ORANGE_PI) || defined(BOARD_ORANGE_PI64)
+
+static int led_state2 = 0;
+
+static void
+test_led_t ( long arg )
+{
+	if ( led_state2 ) {
+	    printf ( "Turning LED's off\n" );
+	    status_off ();
+	    pwr_off ();
+	    led_state2 = 0;
+	} else {
+	    printf ( "Turning LED's on\n" );
+	    status_on ();
+	    pwr_on ();
+	    led_state2 = 1;
+	}
+}
+#endif
+
 /* Useful for seeing if D cache is enabled or not.
  * Should blink two quick pulses, 1 second apart.
+ * This has also been handy on the H5 without timer interrupts available.
  */
 static void
 test_blink_d ( long arg )
@@ -589,6 +623,16 @@ test_blink_d ( long arg )
 
             delay_ms ( b );
         }
+}
+
+/* Nice idea, but this won't work without timer interrupts.
+ * It simply hogs the CPU and we don't get a console.
+ */
+void
+launch_blink_thread ( void )
+{
+	// printf ( "launch blinker thread\n" );
+	// (void) safe_thr_new ( "blinker", test_blink_d, 0 , 25, 0 );
 }
 
 /* -------------------------------------------- */

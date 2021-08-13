@@ -328,7 +328,7 @@ void
 pwr_off ( void )
 {
 	// gpio_output ( GPIO_J, POWER_PIN, 0 );
-	gpio_set_bit ( POWER_LED );
+	gpio_clear_bit ( POWER_LED );
 }
 
 /* This is the red LED */

@@ -81,4 +81,6 @@ typedef void (*cfptr) ( int, void * );
 #define NULL (0)
 #endif
 
+#define __weak               __attribute__((weak))
+
 /* THE END */

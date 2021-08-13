@@ -203,6 +203,7 @@ shell_init ( void )
 {
 	int count;
 
+#ifdef WANT_NET
 	if ( ! net_running() ) {
 	    parse_table ( 0 );
 	    return;
@@ -215,6 +216,8 @@ shell_init ( void )
 	parse_table (count);
 	free ( sym_buf );
 #endif
+
+#endif	/* WANT_NET */
 }
 
 /* --------------- */

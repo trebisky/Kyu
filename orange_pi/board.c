@@ -329,38 +329,50 @@ reset_cpu ( void )
 int
 board_net_init ( void )
 {
+#ifdef WANT_NET
         return emac_init ();
+#endif
 }
 
 /* Bring the network device online */
 void
 board_net_activate ( void )
 {
+#ifdef WANT_NET
         emac_activate ();
+#endif
 }
 
 void
 board_net_show ( void )
 {
+#ifdef WANT_NET
         emac_show ();
+#endif
 }
 
 void
 get_board_net_addr ( char *addr )
 {
+#ifdef WANT_NET
         get_emac_addr ( addr );
+#endif
 }
 
 void
 board_net_send ( struct netbuf *nbp )
 {
+#ifdef WANT_NET
         emac_send ( nbp );
+#endif
 }
 
 void
 board_net_debug ( void )
 {
+#ifdef WANT_NET
 	emac_debug ();
+#endif
 }
 
 /* THE END */

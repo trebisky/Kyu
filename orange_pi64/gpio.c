@@ -308,11 +308,11 @@ gpio_led_init ( void )
 }
 
 /* Called from board.c */
-/* not implemented for Orange Pi */
-/* well, it is now .... */
 void gpio_init ( void )
 {
 	struct h3_gpio *gp = (struct h3_gpio *) 0;
+
+	gpio_clocks_on ();
 
 	printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
 }
@@ -328,7 +328,7 @@ void
 pwr_off ( void )
 {
 	// gpio_output ( GPIO_J, POWER_PIN, 0 );
-	gpio_set_bit ( POWER_LED );
+	gpio_clear_bit ( POWER_LED );
 }
 
 /* This is the red LED */
@@ -490,50 +490,6 @@ gpio_test ( void )
 {
 	// gpio_test3 ();
 	gpio_test2 ();
-}
-
-/* -------------------------------------------------- */
-/* -------------------------------------------------- */
-
-
-/* XXX XXX this CCM stuff doesn't belong here,
- *  but here it is for now.
- */
-
-/* These are registers in the CCM (clock control module)
- */
-#define CCM_GATE	((u32 *) 0x01c2006c)
-#define CCM_RESET4	((u32 *) 0x01c202d8)
-
-#define GATE_UART0	0x00010000
-#define GATE_UART1	0x00020000
-#define GATE_UART2	0x00040000
-#define GATE_UART3	0x00080000
-
-#define RESET4_UART0	0x00010000
-#define RESET4_UART1	0x00020000
-#define RESET4_UART2	0x00040000
-#define RESET4_UART3	0x00080000
-
-/* This is probably set up for us by U-boot,
- * true bare metal would need this.
- */
-void
-uart_clock_init ( int uart )
-{
-	if ( uart == 0 ) {
-	    *CCM_GATE |= GATE_UART0;
-	    *CCM_RESET4 |= RESET4_UART0;
-	} else if ( uart == 1 ) {
-	    *CCM_GATE |= GATE_UART1;
-	    *CCM_RESET4 |= RESET4_UART1;
-	} else if ( uart == 2 ) {
-	    *CCM_GATE |= GATE_UART2;
-	    *CCM_RESET4 |= RESET4_UART2;
-	} else if ( uart == 3 ) {
-	    *CCM_GATE |= GATE_UART3;
-	    *CCM_RESET4 |= RESET4_UART3;
-	}
 }
 
 /* THE END */

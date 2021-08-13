@@ -6,6 +6,7 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  */
+
 /* main.c
  * Tom Trebisky  9/16/2001
  */
@@ -529,6 +530,12 @@ sys_init ( long xxx )
 	init_pcmcia_ds ();
 #endif
 
+	/* Seemed like a nice idea, while working on H5
+	 * clock setup issues, but without a timer, it just
+	 * hogs the CPU.
+	 */
+	// launch_blink_thread ();
+
 	ram_show ();
 
 	/* This is a nice idea, but doesn't always work
@@ -633,7 +640,7 @@ XXuser_init ( int xx )
  * set up his threads and such, to customize the
  * system for his application.
  */
-void
+__weak void
 user_init ( int xx )
 {
 	/* XXX */

@@ -101,7 +101,7 @@ static struct h3_uart * uart_base[] = {
 #define LCR_SETUP	LCR_DATA_8
 
 void uart_gpio_init ( int );
-void uart_clock_init ( int );
+// void uart_clock_init ( int );
 
 /* XXX - Ignores baud rate argument */
 void
@@ -110,7 +110,7 @@ uart_init ( int uart, int baud )
 	struct h3_uart *up = uart_base[uart];
 
 	uart_gpio_init ( uart );
-	uart_clock_init ( uart );
+	// uart_clock_init ( uart );
 
 	up->ier = 0;
 	up->lcr = LCR_DLAB;
@@ -212,7 +212,7 @@ serial_handler ( int devnum )
 	 */
 	// base->ier &= ~(IE_TXE | IE_THRE);
 	base->ier &= IE_RDA;
-	printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
+	// printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
 }
 
 /* This series of routines are for
@@ -267,15 +267,12 @@ serial_setup ( int devnum, int irq, int baud )
 void
 serial_aux_init ( void )
 {
-	/* XXX - redundant with uart_clock_init () in gpio.c */
-	serial_clocks_on ();
-
         // serial_setup ( 0, IRQ_UART0, BAUD_115200 );
         serial_setup ( 1, IRQ_UART1, BAUD_9600 );
         serial_setup ( 2, IRQ_UART2, BAUD_9600 );
         serial_setup ( 3, IRQ_UART3, BAUD_9600 );
 
-	// serial_listen ( 1 );
+	serial_listen ( 1 );
 }
 
 #ifdef notdef

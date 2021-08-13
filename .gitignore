@@ -33,3 +33,4 @@ arch
 kyu.lds
 ./Makefile
 ./Makefile.inc
+Zsizes

@@ -23,6 +23,8 @@ OBJS =  board.o \
 	emac.o \
 	timer.o \
 	h3_spinlocks.o \
+	ccu_reset.o \
+	ccu_clocks.o \
 	ccu.o
 
 all: ../board.o

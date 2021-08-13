@@ -667,7 +667,10 @@ twi_test ( void )
 
 	// hdc_test ();
 
-	lcd_test ();
+	// My LCD demo that I ran for 2,000,000 updates over 2+ weeks
+	// lcd_test ();
+
+	dac_test ();
 }
 
 /* THE END */

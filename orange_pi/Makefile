@@ -17,12 +17,13 @@ OBJS =  board.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
+	emac.o \
 	i2c_lcd.o \
 	i2c_lcd2.o \
 	i2c_hdc1008.o \
+	i2c_dac.o \
 	i2c.o \
 	i2c_hw.o \
-	emac.o \
 	timer.o \
 	h3_spinlocks.o \
 	ccu.o \

@@ -38,7 +38,7 @@
 
 #include "cpu.h"
 
-struct thread *cur_thread;
+extern struct thread *cur_thread;
 
 // now use NUM_IREGS from cpu.h
 // #define ARM_REGS	17	/* include psr */

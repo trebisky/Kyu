@@ -272,11 +272,18 @@ board_init ( void )
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
 
-	/* Turn on the green LED */
+	ccu_init ();
+	r_ccu_init ();
+
+	printf ( "Board_init - initializing GPIO and LED\n" );
 	gpio_init ();
 	gpio_led_init ();
 
+	/* Turn on the green LED */
 	pwr_on ();
+	/* Turn on the red one too */
+	status_on ();
+
 	wd_init ();
 
 	h3_spinlocks_init ();
