@@ -299,6 +299,25 @@
  * The schematic shows CON1 as the dual rows of 24 pins
  *  and CON2 as the single row of 12 pins.
  * In each case, pin 1 is away from the ethernet jack.
+ *
+ * The following is only for the dual row (CON1)
  */
+
+#define NEO_PIN_3	GPIO_A_11
+#define NEO_PIN_5	GPIO_A_12
+#define NEO_PIN_7	GPIO_G_11
+#define NEO_PIN_8	GPIO_G_6
+#define NEO_PIN_10	GPIO_G_7
+#define NEO_PIN_11	GPIO_A_0
+#define NEO_PIN_12	GPIO_A_6
+#define NEO_PIN_13	GPIO_A_2
+#define NEO_PIN_15	GPIO_A_3
+#define NEO_PIN_16	GPIO_G_8
+#define NEO_PIN_18	GPIO_G_9
+#define NEO_PIN_19	GPIO_C_0
+#define NEO_PIN_21	GPIO_C_1
+#define NEO_PIN_22	GPIO_A_1
+#define NEO_PIN_23	GPIO_C_2
+#define NEO_PIN_24	GPIO_C_3
 
 /* THE END */

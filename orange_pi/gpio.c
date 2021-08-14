@@ -30,6 +30,7 @@
 #define GPIO_J    9	/* R_PIO */
 #endif
 
+#include "board.h"
 #include "gpio.h"
 
 struct h3_gpio {
@@ -303,7 +304,11 @@ void
 gpio_led_init ( void )
 {
 	gpio_out_init ( POWER_LED );
+#ifdef BOARD_NANOPI_NEO
+	gpio_out_init ( STATUS_LED_NEO );
+#else
 	gpio_out_init ( STATUS_LED );
+#endif
 }
 
 /* Called from board.c */
