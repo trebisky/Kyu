@@ -304,11 +304,7 @@ void
 gpio_led_init ( void )
 {
 	gpio_out_init ( POWER_LED );
-#ifdef BOARD_NANOPI_NEO
-	gpio_out_init ( STATUS_LED_NEO );
-#else
 	gpio_out_init ( STATUS_LED );
-#endif
 }
 
 /* Called from board.c */
@@ -341,22 +337,14 @@ void
 status_on ( void )
 {
 	// gpio_output ( GPIO_A, STATUS_PIN, 1 );
-#ifdef BOARD_NANOPI_NEO
-	gpio_set_bit ( STATUS_LED_NEO );
-#else
 	gpio_set_bit ( STATUS_LED );
-#endif
 }
 
 void
 status_off ( void )
 {
 	// gpio_output ( GPIO_A, STATUS_PIN, 0 );
-#ifdef BOARD_NANOPI_NEO
-	gpio_clear_bit ( STATUS_LED_NEO );
-#else
 	gpio_clear_bit ( STATUS_LED );
-#endif
 }
 
 /* A reasonable delay for blinking an LED

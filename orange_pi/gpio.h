@@ -18,6 +18,8 @@
  // static int gpio_count[] = { 22, 0, 19, 18, 16, 7, 14, 0, 0, 12 };
  */
 
+#include "board.h"
+
 #define GPIO_A_0	0
 #define GPIO_A_1	1
 #define GPIO_A_2	2
@@ -257,10 +259,17 @@
 /* They call this a "power" LED, but that is misleading */
 /* Power is green, Status is red */
 #define POWER_LED	GPIO_J_10
+
+// #define STATUS_LED	GPIO_A_15
+// #define STATUS_LED_NEO	GPIO_A_10
+#ifndef BOARD_NANOPI_NEO
 #define STATUS_LED	GPIO_A_15
-#define STATUS_LED_NEO	GPIO_A_10
+#else
+#define STATUS_LED	GPIO_A_10
+#endif
 
 /* They call this a "power button", which is even more misleading */
+/* No such thing on the NEO */
 #define POWER_BUTTON	GPIO_J_3
 
 /* Aliases for GPIO pins on the Orange Pi 40 pin header.
