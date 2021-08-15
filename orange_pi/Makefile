@@ -18,6 +18,7 @@ OBJS =  board.o \
 	gpio.o \
 	serial.o \
 	emac.o \
+	dallas.o \
 	i2c_lcd.o \
 	i2c_lcd2.o \
 	i2c_hdc1008.o \

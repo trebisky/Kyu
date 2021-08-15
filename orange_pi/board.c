@@ -375,4 +375,16 @@ board_net_debug ( void )
 #endif
 }
 
+/* This is a hook in the IO test menu
+ * for whatever we happen to be working on at the time.
+ * It will accumulate a list of the various tests
+ * that it has triggered through history.
+ */
+void
+board_test_generic ( int arg )
+{
+	// gpio_rapid ();
+	dallas_test ();
+}
+
 /* THE END */

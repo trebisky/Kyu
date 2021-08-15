@@ -485,6 +485,23 @@ gpio_test ( void )
 	gpio_test2 ();
 }
 
+/* Quick and dirty test to pulse some IO pin.
+ * Scope loop
+ * I see a 4 uS period (250 kHz)
+ */
+void
+gpio_rapid ( void )
+{
+	int pin = GPIO_A_0;
+
+	gpio_out_init ( pin );
+
+	for ( ;; ) {
+	    gpio_set_bit ( pin );
+	    gpio_clear_bit ( pin );
+	}
+}
+
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 

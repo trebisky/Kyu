@@ -76,6 +76,7 @@ static void test_led_t ( long );
 static void test_blink_d ( long );
 static void test_clear ( long );
 static void test_cache ( long );
+static void test_generic ( long );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -125,6 +126,7 @@ struct test io_test_list[] = {
 	test_timer,	"Timer test",		0,
 	test_gic,	"GIC test",		0,
 #endif
+	test_generic,	"generic board test",	0,
 
 
 	0,		0,			0
@@ -481,6 +483,21 @@ static void
 test_cache ( long arg )
 {
 	arch_cache_test ();
+}
+
+/* XXX - for now I am lazy and just setting
+ * this up for one board (the Orange Pi),
+ * but eventually each board family should get
+ * a stub routine and this ifdef will go away.
+ */
+static void
+test_generic ( long arg )
+{
+#ifdef BOARD_ORANGE_PI
+	board_test_generic ( (int) arg );
+#else
+	printf ( "None yet for this hardware\n" );
+#endif
 }
 
 #ifdef BOARD_ORANGE_PI
