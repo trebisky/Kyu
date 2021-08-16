@@ -74,6 +74,12 @@ dallas_reset ( void )
 	return 1;
 }
 
+/* XXX */
+void
+dallas_poke ( void )
+{
+}
+
 static int levels[100];
 
 /* With my generic DS18B20, I see the following

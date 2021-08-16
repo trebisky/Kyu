@@ -1,3 +1,6 @@
 #!/bin/sh
-#git push origin master
-git push github master
+git push origin master
+# The below depends on /mmt on cholla
+# being NFS mounted from some NAS box,
+# which is as per 2021, all screwed up.
+#git push cholla master
