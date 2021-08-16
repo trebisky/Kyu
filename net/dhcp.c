@@ -269,7 +269,7 @@ dhcp_rcv ( struct netbuf *nbp )
 	    dhcp_show_pkt ( bpp, nbp );
 
 	if ( bpp->xid != our_xid ) {
-	    printf ("Bad xid, ingnoring packet\n" );
+	    printf ("DHCP - Bad xid, ignoring packet\n" );
 	    return;
 	}
 

@@ -42,13 +42,48 @@ static int cpu_clock_mhz;
 // Note also that these are with the D cache enabled.
 // The delays will be MUCH longer if the D cache
 //  is not enabled.
+ 
+#ifdef  BOARD_NANOPI_NEO
+/* The autocal yielded a count of 81, but this gave 22 us rather
+ * than 20 us delays, so I reduced it by hand to 74.
+ */
+#define CPU_CLOCK_INIT		408
+// #define DELAY_COUNT_INIT	81
+// #define DELAY_COUNT_INIT	72
+#define DELAY_COUNT_INIT	90
+#else
+#define CPU_CLOCK_INIT		1008
+#define DELAY_COUNT_INIT	201
+#endif
 
-#define CPU_CLOCK_STD	1008
-#define DELAY_COUNT_STD	201
-static int us_delay_count = DELAY_COUNT_STD;
+static int us_delay_count = DELAY_COUNT_INIT;
 
+#ifdef  BOARD_NANOPI_NEO
+/* I spent some time with the Neo (which runs at 408 Mhz
+ * with my oscilloscope using a little routine in dallas.c
+ * I found that calling with delay=0 gives a 3 us delay!
+ * So for really short delays we need to take this
+ * into account.
+ */
+void
+delay_us ( int delay )
+{
+        volatile unsigned int count;
+
+	if ( delay <= 3 )
+	    return;
+
+        count = (delay - 3) * us_delay_count;
+        while ( count -- )
+            ;
+}
+#else
 /* These are good for ballpark timings,
- * and are calibrated by trial and error
+ * and are calibrated by trial and error.
+ * See the above for overhead calibrations on the 408 Mhz Neo.
+ * I am too lazy to fiddle with this for the 1008 Mhz Opi,
+ * but I should do that someday and unify this with the above.
+ * tjt  8-15-2021
  */
 void
 delay_us ( int delay )
@@ -59,6 +94,7 @@ delay_us ( int delay )
         while ( count -- )
             ;
 }
+#endif
 
 // 1003 gives 1.000 ms
 void
@@ -76,13 +112,15 @@ delay_calib ( void )
         int ticks;
 	int i;
 
-	if ( cpu_clock_mhz != CPU_CLOCK_STD ) {
+	if ( cpu_clock_mhz != CPU_CLOCK_INIT ) {
 	    us_delay_count *= cpu_clock_mhz;
-	    us_delay_count /= CPU_CLOCK_STD;
+	    us_delay_count /= CPU_CLOCK_INIT;
+	    printf ( "--- DELAY recalibrated (cpu = %d)\n", cpu_clock_mhz );
+	    printf ( "CPU us_delay_count = %d\n", us_delay_count );
 	}
 
 #ifdef notdef
-	// if ( cpu_clock_mhz == CPU_CLOCK_STD ) return;
+	// if ( cpu_clock_mhz == CPU_CLOCK_INIT ) return;
 
 	for ( i=0; i< 10; i++ ) {
 	    reset_ccnt ();
