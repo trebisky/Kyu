@@ -16,35 +16,75 @@
  */
 
 struct h3_ccu {
-        volatile unsigned long pll_cpux_ctrl;	/* 00 */
+        volatile unsigned int pll_cpux_ctrl;	/* 00 */
 	int __pad0[3];
 	int __pad1[16];
-        volatile unsigned long cpux_ax1_cfg;	/* 50 */
+        volatile unsigned int cpux_ax1_cfg;	/* 50 */
 	int __pad2[3];
-        volatile unsigned long gate0;		/* 60 */
-        volatile unsigned long gate1;		/* 64 */
-        volatile unsigned long gate2;		/* 68 */
-        volatile unsigned long gate3;		/* 6c */
+        volatile unsigned int gate0;		/* 60 */
+        volatile unsigned int gate1;		/* 64 */
+        volatile unsigned int gate2;		/* 68 */
+        volatile unsigned int gate3;		/* 6c */
 };
 
 #define CCU_BASE (struct h3_ccu *) 0x01c20000
 
 #define F_24M	(24 * 1000 * 1000)
 
-/* With this ARM compiler, int and long are both 4 byte items
- */
+/* bits in the pll_cpux_ctrl register */
+#define CPUX_PLL_ENABLE		0x80000000
+#define CPUX_PLL_LOCK		0x10000000
+#define CPUX_SDM_ENA		1<<24	/* no idea what this is, leave it 0 */
+
+/* ==================================================== */
+/* ==================================================== */
+
+void
+set_cpu_clock_1008 ( void )
+{
+	struct h3_ccu *cp = CCU_BASE;
+	int clock = 1008;
+	int new_n, new_k, new_pll;
+	int tmo;
+
+	new_n = clock / 24;
+	new_k = 1;
+	if ( new_n > 32 ) {
+	    new_n /= 2;
+	    new_k = 2;
+	}
+
+	new_pll = CPUX_PLL_ENABLE
+	    | (new_n-1) << 8
+	    | (new_k-1) << 4;
+
+	cp->pll_cpux_ctrl = new_pll;
+	printf ( "new CPU pll_cpux_ctrl = %08x\n", cp->pll_cpux_ctrl );
+
+	for ( tmo = 1000; tmo; tmo-- )
+	    if ( cp->pll_cpux_ctrl & CPUX_PLL_LOCK )
+		break;
+
+	// This reports 0, which means the delay caused by the printf
+	// above to show the PLL reg value is plenty.
+	// printf ( "new CPU pll timeout counter = %d\n", 1000 - tmo );
+
+	if ( tmo == 0 )
+	    printf ( "new CPU setting failed (timed out)\n" );
+}
 
 /* Return CPU clock rate in Hz */
-unsigned long
+unsigned int
 get_cpu_clock ( void )
 {
 	struct h3_ccu *cp = CCU_BASE;
 	int source;
 	unsigned int val;
 	int n, k, m;
-	unsigned long freq;
+	unsigned int freq;
 
-	// printf ( "CCU %08x\n", &cp->cpux_ax1_cfg );
+	printf ( "CCU cpux_ax1_cfg = %08x\n", cp->cpux_ax1_cfg );
+	printf ( "CCU pll_cpux_ctrl = %08x\n", cp->pll_cpux_ctrl );
 
 	source = (cp->cpux_ax1_cfg >> 16) & 0x3;
 	if ( source == 0 )
@@ -63,10 +103,11 @@ get_cpu_clock ( void )
 	m = (val & 0x3) + 1;
 	freq = F_24M * n * k / m;
 
-	// printf ( "sizeof int: %d\n", sizeof(val) );
-	// printf ( "sizeof long: %d\n", sizeof(freq) );
-	// printf ( "clock source: %d\n", source );
-	printf ( "PLL %08x\n", val );
+	printf ( "CCU n, k, m = %d %d %d\n", n, k, m );
+
+	printf ( "clock source: %d\n", source );
+
+	// printf ( "PLL %08x\n", val );
 	printf ( "CPU clock: %d\n", freq );
 	return freq;
 }
@@ -98,7 +139,7 @@ void
 twi_clocks_on ( void )
 {
 	struct h3_ccu *cp = CCU_BASE;
-	volatile unsigned long *lp;
+	volatile unsigned int *lp;
 
 	/* Turn on clock
 	 */
@@ -108,7 +149,7 @@ twi_clocks_on ( void )
 
 	/* release reset
 	 */
-        lp = (volatile unsigned long *) (CCU_BASE_VAL + BUS_RESET_REG4);
+        lp = (volatile unsigned int *) (CCU_BASE_VAL + BUS_RESET_REG4);
 	// show_reg ( "TWI reset reg:", lp );
         *lp |= ALL_TWI;
 	// show_reg ( "TWI reset reg:", lp );
@@ -129,13 +170,13 @@ void
 serial_clocks_on ( void )
 {
 	struct h3_ccu *cp = CCU_BASE;
-	volatile unsigned long *lp;
+	volatile unsigned int *lp;
 
 	/* Turn on clock */
 	cp->gate3 |= ALL_UART;
 
 	/* release reset */
-        lp = (volatile unsigned long *) (CCU_BASE_VAL + BUS_RESET_REG4);
+        lp = (volatile unsigned int *) (CCU_BASE_VAL + BUS_RESET_REG4);
         *lp |= ALL_UART;
 }
 

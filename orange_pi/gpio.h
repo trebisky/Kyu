@@ -20,6 +20,8 @@
 
 #include "board.h"
 
+volatile int * gpio_get_reg ( int );
+
 #define GPIO_A_0	0
 #define GPIO_A_1	1
 #define GPIO_A_2	2

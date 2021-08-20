@@ -296,13 +296,41 @@ board_hardware_init ( void )
 	// stack_addr_show ();
 }
 
-void
-board_init ( void )
+static void
+board_cpu_init ( void )
 {
-	// wdt_disable ();
 	cpu_clock = get_cpu_clock ();
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
+
+	/* The Neo comes up at 408 Mhz, but let's fix that.
+	 */
+	if ( cpu_clock_mhz != 1008 ) {
+	    printf ( "Resetting CPU clock\n" );
+	    set_cpu_clock_1008 ();
+	    cpu_clock = get_cpu_clock ();
+	    cpu_clock_mhz = cpu_clock / 1000 / 1000;
+	    printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
+	}
+}
+
+/* With this ARM compiler, int and long are both 4 byte items
+ */
+static void
+show_compiler_sizes ( void )
+{
+	printf ( "sizeof int: %d\n", sizeof(int) );
+	printf ( "sizeof long: %d\n", sizeof(long) );
+}
+
+void
+board_init ( void )
+{
+	printf ( "Starting board initialization for Orange Pi\n" );
+	// show_compiler_sizes ();
+
+	// wdt_disable ();
+	board_cpu_init ();
 
 	/* Turn on the green LED */
 	gpio_init ();

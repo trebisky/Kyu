@@ -34,15 +34,15 @@
 #include "gpio.h"
 
 struct h3_gpio {
-	volatile unsigned long config[4];
-	volatile unsigned long data;
-	volatile unsigned long drive[2];
-	volatile unsigned long pull[2];
-	long	_pad[119];
-	volatile unsigned long int_config[4];	/* 0x200 */
-	volatile unsigned long int_control;
-	volatile unsigned long int_status;
-	volatile unsigned long int_debounce;
+	volatile unsigned int config[4];
+	volatile unsigned int data;
+	volatile unsigned int drive[2];
+	volatile unsigned int pull[2];
+	int	_pad[119];
+	volatile unsigned int int_config[4];	/* 0x200 */
+	volatile unsigned int int_control;
+	volatile unsigned int int_status;
+	volatile unsigned int int_debounce;
 };
 
 /* In theory each gpio has 32 pins, but they are actually populated like so.
@@ -100,6 +100,18 @@ gpio_config ( int bit, int val )
 
 	tmp = gp->config[reg] & ~(0xf << shift);
 	gp->config[reg] = tmp | (val << shift);
+}
+
+struct h3_gpio *
+gpio_get_base ( int bit )
+{
+	return gpio_base[bit/32];
+}
+
+volatile int *
+gpio_get_reg ( int bit )
+{
+	return &gpio_base[bit/32]->data;
 }
 
 /* There are two pull registers,
@@ -544,8 +556,8 @@ setup_twi_mux ( void )
 
 /* These are registers in the CCM (clock control module)
  */
-#define CCM_GATE	((unsigned long *) 0x01c2006c)
-#define CCM_RESET4	((unsigned long *) 0x01c202d8)
+#define CCM_GATE	((unsigned int *) 0x01c2006c)
+#define CCM_RESET4	((unsigned int *) 0x01c202d8)
 
 #define GATE_UART0	0x00010000
 #define GATE_UART1	0x00020000

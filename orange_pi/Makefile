@@ -11,6 +11,7 @@ include ../Makefile.inc
 XX_OBJS = \
 	h3_thermal.o \
 	h3_sid.o \
+	dallas_opt.o \
 	bogus.o
 
 OBJS =  board.o \
@@ -31,6 +32,9 @@ OBJS =  board.o \
 	multicore.o
 
 all: ../board.o
+
+dallas_opt.o: dallas.c
+	$(OCC) -o $@ -c $<
 
 ../board.o: $(OBJS)
 	$(LD) -r -o ../board.o $(OBJS)

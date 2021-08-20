@@ -75,6 +75,9 @@ COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a7 -mfpu=vfpv4 $(INCS) 
 
 CC = $(CCX) $(COPTS)
 
+# To optimize
+OCC = $(CCX) -Os $(COPTS)
+
 # It is a bug that we cannot invoke gcc to do this,
 # but doing this directly gets the job done.
 LD = arm-linux-gnu-ld.bfd
