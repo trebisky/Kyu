@@ -43,7 +43,11 @@ static int cpu_clock_mhz;
 // The delays will be MUCH longer if the D cache
 //  is not enabled.
  
-#ifdef  BOARD_NANOPI_NEO
+#ifdef  BOARD_NANOPI_NEO_XXX
+/* I don't need this now, as I reset the Neo clock
+ * to 1008 Mhz, just like the Orange Pi, so they can share
+ * the same delay and timing code here.
+ */
 /* The autocal yielded a count of 81, but this gave 22 us rather
  * than 20 us delays, so I reduced it by hand to 74.
  */
@@ -51,14 +55,24 @@ static int cpu_clock_mhz;
 // #define DELAY_COUNT_INIT	81
 // #define DELAY_COUNT_INIT	72
 #define DELAY_COUNT_INIT	90
-#else
-#define CPU_CLOCK_INIT		1008
-#define DELAY_COUNT_INIT	201
 #endif
+
+/* These numbers seem right for a 1008 clock */
+#define CPU_CLOCK_INIT		1008
+// #define DELAY_COUNT_INIT	201
+#define DELAY_COUNT_INIT	160	/* recal on Neo to give nice 5 us */
+
+/* Note - once I reset the Neo CPU clock to 1008, it recalibrated the
+ * delay count to 222 rather than 201
+ * At least it is not an order of magnitude off due to the cache not
+ * being enabled or something.
+ * Then I got busy setting up some low overhead test loops to get the
+ * 5 us delay right.
+ */
 
 static int us_delay_count = DELAY_COUNT_INIT;
 
-#ifdef  BOARD_NANOPI_NEO
+#ifdef  BOARD_NANOPI_NEO_XX
 /* I spent some time with the Neo (which runs at 408 Mhz
  * with my oscilloscope using a little routine in dallas.c
  * I found that calling with delay=0 gives a 3 us delay!
@@ -77,7 +91,8 @@ delay_us ( int delay )
         while ( count -- )
             ;
 }
-#else
+#endif
+
 /* These are good for ballpark timings,
  * and are calibrated by trial and error.
  * See the above for overhead calibrations on the 408 Mhz Neo.
@@ -94,7 +109,6 @@ delay_us ( int delay )
         while ( count -- )
             ;
 }
-#endif
 
 // 1003 gives 1.000 ms
 void

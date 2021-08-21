@@ -79,6 +79,11 @@ dallas_reset ( void )
 #define GPIO_PIN(x)	(x%32)
 #define GPIO_MASK(p)	(1<<p)
 
+/* There is a LOT of overhead in what follows.
+ * I see 5 us of high time, just due to the setup
+ * that gets done here.
+ */
+
 void
 dallas_read_pulse ( void )
 {
@@ -96,18 +101,47 @@ dallas_read_pulse ( void )
 	val_off = *dp & ~m;
 
 	/* generate the down pulse 1 us */
-	/* The double write stretches it from 500 ns to 1 us */
+	/* The redundant writes stretches it to 1 us */
+	/* This works with the CPU running at 1008 Mhz */
+	*dp = val_off;
 	*dp = val_off;
 	*dp = val_off;
 	*dp = val_on;
 }
 
 void
-clock_calib ( void )
+read_calib ( void )
 {
 	for ( ;; ) {
 	    dallas_read_pulse ();
-	    delay_us ( 2 );
+	    // delay_us ( 5 );
+	    // delay_us ( 0 );
+	}
+}
+
+/* Steal code from dallas_read_pulse ()
+ * Then run loop with no overhead.
+ */
+void
+clock_calib ( void )
+{
+	volatile unsigned int *dp;
+	int p, m;
+	unsigned int val_on, val_off;
+
+	gpio_out_init ( dallas_pin );
+
+	p = GPIO_PIN ( dallas_pin );
+	m = GPIO_MASK ( p );
+
+	dp = gpio_get_reg ( dallas_pin );
+	val_on = *dp | m;
+	val_off = *dp & ~m;
+
+	for ( ;; ) {
+	    *dp = val_off;
+	    *dp = val_on;
+	    delay_us ( 5 );
 	}
 }
 
@@ -118,7 +152,8 @@ dallas_test ( void )
 
 	dallas_init ( GPIO_A_0 );
 
-	// clock_calib ();
+	// read_calib ();
+	clock_calib ();
 
 	x = dallas_reset ();
 	printf ( "Dallas reset gave: %d\n", x );
