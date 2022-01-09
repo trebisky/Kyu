@@ -14,6 +14,16 @@
  * This is a driver for the old "Dallas Semiconductor" one wire protocol.
  * Dallas was bought by Maxim in 2002, so this is a bit of an anachronism,
  *  but what the heck.
+ *
+ * A "bus master" chip for the one-wire protocol is available (the DS2480B).
+ * This is a gpio based "bit bang" protocol driver.
+ * In the Maxim AN126 they say the crucial thing is the ability to
+ * generate an "accurate and repeatable" 1 us delay, as well as the ability
+ * to lock out interrupts during transactions.
+ * I base all of my code on two primitives.
+ *  - one is the ability to generate the 1 us read pulse
+ *  - the other is a 5 us delay function.
+ * Longer delays may be produced by a call to the system function delay_us();
  */
 
 #include "kyu.h"
@@ -31,60 +41,20 @@ dallas_init ( int gpio_pin )
 	dallas_pin = gpio_pin;
 }
 
-int
-dallas_reset ( void )
-{
-	int i;
-	int bit;
-
-	gpio_out_init ( dallas_pin );
-	gpio_clear_bit ( dallas_pin );
-
-	/* Must keep low for 480 us minimum */
-	delay_us ( 500 );
-
-	gpio_set_bit ( dallas_pin );
-	gpio_in_init ( dallas_pin );
-
-	/* Wait up to 100 us for line to go low */
-	for ( i=0; i<20; i++ ) {
-	    delay_us ( 5 );
-	    bit = gpio_read_bit ( dallas_pin );
-	    if ( bit == 0 )
-		break;
-	}
-
-	/* never went low */
-	if ( bit != 0 )
-	    return 0;
-
-	/* Wait up to 300 us for line to go high */
-	for ( i=0; i<60; i++ ) {
-	    delay_us ( 5 );
-	    bit = gpio_read_bit ( dallas_pin );
-	    if ( bit == 1 )
-		break;
-	}
-
-	/* never went high */
-	if ( bit != 1 )
-	    return 0;
-
-	/* good ! */
-	return 1;
-}
-
 /* Someday the following will go into gpio.h perhaps
  */
 #define GPIO_PIN(x)	(x%32)
 #define GPIO_MASK(p)	(1<<p)
 
-/* There is a LOT of overhead in what follows.
+/* Here is where we generate the 1 us read pulse.
+ *
+ * There is a LOT of overhead in what follows.
  * I see 5 us of high time, just due to the setup
- * that gets done here.
+ * that gets done here.  That happens before the pulse,
+ * which is OK.
  */
 
-void
+static void
 dallas_read_pulse ( void )
 {
 	volatile unsigned int *dp;
@@ -108,6 +78,79 @@ dallas_read_pulse ( void )
 	*dp = val_off;
 	*dp = val_on;
 }
+
+/* Here is our 5 us delay primitive.
+ */
+static inline void
+dallas_delay5 ( void )
+{
+	delay_us ( 5 );
+}
+
+int
+dallas_reset ( void )
+{
+	int i;
+	int bit;
+
+	gpio_out_init ( dallas_pin );
+	gpio_clear_bit ( dallas_pin );
+
+	/* Must keep low for 480 us minimum */
+	delay_us ( 500 );
+
+	gpio_set_bit ( dallas_pin );
+	gpio_in_init ( dallas_pin );
+
+	/* Wait up to 100 us for line to go low */
+	for ( i=0; i<20; i++ ) {
+	    dallas_delay5 ();
+	    bit = gpio_read_bit ( dallas_pin );
+	    if ( bit == 0 )
+		break;
+	}
+
+	/* never went low */
+	if ( bit != 0 )
+	    return 0;
+
+	/* Wait up to 300 us for line to go high */
+	for ( i=0; i<60; i++ ) {
+	    dallas_delay5 ();
+	    bit = gpio_read_bit ( dallas_pin );
+	    if ( bit == 1 )
+		break;
+	}
+
+	/* never went high */
+	if ( bit != 1 )
+	    return 0;
+
+	/* good ! */
+	return 1;
+}
+
+void
+dallas_test ( void )
+{
+	int x;
+
+	dallas_init ( GPIO_A_0 );
+
+	// read_calib ();
+	// clock_calib ();
+
+	x = dallas_reset ();
+	printf ( "Dallas reset gave: %d\n", x );
+}
+
+/* ==================================================================================== */
+/* ==================================================================================== */
+/* ==================================================================================== */
+/* ==================================================================================== */
+/* experiments below here */
+
+#ifdef notdef
 
 void
 read_calib ( void )
@@ -144,28 +187,6 @@ clock_calib ( void )
 	    delay_us ( 5 );
 	}
 }
-
-void
-dallas_test ( void )
-{
-	int x;
-
-	dallas_init ( GPIO_A_0 );
-
-	// read_calib ();
-	clock_calib ();
-
-	x = dallas_reset ();
-	printf ( "Dallas reset gave: %d\n", x );
-}
-
-/* ==================================================================================== */
-/* ==================================================================================== */
-/* ==================================================================================== */
-/* ==================================================================================== */
-/* experiments below here */
-
-#ifdef notdef
 
 static int levels[100];
 

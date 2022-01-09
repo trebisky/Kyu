@@ -20,7 +20,9 @@
 #include "types.h"
 #include "cpu.h"
 
-struct thread *cur_thread;
+/* Needed to add the extern to satisfy new GCC -fno-common change
+ */
+extern struct thread *cur_thread;
 
 #define DUMP_BYTES	512
 // #define LONG_LIMIT	1024

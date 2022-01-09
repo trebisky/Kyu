@@ -11,6 +11,7 @@ include ../Makefile.inc
 XX_OBJS = \
 	h3_thermal.o \
 	h3_sid.o \
+	ccu_clocks.o \
 	bogus.o
 
 NOT_YET = \
@@ -24,7 +25,6 @@ OBJS =  board.o \
 	timer.o \
 	h3_spinlocks.o \
 	ccu_reset.o \
-	ccu_clocks.o \
 	ccu.o
 
 all: ../board.o
