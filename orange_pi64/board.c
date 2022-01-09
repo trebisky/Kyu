@@ -264,6 +264,42 @@ board_hardware_init ( void )
 	// stack_addr_show ();
 }
 
+/* This gets a fault, but given that we are running at EL 2
+ * that doesn't really tell us if we are in secure mode or not.
+ * We should get a fault just for trying to access
+ * a register that is designated only for EL3.
+ * and there is no such register for EL2.
+ */
+static inline unsigned int
+get_secure(void)
+{
+        unsigned int val;
+
+        // asm volatile("mrs %0, SCR_EL2" : "=r" (val) : : "cc");
+        asm volatile("mrs %0, SCR_EL3" : "=r" (val) : : "cc");
+	return val;
+}
+
+static inline unsigned int
+get_el(void)
+{
+        unsigned int val;
+
+        asm volatile("mrs %0, CurrentEL" : "=r" (val) : : "cc");
+        return val >> 2;
+}
+
+/* Added 1-9-2022 when I got curious about these things.
+ *
+ *  It shows us running at EL 2.
+ */
+void
+board_check_el ( void )
+{
+	printf ( "ARM EL = %d\n", get_el() );
+	// printf ( "ARM SCR = %d\n", get_secure() );
+}
+
 void
 board_init ( void )
 {
@@ -288,6 +324,8 @@ board_init ( void )
 
 	h3_spinlocks_init ();
 	gic_init ();
+
+	board_check_el ();
 
 	/* Must follow gic_init () */
 	gpio_button_enable ();
