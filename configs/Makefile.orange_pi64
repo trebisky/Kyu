@@ -17,8 +17,12 @@ include Makefile.inc
 # from below
 #    linux/linux-lib.o
 
-# machine.o must come first
+# We park things here
+BOGUS = \
+    tcp_xinu.o \
+    bogus.o
 
+# machine.o must come first
 OBJS =  machine.o \
     board.o \
     version.o \
@@ -36,7 +40,7 @@ OBJS =  machine.o \
     dlmalloc.o \
     random.o \
     net.o \
-    tcp_xinu.o \
+    tcp_bsd.o \
     kyulib.o \
     lib.o
 
@@ -65,6 +69,7 @@ machine.o:	bogus
 	cd net ; make
 	cd lib ; make
 	cd tcp_xinu ; make
+	cd tcp_bsd ; make
 #	cd linux ; make
 
 bogus:

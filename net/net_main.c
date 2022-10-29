@@ -199,7 +199,11 @@ net_init ( void )
 
 #ifdef WANT_TCP_XINU
     tcp_xinu_init ();
-#else
+#endif
+#ifdef WANT_TCP_BSD
+    tcp_bsd_init ();
+#endif
+#ifdef WANT_TCP_KYU
     tcp_kyu_init ();
 #endif
 

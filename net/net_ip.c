@@ -90,7 +90,12 @@ ip_rcv ( struct netbuf *nbp )
 #ifdef WANT_TCP_XINU
 	    tcp_xinu_rcv ( nbp );
 	    netbuf_free ( nbp );
-#else
+#endif
+#ifdef WANT_TCP_BSD
+	    tcp_bsd_rcv ( nbp );
+	    netbuf_free ( nbp );
+#endif
+#ifdef WANT_TCP_KYU
 	    tcp_rcv ( nbp );
 	    netbuf_free ( nbp );
 #endif

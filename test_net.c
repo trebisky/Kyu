@@ -55,8 +55,14 @@ test_tcp ( long xxx )
 {
 #ifdef WANT_TCP_XINU
 	printf ( "Testing Xinu TCP\n" );
+	/* Not yet implemented ??? */
 	test_xinu_tcp ();
-#else
+#endif
+#ifdef WANT_TCP_BSD
+	printf ( "Testing BSD TCP\n" );
+	test_bsd_tcp ();
+#endif
+#ifdef WANT_TCP_KYU
 	printf ( "Testing Kyu TCP\n" );
 	test_kyu_tcp ();
 #endif

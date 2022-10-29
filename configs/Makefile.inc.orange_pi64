@@ -63,7 +63,7 @@ OPT = -fno-omit-frame-pointer
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a8 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS) $(ABI) $(DEFS)
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a7 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
-COPTS = -DKYU -nostdinc $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
+COPTS = -DKYU $(DEFS) -nostdinc $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
 
 CC = $(CCX) $(COPTS)
 
