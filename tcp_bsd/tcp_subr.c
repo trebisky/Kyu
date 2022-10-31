@@ -43,7 +43,7 @@
 #include <sys/protosw.h>
 #include <sys/errno.h>
 
-// #include <net/route.h>
+#include <net/route.h>
 #include <net/if.h>
 
 #include <netinet/in.h>
@@ -56,8 +56,8 @@
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
-#include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
+#include <netinet/tcp_var.h>
 
 /* patchable/settable parameters for tcp */
 int 	tcp_mssdflt = TCP_MSS;
@@ -92,9 +92,15 @@ tcp_template(tp)
 	struct tcpcb *tp;
 {
 	register struct inpcb *inp = tp->t_inpcb;
-	register struct mbuf *m;
+// KYU
+//	register struct mbuf *m;
 	register struct tcpiphdr *n;
 
+#ifdef KYU
+	if ((n = tp->t_template) == 0) {
+		n = &tp->t_static_template;
+	}
+#else
 	if ((n = tp->t_template) == 0) {
 		m = m_get(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
@@ -102,6 +108,7 @@ tcp_template(tp)
 		m->m_len = sizeof (struct tcpiphdr);
 		n = mtod(m, struct tcpiphdr *);
 	}
+#endif
 	n->ti_next = n->ti_prev = 0;
 	n->ti_x1 = 0;
 	n->ti_pr = IPPROTO_TCP;
@@ -352,8 +359,10 @@ tcp_close(tp)
 		remque(t->ti_prev);
 		m_freem(m);
 	}
+#ifndef KYU
 	if (tp->t_template)
 		(void) m_free(dtom(tp->t_template));
+#endif
 	free(tp, M_PCB);
 	inp->inp_ppcb = 0;
 	soisdisconnected(so);

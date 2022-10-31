@@ -63,6 +63,7 @@ struct tcpcb {
 #define	TF_SACK_PERMIT	0x0200		/* other side said I could SACK */
 
 	struct	tcpiphdr *t_template;	/* skeletal packet for transmit */
+	struct	tcpiphdr t_static_template;	/* KYU */
 	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
 /*
  * The following fields are used as in the protocol specification.

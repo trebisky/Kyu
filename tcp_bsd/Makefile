@@ -24,7 +24,10 @@ include ../Makefile.inc
 OBJS = kyu_bsd.o \
 	tcp_debug.o \
 	tcp_input.o \
-	tcp_output.o
+	tcp_output.o \
+	tcp_subr.o \
+	tcp_timer.o \
+	tcp_usrreq.o
 
 all: ../tcp_bsd.o
 
@@ -39,6 +42,8 @@ clean:
 BSD_NET3 = /u1/BSD/4.4BSD-Lite/usr/src
 BSD_SRC = $(BSD_NET3)/sys
 
+# Use this to copy, then comment out the lines (or delete them)
+# otherwise you will overwrite any changes.
 
 get:
 #	cp $(BSD_SRC)/netinet/tcp_debug.h .
@@ -57,10 +62,11 @@ get:
 #	cp $(BSD_SRC)/netinet/tcp_usrreq.c .
 
 #	cp $(BSD_SRC)/netinet/in_pcb.h .
-	cp $(BSD_SRC)/netinet/in.h .
-	cp $(BSD_SRC)/netinet/in_systm.h .
-	cp $(BSD_SRC)/netinet/ip.h .
-	cp $(BSD_SRC)/netinet/ip_var.h .
+#	cp $(BSD_SRC)/netinet/in.h .
+#	cp $(BSD_SRC)/netinet/in_systm.h .
+#	cp $(BSD_SRC)/netinet/ip.h .
+#	cp $(BSD_SRC)/netinet/ip_var.h .
+#	cp $(BSD_SRC)/netinet/ip_icmp.h .
 
 #	cp  $(BSD_SRC)/sys/types.h sys
 #	cp  $(BSD_SRC)/sys/mbuf.h sys
@@ -71,30 +77,33 @@ get:
 #	cp  $(BSD_SRC)/sys/cdefs.h sys
 #	cp  $(BSD_SRC)/sys/syslimits.h sys
 #	cp  $(BSD_SRC)/sys/errno.h sys
-	cp  $(BSD_SRC)/sys/time.h sys
-	cp  $(BSD_SRC)/sys/resource.h sys
-	cp  $(BSD_SRC)/sys/ucred.h sys
-	cp  $(BSD_SRC)/sys/uio.h sys
-	cp  $(BSD_SRC)/sys/signal.h sys
-	cp  $(BSD_SRC)/sys/malloc.h sys
-	cp  $(BSD_SRC)/sys/select.h sys
-	cp  $(BSD_SRC)/sys/protosw.h sys
+#	cp  $(BSD_SRC)/sys/time.h sys
+#	cp  $(BSD_SRC)/sys/resource.h sys
+#	cp  $(BSD_SRC)/sys/ucred.h sys
+#	cp  $(BSD_SRC)/sys/uio.h sys
+#	cp  $(BSD_SRC)/sys/signal.h sys
+#	cp  $(BSD_SRC)/sys/malloc.h sys
+#	cp  $(BSD_SRC)/sys/select.h sys
+#	cp  $(BSD_SRC)/sys/protosw.h sys
+#	cp  $(BSD_SRC)/sys/proc.h sys
+#	cp  $(BSD_SRC)/sys/stat.h sys
 
 #	cp  $(BSD_SRC)/net/if.h net
-	cp  $(BSD_SRC)/net/if_arp.h net
-	cp  $(BSD_SRC)/net/route.h net
-	cp  $(BSD_SRC)/net/radix.h net
+#	cp  $(BSD_SRC)/net/if_arp.h net
+#	cp  $(BSD_SRC)/net/route.h net
+#	cp  $(BSD_SRC)/net/radix.h net
 
 	# gross hack (link to i386/include)
 #	cp  $(BSD_SRC)/machine/endian.h machine
 #	cp  $(BSD_SRC)/machine/ansi.h machine
 #	cp  $(BSD_SRC)/machine/types.h machine
-	cp  $(BSD_SRC)/machine/signal.h machine
-	cp  $(BSD_SRC)/machine/trap.h machine
-	cp  $(BSD_SRC)/machine/param.h machine
-	cp  $(BSD_SRC)/machine/limits.h machine
+#	cp  $(BSD_SRC)/machine/signal.h machine
+#	cp  $(BSD_SRC)/machine/trap.h machine
+#	cp  $(BSD_SRC)/machine/param.h machine
+#	cp  $(BSD_SRC)/machine/limits.h machine
+#	cp  $(BSD_SRC)/machine/proc.h machine
 
-	cp  $(BSD_SRC)/libkern/libkern.h libkern
+#	cp  $(BSD_SRC)/libkern/libkern.h libkern
 
 	chmod u+w *.h *.c
 	chmod u+w sys/*

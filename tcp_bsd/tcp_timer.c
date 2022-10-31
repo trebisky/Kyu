@@ -44,7 +44,7 @@
 #include <sys/errno.h>
 
 #include <net/if.h>
-// #include <net/route.h>
+#include <net/route.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -55,8 +55,8 @@
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
-#include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
+#include <netinet/tcp_var.h>
 
 int	tcp_keepidle = TCPTV_KEEP_IDLE;
 int	tcp_keepintvl = TCPTV_KEEPINTVL;
@@ -96,7 +96,7 @@ tcp_slowtimo()
 	register struct inpcb *ip, *ipnxt;
 	register struct tcpcb *tp;
 	int s = splnet();
-	register int i;
+	register long i;
 
 	tcp_maxidle = TCPTV_KEEPCNT * tcp_keepintvl;
 	/*

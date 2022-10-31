@@ -59,7 +59,10 @@
  * cltom(x) -	convert cluster # to ptr to beginning of cluster
  */
 #define mtod(m,t)	((t)((m)->m_data))
+#ifndef KYU
+/* This at best yields compiler warnings and won't work on many architectures */
 #define	dtom(x)		((struct mbuf *)((int)(x) & ~(MSIZE-1)))
+#endif
 #define	mtocl(x)	(((u_int)(x) - (u_int)mbutl) >> MCLSHIFT)
 #define	cltom(x)	((caddr_t)((u_int)mbutl + ((u_int)(x) << MCLSHIFT)))
 

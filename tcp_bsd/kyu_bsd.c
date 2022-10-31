@@ -28,8 +28,8 @@
 #include <tcp.h>
 #include <tcp_seq.h>
 #include <tcp_timer.h>
-#include <tcp_var.h>
 #include <tcpip.h>
+#include <tcp_var.h>
 #include <tcp_debug.h>
 
 /* global variables */
