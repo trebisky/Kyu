@@ -35,7 +35,7 @@
 
 #ifndef TUBA_INCLUDE
 #include <sys/param.h>
-#include <sys/systm.h>
+// #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>

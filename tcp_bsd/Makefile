@@ -4,15 +4,12 @@
 #
 # Tom Trebisky  10-29-2022
 
-BSD_NET3 = /u1/BSD/4.4BSD-Lite/usr/src
-BSD_SRC = $(BSD_NET3)/sys
-
 INCS = -I. -I..
-INCS += -I$(BSD_SRC)
+# INCS += -I$(BSD_SRC)
 
-# To get time.h
+# To get time.h ???
 # /u1/BSD/4.4BSD-Lite/usr/src/include/time.h
-INCS += -I$(BSD_NET3)/include
+#INCS += -I$(BSD_NET3)/include
 
 DEFS += -DKERNEL
 
@@ -24,9 +21,10 @@ DEFS += -DKERNEL
 
 include ../Makefile.inc
 
-OBJS = kyu_bsd.o
-#	tcp_debug.o \
-#	tcp_input.o
+OBJS = kyu_bsd.o \
+	tcp_debug.o \
+	tcp_input.o \
+	tcp_output.o
 
 all: ../tcp_bsd.o
 
@@ -37,6 +35,10 @@ clean:
 	rm -f *.o
 
 # --------------------------
+
+BSD_NET3 = /u1/BSD/4.4BSD-Lite/usr/src
+BSD_SRC = $(BSD_NET3)/sys
+
 
 get:
 #	cp $(BSD_SRC)/netinet/tcp_debug.h .
@@ -54,4 +56,50 @@ get:
 #	cp $(BSD_SRC)/netinet/tcp_timer.c .
 #	cp $(BSD_SRC)/netinet/tcp_usrreq.c .
 
+#	cp $(BSD_SRC)/netinet/in_pcb.h .
+	cp $(BSD_SRC)/netinet/in.h .
+	cp $(BSD_SRC)/netinet/in_systm.h .
+	cp $(BSD_SRC)/netinet/ip.h .
+	cp $(BSD_SRC)/netinet/ip_var.h .
+
+#	cp  $(BSD_SRC)/sys/types.h sys
+#	cp  $(BSD_SRC)/sys/mbuf.h sys
+#	cp  $(BSD_SRC)/sys/param.h sys
+#	cp  $(BSD_SRC)/sys/systm.h sys
+#	cp  $(BSD_SRC)/sys/socketvar.h sys
+#	cp  $(BSD_SRC)/sys/socket.h sys
+#	cp  $(BSD_SRC)/sys/cdefs.h sys
+#	cp  $(BSD_SRC)/sys/syslimits.h sys
+#	cp  $(BSD_SRC)/sys/errno.h sys
+	cp  $(BSD_SRC)/sys/time.h sys
+	cp  $(BSD_SRC)/sys/resource.h sys
+	cp  $(BSD_SRC)/sys/ucred.h sys
+	cp  $(BSD_SRC)/sys/uio.h sys
+	cp  $(BSD_SRC)/sys/signal.h sys
+	cp  $(BSD_SRC)/sys/malloc.h sys
+	cp  $(BSD_SRC)/sys/select.h sys
+	cp  $(BSD_SRC)/sys/protosw.h sys
+
+#	cp  $(BSD_SRC)/net/if.h net
+	cp  $(BSD_SRC)/net/if_arp.h net
+	cp  $(BSD_SRC)/net/route.h net
+	cp  $(BSD_SRC)/net/radix.h net
+
+	# gross hack (link to i386/include)
+#	cp  $(BSD_SRC)/machine/endian.h machine
+#	cp  $(BSD_SRC)/machine/ansi.h machine
+#	cp  $(BSD_SRC)/machine/types.h machine
+	cp  $(BSD_SRC)/machine/signal.h machine
+	cp  $(BSD_SRC)/machine/trap.h machine
+	cp  $(BSD_SRC)/machine/param.h machine
+	cp  $(BSD_SRC)/machine/limits.h machine
+
+	cp  $(BSD_SRC)/libkern/libkern.h libkern
+
 	chmod u+w *.h *.c
+	chmod u+w sys/*
+	chmod u+w net/*
+	chmod u+w machine/*
+	chmod u+w libkern/*
+
+# THE END

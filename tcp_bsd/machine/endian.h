@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1982, 1986, 1993
+ * Copyright (c) 1987, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,63 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)endian.h	8.1 (Berkeley) 6/11/93
  */
+
+#ifndef _ENDIAN_H_
+#define	_ENDIAN_H_
 
 /*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
+ * Define _NOQUAD if the compiler does NOT support 64-bit integers.
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+/* #define _NOQUAD */
 
 /*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
+ * Define the order of 32-bit words in 64-bit words.
  */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+#define _QUAD_HIGHWORD 1
+#define _QUAD_LOWWORD 0
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
+#ifndef _POSIX_SOURCE
+/*
+ * Definitions for byte order, according to byte significance from low
+ * address to high.
+ */
+#define	LITTLE_ENDIAN	1234	/* LSB first: i386, vax */
+#define	BIG_ENDIAN	4321	/* MSB first: 68000, ibm, net */
+#define	PDP_ENDIAN	3412	/* LSB first in word, MSW first in long */
 
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
+#define	BYTE_ORDER	LITTLE_ENDIAN
 
-#ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+unsigned long	htonl __P((unsigned long));
+unsigned short	htons __P((unsigned short));
+unsigned long	ntohl __P((unsigned long));
+unsigned short	ntohs __P((unsigned short));
+__END_DECLS
+
+/*
+ * Macros for network/external number representation conversion.
+ */
+#if BYTE_ORDER == BIG_ENDIAN && !defined(lint)
+#define	ntohl(x)	(x)
+#define	ntohs(x)	(x)
+#define	htonl(x)	(x)
+#define	htons(x)	(x)
+
+#define	NTOHL(x)	(x)
+#define	NTOHS(x)	(x)
+#define	HTONL(x)	(x)
+#define	HTONS(x)	(x)
+
+#else
+
+#define	NTOHL(x)	(x) = ntohl((u_long)x)
+#define	NTOHS(x)	(x) = ntohs((u_short)x)
+#define	HTONL(x)	(x) = htonl((u_long)x)
+#define	HTONS(x)	(x) = htons((u_short)x)
 #endif
+#endif /* ! _POSIX_SOURCE */
+#endif /* !_ENDIAN_H_ */

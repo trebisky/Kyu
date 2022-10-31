@@ -232,9 +232,9 @@ struct	tcpstat {
 };
 
 #ifdef KERNEL
-struct	inpcb tcb;		/* head of queue of active tcpcb's */
-struct	tcpstat tcpstat;	/* tcp statistics */
-u_long	tcp_now;		/* for RFC 1323 timestamps */
+extern struct	inpcb tcb;		/* head of queue of active tcpcb's */
+extern struct	tcpstat tcpstat;	/* tcp statistics */
+extern u_long	tcp_now;		/* for RFC 1323 timestamps */
 
 int	 tcp_attach __P((struct socket *));
 void	 tcp_canceltimers __P((struct tcpcb *));

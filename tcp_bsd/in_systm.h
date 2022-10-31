@@ -30,33 +30,27 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)in_systm.h	8.1 (Berkeley) 6/10/93
  */
 
 /*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
+ * Miscellaneous internetwork
+ * definitions for kernel.
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
 /*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
+ * Network types.
+ *
+ * Internally the system keeps counters in the headers with the bytes
+ * swapped so that VAX instructions will work on them.  It reverses
+ * the bytes before transmission at each protocol level.  The n_ types
+ * represent the types with the bytes in ``high-ender'' order.
  */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+typedef u_short n_short;		/* short as received from the net */
+typedef u_long	n_long;			/* long as received from the net */
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
+typedef	u_long	n_time;			/* ms since 00:00 GMT, byte rev */
 
 #ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
+n_time	 iptime __P((void));
 #endif

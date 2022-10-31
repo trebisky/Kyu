@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1982, 1986, 1993
+ * Copyright (c) 1982, 1986, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,54 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)uio.h	8.5 (Berkeley) 2/22/94
  */
+
+#ifndef _SYS_UIO_H_
+#define	_SYS_UIO_H_
 
 /*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
+ * XXX
+ * iov_base should be a void *.
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+struct iovec {
+	char	*iov_base;	/* Base address. */
+	size_t	 iov_len;	/* Length. */
+};
 
-/*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
- */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+enum	uio_rw { UIO_READ, UIO_WRITE };
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
+/* Segment flag values. */
+enum uio_seg {
+	UIO_USERSPACE,		/* from user data space */
+	UIO_SYSSPACE,		/* from system space */
+	UIO_USERISPACE		/* from user I space */
+};
 
 #ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
-#endif
+struct uio {
+	struct	iovec *uio_iov;
+	int	uio_iovcnt;
+	off_t	uio_offset;
+	int	uio_resid;
+	enum	uio_seg uio_segflg;
+	enum	uio_rw uio_rw;
+	struct	proc *uio_procp;
+};
+
+/*
+ * Limits
+ */
+#define UIO_MAXIOV	1024		/* max 1K of iov's */
+#define UIO_SMALLIOV	8		/* 8 on stack, else malloc */
+#endif /* KERNEL */
+
+#ifndef	KERNEL
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+ssize_t	readv __P((int, const struct iovec *, int));
+ssize_t	writev __P((int, const struct iovec *, int));
+__END_DECLS
+#endif /* !KERNEL */
+#endif /* !_SYS_UIO_H_ */

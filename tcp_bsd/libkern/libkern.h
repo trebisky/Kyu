@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 1982, 1986, 1993
+/*-
+ * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,69 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
  */
 
-/*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
- */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+#include <sys/types.h>
 
-/*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
- */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+static inline int
+imax(a, b)
+	int a, b;
+{
+	return (a > b ? a : b);
+}
+static inline int
+imin(a, b)
+	int a, b;
+{
+	return (a < b ? a : b);
+}
+static inline long
+lmax(a, b)
+	long a, b;
+{
+	return (a > b ? a : b);
+}
+static inline long
+lmin(a, b)
+	long a, b;
+{
+	return (a < b ? a : b);
+}
+static inline u_int
+max(a, b)
+	u_int a, b;
+{
+	return (a > b ? a : b);
+}
+static inline u_int
+min(a, b)
+	u_int a, b;
+{
+	return (a < b ? a : b);
+}
+static inline u_long
+ulmax(a, b)
+	u_long a, b;
+{
+	return (a > b ? a : b);
+}
+static inline u_long
+ulmin(a, b)
+	u_long a, b;
+{
+	return (a < b ? a : b);
+}
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
-
-#ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
-#endif
+/* Prototypes for non-quad routines. */
+int	 bcmp __P((const void *, const void *, size_t));
+int	 ffs __P((int));
+int	 locc __P((int, char *, u_int));
+u_long	 random __P((void));
+char	*rindex __P((const char *, int));
+int	 scanc __P((u_int, u_char *, u_char *, int));
+int	 skpc __P((int, int, char *));
+char	*strcat __P((char *, const char *));
+char	*strcpy __P((char *, const char *));
+size_t	 strlen __P((const char *));
+char	*strncpy __P((char *, const char *, size_t));

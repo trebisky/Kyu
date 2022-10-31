@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 1982, 1986, 1993
+/*-
+ * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,43 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)ansi.h	8.2 (Berkeley) 1/4/94
  */
+
+#ifndef	_ANSI_H_
+#define	_ANSI_H_
 
 /*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
+ * Types which are fundamental to the implementation and may appear in
+ * more than one standard header are defined here.  Standard headers
+ * then use:
+ *	#ifdef	_BSD_SIZE_T_
+ *	typedef	_BSD_SIZE_T_ size_t;
+ *	#undef	_BSD_SIZE_T_
+ *	#endif
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+#define	_BSD_CLOCK_T_	unsigned long		/* clock() */
+#define	_BSD_PTRDIFF_T_	int			/* ptr1 - ptr2 */
+#define	_BSD_SIZE_T_	unsigned int		/* sizeof() */
+#define	_BSD_SSIZE_T_	int			/* byte count or error */
+#define	_BSD_TIME_T_	long			/* time() */
+#define	_BSD_VA_LIST_	char *			/* va_list */
 
 /*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
+ * Runes (wchar_t) is declared to be an ``int'' instead of the more natural
+ * ``unsigned long'' or ``long''.  Two things are happening here.  It is not
+ * unsigned so that EOF (-1) can be naturally assigned to it and used.  Also,
+ * it looks like 10646 will be a 31 bit standard.  This means that if your
+ * ints cannot hold 32 bits, you will be in trouble.  The reason an int was
+ * chosen over a long is that the is*() and to*() routines take ints (says
+ * ANSI C), but they use _RUNE_T_ instead of int.  By changing it here, you
+ * lose a bit of ANSI conformance, but your programs will still work.
+ *    
+ * Note that _WCHAR_T_ and _RUNE_T_ must be of the same type.  When wchar_t
+ * and rune_t are typedef'd, _WCHAR_T_ will be undef'd, but _RUNE_T remains
+ * defined for ctype.h.
  */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+#define	_BSD_WCHAR_T_	int			/* wchar_t */
+#define	_BSD_RUNE_T_	int			/* rune_t */
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
-
-#ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
-#endif
+#endif	/* _ANSI_H_ */

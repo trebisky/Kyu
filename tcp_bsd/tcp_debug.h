@@ -55,5 +55,6 @@ char	*tanames[] =
 #endif
 
 #define	TCP_NDEBUG 100
-struct	tcp_debug tcp_debug[TCP_NDEBUG];
-int	tcp_debx;
+
+extern struct	tcp_debug tcp_debug[];
+extern int	tcp_debx;

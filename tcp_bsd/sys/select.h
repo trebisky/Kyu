@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 1982, 1986, 1993
+/*-
+ * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,27 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)select.h	8.2 (Berkeley) 1/4/94
  */
+
+#ifndef _SYS_SELECT_H_
+#define	_SYS_SELECT_H_
 
 /*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
+ * Used to maintain information about processes that wish to be
+ * notified when I/O becomes possible.
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
-
-/*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
- */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
-
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
+struct selinfo {
+	pid_t	si_pid;		/* process to be notified */
+	short	si_flags;	/* see below */
+};
+#define	SI_COLL	0x0001		/* collision occurred */
 
 #ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
+struct proc;
+
+void	selrecord __P((struct proc *selector, struct selinfo *));
+void	selwakeup __P((struct selinfo *));
 #endif
+
+#endif /* !_SYS_SELECT_H_ */

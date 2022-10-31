@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1982, 1986, 1993
+ * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,25 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.1 (Berkeley) 6/10/93
+ *	@(#)syslimits.h	8.1 (Berkeley) 6/2/93
  */
 
-/*
- * TCP sequence numbers are 32 bit integers operated
- * on with modular arithmetic.  These macros can be
- * used to compare such integers.
- */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+#define	ARG_MAX			20480	/* max bytes for an exec function */
+#define	CHILD_MAX		   40	/* max simultaneous processes */
+#define	LINK_MAX		32767	/* max file link count */
+#define	MAX_CANON		  255	/* max bytes in term canon input line */
+#define	MAX_INPUT		  255	/* max bytes in terminal input */
+#define	NAME_MAX		  255	/* max bytes in a file name */
+#define	NGROUPS_MAX		   16	/* max supplemental group id's */
+#define	OPEN_MAX		   64	/* max open files per process */
+#define	PATH_MAX		 1024	/* max bytes in pathname */
+#define	PIPE_BUF		  512	/* max bytes for atomic pipe writes */
 
-/*
- * Macros to initialize tcp sequence numbers for
- * send and receive from initial send and receive
- * sequence numbers.
- */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
-
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-
-#define	TCP_ISSINCR	(125*1024)	/* increment for tcp_iss each second */
-
-#ifdef KERNEL
-extern tcp_seq	tcp_iss;		/* tcp initial send seq # */
-#endif
+#define	BC_BASE_MAX		   99	/* max ibase/obase values in bc(1) */
+#define	BC_DIM_MAX		 2048	/* max array elements in bc(1) */
+#define	BC_SCALE_MAX		   99	/* max scale value in bc(1) */
+#define	BC_STRING_MAX		 1000	/* max const string length in bc(1) */
+#define	COLL_WEIGHTS_MAX	    0	/* max weights for order keyword */
+#define	EXPR_NEST_MAX		   32	/* max expressions nested in expr(1) */
+#define	LINE_MAX		 2048	/* max bytes in an input line */
+#define	RE_DUP_MAX		  255	/* max RE's in interval notation */
