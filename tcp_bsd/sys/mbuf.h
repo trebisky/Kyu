@@ -63,8 +63,8 @@
 /* This at best yields compiler warnings and won't work on many architectures */
 #define	dtom(x)		((struct mbuf *)((int)(x) & ~(MSIZE-1)))
 #endif
-#define	mtocl(x)	(((u_int)(x) - (u_int)mbutl) >> MCLSHIFT)
-#define	cltom(x)	((caddr_t)((u_int)mbutl + ((u_int)(x) << MCLSHIFT)))
+#define	mtocl(x)	(((u_long)(x) - (u_long)mbutl) >> MCLSHIFT)
+#define	cltom(x)	((caddr_t)((u_long)mbutl + ((u_long)(x) << MCLSHIFT)))
 
 /* header at beginning of each mbuf: */
 struct m_hdr {

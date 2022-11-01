@@ -27,7 +27,8 @@ OBJS = kyu_bsd.o \
 	tcp_output.o \
 	tcp_subr.o \
 	tcp_timer.o \
-	tcp_usrreq.o
+	tcp_usrreq.o \
+	uipc_mbuf.o
 
 all: ../tcp_bsd.o
 
@@ -85,15 +86,17 @@ get:
 #	cp  $(BSD_SRC)/sys/malloc.h sys
 #	cp  $(BSD_SRC)/sys/select.h sys
 #	cp  $(BSD_SRC)/sys/protosw.h sys
-#	cp  $(BSD_SRC)/sys/proc.h sys
 #	cp  $(BSD_SRC)/sys/stat.h sys
+
+# -- for uipc_mbuf.h
+#	cp  $(BSD_SRC)/sys/domain.h sys
 
 #	cp  $(BSD_SRC)/net/if.h net
 #	cp  $(BSD_SRC)/net/if_arp.h net
 #	cp  $(BSD_SRC)/net/route.h net
 #	cp  $(BSD_SRC)/net/radix.h net
 
-	# gross hack (link to i386/include)
+	# machine is a gross hack (link to i386/include)
 #	cp  $(BSD_SRC)/machine/endian.h machine
 #	cp  $(BSD_SRC)/machine/ansi.h machine
 #	cp  $(BSD_SRC)/machine/types.h machine
@@ -101,9 +104,10 @@ get:
 #	cp  $(BSD_SRC)/machine/trap.h machine
 #	cp  $(BSD_SRC)/machine/param.h machine
 #	cp  $(BSD_SRC)/machine/limits.h machine
-#	cp  $(BSD_SRC)/machine/proc.h machine
 
 #	cp  $(BSD_SRC)/libkern/libkern.h libkern
+
+#	cp  $(BSD_SRC)/kern/uipc_mbuf.c .
 
 	chmod u+w *.h *.c
 	chmod u+w sys/*
