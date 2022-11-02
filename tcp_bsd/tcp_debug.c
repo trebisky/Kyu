@@ -86,7 +86,9 @@ tcp_trace(act, ostate, tp, ti, req)
 
 	if (tcp_debx == TCP_NDEBUG)
 		tcp_debx = 0;
-	td->td_time = iptime();
+// KYU - comment this out for now, I am not sure that I will even
+//  be keeping tcp_debug.c
+//	td->td_time = iptime();
 	td->td_act = act;
 	td->td_ostate = ostate;
 	td->td_tcb = (caddr_t)tp;

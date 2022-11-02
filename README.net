@@ -1,0 +1,28 @@
+Kyu network subsystem and configuration
+
+    11-2-2022
+
+Kyu has a network subsystem that supports UDP transfers nicely, along with
+working DNS, DHCP, and TFTP tools that use it.
+
+As of this writing, TCP is unfinished and experimental.
+3 different TCP subsystems exist, as follows:
+
+1) An unfinished "written from scratch" Kyu TCP subsystem.
+2) A port of the Xinu TCP code that has unsolved issues.
+3) A port of the BSD4.4 TCP code that is currently in progress.
+
+To change the build to switch between these, several things need to
+be configured by hand.
+
+1) in the file kyu.h select one of the three by uncommenting
+the appropriate line, i.e. -- 
+
+    #define WANT_TCP_BSD
+
+2) in the Makefile, include one of the three in the OBJS link
+by uncommenting one of the 3 options, i.e. --
+
+    OBJS += tcp_bsd.o
+
+That should do it.

@@ -36,9 +36,12 @@ OBJS =  machine.o \
     dlmalloc.o \
     random.o \
     net.o \
-    tcp_kyu.o \
     kyulib.o \
     lib.o
+
+#OBJS += tcp_kyu.o
+OBJS += tcp_bsd.o
+#OBJS += tcp_xinu.o
 
 # Get rid of network stuff to check resulting size
 NO_NET_OBJS =  machine.o \
@@ -84,9 +87,11 @@ machine.o:	bogus
 	cd board ; make
 	cd net ; make
 	cd lib ; make
-#	cd tcp_xinu ; make
-#	cd tcp_bsd ; make
+	cd tcp_xinu ; make
+	cd tcp_bsd ; make
 	cd tcp_kyu ; make
+
+# an old experiment that did not turn out well
 #	cd linux ; make
 
 bogus:
@@ -140,6 +145,8 @@ clean:
 	cd net ; make clean
 	cd lib ; make clean
 	cd tcp_xinu ; make clean
+	cd tcp_bsd ; make clean
+	cd tcp_kyu ; make clean
 #	cd linux ; make clean
 
 # THE END

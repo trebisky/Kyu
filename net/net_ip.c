@@ -87,18 +87,7 @@ ip_rcv ( struct netbuf *nbp )
 	    udp_rcv ( nbp );
 	    netbuf_free ( nbp );
 	} else if ( ipp->proto == IPPROTO_TCP ) {
-#ifdef WANT_TCP_XINU
-	    tcp_xinu_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
-#ifdef WANT_TCP_BSD
-	    tcp_bsd_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
-#ifdef WANT_TCP_KYU
 	    tcp_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",
 		    ip2str32 ( ipp->src ), nbp->plen, ipp->proto, ipp->sum );

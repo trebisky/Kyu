@@ -33,6 +33,8 @@
 #include <tcp_var.h>
 #include <tcp_debug.h>
 
+struct	mbuf *m_devget ( char *, int, int, struct ifnet *, void (*)() );
+
 /* global variables */
 
 int mbtypes[] = {                               /* from mbuf.h */
@@ -89,6 +91,8 @@ u_long	tcp_now;		/* for RFC 1323 timestamps */
 /* from tcp_debug.h */
 struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
+
+struct in_addr zeroin_addr;
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
@@ -152,17 +156,24 @@ tcp_bsd_show ( void )
 static void
 tcp_bsd_rcv ( struct netbuf *nbp )
 {
-	struct netpacket *pkt;
+	// struct netpacket *pkt;
+	struct mbuf *m;
 
-	// printf ( "TCP: bsd_rcv %d\n", ntohs(nbp->iptr->len) );
+	printf ( "TCP: bsd_rcv %d\n", ntohs(nbp->iptr->len) );
+
+	m = m_devget ( (char *) nbp->iptr, nbp->ilen, 0, NULL, 0 );
+
+	tcp_input ( m, nbp->ilen );
+
+	/* do NOT free the netbuf here */
 
 	/* Must give eptr since we may have PREPAD */
-	pkt = (struct netpacket *) nbp->eptr;
+	// pkt = (struct netpacket *) nbp->eptr;
 	// ip_ntoh ( pkt );
 	// tcp_ntoh ( pkt );
 
 	// tcp_in ( pkt );
-	/* do NOT free the packet here */
+
 }
 
 /* Something more clever could be done for these,
@@ -185,5 +196,67 @@ void    bzero (void *buf, u_int len)
 int splnet ( void ) {};
 int splimp ( void ) {};
 int splx ( int arg ) {};
+
+/* More stubs
+ */
+
+void sbflush ( void ) {};
+void sbdrop ( void ) {};
+void sbappend ( void ) {};
+void sbreserve ( void ) {};
+
+// void soreserve ( void ) {};
+
+void soisdisconnected ( void ) {};
+void soisdisconnecting ( void ) {};
+void soisconnected ( void ) {};
+void soisconnecting ( void ) {};
+void socantsendmore ( void ) {};
+void sohasoutofband ( void ) {};
+void socantrcvmore ( void ) {};
+void soabort ( void ) {};
+void soreserve ( void ) {};
+
+struct  socket * sonewconn1 ( struct socket *head, int connstatus) {};
+
+int in_pcballoc ( struct socket *s, struct inpcb *i ) {};
+int in_pcbdetach ( struct inpcb * ) {};
+
+int in_setsockaddr ( struct inpcb *, struct mbuf * ) {};
+int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {};
+
+int ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm ) {};
+
+// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) {};
+
+int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {};
+int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {};
+int in_pcbdisconnect ( struct inpcb *n ) {};
+
+void wakeup ( void ) {};
+void sowakeup ( void ) {};
+void inetctlerrmap ( void ) {};
+
+int in_losing ( struct inpcb *n ) {};
+int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {};
+
+int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {};
+//               ‘int(struct inpcb *, struct sockaddr *, unsigned int,  struct in_addr,  unsigned int,  int,  void (*)(struct inpcb *, int))’}
+
+void _insque ( void ) {};
+void _remque ( void ) {};
+
+int in_localaddr ( struct in_addr ) {};
+
+int ip_output ( struct mbuf *, struct mbuf *, struct route *, int,  struct ip_moptions * ) {};
+
+void rtalloc ( struct route * ) {};
+
+void ip_stripoptions ( struct mbuf *, struct mbuf * ) {};
+
+void ip_pcblookup ( struct route * ) {};
+struct mbuf * ip_srcroute ( void ) {};
+
+struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {};
 
 /* THE END */

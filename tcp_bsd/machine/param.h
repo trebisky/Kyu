@@ -84,8 +84,11 @@
  * of the hardware page size.
  */
 #define	MSIZE		128		/* size of an mbuf */
-#define	MCLBYTES	1024
-#define	MCLSHIFT	10
+// Kyu
+// #define	MCLBYTES	1024
+// #define	MCLSHIFT	10
+#define	MCLBYTES	2048
+#define	MCLSHIFT	11
 #define	MCLOFSET	(MCLBYTES - 1)
 #ifndef NMBCLUSTERS
 #ifdef GATEWAY

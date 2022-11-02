@@ -65,11 +65,14 @@
 
 #define WANT_SMP
 
-/* Xinu TCP needs the net timer */
-#define WANT_NET_TIMER
 // #define WANT_TCP_XINU
-// #define WANT_TCP_BSD
-#define WANT_TCP_KYU
+#define WANT_TCP_BSD
+// #define WANT_TCP_KYU
+
+/* Xinu TCP needs the net timer */
+#ifdef WANT_TCP_XINU
+#define WANT_NET_TIMER
+#endif
 
 #ifndef WANT_TCP_XINU
 #ifndef WANT_TCP_BSD

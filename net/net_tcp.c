@@ -44,6 +44,7 @@ void
 tcp_rcv ( struct netbuf *nbp )
 {
 	(*tcp_ops->rcv) (nbp);
+	netbuf_free ( nbp );
 }
 
 void xtest_show ( long );
@@ -68,21 +69,5 @@ xtest_show ( long xxx )
 {
 	printf ( "TCP show -- sorry, not ready yet\n" );
 }
-
-#ifdef notdef
-#ifdef WANT_TCP_XINU
-	    tcp_xinu_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
-#ifdef WANT_TCP_BSD
-	    tcp_bsd_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
-#ifdef WANT_TCP_KYU
-	    // tcp_rcv ( nbp );
-	    tcp_kyu_rcv ( nbp );
-	    netbuf_free ( nbp );
-#endif
-#endif
 
 /* THE END */
