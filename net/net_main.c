@@ -196,16 +196,7 @@ net_init ( void )
 
     netbuf_init ();
     udp_init ();
-
-#ifdef WANT_TCP_XINU
-    tcp_xinu_init ();
-#endif
-#ifdef WANT_TCP_BSD
-    tcp_bsd_init ();
-#endif
-#ifdef WANT_TCP_KYU
-    tcp_kyu_init ();
-#endif
+    kyu_tcp_init ();
 
     arp_init ();
     dns_init ();

@@ -7,6 +7,7 @@
 #include "kyu.h"
 #include "thread.h"
 #include "../net/net.h"		/* Kyu */
+#include "../net/kyu_tcp.h"
 
 #include <sys/param.h>
 // #include <sys/systm.h>
@@ -91,10 +92,34 @@ int	tcp_debx;
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
+static void bsd_init ( void );
+static void tcp_globals_init ( void );
+static void tcp_bsd_rcv ( struct netbuf *nbp );
+
+struct tcp_ops bsd_ops = {
+	bsd_init,
+	tcp_bsd_rcv
+};
+
 
 /* Kyu calls this during initialization */
-void
+struct tcp_ops *
 tcp_bsd_init ( void )
+{
+	return &bsd_ops;
+}
+
+static void
+bsd_init ( void )
+{
+	tcp_globals_init ();
+
+	// in tcp_subr.c
+	tcp_init ();
+}
+
+static void
+tcp_globals_init ( void )
 {
 	/* From netiso/tuba_subr.c */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
@@ -124,7 +149,7 @@ tcp_bsd_show ( void )
  *  From ip_rcv() in net/net_ip.c
  * Be sure and let Kyu free the packet.
  */
-void
+static void
 tcp_bsd_rcv ( struct netbuf *nbp )
 {
 	struct netpacket *pkt;
@@ -139,5 +164,26 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	// tcp_in ( pkt );
 	/* do NOT free the packet here */
 }
+
+/* Something more clever could be done for these,
+ * but this gets us going for now.
+ */
+
+void    bcopy (const void *from, void *to, u_int len)
+{
+	memcpy ( to, from, len );
+}
+
+void    bzero (void *buf, u_int len)
+{
+	memset ( buf, 0, len );
+}
+
+/* This won't do of course, but keeps things quiet for now.
+*/
+
+int splnet ( void ) {};
+int splimp ( void ) {};
+int splx ( int arg ) {};
 
 /* THE END */

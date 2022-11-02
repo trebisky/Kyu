@@ -409,7 +409,7 @@ button_handler ( int xx )
 	gpio_int_ack ( POWER_BUTTON );
 
 	thr_show ();
-	tcp_show ();
+	// tcp_show ();
 }
 
 /* Should not hurt to call this twice.

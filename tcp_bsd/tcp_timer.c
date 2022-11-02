@@ -33,6 +33,8 @@
  *	@(#)tcp_timer.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <kyu_compat.h>
+
 #ifndef TUBA_INCLUDE
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -36,7 +36,7 @@ OBJS =  machine.o \
     dlmalloc.o \
     random.o \
     net.o \
-    tcp_xinu.o \
+    tcp_kyu.o \
     kyulib.o \
     lib.o
 
@@ -84,7 +84,9 @@ machine.o:	bogus
 	cd board ; make
 	cd net ; make
 	cd lib ; make
-	cd tcp_xinu ; make
+#	cd tcp_xinu ; make
+#	cd tcp_bsd ; make
+	cd tcp_kyu ; make
 #	cd linux ; make
 
 bogus:

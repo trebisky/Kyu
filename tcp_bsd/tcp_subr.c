@@ -33,6 +33,8 @@
  *	@(#)tcp_subr.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <kyu_compat.h>
+
 #include <sys/param.h>
 // #include <sys/proc.h>
 #include <sys/systm.h>

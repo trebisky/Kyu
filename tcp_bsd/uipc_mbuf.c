@@ -33,6 +33,8 @@
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
  */
 
+#include <kyu_compat.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 // #include <sys/proc.h>

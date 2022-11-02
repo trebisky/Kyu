@@ -41,6 +41,8 @@
 #define	TANAMES
 #endif
 
+#include <kyu_compat.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>

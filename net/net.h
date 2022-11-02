@@ -23,6 +23,9 @@
 #include <arch/types.h>
 #include "netbuf.h"
 
+#ifndef __KYU_NET_H__
+#define __KYU_NET_H__
+
 #define DEBUG_TCP
 
 #define ETH_ARP		0x0806
@@ -93,4 +96,5 @@ struct ip_hdr {
 #define IP_DF			0x4000	/* don't fragment */
 #define IP_MF			0x2000	/* more fragments */
 
+#endif  /* __KYU_NET_H__ */
 /*  THE END */

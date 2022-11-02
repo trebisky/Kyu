@@ -33,6 +33,8 @@
  *	@(#)tcp_output.c	8.3 (Berkeley) 12/30/93
  */
 
+#include <kyu_compat.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>

@@ -7,6 +7,9 @@
 INCS = -I. -I..
 # INCS += -I$(BSD_SRC)
 
+# Including ".." in the above lets us get the kyu include
+# files - such as arch/cpu.h for htonl() and such.
+
 # To get time.h ???
 # /u1/BSD/4.4BSD-Lite/usr/src/include/time.h
 #INCS += -I$(BSD_NET3)/include
