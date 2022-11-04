@@ -70,9 +70,10 @@ u_long	sb_max;			/* socketvar.h */
 
 struct  ifnet   *ifnet;		/* net/if.h */
 
-struct	route_cb route_cb;			/* net/route.h */
-struct	rtstat	rtstat;				/* net/route.h */
-struct	radix_node_head *rt_tables[AF_MAX+1];	/* net/route.h */
+/* from net/route.h */
+struct	route_cb route_cb;
+struct	rtstat	rtstat;
+// struct	radix_node_head *rt_tables[AF_MAX+1];
 
 /* from ip_var.h */
 struct	ipstat	ipstat;
@@ -92,7 +93,8 @@ u_long	tcp_now;		/* for RFC 1323 timestamps */
 struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
 
-struct in_addr zeroin_addr;
+/* Handy address full of all zeros */
+struct in_addr zeroin_addr = { 0 };
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
@@ -159,9 +161,22 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	// struct netpacket *pkt;
 	struct mbuf *m;
 
-	printf ( "TCP: bsd_rcv %d\n", ntohs(nbp->iptr->len) );
+	nbp->iptr->len = ntohs ( nbp->iptr->len );
+	nbp->iptr->id = ntohs ( nbp->iptr->id );
+	nbp->iptr->offset = ntohs ( nbp->iptr->offset );
+
+	// printf ( "TCP: bsd_rcv %d bytes\n", ntohs(nbp->iptr->len) );
+	printf ( "TCP: bsd_rcv %d bytes\n", nbp->iptr->len );
+
+	dump_buf ( (char *) nbp->iptr, nbp->ilen );
 
 	m = m_devget ( (char *) nbp->iptr, nbp->ilen, 0, NULL, 0 );
+	if ( ! m ) {
+	    printf ( "** m_devget fails\n" );
+	    return;
+	}
+	printf ( "M_devget: %08x %d\n", m, nbp->ilen );
+	dump_buf ( (char *) m, 128 );
 
 	tcp_input ( m, nbp->ilen );
 
@@ -174,6 +189,22 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 
 	// tcp_in ( pkt );
 
+}
+
+/* Called when TCP wants to hand a packet to IP for transmission
+ */
+int
+ip_output ( struct mbuf *, struct mbuf *, struct route *, int,  struct ip_moptions * )
+{
+	printf ( "TCP(bsd): ip_output\n" );
+}
+
+/* Called when TCP wants to send a control message.
+ */
+int
+ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm )
+{
+	printf ( "TCP(bsd): ctl output\n" );
 }
 
 /* Something more clever could be done for these,
@@ -193,70 +224,65 @@ void    bzero (void *buf, u_int len)
 /* This won't do of course, but keeps things quiet for now.
 */
 
-int splnet ( void ) {};
-int splimp ( void ) {};
-int splx ( int arg ) {};
+int splnet ( void ) {}
+int splimp ( void ) {}
+int splx ( int arg ) {}
 
 /* More stubs
  */
 
-void sbflush ( void ) {};
-void sbdrop ( void ) {};
-void sbappend ( void ) {};
-void sbreserve ( void ) {};
+void sbflush ( void ) {}
+void sbdrop ( void ) {}
+void sbappend ( void ) {}
+void sbreserve ( void ) {}
 
-// void soreserve ( void ) {};
+// void soreserve ( void ) {}
 
-void soisdisconnected ( void ) {};
-void soisdisconnecting ( void ) {};
-void soisconnected ( void ) {};
-void soisconnecting ( void ) {};
-void socantsendmore ( void ) {};
-void sohasoutofband ( void ) {};
-void socantrcvmore ( void ) {};
-void soabort ( void ) {};
-void soreserve ( void ) {};
+void soisdisconnected ( void ) {}
+void soisdisconnecting ( void ) {}
+void soisconnected ( void ) {}
+void soisconnecting ( void ) {}
+void socantsendmore ( void ) {}
+void sohasoutofband ( void ) {}
+void socantrcvmore ( void ) {}
+void soabort ( void ) {}
+void soreserve ( void ) {}
 
-struct  socket * sonewconn1 ( struct socket *head, int connstatus) {};
+struct  socket * sonewconn1 ( struct socket *head, int connstatus) {}
 
-int in_pcballoc ( struct socket *s, struct inpcb *i ) {};
-int in_pcbdetach ( struct inpcb * ) {};
+int in_pcballoc ( struct socket *s, struct inpcb *i ) {}
+int in_pcbdetach ( struct inpcb * ) {}
 
-int in_setsockaddr ( struct inpcb *, struct mbuf * ) {};
-int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {};
+int in_setsockaddr ( struct inpcb *, struct mbuf * ) {}
+int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {}
 
-int ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm ) {};
+// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) {}
 
-// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) {};
+int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {}
+int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {}
+int in_pcbdisconnect ( struct inpcb *n ) {}
 
-int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {};
-int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {};
-int in_pcbdisconnect ( struct inpcb *n ) {};
+void wakeup ( void ) {}
+void sowakeup ( void ) {}
+void inetctlerrmap ( void ) {}
 
-void wakeup ( void ) {};
-void sowakeup ( void ) {};
-void inetctlerrmap ( void ) {};
+int in_losing ( struct inpcb *n ) {}
+int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {}
 
-int in_losing ( struct inpcb *n ) {};
-int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {};
+int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {}
 
-int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {};
-//               ‘int(struct inpcb *, struct sockaddr *, unsigned int,  struct in_addr,  unsigned int,  int,  void (*)(struct inpcb *, int))’}
+void _insque ( void ) {}
+void _remque ( void ) {}
 
-void _insque ( void ) {};
-void _remque ( void ) {};
+int in_localaddr ( struct in_addr ) {}
 
-int in_localaddr ( struct in_addr ) {};
+void rtalloc ( struct route * ) {}
 
-int ip_output ( struct mbuf *, struct mbuf *, struct route *, int,  struct ip_moptions * ) {};
+void ip_stripoptions ( struct mbuf *, struct mbuf * ) {}
 
-void rtalloc ( struct route * ) {};
+void ip_pcblookup ( struct route * ) {}
+struct mbuf * ip_srcroute ( void ) {}
 
-void ip_stripoptions ( struct mbuf *, struct mbuf * ) {};
-
-void ip_pcblookup ( struct route * ) {};
-struct mbuf * ip_srcroute ( void ) {};
-
-struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {};
+struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {}
 
 /* THE END */

@@ -233,7 +233,7 @@ struct route_cb {
 
 extern struct	route_cb route_cb;
 extern struct	rtstat	rtstat;
-extern struct	radix_node_head *rt_tables[];
+// extern struct	radix_node_head *rt_tables[];
 
 void	 route_init __P((void));
 int	 route_output __P((struct mbuf *, struct socket *));

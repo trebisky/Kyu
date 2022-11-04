@@ -257,12 +257,16 @@ tcp_input(m, iphlen)
 	ti->ti_x1 = 0;
 	ti->ti_len = (u_short)tlen;
 	HTONS(ti->ti_len);
+	printf ( "tcp_input 1 %d\n", len );
 	if (ti->ti_sum = in_cksum(m, len)) {
 		tcpstat.tcps_rcvbadsum++;
+		printf ( "tcp_input 2 %d\n", ti->ti_sum );
+		dump_buf ( (char *) ti, len );
 		goto drop;
 	}
 #endif /* TUBA_INCLUDE */
 
+	printf ( "tcp_input 3\n" );
 	/*
 	 * Check that TCP offset makes sense,
 	 * pull out TCP options and adjust length.		XXX
@@ -270,8 +274,10 @@ tcp_input(m, iphlen)
 	off = ti->ti_off << 2;
 	if (off < sizeof (struct tcphdr) || off > tlen) {
 		tcpstat.tcps_rcvbadoff++;
+		printf ( "tcp_input 4\n" );
 		goto drop;
 	}
+	printf ( "tcp_input 5\n" );
 	tlen -= off;
 	ti->ti_len = tlen;
 	if (off > sizeof (struct tcphdr)) {

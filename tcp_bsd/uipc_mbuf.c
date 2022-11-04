@@ -56,7 +56,7 @@ char	*mclrefcnt;
 void m_reclaim ( void );
 
 void
-mbinit()
+mbinit(void)
 {
 	int s;
 
@@ -90,6 +90,7 @@ m_clalloc(ncl, nowait)
 	npg = ncl * CLSIZE;
 // KYU XXX
 //	p = (caddr_t)kmem_malloc(mb_map, ctob(npg), !nowait);
+
 	if (p == NULL) {
 		if (logged == 0) {
 			logged++;
@@ -109,7 +110,7 @@ m_clalloc(ncl, nowait)
 }
 
 /*
- * When MGET failes, ask protocols to free space when short of memory,
+ * When MGET fails, ask protocols to free space when short of memory,
  * then re-attempt to allocate an mbuf.
  */
 struct mbuf *
