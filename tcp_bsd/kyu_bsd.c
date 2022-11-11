@@ -96,8 +96,14 @@ int	tcp_debx;
 /* Handy address full of all zeros */
 struct in_addr zeroin_addr = { 0 };
 
+/* From netinet/ip_input.c
+ * this oddity bears some looking at -- gone in NetBSD-1.3
+ */
+struct  in_ifaddr *in_ifaddr;                   /* first inet address */
+
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
+
 static void bsd_init ( void );
 static void tcp_globals_init ( void );
 static void tcp_bsd_rcv ( struct netbuf *nbp );
@@ -118,6 +124,7 @@ tcp_bsd_init ( void )
 static void
 bsd_init ( void )
 {
+	printf ( "BSD tcp init called\n" );
 	tcp_globals_init ();
 
 	// in tcp_subr.c
@@ -127,6 +134,8 @@ bsd_init ( void )
 static void
 tcp_globals_init ( void )
 {
+	mclfree = NULL;
+
 	/* From netiso/tuba_subr.c */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
 	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
@@ -140,6 +149,8 @@ tcp_globals_init ( void )
 
 	/* maximum chars per socket buffer, from socketvar.h */
 	sb_max = SB_MAX;
+
+	tcb.inp_next = tcb.inp_prev = &tcb;
 
 	// ifnet = XXX
 }
@@ -160,13 +171,15 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 {
 	// struct netpacket *pkt;
 	struct mbuf *m;
+	struct ip *iip;
 
+	/* byte swap fields in IP header */
 	nbp->iptr->len = ntohs ( nbp->iptr->len );
 	nbp->iptr->id = ntohs ( nbp->iptr->id );
 	nbp->iptr->offset = ntohs ( nbp->iptr->offset );
 
 	// printf ( "TCP: bsd_rcv %d bytes\n", ntohs(nbp->iptr->len) );
-	printf ( "TCP: bsd_rcv %d bytes\n", nbp->iptr->len );
+	printf ( "TCP: bsd_rcv %d, %d bytes\n", nbp->ilen, nbp->iptr->len );
 
 	dump_buf ( (char *) nbp->iptr, nbp->ilen );
 
@@ -177,6 +190,13 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	}
 	printf ( "M_devget: %08x %d\n", m, nbp->ilen );
 	dump_buf ( (char *) m, 128 );
+
+	/* Ah, but what goes on during IP processing by the BSD code */
+	/* For one thing, it subtracts the size of the IP header
+	 * off of the length field in the IP header itself.
+	 */
+	iip = mtod(m, struct ip *);
+	iip->ip_len -= sizeof(struct ip);
 
 	tcp_input ( m, nbp->ilen );
 
@@ -221,6 +241,46 @@ void    bzero (void *buf, u_int len)
 	memset ( buf, 0, len );
 }
 
+/* -------------------------------------------------------------------------------------------- */
+
+/* Here is our mbuf allocation scheme.
+ */
+
+void * kyu_malloc ( unsigned long );
+
+void *
+k_mbuf_alloc ( void )
+{
+	void *rv;
+
+	rv = kyu_malloc ( MSIZE );	/* 128 */
+	printf ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
+	memset ( rv, 0xab, MSIZE );
+	return rv;
+}
+
+/* XXX todo */
+void
+k_mbuf_free ( void *m )
+{
+}
+
+void *
+k_mbufcl_alloc ( void )
+{
+	void *rv;
+
+	rv = kyu_malloc ( MCLBYTES );	/* 2048 */
+	return rv;
+}
+
+// void k_mbufcl_free ( void *cl ) { }
+
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+
 /* This won't do of course, but keeps things quiet for now.
 */
 
@@ -236,8 +296,6 @@ void sbdrop ( void ) {}
 void sbappend ( void ) {}
 void sbreserve ( void ) {}
 
-// void soreserve ( void ) {}
-
 void soisdisconnected ( void ) {}
 void soisdisconnecting ( void ) {}
 void soisconnected ( void ) {}
@@ -247,42 +305,62 @@ void sohasoutofband ( void ) {}
 void socantrcvmore ( void ) {}
 void soabort ( void ) {}
 void soreserve ( void ) {}
+void sofree ( struct socket *so ) {}
+
 
 struct  socket * sonewconn1 ( struct socket *head, int connstatus) {}
 
-int in_pcballoc ( struct socket *s, struct inpcb *i ) {}
-int in_pcbdetach ( struct inpcb * ) {}
+// -- in in_pcb.c
+// int in_pcballoc ( struct socket *s, struct inpcb *i ) {}
+// int in_pcbdetach ( struct inpcb * ) {}
 
-int in_setsockaddr ( struct inpcb *, struct mbuf * ) {}
-int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {}
+// int in_setsockaddr ( struct inpcb *, struct mbuf * ) {}
+// int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {}
 
 // void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) {}
 
-int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {}
-int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {}
-int in_pcbdisconnect ( struct inpcb *n ) {}
+// int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {}
+// int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {}
+// int in_pcbdisconnect ( struct inpcb *n ) {}
+
+// int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {}
+// struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {}
+
+// int in_losing ( struct inpcb *n ) {}
+
+// -- in in.c
+// int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {}
+
+void ip_pcblookup ( struct route * ) {}
 
 void wakeup ( void ) {}
 void sowakeup ( void ) {}
 void inetctlerrmap ( void ) {}
 
-int in_losing ( struct inpcb *n ) {}
-int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {}
-
-int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {}
-
 void _insque ( void ) {}
 void _remque ( void ) {}
 
-int in_localaddr ( struct in_addr ) {}
+// int in_localaddr ( struct in_addr ) {}
 
 void rtalloc ( struct route * ) {}
 
 void ip_stripoptions ( struct mbuf *, struct mbuf * ) {}
 
-void ip_pcblookup ( struct route * ) {}
 struct mbuf * ip_srcroute ( void ) {}
 
-struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {}
+/* from net/if.c */
+struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) {}
+struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) {}
+struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) {}
+
+/* from net/route.c */
+void rtfree( struct rtentry *rt ) {}
+int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) {}
+
+/* from net/rtsock.c */
+void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) {}
+
+void ip_freemoptions( register struct ip_moptions * ) {}
+
 
 /* THE END */

@@ -231,7 +231,8 @@ struct ip_mreq {
 #ifdef KERNEL
 int	 in_broadcast __P((struct in_addr, struct ifnet *));
 int	 in_canforward __P((struct in_addr));
-int	 in_cksum __P((struct mbuf *, int));
+//int	 in_cksum __P((struct mbuf *, int));
+int	 tcp_cksum ( struct mbuf *, int);
 int	 in_localaddr __P((struct in_addr));
 u_long	 in_netof __P((struct in_addr));
 void	 in_socktrim __P((struct sockaddr_in *));

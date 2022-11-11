@@ -80,7 +80,8 @@ int	 in_pcbdisconnect __P((struct inpcb *));
 struct inpcb *
 	 in_pcblookup __P((struct inpcb *,
 	    struct in_addr, u_int, struct in_addr, u_int, int));
-int	 in_pcbnotify __P((struct inpcb *, struct sockaddr *,
+// int	 in_pcbnotify __P((struct inpcb *, struct sockaddr *,
+void	 in_pcbnotify __P((struct inpcb *, struct sockaddr *,
 	    u_int, struct in_addr, u_int, int, void (*)(struct inpcb *, int)));
 void	 in_rtchange __P((struct inpcb *, int));
 int	 in_setpeeraddr __P((struct inpcb *, struct mbuf *));

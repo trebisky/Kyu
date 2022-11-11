@@ -25,12 +25,16 @@ DEFS += -DKERNEL
 include ../Makefile.inc
 
 OBJS = kyu_bsd.o \
+	mbuf.o \
 	tcp_debug.o \
 	tcp_input.o \
 	tcp_output.o \
 	tcp_subr.o \
 	tcp_timer.o \
 	tcp_usrreq.o \
+	in_pcb.o \
+	in.o \
+	tcp_cksum.o \
 	uipc_mbuf.o
 
 all: ../tcp_bsd.o
@@ -65,12 +69,18 @@ get:
 #	cp $(BSD_SRC)/netinet/tcp_timer.c .
 #	cp $(BSD_SRC)/netinet/tcp_usrreq.c .
 
+#	cp $(BSD_SRC)/netinet/in_pcb.c .
+#	cp $(BSD_SRC)/netinet/in.c .
+
 #	cp $(BSD_SRC)/netinet/in_pcb.h .
 #	cp $(BSD_SRC)/netinet/in.h .
 #	cp $(BSD_SRC)/netinet/in_systm.h .
 #	cp $(BSD_SRC)/netinet/ip.h .
 #	cp $(BSD_SRC)/netinet/ip_var.h .
 #	cp $(BSD_SRC)/netinet/ip_icmp.h .
+#	cp $(BSD_SRC)/netinet/in_var.h .
+
+#	cp $(BSD_SRC)/netinet/if_ether.h .
 
 #	cp  $(BSD_SRC)/sys/types.h sys
 #	cp  $(BSD_SRC)/sys/mbuf.h sys
@@ -90,6 +100,7 @@ get:
 #	cp  $(BSD_SRC)/sys/select.h sys
 #	cp  $(BSD_SRC)/sys/protosw.h sys
 #	cp  $(BSD_SRC)/sys/stat.h sys
+#	cp  $(BSD_SRC)/sys/sockio.h sys
 
 # -- for uipc_mbuf.h
 #	cp  $(BSD_SRC)/sys/domain.h sys
@@ -99,7 +110,7 @@ get:
 #	cp  $(BSD_SRC)/net/route.h net
 #	cp  $(BSD_SRC)/net/radix.h net
 
-	# machine is a gross hack (link to i386/include)
+# machine is a gross hack (link to i386/include)
 #	cp  $(BSD_SRC)/machine/endian.h machine
 #	cp  $(BSD_SRC)/machine/ansi.h machine
 #	cp  $(BSD_SRC)/machine/types.h machine
@@ -107,6 +118,8 @@ get:
 #	cp  $(BSD_SRC)/machine/trap.h machine
 #	cp  $(BSD_SRC)/machine/param.h machine
 #	cp  $(BSD_SRC)/machine/limits.h machine
+
+#	cp  $(BSD_SRC)/i386/i386/in_cksum.c tcp_cksum.c
 
 #	cp  $(BSD_SRC)/libkern/libkern.h libkern
 

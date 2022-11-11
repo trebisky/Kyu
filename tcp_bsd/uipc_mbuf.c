@@ -53,14 +53,22 @@
 struct	mbuf *mbutl;
 char	*mclrefcnt;
 
-void m_reclaim ( void );
+static void m_reclaim ( void );
+// struct mbuf * m_retry ( int , int );
+// struct mbuf * m_retryhdr ( int, int );
 
+#ifndef KYU
+/* Kyu just starts up with mclfree = NULL
+ * and lets things get allocated as needed.
+ * None of this "preloading" the free list.
+ */
 void
 mbinit(void)
 {
 	int s;
 
 	mclfree = NULL;
+
 #define NCL_INIT	(4096/CLBYTES)
 	s = splimp();
 	if (m_clalloc(NCL_INIT, M_DONTWAIT) == 0)
@@ -108,14 +116,14 @@ m_clalloc(ncl, nowait)
 	mbstat.m_clusters += ncl;
 	return (1);
 }
+#endif
 
 /*
  * When MGET fails, ask protocols to free space when short of memory,
  * then re-attempt to allocate an mbuf.
  */
 struct mbuf *
-m_retry(i, t)
-	int i, t;
+m_retry ( int i, int t )
 {
 	register struct mbuf *m;
 
@@ -130,8 +138,7 @@ m_retry(i, t)
  * As above; retry an MGETHDR.
  */
 struct mbuf *
-m_retryhdr(i, t)
-	int i, t;
+m_retryhdr ( int i, int t )
 {
 	register struct mbuf *m;
 
@@ -142,7 +149,7 @@ m_retryhdr(i, t)
 	return (m);
 }
 
-void
+static void
 m_reclaim ( void )
 {
 	register struct domain *dp;
@@ -615,9 +622,11 @@ m_devget(buf, totlen, off0, ifp, copy)
 		cp += off + 2 * sizeof(u_short);
 		totlen -= 2 * sizeof(u_short);
 	}
+
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == 0)
 		return (0);
+
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
 	m->m_len = MHLEN;

@@ -77,8 +77,10 @@ tcp_init()
 
 	tcp_iss = 1;		/* wrong */
 	tcb.inp_next = tcb.inp_prev = &tcb;
+
 	if (max_protohdr < sizeof(struct tcpiphdr))
 		max_protohdr = sizeof(struct tcpiphdr);
+
 	if (max_linkhdr + sizeof(struct tcpiphdr) > MHLEN)
 		panic("tcp_init");
 }
@@ -200,8 +202,10 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	else
 		ti->ti_win = htons((u_short)win);
 	ti->ti_urp = 0;
-	ti->ti_sum = 0;
-	ti->ti_sum = in_cksum(m, tlen);
+	// Kyu
+	// ti->ti_sum = 0;
+	// ti->ti_sum = in_cksum(m, tlen);
+	ti->ti_sum = tcp_cksum(m, tlen);
 	((struct ip *)ti)->ip_len = tlen;
 	((struct ip *)ti)->ip_ttl = ip_defttl;
 	(void) ip_output(m, NULL, ro, 0, NULL);

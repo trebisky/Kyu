@@ -55,6 +55,19 @@ udelay ( int count )
 }
 #endif
 
+/* XXX - gross hack to get tcp_bsd running.
+ * We can't just call "malloc" in the bsd directory
+ *  (at least not at this time) because it has its own
+ *  malloc.h  So this routine is not in the BSD
+ *  namespace and bounces to the kyu malloc code.
+ */
+
+void *
+kyu_malloc ( unsigned long count )
+{
+	return malloc ( count );
+}
+
 int
 hextoi ( char *s )
 {

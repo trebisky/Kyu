@@ -468,7 +468,8 @@ send:
 	if (len + optlen)
 		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
 		    optlen + len));
-	ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
+	// ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
+	ti->ti_sum = tcp_cksum(m, (int)(hdrlen + len));
 
 	/*
 	 * In transmit state, time the transmission and arrange for

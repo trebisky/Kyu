@@ -102,6 +102,7 @@ struct mbuf {
 		char	M_databuf[MLEN];		/* !M_PKTHDR, !M_EXT */
 	} M_dat;
 };
+
 #define	m_next		m_hdr.mh_next
 #define	m_len		m_hdr.mh_len
 #define	m_data		m_hdr.mh_data
@@ -170,7 +171,29 @@ struct mbuf {
  * allocates an mbuf and initializes it to contain a packet header
  * and internal data.
  */
-#define	MGET(m, how, type) { \
+
+#ifdef KYU
+    void * k_mbuf_alloc ( void );
+    void * k_mbufcl_alloc ( void );
+    void k_mbuf_free ( void * );
+    // void k_mbufcl_free ( void * );
+#endif
+
+#ifdef KYU
+    #define	MGET(m, how, type) { \
+	(m) = (struct mbuf *) k_mbuf_alloc (); \
+	if (m) { \
+		(m)->m_type = (type); \
+		MBUFLOCK(mbstat.m_mtypes[type]++;) \
+		(m)->m_next = (struct mbuf *) NULL; \
+		(m)->m_nextpkt = (struct mbuf *) NULL; \
+		(m)->m_data = (m)->m_dat; \
+		(m)->m_flags = 0; \
+	} else \
+		panic ( "mbuf MGET exhausted"); \
+    }
+#else
+    #define	MGET(m, how, type) { \
 	MALLOC((m), struct mbuf *, MSIZE, mbtypes[type], (how)); \
 	if (m) { \
 		(m)->m_type = (type); \
@@ -181,9 +204,24 @@ struct mbuf {
 		(m)->m_flags = 0; \
 	} else \
 		(m) = m_retry((how), (type)); \
-}
+    }
+#endif
 
-#define	MGETHDR(m, how, type) { \
+#ifdef KYU
+    #define	MGETHDR(m, how, type) { \
+	(m) = (struct mbuf *) k_mbuf_alloc (); \
+	if (m) { \
+		(m)->m_type = (type); \
+		MBUFLOCK(mbstat.m_mtypes[type]++;) \
+		(m)->m_next = (struct mbuf *)NULL; \
+		(m)->m_nextpkt = (struct mbuf *)NULL; \
+		(m)->m_data = (m)->m_pktdat; \
+		(m)->m_flags = M_PKTHDR; \
+	} else \
+		panic ( "mbuf MGETHDR exhausted"); \
+    }
+#else
+    #define	MGETHDR(m, how, type) { \
 	MALLOC((m), struct mbuf *, MSIZE, mbtypes[type], (how)); \
 	if (m) { \
 		(m)->m_type = (type); \
@@ -194,7 +232,8 @@ struct mbuf {
 		(m)->m_flags = M_PKTHDR; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
-}
+    }
+#endif
 
 /*
  * Mbuf cluster macros.
@@ -213,6 +252,21 @@ union mcluster {
 	char	mcl_buf[MCLBYTES];
 };
 
+#ifdef KYU
+#define	MCLALLOC(p, how) \
+	MBUFLOCK( \
+	  if (mclfree == 0) { \
+		(p) = k_mbufcl_alloc (); \
+		if ( !p ) \
+		    panic ( "mbufcl MCLALLOC exhausted"); \
+	  } else { \
+	        (p) = (caddr_t) mclfree; \
+		++mclrefcnt[mtocl(p)]; \
+		mbstat.m_clfree--; \
+		mclfree = ((union mcluster *)(p))->mcl_next; \
+	    } \
+	  )
+#else
 #define	MCLALLOC(p, how) \
 	MBUFLOCK( \
 	  if (mclfree == 0) \
@@ -223,7 +277,9 @@ union mcluster {
 		mclfree = ((union mcluster *)(p))->mcl_next; \
 	  } \
 	)
+#endif
 
+/* This should work unchanged for Kyu */
 #define	MCLGET(m, how) \
 	{ MCLALLOC((m)->m_ext.ext_buf, (how)); \
 	  if ((m)->m_ext.ext_buf != NULL) { \
@@ -233,6 +289,10 @@ union mcluster {
 	  } \
 	}
 
+/* This also should work OK as is for Kyu.
+ * clusters just go onto the free list that we
+ * manage right here.
+ */
 #define	MCLFREE(p) \
 	MBUFLOCK ( \
 	  if (--mclrefcnt[mtocl(p)] == 0) { \
@@ -261,6 +321,12 @@ union mcluster {
 	  FREE((m), mbtypes[(m)->m_type]); \
 	}
 #else /* notyet */
+#endif
+
+#ifdef KYU
+/* XXX */
+#define	MFREE(m, nn)
+#else
 #define	MFREE(m, nn) \
 	{ MBUFLOCK(mbstat.m_mtypes[(m)->m_type]--;) \
 	  if ((m)->m_flags & M_EXT) { \

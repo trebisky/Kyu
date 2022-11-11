@@ -36,6 +36,8 @@ kyu_tcp_init ( void )
 #ifdef WANT_TCP_KYU
 	tcp_ops = tcp_kyu_init ();
 #endif
+
+	(*tcp_ops->init) ();
 }
 
 /* Pass a received packet on to TCP

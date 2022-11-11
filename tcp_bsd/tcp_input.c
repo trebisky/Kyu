@@ -233,11 +233,15 @@ tcp_input(m, iphlen)
 	int ts_present = 0;
 
 	tcpstat.tcps_rcvtotal++;
+
 	/*
 	 * Get IP and TCP header together in first mbuf.
 	 * Note: IP leaves IP header in first mbuf.
 	 */
 	ti = mtod(m, struct tcpiphdr *);
+	printf ( "tcp_input 0 len = %d\n", iphlen );
+	dump_buf ( (char *) ti, 128 );	/* XXX */
+
 	if (iphlen > sizeof (struct ip))
 		ip_stripoptions(m, (struct mbuf *)0);
 	if (m->m_len < sizeof (struct tcpiphdr)) {
@@ -257,10 +261,13 @@ tcp_input(m, iphlen)
 	ti->ti_x1 = 0;
 	ti->ti_len = (u_short)tlen;
 	HTONS(ti->ti_len);
-	printf ( "tcp_input 1 %d\n", len );
-	if (ti->ti_sum = in_cksum(m, len)) {
+	mbuf_show ( m, "tcp_input 1" );
+	printf ( "tcp_input 1 %08x, %d\n", ti, len );
+
+	// if (ti->ti_sum = in_cksum(m, len)) {
+	if (ti->ti_sum = tcp_cksum(m, len)) {
 		tcpstat.tcps_rcvbadsum++;
-		printf ( "tcp_input 2 %d\n", ti->ti_sum );
+		printf ( "tcp_input 2, sum = %d\n", ti->ti_sum );
 		dump_buf ( (char *) ti, len );
 		goto drop;
 	}
@@ -281,6 +288,7 @@ tcp_input(m, iphlen)
 	tlen -= off;
 	ti->ti_len = tlen;
 	if (off > sizeof (struct tcphdr)) {
+		printf ( "tcp_input 6\n" );
 		if (m->m_len < sizeof(struct ip) + off) {
 			if ((m = m_pullup(m, sizeof (struct ip) + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
@@ -308,6 +316,7 @@ tcp_input(m, iphlen)
 			optp = NULL;	/* we've parsed the options */
 		}
 	}
+	printf ( "tcp_input 7A\n" );
 	tiflags = ti->ti_flags;
 
 	/*
@@ -333,6 +342,7 @@ findpcb:
 			tcp_last_inpcb = inp;
 		++tcpstat.tcps_pcbcachemiss;
 	}
+	printf ( "tcp_input 7B\n" );
 
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then
@@ -348,6 +358,7 @@ findpcb:
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 	
+	printf ( "tcp_input 8\n" );
 	/* Unscale the window into a 32-bit value. */
 	if ((tiflags & TH_SYN) == 0)
 		tiwin = ti->ti_win << tp->snd_scale;
@@ -1291,6 +1302,7 @@ dropafterack:
 	return;
 
 dropwithreset:
+	printf ( "tcp_input 9 (drop with reset)\n" );
 	/*
 	 * Generate a RST, dropping incoming segment.
 	 * Make ACK acceptable to originator of segment.
@@ -1313,6 +1325,7 @@ dropwithreset:
 	return;
 
 drop:
+	printf ( "tcp_input 10 (just drop)\n" );
 	/*
 	 * Drop space held by incoming segment and return.
 	 */

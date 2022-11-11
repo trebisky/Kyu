@@ -85,8 +85,12 @@ tcp_usrreq(so, req, m, nam, control)
 	int ostate;
 
 	if (req == PRU_CONTROL)
-		return (in_control(so, (long)m, (caddr_t)nam,
-			(struct ifnet *)control));
+#ifdef KYU
+	    return (EINVAL);
+#else
+	    /* Handle ioctl */
+	    return in_control(so, (long)m, (caddr_t)nam, (struct ifnet *)control);
+#endif
 	if (control && control->m_len) {
 		m_freem(control);
 		if (m)
