@@ -90,6 +90,7 @@
 #define	MCLBYTES	2048
 #define	MCLSHIFT	11
 #define	MCLOFSET	(MCLBYTES - 1)
+
 #ifndef NMBCLUSTERS
 #ifdef GATEWAY
 #define	NMBCLUSTERS	512		/* map size, max cluster allocation */

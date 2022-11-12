@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+// #include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -12,6 +12,7 @@
 #include <sys/param.h>
 // #include <sys/systm.h>
 #include <sys/mbuf.h>
+#include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 // #include <sys/protosw.h>
@@ -37,6 +38,7 @@ struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
 
 /* global variables */
 
+/* For malloc/free */
 int mbtypes[] = {                               /* from mbuf.h */
         M_FREE,         /* MT_FREE      0          should be on free list */
         M_MBUF,         /* MT_DATA      1          dynamic (data) allocation */

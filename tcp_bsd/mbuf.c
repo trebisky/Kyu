@@ -6,6 +6,7 @@
  */
 
 #include "kyu.h"
+#include "mbuf.h"
 
 // #include <sys/mbuf.h>
 
@@ -133,15 +134,9 @@ struct mbuf {
 
 #define mtod(m,t)	((t)((m)->m_data))
 
-union mcluster {
-        union   mcluster *mcl_next;
-        char    mcl_buf[MCLBYTES];
-};
-
 extern int max_linkhdr;
 
-static union   mcluster *mclfree;	/* mbuf.h */
-
+static void mb_clget ( struct mbuf * );
 
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
@@ -151,10 +146,32 @@ static union   mcluster *mclfree;	/* mbuf.h */
 
 void * kyu_malloc ( unsigned long );
 
+/* ---- */
+
+/* TODO -- add statistics
+ *
+ * "alloc" - how many in use.
+ * "free" - how many on free list.
+ * "max" - high water of in use.
+ * -- also impose limit on alloc to avoid runaway bugs
+ */
+
+struct my_list {
+	struct my_list *next;
+};
+
+static void *mbuf_list = NULL;
+
 void *
 k_mbuf_alloc ( void )
 {
 	void *rv;
+
+	if ( mbuf_list ) {
+	    rv = mbuf_list;
+	    mbuf_list = ((struct my_list *) rv) -> next;
+	    return rv;
+	}
 
 	rv = kyu_malloc ( MSIZE );	/* 128 */
 	printf ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
@@ -162,23 +179,104 @@ k_mbuf_alloc ( void )
 	return rv;
 }
 
-/* XXX todo */
 void
 k_mbuf_free ( void *m )
 {
+	((struct my_list *) m) -> next = (struct my_list *) mbuf_list;
+	mbuf_list = (void *) m;
+}
+
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+/* Cluster stuff */
+
+/* This is a tangled business in the original code as follows.
+ * Where do the reference counts go?
+ * They are kept in a separate array (mclrefcnt} of bytes.
+ * The index for this needs to be determined given just
+ * the address of the cluster.  So the clusters are kept
+ * in a contiguous block of memory.
+ * The macro mtocl(p) generates the index.
+ * The reference count is only needed because copies are performed
+ * not by copying, but by copying a pointer and bumping the refcnt.
+ *
+ * My desire is to first of all, capture all of this in one place,
+ * namely right here.  The original code fiddled with the VM system
+ * to get a block of pages, but I don't care about that.
+ *
+ * As I think of this a bit, I am tempted to get rid of the refcnt
+ * business altogether and just copy the cluster contents into
+ * a new cluster.  But I probably won't.
+ */
+
+static void *mbufcl_list = NULL;
+
+#ifdef notdef
+	/* From i386/i386/machdep.c */
+	mclrefcnt = (char *)malloc(NMBCLUSTERS+CLBYTES/MCLBYTES,
+                                   M_MBUF, M_NOWAIT);
+        bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
+        mb_map = kmem_suballoc(kernel_map, (vm_offset_t)&mbutl, &maxaddr,
+                               VM_MBUF_SIZE, FALSE);
+#endif
+
+static unsigned char mclrefcnt[NMBCLUSTERS];
+static char clusters[NMBCLUSTERS*MCLBYTES];
+
+// #define	mtocl(x)	(((u_long)(x) - (u_long)mbutl) >> MCLSHIFT)
+// #define	mtocl(x)	(((u_long)(x) - (u_long)clusters) / MCLBYTES)
+#define	mtocl(x)	(((u_long)(x) - (u_long)clusters) >> MCLSHIFT)
+
+void
+mb_cl_init ( void )
+{
+	int i;
+	char *cl;
+
+	bzero ( mclrefcnt, NMBCLUSTERS );
+
+	mbufcl_list = NULL;
+
+	cl = clusters;
+	for ( i=0; i<NMBCLUSTERS; i++ ) {
+	    ((struct my_list *) cl) -> next = (struct my_list *) mbufcl_list;
+	    mbufcl_list = (void *) cl;
+	    cl += MCLBYTES;
+	}
 }
 
 void *
-k_mbufcl_alloc ( void )
+mbufcl_alloc ( void )
 {
 	void *rv;
 
-	rv = kyu_malloc ( MCLBYTES );	/* 2048 */
+	if ( ! mbufcl_list )
+	    panic ( "mb_clget: clusters exhausted"); \
+
+	rv = mbufcl_list;
+	mbufcl_list = ( (struct my_list *) rv) -> next;
+
+	mclrefcnt[mtocl(rv)] = 1;
+
 	return rv;
 }
 
 void
-k_mbufcl_free ( void *cl ) { }
+mbufcl_free ( void *cl )
+{
+	if ( --mclrefcnt[mtocl(cl)] )
+	    return;
+
+	((struct my_list *) cl) -> next = (struct my_list *) mbufcl_list;
+	mbufcl_list = (void *) cl;
+}
+
+/* bump a cluster reference count */
+void
+mb_clref_bump ( void *p )
+{
+	++mclrefcnt[mtocl(p)];
+}
 
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
@@ -212,7 +310,16 @@ mbuf_show ( struct mbuf *mp, char *msg )
 void
 mb_init ( void )
 {
-	mclfree = NULL;
+	struct mbuf *m;
+
+	mb_cl_init ();
+
+	/* More of a diagnostic than anything else */
+	m = mb_get ( MT_DATA );
+	mb_freem ( m );
+	m = mb_get ( MT_DATA );
+	mb_clget ( m );
+	mb_freem ( m );
 }
 
 struct mbuf *
@@ -224,7 +331,7 @@ mb_free ( struct mbuf *m )
 	    return NULL;
 
 	if ( m->m_flags & M_EXT)
-	    k_mbufcl_free ( m->m_ext.ext_buf );
+	    mbufcl_free ( m->m_ext.ext_buf );
 	n = m->m_next;
 	k_mbuf_free ( m );
 
@@ -241,7 +348,7 @@ mb_freem ( struct mbuf *m )
 
         do {
 	    if ( m->m_flags & M_EXT)
-		k_mbufcl_free ( m->m_ext.ext_buf );
+		mbufcl_free ( m->m_ext.ext_buf );
 	    n = m->m_next;
 	    k_mbuf_free ( m );
         } while (m = n);
@@ -287,27 +394,17 @@ mb_gethdr ( int type )
 	return m;
 }
 
-static void *
-mb_clalloc ()
+/* Add a cluster to an mbuf.
+ * - one and only use in mb_devget() below
+ */
+static void
+mb_clget ( struct mbuf *m )
 {
 	void *p;
 
-	if ( ! mclfree ) {
-                p = k_mbufcl_alloc ();
-		if ( ! p )
-                    panic ( "mb_clalloc exhausted"); \
-		return p;
-	}
-	p = mclfree;
-	mclfree = ( (union mcluster *) p )->mcl_next;
-	return p;
-}
+	p = mbufcl_alloc ();
 
-
-void
-mb_clget ( struct mbuf *m )
-{
-        m->m_ext.ext_buf = mb_clalloc ();
+        m->m_ext.ext_buf = p;
 	m->m_data = m->m_ext.ext_buf;
 	m->m_flags |= M_EXT;
 	m->m_ext.ext_size = MCLBYTES;
@@ -362,6 +459,7 @@ mb_devget ( char *buf, int totlen, int off0,
 			// MCLGET(m, M_DONTWAIT);
 			mb_clget ( m );
 
+			/* ?? won't this always be true? */
 			if (m->m_flags & M_EXT)
 				m->m_len = len = min(len, MCLBYTES);
 			else

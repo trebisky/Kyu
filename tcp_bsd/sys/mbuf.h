@@ -59,12 +59,14 @@
  * cltom(x) -	convert cluster # to ptr to beginning of cluster
  */
 #define mtod(m,t)	((t)((m)->m_data))
+
 #ifndef KYU
 /* This at best yields compiler warnings and won't work on many architectures */
 #define	dtom(x)		((struct mbuf *)((int)(x) & ~(MSIZE-1)))
 #endif
-#define	mtocl(x)	(((u_long)(x) - (u_long)mbutl) >> MCLSHIFT)
-#define	cltom(x)	((caddr_t)((u_long)mbutl + ((u_long)(x) << MCLSHIFT)))
+
+// #define	mtocl(x)	(((u_long)(x) - (u_long)mbutl) >> MCLSHIFT)
+// #define	cltom(x)	((caddr_t)((u_long)mbutl + ((u_long)(x) << MCLSHIFT)))
 
 /* header at beginning of each mbuf: */
 struct m_hdr {
@@ -150,196 +152,7 @@ struct mbuf {
 
 /*
  * mbuf utility macros:
- *
- *	MBUFLOCK(code)
- * prevents a section of code from from being interrupted by network
- * drivers.
  */
-#define	MBUFLOCK(code) \
-	{ int ms = splimp(); \
-	  { code } \
-	  splx(ms); \
-	}
-
-/* Kyu - am replacing all of these macros */
-#ifdef PORCUPINE
-/*
- * mbuf allocation/deallocation macros:
- *
- *	MGET(struct mbuf *m, int how, int type)
- * allocates an mbuf and initializes it to contain internal data.
- *
- *	MGETHDR(struct mbuf *m, int how, int type)
- * allocates an mbuf and initializes it to contain a packet header
- * and internal data.
- */
-
-#ifdef KYU
-    void * k_mbuf_alloc ( void );
-    void * k_mbufcl_alloc ( void );
-    void k_mbuf_free ( void * );
-    // void k_mbufcl_free ( void * );
-#endif
-
-#ifdef KYU
-    #define	MGET(m, how, type) { \
-	(m) = (struct mbuf *) k_mbuf_alloc (); \
-	if (m) { \
-		(m)->m_type = (type); \
-		MBUFLOCK(mbstat.m_mtypes[type]++;) \
-		(m)->m_next = (struct mbuf *) NULL; \
-		(m)->m_nextpkt = (struct mbuf *) NULL; \
-		(m)->m_data = (m)->m_dat; \
-		(m)->m_flags = 0; \
-	} else \
-		panic ( "mbuf MGET exhausted"); \
-    }
-#else
-    #define	MGET(m, how, type) { \
-	MALLOC((m), struct mbuf *, MSIZE, mbtypes[type], (how)); \
-	if (m) { \
-		(m)->m_type = (type); \
-		MBUFLOCK(mbstat.m_mtypes[type]++;) \
-		(m)->m_next = (struct mbuf *)NULL; \
-		(m)->m_nextpkt = (struct mbuf *)NULL; \
-		(m)->m_data = (m)->m_dat; \
-		(m)->m_flags = 0; \
-	} else \
-		(m) = m_retry((how), (type)); \
-    }
-#endif
-
-#ifdef KYU
-    #define	XMGETHDR(m, how, type) { \
-	(m) = (struct mbuf *) k_mbuf_alloc (); \
-	if (m) { \
-		(m)->m_type = (type); \
-		MBUFLOCK(mbstat.m_mtypes[type]++;) \
-		(m)->m_next = (struct mbuf *)NULL; \
-		(m)->m_nextpkt = (struct mbuf *)NULL; \
-		(m)->m_data = (m)->m_pktdat; \
-		(m)->m_flags = M_PKTHDR; \
-	} else \
-		panic ( "mbuf MGETHDR exhausted"); \
-    }
-#else
-    #define	XMGETHDR(m, how, type) { \
-	MALLOC((m), struct mbuf *, MSIZE, mbtypes[type], (how)); \
-	if (m) { \
-		(m)->m_type = (type); \
-		MBUFLOCK(mbstat.m_mtypes[type]++;) \
-		(m)->m_next = (struct mbuf *)NULL; \
-		(m)->m_nextpkt = (struct mbuf *)NULL; \
-		(m)->m_data = (m)->m_pktdat; \
-		(m)->m_flags = M_PKTHDR; \
-	} else \
-		(m) = m_retryhdr((how), (type)); \
-    }
-#endif
-
-/*
- * Mbuf cluster macros.
- * MCLALLOC(caddr_t p, int how) allocates an mbuf cluster.
- * MCLGET adds such clusters to a normal mbuf;
- * the flag M_EXT is set upon success.
- * MCLFREE releases a reference to a cluster allocated by MCLALLOC,
- * freeing the cluster if the reference count has reached 0.
- *
- * Normal mbuf clusters are normally treated as character arrays
- * after allocation, but use the first word of the buffer as a free list
- * pointer while on the free list.
- */
-union mcluster {
-	union	mcluster *mcl_next;
-	char	mcl_buf[MCLBYTES];
-};
-
-#ifdef KYU
-#define	MCLALLOC(p, how) \
-	MBUFLOCK( \
-	  if (mclfree == 0) { \
-		(p) = k_mbufcl_alloc (); \
-		if ( !p ) \
-		    panic ( "mbufcl MCLALLOC exhausted"); \
-	  } else { \
-	        (p) = (caddr_t) mclfree; \
-		++mclrefcnt[mtocl(p)]; \
-		mbstat.m_clfree--; \
-		mclfree = ((union mcluster *)(p))->mcl_next; \
-	    } \
-	  )
-#else
-#define	MCLALLOC(p, how) \
-	MBUFLOCK( \
-	  if (mclfree == 0) \
-		(void)m_clalloc(1, (how)); \
-	  if ((p) = (caddr_t)mclfree) { \
-		++mclrefcnt[mtocl(p)]; \
-		mbstat.m_clfree--; \
-		mclfree = ((union mcluster *)(p))->mcl_next; \
-	  } \
-	)
-#endif
-
-/* This should work unchanged for Kyu */
-#define	MCLGET(m, how) \
-	{ MCLALLOC((m)->m_ext.ext_buf, (how)); \
-	  if ((m)->m_ext.ext_buf != NULL) { \
-		(m)->m_data = (m)->m_ext.ext_buf; \
-		(m)->m_flags |= M_EXT; \
-		(m)->m_ext.ext_size = MCLBYTES;  \
-	  } \
-	}
-
-/* This also should work OK as is for Kyu.
- * clusters just go onto the free list that we
- * manage right here.
- */
-#define	MCLFREE(p) \
-	MBUFLOCK ( \
-	  if (--mclrefcnt[mtocl(p)] == 0) { \
-		((union mcluster *)(p))->mcl_next = mclfree; \
-		mclfree = (union mcluster *)(p); \
-		mbstat.m_clfree++; \
-	  } \
-	)
-
-/*
- * MFREE(struct mbuf *m, struct mbuf *n)
- * Free a single mbuf and associated external storage.
- * Place the successor, if any, in n.
- */
-#ifdef notyet
-#define	MFREE(m, n) \
-	{ MBUFLOCK(mbstat.m_mtypes[(m)->m_type]--;) \
-	  if ((m)->m_flags & M_EXT) { \
-		if ((m)->m_ext.ext_free) \
-			(*((m)->m_ext.ext_free))((m)->m_ext.ext_buf, \
-			    (m)->m_ext.ext_size); \
-		else \
-			MCLFREE((m)->m_ext.ext_buf); \
-	  } \
-	  (n) = (m)->m_next; \
-	  FREE((m), mbtypes[(m)->m_type]); \
-	}
-#else /* notyet */
-#endif
-
-#ifdef KYU
-/* XXX */
-#define	MFREE(m, nn)
-#else
-#define	MFREE(m, nn) \
-	{ MBUFLOCK(mbstat.m_mtypes[(m)->m_type]--;) \
-	  if ((m)->m_flags & M_EXT) { \
-		MCLFREE((m)->m_ext.ext_buf); \
-	  } \
-	  (nn) = (m)->m_next; \
-	  FREE((m), mbtypes[(m)->m_type]); \
-	}
-#endif
-
-#endif /* PORCUPINE */
 
 /*
  * Copy mbuf pkthdr from from to to.
@@ -425,11 +238,11 @@ struct mbstat {
 };
 
 #ifdef	KERNEL
-extern	struct mbuf *mbutl;		/* virtual address of mclusters */
-extern	char *mclrefcnt;		/* cluster reference counts */
+// extern	struct mbuf *mbutl;		/* virtual address of mclusters */
+// extern	char *mclrefcnt;		/* cluster reference counts */
 extern	struct	mbstat mbstat;
-extern	int nmbclusters;
-extern	union	mcluster *mclfree;
+// extern	int nmbclusters;
+// extern	union	mcluster *mclfree;
 
 extern int	max_linkhdr;		/* largest link-level header */
 extern int	max_protohdr;		/* largest protocol header */

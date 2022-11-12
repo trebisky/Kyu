@@ -41,8 +41,10 @@
 // #include <sys/proc.h>
 #include <sys/malloc.h>
 // #include <sys/map.h>
+
 #define MBTYPES
 #include <sys/mbuf.h>
+
 // #include <sys/kernel.h>
 // #include <sys/syslog.h>
 #include <sys/domain.h>
@@ -51,183 +53,13 @@
 // #include <vm/vm.h>
 
 // extern	vm_map_t mb_map;
-struct	mbuf *mbutl;
-char	*mclrefcnt;
+// struct	mbuf *mbutl;
 
-static void m_reclaim ( void );
+// char	*mclrefcnt;
+
+// static void m_reclaim ( void );
 // struct mbuf * m_retry ( int , int );
 // struct mbuf * m_retryhdr ( int, int );
-
-#ifndef KYU
-/* Kyu just starts up with mclfree = NULL
- * and lets things get allocated as needed.
- * None of this "preloading" the free list.
- */
-void
-mbinit(void)
-{
-	int s;
-
-	mclfree = NULL;
-
-#define NCL_INIT	(4096/CLBYTES)
-	s = splimp();
-	if (m_clalloc(NCL_INIT, M_DONTWAIT) == 0)
-		goto bad;
-	splx(s);
-	return;
-bad:
-	panic("mbinit");
-}
-
-/*
- * Allocate some number of mbuf clusters
- * and place on cluster free list.
- * Must be called at splimp.
- */
-/* ARGSUSED */
-int
-m_clalloc(ncl, nowait)
-	register int ncl;
-	int nowait;
-{
-	static int logged;
-	register caddr_t p;
-	register int i;
-	int npg;
-
-	npg = ncl * CLSIZE;
-// KYU XXX
-//	p = (caddr_t)kmem_malloc(mb_map, ctob(npg), !nowait);
-
-	if (p == NULL) {
-		if (logged == 0) {
-			logged++;
-			// log(LOG_ERR, "mb_map full\n");
-		}
-		return (0);
-	}
-	ncl = ncl * CLBYTES / MCLBYTES;
-	for (i = 0; i < ncl; i++) {
-		((union mcluster *)p)->mcl_next = mclfree;
-		mclfree = (union mcluster *)p;
-		p += MCLBYTES;
-		mbstat.m_clfree++;
-	}
-	mbstat.m_clusters += ncl;
-	return (1);
-}
-#endif
-
-/* Not in Kyu */
-#ifdef notdef
--- /*
---  * When MGET fails, ask protocols to free space when short of memory,
---  * then re-attempt to allocate an mbuf.
---  */
--- struct mbuf *
--- m_retry ( int i, int t )
--- {
--- 	register struct mbuf *m;
--- 
--- 	m_reclaim();
--- #define m_retry(i, t)	(struct mbuf *)0
--- 	MGET(m, i, t);
--- #undef m_retry
--- 	return (m);
--- }
--- 
--- /*
---  * As above; retry an MGETHDR.
---  */
--- struct mbuf *
--- m_retryhdr ( int i, int t )
--- {
--- 	register struct mbuf *m;
--- 
--- 	m_reclaim();
--- #define m_retryhdr(i, t) (struct mbuf *)0
--- 	MGETHDR(m, i, t);
--- #undef m_retryhdr
--- 	return (m);
--- }
--- 
--- static void
--- m_reclaim ( void )
--- {
--- 	register struct domain *dp;
--- 	register struct protosw *pr;
--- 	int s = splimp();
--- 
--- 	for (dp = domains; dp; dp = dp->dom_next)
--- 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
--- 			if (pr->pr_drain)
--- 				(*pr->pr_drain)();
--- 	splx(s);
--- 	mbstat.m_drain++;
--- }
--- 
--- /*
---  * Space allocation routines.
---  * These are also available as macros
---  * for critical paths.
---  */
--- struct mbuf *
--- m_get(nowait, type)
--- 	int nowait, type;
--- {
--- 	register struct mbuf *m;
--- 
--- 	MGET(m, nowait, type);
--- 	return (m);
--- }
--- 
--- struct mbuf *
--- m_gethdr(nowait, type)
--- 	int nowait, type;
--- {
--- 	register struct mbuf *m;
--- 
--- 	MGETHDR(m, nowait, type);
--- 	return (m);
--- }
--- 
--- struct mbuf *
--- m_getclr(nowait, type)
--- 	int nowait, type;
--- {
--- 	register struct mbuf *m;
--- 
--- 	MGET(m, nowait, type);
--- 	if (m == 0)
--- 		return (0);
--- 	bzero(mtod(m, caddr_t), MLEN);
--- 	return (m);
--- }
--- 
--- struct mbuf *
--- m_free(m)
--- 	struct mbuf *m;
--- {
--- 	register struct mbuf *n;
--- 
--- 	MFREE(m, n);
--- 	return (n);
--- }
--- 
--- void
--- m_freem(m)
--- 	register struct mbuf *m;
--- {
--- 	register struct mbuf *n;
--- 
--- 	if (m == NULL)
--- 		return;
--- 	do {
--- 		MFREE(m, n);
--- 	} while (m = n);
--- }
-#endif
 
 /*
  * Mbuffer utility routines.
@@ -318,7 +150,8 @@ m_copym(m, off0, len, wait)
 		n->m_len = min(len, m->m_len - off);
 		if (m->m_flags & M_EXT) {
 			n->m_data = m->m_data + off;
-			mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
+			// mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
+			mb_clref_bump ( m->m_ext.ext_buf );
 			n->m_ext = m->m_ext;
 			n->m_flags |= M_EXT;
 		} else
@@ -605,7 +438,8 @@ extpacket:
 	if (m->m_flags & M_EXT) {
 		n->m_flags |= M_EXT;
 		n->m_ext = m->m_ext;
-		mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
+		// mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
+		mb_clref_bump ( m->m_ext.ext_buf );
 		m->m_ext.ext_size = 0; /* For Accounting XXXXXX danger */
 		n->m_data = m->m_data + len;
 	} else {

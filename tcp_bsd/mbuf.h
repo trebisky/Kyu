@@ -22,4 +22,6 @@ struct mbuf * mb_gethdr ( int );
 struct mbuf * mb_free ( struct mbuf * );
 void mb_freem ( struct mbuf * );
 
+#define mtod(m,t)	((t)((m)->m_data))
+
 /* THE END */
