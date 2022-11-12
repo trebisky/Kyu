@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,112 +119,115 @@ m_clalloc(ncl, nowait)
 }
 #endif
 
-/*
- * When MGET fails, ask protocols to free space when short of memory,
- * then re-attempt to allocate an mbuf.
- */
-struct mbuf *
-m_retry ( int i, int t )
-{
-	register struct mbuf *m;
-
-	m_reclaim();
-#define m_retry(i, t)	(struct mbuf *)0
-	MGET(m, i, t);
-#undef m_retry
-	return (m);
-}
-
-/*
- * As above; retry an MGETHDR.
- */
-struct mbuf *
-m_retryhdr ( int i, int t )
-{
-	register struct mbuf *m;
-
-	m_reclaim();
-#define m_retryhdr(i, t) (struct mbuf *)0
-	MGETHDR(m, i, t);
-#undef m_retryhdr
-	return (m);
-}
-
-static void
-m_reclaim ( void )
-{
-	register struct domain *dp;
-	register struct protosw *pr;
-	int s = splimp();
-
-	for (dp = domains; dp; dp = dp->dom_next)
-		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
-			if (pr->pr_drain)
-				(*pr->pr_drain)();
-	splx(s);
-	mbstat.m_drain++;
-}
-
-/*
- * Space allocation routines.
- * These are also available as macros
- * for critical paths.
- */
-struct mbuf *
-m_get(nowait, type)
-	int nowait, type;
-{
-	register struct mbuf *m;
-
-	MGET(m, nowait, type);
-	return (m);
-}
-
-struct mbuf *
-m_gethdr(nowait, type)
-	int nowait, type;
-{
-	register struct mbuf *m;
-
-	MGETHDR(m, nowait, type);
-	return (m);
-}
-
-struct mbuf *
-m_getclr(nowait, type)
-	int nowait, type;
-{
-	register struct mbuf *m;
-
-	MGET(m, nowait, type);
-	if (m == 0)
-		return (0);
-	bzero(mtod(m, caddr_t), MLEN);
-	return (m);
-}
-
-struct mbuf *
-m_free(m)
-	struct mbuf *m;
-{
-	register struct mbuf *n;
-
-	MFREE(m, n);
-	return (n);
-}
-
-void
-m_freem(m)
-	register struct mbuf *m;
-{
-	register struct mbuf *n;
-
-	if (m == NULL)
-		return;
-	do {
-		MFREE(m, n);
-	} while (m = n);
-}
+/* Not in Kyu */
+#ifdef notdef
+-- /*
+--  * When MGET fails, ask protocols to free space when short of memory,
+--  * then re-attempt to allocate an mbuf.
+--  */
+-- struct mbuf *
+-- m_retry ( int i, int t )
+-- {
+-- 	register struct mbuf *m;
+-- 
+-- 	m_reclaim();
+-- #define m_retry(i, t)	(struct mbuf *)0
+-- 	MGET(m, i, t);
+-- #undef m_retry
+-- 	return (m);
+-- }
+-- 
+-- /*
+--  * As above; retry an MGETHDR.
+--  */
+-- struct mbuf *
+-- m_retryhdr ( int i, int t )
+-- {
+-- 	register struct mbuf *m;
+-- 
+-- 	m_reclaim();
+-- #define m_retryhdr(i, t) (struct mbuf *)0
+-- 	MGETHDR(m, i, t);
+-- #undef m_retryhdr
+-- 	return (m);
+-- }
+-- 
+-- static void
+-- m_reclaim ( void )
+-- {
+-- 	register struct domain *dp;
+-- 	register struct protosw *pr;
+-- 	int s = splimp();
+-- 
+-- 	for (dp = domains; dp; dp = dp->dom_next)
+-- 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
+-- 			if (pr->pr_drain)
+-- 				(*pr->pr_drain)();
+-- 	splx(s);
+-- 	mbstat.m_drain++;
+-- }
+-- 
+-- /*
+--  * Space allocation routines.
+--  * These are also available as macros
+--  * for critical paths.
+--  */
+-- struct mbuf *
+-- m_get(nowait, type)
+-- 	int nowait, type;
+-- {
+-- 	register struct mbuf *m;
+-- 
+-- 	MGET(m, nowait, type);
+-- 	return (m);
+-- }
+-- 
+-- struct mbuf *
+-- m_gethdr(nowait, type)
+-- 	int nowait, type;
+-- {
+-- 	register struct mbuf *m;
+-- 
+-- 	MGETHDR(m, nowait, type);
+-- 	return (m);
+-- }
+-- 
+-- struct mbuf *
+-- m_getclr(nowait, type)
+-- 	int nowait, type;
+-- {
+-- 	register struct mbuf *m;
+-- 
+-- 	MGET(m, nowait, type);
+-- 	if (m == 0)
+-- 		return (0);
+-- 	bzero(mtod(m, caddr_t), MLEN);
+-- 	return (m);
+-- }
+-- 
+-- struct mbuf *
+-- m_free(m)
+-- 	struct mbuf *m;
+-- {
+-- 	register struct mbuf *n;
+-- 
+-- 	MFREE(m, n);
+-- 	return (n);
+-- }
+-- 
+-- void
+-- m_freem(m)
+-- 	register struct mbuf *m;
+-- {
+-- 	register struct mbuf *n;
+-- 
+-- 	if (m == NULL)
+-- 		return;
+-- 	do {
+-- 		MFREE(m, n);
+-- 	} while (m = n);
+-- }
+#endif
 
 /*
  * Mbuffer utility routines.
@@ -241,9 +245,11 @@ m_prepend(m, len, how)
 {
 	struct mbuf *mn;
 
-	MGET(mn, how, m->m_type);
+	// MGET(mn, how, m->m_type);
+	mn = mb_get ( m->m_type );
 	if (mn == (struct mbuf *)NULL) {
-		m_freem(m);
+		// m_freem(m);
+		mb_freem(m);
 		return ((struct mbuf *)NULL);
 	}
 	if (m->m_flags & M_PKTHDR) {
@@ -296,7 +302,8 @@ m_copym(m, off0, len, wait)
 				panic("m_copym");
 			break;
 		}
-		MGET(n, wait, m->m_type);
+		// MGET(n, wait, m->m_type);
+		n = mb_get ( m->m_type );
 		*np = n;
 		if (n == 0)
 			goto nospace;
@@ -326,8 +333,10 @@ m_copym(m, off0, len, wait)
 	if (top == 0)
 		MCFail++;
 	return (top);
+
 nospace:
-	m_freem(top);
+	// m_freem(top);
+	mb_freem(top);
 	MCFail++;
 	return (0);
 }
@@ -389,7 +398,8 @@ m_cat(m, n)
 		bcopy(mtod(n, caddr_t), mtod(m, caddr_t) + m->m_len,
 		    (u_int)n->m_len);
 		m->m_len += n->m_len;
-		n = m_free(n);
+		// n = m_free(n);
+		n = mb_free(n);
 	}
 }
 
@@ -501,7 +511,8 @@ m_pullup(n, len)
 	} else {
 		if (len > MHLEN)
 			goto bad;
-		MGET(m, M_DONTWAIT, n->m_type);
+		// MGET(m, M_DONTWAIT, n->m_type);
+		m = mb_get ( n->m_type );
 		if (m == 0)
 			goto bad;
 		m->m_len = 0;
@@ -522,16 +533,19 @@ m_pullup(n, len)
 		if (n->m_len)
 			n->m_data += count;
 		else
-			n = m_free(n);
+			n = mb_free(n);
 	} while (len > 0 && n);
 	if (len > 0) {
-		(void) m_free(m);
+		// (void) m_free(m);
+		(void) mb_free(m);
 		goto bad;
 	}
 	m->m_next = n;
 	return (m);
+
 bad:
-	m_freem(n);
+	// m_freem(n);
+	mb_freem(n);
 	MPFail++;
 	return (0);
 }
@@ -555,7 +569,8 @@ m_split(m0, len0, wait)
 		return (0);
 	remain = m->m_len - len;
 	if (m0->m_flags & M_PKTHDR) {
-		MGETHDR(n, wait, m0->m_type);
+		// MGETHDR(n, wait, m0->m_type);
+		n = mb_gethdr ( m0->m_type );
 		if (n == 0)
 			return (0);
 		n->m_pkthdr.rcvif = m0->m_pkthdr.rcvif;
@@ -568,7 +583,8 @@ m_split(m0, len0, wait)
 			MH_ALIGN(n, 0);
 			n->m_next = m_split(m, len, wait);
 			if (n->m_next == 0) {
-				(void) m_free(n);
+				// (void) m_free(n);
+				(void) mb_free(n);
 				return (0);
 			} else
 				return (n);
@@ -579,7 +595,8 @@ m_split(m0, len0, wait)
 		m->m_next = 0;
 		return (n);
 	} else {
-		MGET(n, wait, m->m_type);
+		// MGET(n, wait, m->m_type);
+		n = mb_get ( m->m_type );
 		if (n == 0)
 			return (0);
 		M_ALIGN(n, remain);
@@ -600,74 +617,5 @@ extpacket:
 	m->m_next = 0;
 	return (n);
 }
-/*
- * Routine to copy from device local memory into mbufs.
- */
-struct mbuf *
-m_devget(buf, totlen, off0, ifp, copy)
-	char *buf;
-	int totlen, off0;
-	struct ifnet *ifp;
-	void (*copy)();
-{
-	register struct mbuf *m;
-	struct mbuf *top = 0, **mp = &top;
-	register int off = off0, len;
-	register char *cp;
-	char *epkt;
 
-	cp = buf;
-	epkt = cp + totlen;
-	if (off) {
-		cp += off + 2 * sizeof(u_short);
-		totlen -= 2 * sizeof(u_short);
-	}
-
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == 0)
-		return (0);
-
-	m->m_pkthdr.rcvif = ifp;
-	m->m_pkthdr.len = totlen;
-	m->m_len = MHLEN;
-
-	while (totlen > 0) {
-		if (top) {
-			MGET(m, M_DONTWAIT, MT_DATA);
-			if (m == 0) {
-				m_freem(top);
-				return (0);
-			}
-			m->m_len = MLEN;
-		}
-		len = min(totlen, epkt - cp);
-		if (len >= MINCLSIZE) {
-			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
-				m->m_len = len = min(len, MCLBYTES);
-			else
-				len = m->m_len;
-		} else {
-			/*
-			 * Place initial small packet/header at end of mbuf.
-			 */
-			if (len < m->m_len) {
-				if (top == 0 && len + max_linkhdr <= m->m_len)
-					m->m_data += max_linkhdr;
-				m->m_len = len;
-			} else
-				len = m->m_len;
-		}
-		if (copy)
-			copy(cp, mtod(m, caddr_t), (unsigned)len);
-		else
-			bcopy(cp, mtod(m, caddr_t), (unsigned)len);
-		cp += len;
-		*mp = m;
-		mp = &m->m_next;
-		totlen -= len;
-		if (cp == epkt)
-			cp = buf;
-	}
-	return (top);
-}
+// THE END

@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+#include <mbuf.h>
 
 #include <sys/param.h>
 // #include <sys/proc.h>
@@ -106,7 +107,8 @@ tcp_template(tp)
 	}
 #else
 	if ((n = tp->t_template) == 0) {
-		m = m_get(M_DONTWAIT, MT_HEADER);
+		// m = m_get(M_DONTWAIT, MT_HEADER);
+		m = mb_get ( MT_HEADER );
 		if (m == NULL)
 			return (0);
 		m->m_len = sizeof (struct tcpiphdr);
@@ -162,7 +164,8 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 		ro = &tp->t_inpcb->inp_route;
 	}
 	if (m == 0) {
-		m = m_gethdr(M_DONTWAIT, MT_HEADER);
+		// m = m_gethdr(M_DONTWAIT, MT_HEADER);
+		m = mb_gethdr ( MT_HEADER );
 		if (m == NULL)
 			return;
 #ifdef TCP_COMPAT_42
@@ -175,7 +178,8 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 		ti = mtod(m, struct tcpiphdr *);
 		flags = TH_ACK;
 	} else {
-		m_freem(m->m_next);
+		// m_freem(m->m_next);
+		mb_freem(m->m_next);
 		m->m_next = 0;
 		m->m_data = (caddr_t)ti;
 		m->m_len = sizeof (struct tcpiphdr);
@@ -208,6 +212,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	ti->ti_sum = tcp_cksum(m, tlen);
 	((struct ip *)ti)->ip_len = tlen;
 	((struct ip *)ti)->ip_ttl = ip_defttl;
+	printf ( "TCP respond\n" );
 	(void) ip_output(m, NULL, ro, 0, NULL);
 }
 
@@ -363,11 +368,12 @@ tcp_close(tp)
 		t = (struct tcpiphdr *)t->ti_next;
 		m = REASS_MBUF((struct tcpiphdr *)t->ti_prev);
 		remque(t->ti_prev);
-		m_freem(m);
+		// m_freem(m);
+		mb_freem(m);
 	}
 #ifndef KYU
 	if (tp->t_template)
-		(void) m_free(dtom(tp->t_template));
+		(void) mb_free(dtom(tp->t_template));
 #endif
 	free(tp, M_PCB);
 	inp->inp_ppcb = 0;

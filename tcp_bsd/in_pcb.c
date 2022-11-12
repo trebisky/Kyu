@@ -301,7 +301,7 @@ in_pcbdetach(inp)
 	so->so_pcb = 0;
 	sofree(so);
 	if (inp->inp_options)
-		(void)m_free(inp->inp_options);
+		(void)mb_free(inp->inp_options);
 	if (inp->inp_route.ro_rt)
 		rtfree(inp->inp_route.ro_rt);
 	ip_freemoptions(inp->inp_moptions);

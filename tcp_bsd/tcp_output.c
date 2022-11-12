@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -358,11 +359,13 @@ send:
 		m->m_len += hdrlen;
 		m->m_data -= hdrlen;
 #else
-		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		// MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		m = mb_gethdr ( MT_HEADER );
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
 		}
+
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 		if (len <= MHLEN - hdrlen - max_linkhdr) {
@@ -393,11 +396,13 @@ send:
 		else
 			tcpstat.tcps_sndwinup++;
 
-		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		// MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		m = mb_gethdr ( MT_HEADER );
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
 		}
+
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}

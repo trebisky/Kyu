@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+#include <mbuf.h>
 
 #ifndef TUBA_INCLUDE
 #include <sys/param.h>
@@ -142,7 +143,8 @@ tcp_reass(tp, ti, m)
 			if (i >= ti->ti_len) {
 				tcpstat.tcps_rcvduppack++;
 				tcpstat.tcps_rcvdupbyte += ti->ti_len;
-				m_freem(m);
+				// m_freem(m);
+				mb_freem(m);
 				return (0);
 			}
 			m_adj(m, i);
@@ -172,7 +174,8 @@ tcp_reass(tp, ti, m)
 		q = (struct tcpiphdr *)q->ti_next;
 		m = REASS_MBUF((struct tcpiphdr *)q->ti_prev);
 		remque(q->ti_prev);
-		m_freem(m);
+		// m_freem(m);
+		mb_freem(m);
 	}
 
 	/*
@@ -199,7 +202,7 @@ present:
 		m = REASS_MBUF(ti);
 		ti = (struct tcpiphdr *)ti->ti_next;
 		if (so->so_state & SS_CANTRCVMORE)
-			m_freem(m);
+			mb_freem(m);
 		else
 			sbappend(&so->so_rcv, m);
 	} while (ti != (struct tcpiphdr *)tp && ti->ti_seq == tp->rcv_nxt);
@@ -468,7 +471,8 @@ findpcb:
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = ti->ti_ack;
-				m_freem(m);
+				// m_freem(m);
+				mb_freem(m);
 
 				/*
 				 * If all outstanding data are acked, stop
@@ -568,9 +572,12 @@ findpcb:
 		if (m->m_flags & (M_BCAST|M_MCAST) ||
 		    IN_MULTICAST(ti->ti_dst.s_addr))
 			goto drop;
-		am = m_get(M_DONTWAIT, MT_SONAME);	/* XXX */
+
+		// am = m_get(M_DONTWAIT, MT_SONAME);
+		am = mb_get ( MT_SONAME );	/* XXX */
 		if (am == NULL)
 			goto drop;
+
 		am->m_len = sizeof (struct sockaddr_in);
 		sin = mtod(am, struct sockaddr_in *);
 		sin->sin_family = AF_INET;
@@ -583,10 +590,13 @@ findpcb:
 			inp->inp_laddr = ti->ti_dst;
 		if (in_pcbconnect(inp, am)) {
 			inp->inp_laddr = laddr;
-			(void) m_free(am);
+			// (void) m_free(am);
+			(void) mb_free(am);
 			goto drop;
 		}
-		(void) m_free(am);
+
+		// (void) m_free(am);
+		(void) mb_free(am);
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			tp = tcp_drop(tp, ENOBUFS);
@@ -1226,7 +1236,8 @@ dodata:							/* XXX */
 		 */
 		len = so->so_rcv.sb_hiwat - (tp->rcv_adv - tp->rcv_nxt);
 	} else {
-		m_freem(m);
+		// m_freem(m);
+		mb_freem(m);
 		tiflags &= ~TH_FIN;
 	}
 
@@ -1296,7 +1307,8 @@ dropafterack:
 	 */
 	if (tiflags & TH_RST)
 		goto drop;
-	m_freem(m);
+	// m_freem(m);
+	mb_freem(m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
 	return;
@@ -1331,7 +1343,8 @@ drop:
 	 */
 	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
 		tcp_trace(TA_DROP, ostate, tp, &tcp_saveti, 0);
-	m_freem(m);
+	// m_freem(m);
+	mb_freem(m);
 	/* destroy temporarily created socket */
 	if (dropsocket)
 		(void) soabort(so);

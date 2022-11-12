@@ -6,9 +6,17 @@
  */
 
 #include "kyu.h"
+
 // #include <sys/mbuf.h>
 
-typedef	char *		caddr_t;
+// For MCLBYTES
+#include <sys/param.h>
+#include <sys/types.h>
+
+// for min
+#include <sys/systm.h>
+
+// typedef	char *		caddr_t;
 
 #ifdef notdef
 #include "thread.h"
@@ -42,6 +50,7 @@ typedef	char *		caddr_t;
 #define	MSIZE		128		/* XXX */
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
+#define	MINCLSIZE	(MHLEN + MLEN)	/* smallest amount to put in cluster */
 
 /* header at beginning of each mbuf: */
 struct m_hdr {		/* 20 bytes */
@@ -122,6 +131,58 @@ struct mbuf {
 #define MT_CONTROL	14	/* extra-data protocol message */
 #define MT_OOBDATA	15	/* expedited data  */
 
+#define mtod(m,t)	((t)((m)->m_data))
+
+union mcluster {
+        union   mcluster *mcl_next;
+        char    mcl_buf[MCLBYTES];
+};
+
+extern int max_linkhdr;
+
+static union   mcluster *mclfree;	/* mbuf.h */
+
+
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+
+/* Here is our mbuf allocation scheme.
+ */
+
+void * kyu_malloc ( unsigned long );
+
+void *
+k_mbuf_alloc ( void )
+{
+	void *rv;
+
+	rv = kyu_malloc ( MSIZE );	/* 128 */
+	printf ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
+	memset ( rv, 0xab, MSIZE );
+	return rv;
+}
+
+/* XXX todo */
+void
+k_mbuf_free ( void *m )
+{
+}
+
+void *
+k_mbufcl_alloc ( void )
+{
+	void *rv;
+
+	rv = kyu_malloc ( MCLBYTES );	/* 2048 */
+	return rv;
+}
+
+void
+k_mbufcl_free ( void *cl ) { }
+
+/* -------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------------------------- */
+
 void
 mbuf_show ( struct mbuf *mp, char *msg )
 {
@@ -138,6 +199,199 @@ mbuf_show ( struct mbuf *mp, char *msg )
 	printf ( " data: %08x (%d)\n", mp->m_data, off );
 	printf ( " type: %d\n", mp->m_type );
 	printf ( " flags: %08x\n", mp->m_flags );
+}
+
+/* I am moving routines from uipc_mbuf.c to this file.
+ * in the process, I change the names from m_ to mb_
+ * My goal is simplification and centralization.
+ * I am willing to sacrifice efficiency.
+ * In particular, I am trying to do away with the
+ *  macros in sys/mbuf.h that do yield nice inline code.
+ */
+
+void
+mb_init ( void )
+{
+	mclfree = NULL;
+}
+
+struct mbuf *
+mb_free ( struct mbuf *m )
+{
+        struct mbuf *n;
+
+        if (m == NULL)
+	    return NULL;
+
+	if ( m->m_flags & M_EXT)
+	    k_mbufcl_free ( m->m_ext.ext_buf );
+	n = m->m_next;
+	k_mbuf_free ( m );
+
+        return (n);
+}
+
+void
+mb_freem ( struct mbuf *m )
+{
+        struct mbuf *n;
+
+        if (m == NULL)
+	    return;
+
+        do {
+	    if ( m->m_flags & M_EXT)
+		k_mbufcl_free ( m->m_ext.ext_buf );
+	    n = m->m_next;
+	    k_mbuf_free ( m );
+        } while (m = n);
+}
+
+/* replaces MGET
+ */
+struct mbuf *
+mb_get ( int type )
+{
+	struct mbuf *m;
+
+        m = (struct mbuf *) k_mbuf_alloc ();
+	if ( ! m )
+	    panic ( "mbuf mb_get exhausted");
+
+	m->m_type = type;
+	m->m_next = (struct mbuf *) NULL;
+	m->m_nextpkt = (struct mbuf *) NULL;
+	m->m_data = m->m_dat;
+	m->m_flags = 0;
+
+	return m;
+}
+
+/* replaces MGETHDR
+ */
+struct mbuf *
+mb_gethdr ( int type )
+{
+	struct mbuf *m;
+
+        m = (struct mbuf *) k_mbuf_alloc ();
+	if ( ! m )
+	    panic ( "mbuf mb_gethdr exhausted");
+
+	m->m_type = type;
+	m->m_next = (struct mbuf *) NULL;
+	m->m_nextpkt = (struct mbuf *) NULL;
+	m->m_data = m->m_dat;
+	m->m_flags = M_PKTHDR;
+
+	return m;
+}
+
+static void *
+mb_clalloc ()
+{
+	void *p;
+
+	if ( ! mclfree ) {
+                p = k_mbufcl_alloc ();
+		if ( ! p )
+                    panic ( "mb_clalloc exhausted"); \
+		return p;
+	}
+	p = mclfree;
+	mclfree = ( (union mcluster *) p )->mcl_next;
+	return p;
+}
+
+
+void
+mb_clget ( struct mbuf *m )
+{
+        m->m_ext.ext_buf = mb_clalloc ();
+	m->m_data = m->m_ext.ext_buf;
+	m->m_flags |= M_EXT;
+	m->m_ext.ext_size = MCLBYTES;
+}
+
+/*
+ * Routine to copy from device local memory into mbufs.
+ * offset parameter might be used for hardware that
+ * puts the ethernet header at the end (trailing packet).
+ * I have yet to encounter one of these.
+ */
+struct mbuf *
+mb_devget ( char *buf, int totlen, int off0,
+	struct ifnet *ifp, void (*copy)()  )
+{
+	struct mbuf *m;
+	struct mbuf *top = 0, **mp = &top;
+	int off = off0, len;
+	char *cp;
+	char *epkt;
+
+	cp = buf;
+	epkt = cp + totlen;
+	if (off) {
+		cp += off + 2 * sizeof(u_short);
+		totlen -= 2 * sizeof(u_short);
+	}
+
+	// MGETHDR(m, M_DONTWAIT, MT_DATA);
+	m = mb_gethdr ( MT_DATA );
+
+	if (m == 0)
+		return (0);
+
+	m->m_pkthdr.rcvif = ifp;
+	m->m_pkthdr.len = totlen;
+	m->m_len = MHLEN;
+
+	while (totlen > 0) {
+		if (top) {
+			// MGET(m, M_DONTWAIT, MT_DATA);
+			m = mb_get ( MT_DATA );
+			if (m == 0) {
+				// m_freem(top);
+				mb_freem(top);
+				return (0);
+			}
+			m->m_len = MLEN;
+		}
+		len = min(totlen, epkt - cp);
+		if (len >= MINCLSIZE) {
+			// MCLGET(m, M_DONTWAIT);
+			mb_clget ( m );
+
+			if (m->m_flags & M_EXT)
+				m->m_len = len = min(len, MCLBYTES);
+			else
+				len = m->m_len;
+		} else {
+			/*
+			 * Place initial small packet/header at end of mbuf.
+			 */
+			if (len < m->m_len) {
+				if (top == 0 && len + max_linkhdr <= m->m_len)
+					m->m_data += max_linkhdr;
+				m->m_len = len;
+			} else
+				len = m->m_len;
+		}
+
+		if (copy)
+			copy(cp, mtod(m, caddr_t), (unsigned)len);
+		else
+			bcopy(cp, mtod(m, caddr_t), (unsigned)len);
+
+		cp += len;
+		*mp = m;
+		mp = &m->m_next;
+		totlen -= len;
+		if (cp == epkt)
+			cp = buf;
+	}
+
+	return (top);
 }
 
 /* THE END */

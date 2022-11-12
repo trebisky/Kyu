@@ -161,6 +161,8 @@ struct mbuf {
 	  splx(ms); \
 	}
 
+/* Kyu - am replacing all of these macros */
+#ifdef PORCUPINE
 /*
  * mbuf allocation/deallocation macros:
  *
@@ -208,7 +210,7 @@ struct mbuf {
 #endif
 
 #ifdef KYU
-    #define	MGETHDR(m, how, type) { \
+    #define	XMGETHDR(m, how, type) { \
 	(m) = (struct mbuf *) k_mbuf_alloc (); \
 	if (m) { \
 		(m)->m_type = (type); \
@@ -221,7 +223,7 @@ struct mbuf {
 		panic ( "mbuf MGETHDR exhausted"); \
     }
 #else
-    #define	MGETHDR(m, how, type) { \
+    #define	XMGETHDR(m, how, type) { \
 	MALLOC((m), struct mbuf *, MSIZE, mbtypes[type], (how)); \
 	if (m) { \
 		(m)->m_type = (type); \
@@ -337,6 +339,8 @@ union mcluster {
 	}
 #endif
 
+#endif /* PORCUPINE */
+
 /*
  * Copy mbuf pkthdr from from to to.
  * from must have M_PKTHDR set, and to must be empty.
@@ -437,12 +441,12 @@ extern	int mbtypes[];
 struct	mbuf *m_copym __P((struct mbuf *, int, int, int));
 struct	mbuf *m_free __P((struct mbuf *));
 struct	mbuf *m_get __P((int, int));
-struct	mbuf *m_getclr __P((int, int));
+// struct	mbuf *m_getclr __P((int, int));
 struct	mbuf *m_gethdr __P((int, int));
 struct	mbuf *m_prepend __P((struct mbuf *, int, int));
 struct	mbuf *m_pullup __P((struct mbuf *, int));
-struct	mbuf *m_retry __P((int, int));
-struct	mbuf *m_retryhdr __P((int, int));
+//struct	mbuf *m_retry __P((int, int));
+//struct	mbuf *m_retryhdr __P((int, int));
 int	m_clalloc __P((int, int));
 void	m_copyback __P((struct mbuf *, int, int, caddr_t));
 void	m_freem __P((struct mbuf *));

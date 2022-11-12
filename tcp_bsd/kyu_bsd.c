@@ -33,7 +33,7 @@
 #include <tcp_var.h>
 #include <tcp_debug.h>
 
-struct	mbuf *m_devget ( char *, int, int, struct ifnet *, void (*)() );
+struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
 
 /* global variables */
 
@@ -60,7 +60,7 @@ int mbtypes[] = {                               /* from mbuf.h */
 };
 
 struct  mbstat mbstat;		/* mbuf.h */
-union   mcluster *mclfree;	/* mbuf.h */
+// union   mcluster *mclfree;
 int max_linkhdr;		/* mbuf.h */
 int max_protohdr;		/* mbuf.h */
 int max_hdr;			/* mbuf.h */
@@ -125,7 +125,11 @@ static void
 bsd_init ( void )
 {
 	printf ( "BSD tcp init called\n" );
+
 	tcp_globals_init ();
+
+	// in mbuf.c
+	mb_init ();
 
 	// in tcp_subr.c
 	tcp_init ();
@@ -134,8 +138,6 @@ bsd_init ( void )
 static void
 tcp_globals_init ( void )
 {
-	mclfree = NULL;
-
 	/* From netiso/tuba_subr.c */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
 	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
@@ -183,9 +185,9 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 
 	dump_buf ( (char *) nbp->iptr, nbp->ilen );
 
-	m = m_devget ( (char *) nbp->iptr, nbp->ilen, 0, NULL, 0 );
+	m = mb_devget ( (char *) nbp->iptr, nbp->ilen, 0, NULL, 0 );
 	if ( ! m ) {
-	    printf ( "** m_devget fails\n" );
+	    printf ( "** mb_devget fails\n" );
 	    return;
 	}
 	printf ( "M_devget: %08x %d\n", m, nbp->ilen );
@@ -211,12 +213,114 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 
 }
 
+#ifdef notdef
+void
+udp_send ( u32 dest_ip, int sport, int dport, char *buf, int size )
+{
+        struct udp_hdr *udp;
+        struct netbuf *nbp;
+        struct bogus_ip *bip;
+
+        nbp = netbuf_alloc ();
+        if ( ! nbp )
+            return;
+
+        nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+        nbp->dptr = nbp->pptr + sizeof ( struct udp_hdr );
+
+        memcpy ( nbp->dptr, buf, size );
+
+        size += sizeof(struct udp_hdr);
+        nbp->plen = size;
+        nbp->ilen = size + sizeof(struct ip_hdr);
+
+        udp = (struct udp_hdr *) nbp->pptr;
+        udp->sport = htons(sport);
+        udp->dport = htons(dport);
+        udp->len = htons(nbp->plen);
+        udp->sum = 0;
+
+        /* Fill out a bogus IP header just to do
+         * checksum computation.  It will pick up
+         * the proto field from this however.
+         */
+        bip = (struct bogus_ip *) nbp->iptr;
+        memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
+
+        bip->proto = IPPROTO_UDP;
+        bip->len = udp->len;
+        bip->dst = dest_ip;
+        bip->src = host_info.my_ip;
+
+        /*
+        udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
+        */
+        udp->sum = ~in_cksum_i ( nbp->iptr, nbp->ilen, 0 );
+
+        ip_send ( nbp, dest_ip );
+}
+#endif
+
+
 /* Called when TCP wants to hand a packet to IP for transmission
  */
 int
-ip_output ( struct mbuf *, struct mbuf *, struct route *, int,  struct ip_moptions * )
+ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_moptions *O )
 {
+        struct netbuf *nbp;
+        struct ip_hdr *ipp;
+	struct mbuf *mp;
+        int len;
+        int size = 0;
+	char *buf;
+
 	printf ( "TCP(bsd): ip_output\n" );
+	printf ( " ip_output A = %08x\n", A );
+	printf ( " ip_output B = %08x\n", B );
+	printf ( " ip_output R = %08x\n", R );
+	printf ( " ip_output N = %d\n", N );
+	printf ( " ip_output O = %08x\n", O );
+	mbuf_show ( A, "ip_output" );
+	dump_buf ( (char *) A, 128 );
+
+        nbp = netbuf_alloc ();
+        if ( ! nbp )
+            return 1;
+
+	printf ( "IP output 1\n" );
+	buf = (char *) nbp->iptr;
+	for (mp = A; mp; mp = mp->m_next) {
+                len = mp->m_len;
+                if (len == 0)
+                        continue;
+                // bcopy ( mtod(mp, char *), buf, len );
+                memcpy ( buf, mtod(mp, char *), len );
+                buf += len;
+                size += len;
+        }
+	printf ( "IP output 2\n" );
+
+        mb_freem ( A );
+
+	printf ( "IP output 3\n" );
+
+        nbp->ilen = size;
+        nbp->plen = size - sizeof(struct ip_hdr);
+
+	/* BSD has given us a partially completed IP header.
+	 * In particular, it contains src/dst IP numbers.
+	 */
+
+        nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
+
+	// not needed on output.
+        // nbp->dptr = nbp->pptr + sizeof ( struct udp_hdr );
+
+	ipp = nbp->iptr;
+
+        ip_send ( nbp, ipp->dst );
+	printf ( "IP output 4\n" );
+	return 0;
 }
 
 /* Called when TCP wants to send a control message.
@@ -240,41 +344,6 @@ void    bzero (void *buf, u_int len)
 {
 	memset ( buf, 0, len );
 }
-
-/* -------------------------------------------------------------------------------------------- */
-
-/* Here is our mbuf allocation scheme.
- */
-
-void * kyu_malloc ( unsigned long );
-
-void *
-k_mbuf_alloc ( void )
-{
-	void *rv;
-
-	rv = kyu_malloc ( MSIZE );	/* 128 */
-	printf ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
-	memset ( rv, 0xab, MSIZE );
-	return rv;
-}
-
-/* XXX todo */
-void
-k_mbuf_free ( void *m )
-{
-}
-
-void *
-k_mbufcl_alloc ( void )
-{
-	void *rv;
-
-	rv = kyu_malloc ( MCLBYTES );	/* 2048 */
-	return rv;
-}
-
-// void k_mbufcl_free ( void *cl ) { }
 
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
@@ -361,6 +430,5 @@ int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct s
 void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) {}
 
 void ip_freemoptions( register struct ip_moptions * ) {}
-
 
 /* THE END */

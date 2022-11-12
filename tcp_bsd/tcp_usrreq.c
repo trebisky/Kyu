@@ -34,6 +34,7 @@
  */
 
 #include <kyu_compat.h>
+#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,9 +93,10 @@ tcp_usrreq(so, req, m, nam, control)
 	    return in_control(so, (long)m, (caddr_t)nam, (struct ifnet *)control);
 #endif
 	if (control && control->m_len) {
-		m_freem(control);
+		// m_freem(control);
+		mb_freem(control);
 		if (m)
-			m_freem(m);
+			mb_freem(m);
 		return (EINVAL);
 	}
 
@@ -294,7 +296,8 @@ tcp_usrreq(so, req, m, nam, control)
 
 	case PRU_SENDOOB:
 		if (sbspace(&so->so_snd) < -512) {
-			m_freem(m);
+			// m_freem(m);
+			mb_freem(m);
 			error = ENOBUFS;
 			break;
 		}
@@ -357,7 +360,7 @@ tcp_ctloutput(op, so, level, optname, mp)
 	if (inp == NULL) {
 		splx(s);
 		if (op == PRCO_SETOPT && *mp)
-			(void) m_free(*mp);
+			(void) mb_free(*mp);
 		return (ECONNRESET);
 	}
 	if (level != IPPROTO_TCP) {
@@ -394,11 +397,12 @@ tcp_ctloutput(op, so, level, optname, mp)
 			break;
 		}
 		if (m)
-			(void) m_free(m);
+			(void) mb_free(m);
 		break;
 
 	case PRCO_GETOPT:
-		*mp = m = m_get(M_WAIT, MT_SOOPTS);
+		// *mp = m = m_get(M_WAIT, MT_SOOPTS);
+		*mp = m = mb_get ( MT_SOOPTS );
 		m->m_len = sizeof(int);
 
 		switch (optname) {
