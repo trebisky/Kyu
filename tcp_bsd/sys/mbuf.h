@@ -65,6 +65,7 @@
 #define	dtom(x)		((struct mbuf *)((int)(x) & ~(MSIZE-1)))
 #endif
 
+// Use entirely for the cluster refcount business
 // #define	mtocl(x)	(((u_long)(x) - (u_long)mbutl) >> MCLSHIFT)
 // #define	cltom(x)	((caddr_t)((u_long)mbutl + ((u_long)(x) << MCLSHIFT)))
 
@@ -249,7 +250,7 @@ extern int	max_protohdr;		/* largest protocol header */
 extern int	max_hdr;		/* largest link+protocol header */
 extern int	max_datalen;		/* MHLEN - max_hdr */
 
-extern	int mbtypes[];
+// extern	int mbtypes[];
 
 struct	mbuf *m_copym __P((struct mbuf *, int, int, int));
 struct	mbuf *m_free __P((struct mbuf *));

@@ -67,9 +67,12 @@ in_pcballoc(so, head)
 {
 	register struct inpcb *inp;
 
-	MALLOC(inp, struct inpcb *, sizeof(*inp), M_PCB, M_WAITOK);
+	// MALLOC(inp, struct inpcb *, sizeof(*inp), M_PCB, M_WAITOK);
+	inp = (struct inpcb *) k_inpcb_alloc ();
+
 	if (inp == NULL)
 		return (ENOBUFS);
+
 	bzero((caddr_t)inp, sizeof(*inp));
 	inp->inp_head = head;
 	inp->inp_socket = so;
@@ -307,7 +310,8 @@ in_pcbdetach(inp)
 		rtfree(inp->inp_route.ro_rt);
 	ip_freemoptions(inp->inp_moptions);
 	remque(inp);
-	FREE(inp, M_PCB);
+	// FREE(inp, M_PCB);
+	k_inpcb_free ( inp );
 }
 
 int

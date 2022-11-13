@@ -35,7 +35,8 @@ OBJS = kyu_bsd.o \
 	in_pcb.o \
 	in.o \
 	tcp_cksum.o \
-	uipc_mbuf.o
+	uipc_mbuf.o \
+	test.o
 
 all: ../tcp_bsd.o
 

@@ -60,5 +60,5 @@ struct	domain {
 };
 
 #ifdef KERNEL
-struct	domain *domains;
+// struct	domain *domains;
 #endif

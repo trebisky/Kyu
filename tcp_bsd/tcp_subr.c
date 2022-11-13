@@ -39,7 +39,7 @@
 #include <sys/param.h>
 // #include <sys/proc.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
+// #include <sys/malloc.h>
 #include <sys/mbuf.h>
 
 #include <sys/socket.h>
@@ -228,9 +228,11 @@ tcp_newtcpcb(inp)
 {
 	register struct tcpcb *tp;
 
-	tp = malloc(sizeof(*tp), M_PCB, M_NOWAIT);
+	// tp = (struct tcpcb *) malloc(sizeof(*tp), M_PCB, M_NOWAIT);
+	tp = (struct tcpcb *) k_tcpcb_alloc ();
 	if (tp == NULL)
 		return ((struct tcpcb *)0);
+
 	bzero((char *) tp, sizeof(struct tcpcb));
 	tp->seg_next = tp->seg_prev = (struct tcpiphdr *)tp;
 	tp->t_maxseg = tcp_mssdflt;
@@ -376,7 +378,9 @@ tcp_close(tp)
 	if (tp->t_template)
 		(void) mb_free(dtom(tp->t_template));
 #endif
-	free(tp, M_PCB);
+	// free(tp, M_PCB);
+	k_tcpcb_free ( tp );
+
 	inp->inp_ppcb = 0;
 	soisdisconnected(so);
 	/* clobber input pcb cache if we're closing the cached connection */

@@ -17,7 +17,24 @@
 // for min
 #include <sys/systm.h>
 
-// typedef	char *		caddr_t;
+// for struct socket
+#include <sys/socketvar.h>
+// for struct inpcb
+#include <sys/socket.h>
+#include <net/route.h>
+#include <net/if.h>
+#include <in.h>
+#include <in_systm.h>
+#include <ip.h>
+#include <in_pcb.h>
+// for tcpcb
+#include <ip_var.h>
+#include <tcp.h>
+#include <tcp_timer.h>
+#include <tcpip.h>
+#include <tcp_var.h>
+
+/* ------------------ */
 
 #ifdef notdef
 #include "thread.h"
@@ -27,7 +44,7 @@
 #include <sys/param.h>
 // #include <sys/systm.h>
 #include <sys/socket.h>
-#include <sys/socketvar.h>
+// #include <sys/socketvar.h>
 // #include <sys/protosw.h>
 // #include <sys/errno.h>
 
@@ -184,6 +201,95 @@ k_mbuf_free ( void *m )
 {
 	((struct my_list *) m) -> next = (struct my_list *) mbuf_list;
 	mbuf_list = (void *) m;
+}
+
+/* -------------------------------------------------------------------------------------------- */
+/* socket, in_pcb, and tcpcb just imitate the above.
+ * XXX - they don't really belong here and should be merged
+ *  with the above into a general allocator (along with statistics and limits).
+ */
+
+static void *sock_list = NULL;
+static void *inpcb_list = NULL;
+static void *tcpcb_list = NULL;
+
+void *
+k_sock_alloc ( void )
+{
+	void *rv;
+	int n = sizeof ( struct socket );
+
+	if ( sock_list ) {
+	    rv = sock_list;
+	    sock_list = ((struct my_list *) rv) -> next;
+	    return rv;
+	}
+
+	rv = kyu_malloc ( n );
+	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
+	// memset ( rv, 0, n );
+	return rv;
+}
+
+void
+k_sock_free ( void *m )
+{
+	((struct my_list *) m) -> next = (struct my_list *) sock_list;
+	sock_list = (void *) m;
+}
+
+/* -- */
+
+void *
+k_inpcb_alloc ( void )
+{
+	void *rv;
+	int n = sizeof ( struct inpcb );
+
+	if ( inpcb_list ) {
+	    rv = inpcb_list;
+	    inpcb_list = ((struct my_list *) rv) -> next;
+	    return rv;
+	}
+
+	rv = kyu_malloc ( n );
+	printf ( "kyu_inpcb_alloc: %d %08x\n", n, rv );
+	// memset ( rv, 0, n );
+	return rv;
+}
+
+void
+k_inpcb_free ( void *m )
+{
+	((struct my_list *) m) -> next = (struct my_list *) inpcb_list;
+	inpcb_list = (void *) m;
+}
+
+/* -- */
+
+void *
+k_tcpcb_alloc ( void )
+{
+	void *rv;
+	int n = sizeof ( struct tcpcb );
+
+	if ( tcpcb_list ) {
+	    rv = tcpcb_list;
+	    tcpcb_list = ((struct my_list *) rv) -> next;
+	    return rv;
+	}
+
+	rv = kyu_malloc ( n );
+	printf ( "kyu_tcpcb_alloc: %d %08x\n", n, rv );
+	// memset ( rv, 0, n );
+	return rv;
+}
+
+void
+k_tcpcb_free ( void *m )
+{
+	((struct my_list *) m) -> next = (struct my_list *) tcpcb_list;
+	tcpcb_list = (void *) m;
 }
 
 /* -------------------------------------------------------------------------------------------- */

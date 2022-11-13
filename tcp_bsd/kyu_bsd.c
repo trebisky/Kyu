@@ -15,7 +15,8 @@
 #include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-// #include <sys/protosw.h>
+#include <sys/protosw.h>
+#include <sys/domain.h>
 // #include <sys/errno.h>
 
 #include <net/if.h>
@@ -38,6 +39,7 @@ struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
 
 /* global variables */
 
+#ifdef notdef
 /* For malloc/free */
 int mbtypes[] = {                               /* from mbuf.h */
         M_FREE,         /* MT_FREE      0          should be on free list */
@@ -56,10 +58,8 @@ int mbtypes[] = {                               /* from mbuf.h */
         M_IFADDR,       /* MT_IFADDR    13         interface address */
         M_MBUF,         /* MT_CONTROL   14         extra-data protocol message */
         M_MBUF,         /* MT_OOBDATA   15         expedited data  */
-#ifdef DATAKIT
-        25, 26, 27, 28, 29, 30, 31, 32          /* datakit ugliness */
-#endif
 };
+#endif
 
 struct  mbstat mbstat;		/* mbuf.h */
 // union   mcluster *mclfree;
@@ -103,6 +103,35 @@ struct in_addr zeroin_addr = { 0 };
  */
 struct  in_ifaddr *in_ifaddr;                   /* first inet address */
 
+/* Both of these from in_proto.c
+ *  In the original there is an array "inetsw" of which the tcp_proto
+ *  entry below is just one of many entries.
+ */
+
+/* From net/radix.c
+ * -- something to do with routing.
+ */
+int
+rn_inithead ( void **head, int off )
+{
+	panic ( "rn_inithead called" );
+}
+
+
+extern struct domain inetdomain;
+
+struct protosw tcp_proto =
+{ SOCK_STREAM,  &inetdomain,    IPPROTO_TCP,    PR_CONNREQUIRED|PR_WANTRCVD,
+  tcp_input,    0,              tcp_ctlinput,   tcp_ctloutput,
+  tcp_usrreq,
+  tcp_init,     tcp_fasttimo,   tcp_slowtimo,   tcp_drain };
+
+struct domain inetdomain =
+    { AF_INET, "internet", 0, 0, 0,
+      // inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
+      &tcp_proto, &tcp_proto, 0,
+      rn_inithead, 32, sizeof(struct sockaddr_in) };
+
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
@@ -135,6 +164,8 @@ bsd_init ( void )
 
 	// in tcp_subr.c
 	tcp_init ();
+
+	bsd_server_test ();
 }
 
 static void
@@ -359,78 +390,89 @@ int splnet ( void ) {}
 int splimp ( void ) {}
 int splx ( int arg ) {}
 
+#ifdef notdef
+/* Doesn't work */
+void malloc ( void )
+{
+	panic ( "malloc called\n" );
+}
+
+void free ( void )
+{
+	panic ( "free called\n" );
+}
+#endif
+
+
 /* More stubs
  */
 
-void sbflush ( void ) {}
-void sbdrop ( void ) {}
-void sbappend ( void ) {}
-void sbreserve ( void ) {}
+void sbappend ( void ) { panic ( "sbappend" ); }
 
-void soisdisconnected ( void ) {}
-void soisdisconnecting ( void ) {}
-void soisconnected ( void ) {}
-void soisconnecting ( void ) {}
-void socantsendmore ( void ) {}
-void sohasoutofband ( void ) {}
-void socantrcvmore ( void ) {}
-void soabort ( void ) {}
-void soreserve ( void ) {}
-void sofree ( struct socket *so ) {}
+void soisdisconnected ( void ) { panic ( "soisdisconncted" ); }
+void soisdisconnecting ( void ) { panic ( "soisdisconncting" ); }
+void soisconnected ( void ) { panic ( "soisconnected" ); }
+void soisconnecting ( void ) { panic ( "soisconnecting" ); }
+void socantsendmore ( void ) { panic ( "socantsendore" ); }
+void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
+void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
+void soabort ( void ) { panic ( "soabort" ); }
+void sorflush ( void ) { panic ( "sorflush" ); }
 
+void soqremque ( void ) { panic ( "soqremque" ); }
 
-struct  socket * sonewconn1 ( struct socket *head, int connstatus) {}
+struct  socket * sonewconn1 ( struct socket *head, int connstatus) { panic ( "sonewconn1" ); }
 
 // -- in in_pcb.c
-// int in_pcballoc ( struct socket *s, struct inpcb *i ) {}
-// int in_pcbdetach ( struct inpcb * ) {}
+// int in_pcballoc ( struct socket *s, struct inpcb *i ) { panic ( "X" ); }
+// int in_pcbdetach ( struct inpcb * ) { panic ( "X" ); }
 
-// int in_setsockaddr ( struct inpcb *, struct mbuf * ) {}
-// int in_setpeeraddr ( struct inpcb *, struct mbuf * ) {}
+// int in_setsockaddr ( struct inpcb *, struct mbuf * ) { panic ( "X" ); }
+// int in_setpeeraddr ( struct inpcb *, struct mbuf * ) { panic ( "X" ); }
 
-// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) {}
+// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) { panic ( "X" ); }
 
-// int in_pcbbind ( struct inpcb *n, struct mbuf *m ) {}
-// int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) {}
-// int in_pcbdisconnect ( struct inpcb *n ) {}
+// int in_pcbbind ( struct inpcb *n, struct mbuf *m ) { panic ( "X" ); }
+// int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) { panic ( "X" ); }
+// int in_pcbdisconnect ( struct inpcb *n ) { panic ( "X" ); }
 
-// int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) {}
-// struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) {}
+// int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) { panic ( "X" ); }
+// struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) { panic ( "X" ); }
 
-// int in_losing ( struct inpcb *n ) {}
+// int in_losing ( struct inpcb *n ) { panic ( "X" ); }
 
 // -- in in.c
-// int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) {}
+// int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) { panic ( "X" ); }
 
-void ip_pcblookup ( struct route * ) {}
+void ip_pcblookup ( struct route * ) { panic ( "in_pcblookup" ); }
 
-void wakeup ( void ) {}
-void sowakeup ( void ) {}
-void inetctlerrmap ( void ) {}
+void wakeup ( void ) { panic ( "wakeup" ); }
+void sowakeup ( void ) { panic ( "sowakeup" ); }
+void inetctlerrmap ( void ) { panic ( "inetctlerrmap" ); }
 
-void _insque ( void ) {}
-void _remque ( void ) {}
+void _insque ( void ) { panic ( "_insque" ); }
+void _remque ( void ) { panic ( "_remque" ); }
 
-// int in_localaddr ( struct in_addr ) {}
+// int in_localaddr ( struct in_addr ) { panic ( "X" ); }
 
-void rtalloc ( struct route * ) {}
+void rtalloc ( struct route * ) { panic ( "rtalloc" ); }
 
-void ip_stripoptions ( struct mbuf *, struct mbuf * ) {}
+void ip_stripoptions ( struct mbuf *, struct mbuf * ) { panic ( "ip_stripoptions" ); }
 
-struct mbuf * ip_srcroute ( void ) {}
+struct mbuf * ip_srcroute ( void ) { panic ( "X" ); }
 
 /* from net/if.c */
-struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) {}
-struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) {}
-struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) {}
+struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "X" ); }
+struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "X" ); }
+struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "X" ); }
 
 /* from net/route.c */
-void rtfree( struct rtentry *rt ) {}
-int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) {}
+void rtfree( struct rtentry *rt ) { panic ( "X" ); }
+int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) { panic ( "X" ); }
 
 /* from net/rtsock.c */
-void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) {}
+void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) { panic ( "X" ); }
 
-void ip_freemoptions( register struct ip_moptions * ) {}
+void ip_freemoptions( register struct ip_moptions * ) { panic ( "X" ); }
 
 /* THE END */

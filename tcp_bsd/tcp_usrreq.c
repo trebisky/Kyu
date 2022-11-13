@@ -86,13 +86,15 @@ tcp_usrreq(so, req, m, nam, control)
 	int error = 0;
 	int ostate;
 
-	if (req == PRU_CONTROL)
 #ifdef KYU
+	if (req == PRU_CONTROL)
 	    return (EINVAL);
 #else
 	    /* Handle ioctl */
+	if (req == PRU_CONTROL)
 	    return in_control(so, (long)m, (caddr_t)nam, (struct ifnet *)control);
 #endif
+
 	if (control && control->m_len) {
 		// m_freem(control);
 		mb_freem(control);
@@ -103,6 +105,8 @@ tcp_usrreq(so, req, m, nam, control)
 
 	s = splnet();
 	inp = sotoinpcb(so);
+	printf ( "tcp_usrreq 1 (%08x, %08x)\n", so, inp );
+
 	/*
 	 * When a TCP is attached to a socket, then there will be
 	 * a (struct inpcb) pointed at by the socket, and this
@@ -112,6 +116,9 @@ tcp_usrreq(so, req, m, nam, control)
 		splx(s);
 		return (EINVAL);		/* XXX */
 	}
+
+	printf ( "tcp_usrreq 2\n" );
+
 	if (inp) {
 		tp = intotcpcb(inp);
 		/* WHAT IF TP IS 0? */
@@ -121,6 +128,8 @@ tcp_usrreq(so, req, m, nam, control)
 		ostate = tp->t_state;
 	} else
 		ostate = 0;
+
+
 	switch (req) {
 
 	/*
@@ -128,16 +137,20 @@ tcp_usrreq(so, req, m, nam, control)
 	 * and an internet control block.
 	 */
 	case PRU_ATTACH:
+		printf ( "tcp_usrreq 3\n" );
 		if (inp) {
 			error = EISCONN;
 			break;
 		}
+		printf ( "tcp_usrreq 3b\n" );
 		error = tcp_attach(so);
 		if (error)
 			break;
+		printf ( "tcp_usrreq 4\n" );
 		if ((so->so_options & SO_LINGER) && so->so_linger == 0)
 			so->so_linger = TCP_LINGERTIME;
 		tp = sototcpcb(so);
+		printf ( "tcp_usrreq 5\n" );
 		break;
 
 	/*
@@ -337,6 +350,10 @@ tcp_usrreq(so, req, m, nam, control)
 	default:
 		panic("tcp_usrreq");
 	}
+	
+
+	printf ( "tcp_usrreq 6\n" );
+
 	if (tp && (so->so_options & SO_DEBUG))
 		tcp_trace(TA_USER, ostate, tp, (struct tcpiphdr *)0, req);
 	splx(s);
@@ -439,17 +456,25 @@ tcp_attach(so)
 	struct inpcb *inp;
 	int error;
 
+	printf ( "tcp_attach 0\n" );
+
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
 		error = soreserve(so, tcp_sendspace, tcp_recvspace);
 		if (error)
 			return (error);
 	}
+	printf ( "tcp_attach 1\n" );
+
 	error = in_pcballoc(so, &tcb);
 	if (error)
 		return (error);
+
+	printf ( "tcp_attach 2\n" );
+
 	inp = sotoinpcb(so);
 	tp = tcp_newtcpcb(inp);
 	if (tp == 0) {
+		printf ( "tcp_attach 2e\n" );
 		int nofd = so->so_state & SS_NOFDREF;	/* XXX */
 
 		so->so_state &= ~SS_NOFDREF;	/* don't free the socket yet */
@@ -457,6 +482,7 @@ tcp_attach(so)
 		so->so_state |= nofd;
 		return (ENOBUFS);
 	}
+	printf ( "tcp_attach 3\n" );
 	tp->t_state = TCPS_CLOSED;
 	return (0);
 }

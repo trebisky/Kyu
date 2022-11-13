@@ -300,7 +300,9 @@ extern struct kmemstats kmemstats[];
 extern struct kmemusage *kmemusage;
 extern char *kmembase;
 extern struct kmembuckets bucket[];
-extern void *malloc __P((unsigned long size, int type, int flags));
-extern void free __P((void *addr, int type));
+
+// extern void *malloc __P((unsigned long size, int type, int flags));
+// extern void free __P((void *addr, int type));
+
 #endif /* KERNEL */
 #endif /* !_SYS_MALLOC_H_ */
