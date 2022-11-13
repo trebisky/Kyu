@@ -176,7 +176,8 @@ int	 ip_setmoptions __P((int, struct ip_moptions **, struct mbuf *));
 void	 ip_slowtimo __P((void));
 struct mbuf *
 	 ip_srcroute __P((void));
-void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
+// void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
+void	 ip_stripoptions __P((struct mbuf *));
 int	 ip_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	 ipintr __P((void));
 int	 rip_ctloutput __P((int, struct socket *, int, int, struct mbuf **));

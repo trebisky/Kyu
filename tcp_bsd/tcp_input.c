@@ -247,7 +247,8 @@ tcp_input(m, iphlen)
 	dump_buf ( (char *) ti, 128 );	/* XXX */
 
 	if (iphlen > sizeof (struct ip))
-		ip_stripoptions(m, (struct mbuf *)0);
+		ip_stripoptions ( m );
+		// ip_stripoptions(m, (struct mbuf *)0);
 	if (m->m_len < sizeof (struct tcpiphdr)) {
 		if ((m = m_pullup(m, sizeof (struct tcpiphdr))) == 0) {
 			tcpstat.tcps_rcvshort++;

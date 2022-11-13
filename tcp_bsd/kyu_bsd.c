@@ -378,6 +378,35 @@ void    bzero (void *buf, u_int len)
 	memset ( buf, 0, len );
 }
 
+/* This is taken from i386/i386/machdep.c and sys/proc.h
+ */
+
+struct  llist {
+        struct  llist *f_link;
+        struct  llist *r_link;
+};
+
+void
+_insque ( struct llist *element, struct llist *head)
+{
+        element->f_link = head->f_link;
+        head->f_link = element;
+        element->r_link = head;
+        (element->f_link)->r_link = element;
+}
+
+/*
+ * remove an element from a queue
+ */
+void
+_remque ( struct llist *element)
+{
+        (element->f_link)->r_link = element->r_link;
+        (element->r_link)->f_link = element->f_link;
+        // element->r_link = (struct llist *)0;
+}
+
+
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
@@ -450,14 +479,11 @@ void wakeup ( void ) { panic ( "wakeup" ); }
 void sowakeup ( void ) { panic ( "sowakeup" ); }
 void inetctlerrmap ( void ) { panic ( "inetctlerrmap" ); }
 
-void _insque ( void ) { panic ( "_insque" ); }
-void _remque ( void ) { panic ( "_remque" ); }
-
 // int in_localaddr ( struct in_addr ) { panic ( "X" ); }
 
 void rtalloc ( struct route * ) { panic ( "rtalloc" ); }
 
-void ip_stripoptions ( struct mbuf *, struct mbuf * ) { panic ( "ip_stripoptions" ); }
+// void ip_stripoptions ( struct mbuf *, struct mbuf * ) { panic ( "ip_stripoptions" ); }
 
 struct mbuf * ip_srcroute ( void ) { panic ( "X" ); }
 

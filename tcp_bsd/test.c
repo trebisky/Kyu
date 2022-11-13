@@ -13,6 +13,11 @@
 #include <sys/socket.h>
 #include <sys/protosw.h>
 
+// for stripoptions
+#include <in_systm.h>
+#include <in.h>
+#include <ip.h>
+
 /* -------- */
 #ifdef notdef
 #include "kyu.h"
@@ -27,9 +32,6 @@
 #include <net/if.h>
 #include <net/route.h>
 
-#include <in.h>
-#include <in_systm.h>
-#include <ip.h>
 #include <in_pcb.h>
 #include <ip_var.h>
 
@@ -59,12 +61,46 @@ server_bind ( int port )
 {
 	struct socket *so;
 	int e;
+	struct mbuf *nam;
+	struct sockaddr_in myaddr;
+	int len;
 
 	so = (struct socket *) k_sock_alloc ();
 	// error = socreate(uap->domain, &so, uap->type, uap->protocol);
 	e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
-	if ( e )
-	    panic ( "socreate fails" );
+	if ( e ) {
+	    printf ( "socreate fails\n" );
+	    return;
+	}
+
+#ifdef notdef
+	struct sockaddr_in serv_addr;
+	bzero ( &serv_addr, sizeof(serv_addr) );
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = htonl ( INADDR_ANY );
+	serv_addr.sin_port = htons ( MY_TCP_PORT );
+	bind ( sockfd, &serv_addr, sizeof(serv_addr) );
+	e = sockargs(&nam, uap->name, uap->namelen, MT_SONAME))
+#endif
+
+	len = sizeof(myaddr);
+	bzero ( &myaddr, len );
+	myaddr.sin_family = AF_INET;
+	myaddr.sin_addr.s_addr = INADDR_ANY;
+	myaddr.sin_port = port;
+
+	e = sockargs(&nam, &myaddr, len, MT_SONAME);
+	if ( e ) {
+	    printf ( "sockargs fails\n" );
+	    return;
+	}
+
+	e = sobind ( so, nam );
+	if ( e ) {
+	    printf ( "sobind fails\n" );
+	    return;
+	}
+
 	printf ( "--- Server bind OK\n" );
 }
 
@@ -75,6 +111,37 @@ void sbrelease ( struct sockbuf * );
 void sofree ( struct socket * );
 void sbflush ( struct sockbuf * );
 void sbdrop ( struct sockbuf *, int );
+
+int
+sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
+{
+        struct sockaddr *sa;
+        struct mbuf *m;
+        int error;
+
+        if ( (u_int)buflen > MLEN ) {
+                return (EINVAL);
+        }
+
+        // m = m_get(M_WAIT, type);
+        m = (struct mbuf *) mb_get(type);
+        if (m == NULL)
+                return (ENOBUFS);
+
+        m->m_len = buflen;
+        bcopy ( buf, mtod(m, caddr_t), (u_int)buflen);
+        // error = copyin(buf, mtod(m, caddr_t), (u_int)buflen);
+        // if (error) {
+        //      (void) mb_free(m);
+	//	return error;
+	//	}
+	*mp = m;
+	if (type == MT_SONAME) {
+		sa = mtod(m, struct sockaddr *);
+		sa->sa_len = buflen;
+	}
+        return 0;
+}
 
 /* The original is in kern/uipc_socket.c
  */
@@ -121,6 +188,25 @@ socreate ( struct socket *so, int dom, int type, int proto)
         // *aso = so;
         return (0);
 }
+
+int
+sobind ( struct socket *so, struct mbuf *nam )
+{
+        // int s = splnet();
+        int error;
+
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_BIND,
+        //         (struct mbuf *)0, nam, (struct mbuf *)0);
+        error = tcp_usrreq (so, PRU_BIND,
+
+                (struct mbuf *)0, nam, (struct mbuf *)0);
+
+        // splx(s);
+        return (error);
+}
+
+
+/* ------------- */
 
 void
 sofree ( struct socket *so )
@@ -257,6 +343,30 @@ sbdrop ( struct sockbuf *sb, int len)
         } else
                 sb->sb_mb = next;
 }
+
+/*
+ * Strip out IP options, at higher
+ * level protocol in the kernel.
+ */
+/* From netinet/ip_input.c */
+void
+ip_stripoptions ( struct mbuf *m )
+{
+        int i;
+        struct ip *ip = mtod(m, struct ip *);
+        caddr_t opts;
+        int olen;
+
+        olen = (ip->ip_hl<<2) - sizeof (struct ip);
+        opts = (caddr_t)(ip + 1);
+        i = m->m_len - (sizeof (struct ip) + olen);
+        bcopy(opts  + olen, opts, (unsigned)i);
+        m->m_len -= olen;
+        if (m->m_flags & M_PKTHDR)
+                m->m_pkthdr.len -= olen;
+        ip->ip_hl = sizeof(struct ip) >> 2;
+}
+
 
 
 /* THE END */
