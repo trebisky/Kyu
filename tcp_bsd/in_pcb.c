@@ -220,6 +220,8 @@ in_pcbconnect(inp, nam)
 	}
 
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
+
+#ifdef ROUTING_STUFF
 		register struct route *ro;
 
 		ia = (struct in_ifaddr *)0;
@@ -253,6 +255,12 @@ in_pcbconnect(inp, nam)
 		 */
 		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 			ia = ifatoia(ro->ro_rt->rt_ifa);
+#else
+		/* Kyu doesn't do this routing stuff.
+		 */
+		ia = (struct in_ifaddr *)0;
+#endif
+
 		if (ia == 0) {
 			u_short fport = sin->sin_port;
 
@@ -326,8 +334,8 @@ in_pcbdetach(inp)
 	sofree(so);
 	if (inp->inp_options)
 		(void)mb_free(inp->inp_options);
-	if (inp->inp_route.ro_rt)
-		rtfree(inp->inp_route.ro_rt);
+	//if (inp->inp_route.ro_rt)
+	//	rtfree(inp->inp_route.ro_rt);
 	ip_freemoptions(inp->inp_moptions);
 	remque(inp);
 	// FREE(inp, M_PCB);
@@ -410,9 +418,10 @@ in_pcbnotify(head, dst, fport_arg, laddr, lport_arg, cmd, notify)
 		fport = 0;
 		lport = 0;
 		laddr.s_addr = 0;
-		if (cmd != PRC_HOSTDEAD)
-			notify = in_rtchange;
+		// if (cmd != PRC_HOSTDEAD)
+		// 	notify = in_rtchange;
 	}
+
 	errno = inetctlerrmap[cmd];
 	for (inp = head->inp_next; inp != head;) {
 		if (inp->inp_faddr.s_addr != faddr.s_addr ||
@@ -426,10 +435,11 @@ in_pcbnotify(head, dst, fport_arg, laddr, lport_arg, cmd, notify)
 		oinp = inp;
 		inp = inp->inp_next;
 		if (notify)
-			(*notify)(oinp, errno);
+		 	(*notify)(oinp, errno);
 	}
 }
 
+#ifdef ROUTING_STUFF
 /*
  * Check for alternatives when higher level complains
  * about service problems.  For now, invalidate cached
@@ -456,11 +466,11 @@ in_losing(inp)
 				rt->rt_gateway, rt_mask(rt), rt->rt_flags, 
 				(struct rtentry **)0);
 		else 
+		    rtfree(rt);
 		/*
 		 * A new route can be allocated
 		 * the next time output is attempted.
 		 */
-			rtfree(rt);
 	}
 }
 
@@ -474,7 +484,7 @@ in_rtchange(inp, errno)
 	int errno;
 {
 	if (inp->inp_route.ro_rt) {
-		rtfree(inp->inp_route.ro_rt);
+		// rtfree(inp->inp_route.ro_rt);
 		inp->inp_route.ro_rt = 0;
 		/*
 		 * A new route can be allocated the next time
@@ -482,6 +492,7 @@ in_rtchange(inp, errno)
 		 */
 	}
 }
+#endif
 
 struct inpcb *
 in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
@@ -494,9 +505,14 @@ in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
 	int matchwild = 3, wildcard;
 	u_short fport = fport_arg, lport = lport_arg;
 
+	/* Interestingly enough, the addr and port values from the TCP
+	 * packet come here in network bytes order.
+	 * Also the port values in the inpcb are expected to be
+	 * in network bytes order!
+	 */
 	printf ( "in_pcblookup 0, %08x\n", head );
-	printf ( "in_pcblookup src = %08x, %d %08x\n", faddr.s_addr, fport_arg, fport_arg );
-	printf ( "in_pcblookup local = %08x, %d %08x\n", laddr.s_addr, lport_arg, lport_arg );
+	printf ( "in_pcblookup src = %08x, %d %08x (%d)\n", faddr.s_addr, fport_arg, fport_arg, ntohs(fport_arg) );
+	printf ( "in_pcblookup local = %08x, %d %08x (%d)\n", laddr.s_addr, lport_arg, lport_arg, ntohs(lport_arg) );
 	printf ( "in_pcblookup flags = %d\n", flags );
 
 	for (inp = head->inp_next; inp != head; inp = inp->inp_next) {

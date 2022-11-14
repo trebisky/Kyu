@@ -71,7 +71,7 @@ struct inpcb {
 #define	sotoinpcb(so)	((struct inpcb *)(so)->so_pcb)
 
 #ifdef KERNEL
-int	 in_losing __P((struct inpcb *));
+// int	 in_losing __P((struct inpcb *));
 int	 in_pcballoc __P((struct socket *, struct inpcb *));
 int	 in_pcbbind __P((struct inpcb *, struct mbuf *));
 int	 in_pcbconnect __P((struct inpcb *, struct mbuf *));

@@ -199,6 +199,7 @@ tcp_timers(tp, timer)
 		TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		    tp->t_rttmin, TCPTV_REXMTMAX);
 		tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
+
 		/*
 		 * If losing, let the lower level know and try for
 		 * a better route.  Also, if we backed off this far,
@@ -208,7 +209,7 @@ tcp_timers(tp, timer)
 		 * retransmit times until then.
 		 */
 		if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4) {
-			in_losing(tp->t_inpcb);
+			// in_losing(tp->t_inpcb);
 			tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
 			tp->t_srtt = 0;
 		}
@@ -242,12 +243,12 @@ tcp_timers(tp, timer)
 		 * to go below this.)
 		 */
 		{
-		u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
-		if (win < 2)
-			win = 2;
-		tp->snd_cwnd = tp->t_maxseg;
-		tp->snd_ssthresh = win * tp->t_maxseg;
-		tp->t_dupacks = 0;
+		    u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
+		    if (win < 2)
+			    win = 2;
+		    tp->snd_cwnd = tp->t_maxseg;
+		    tp->snd_ssthresh = win * tp->t_maxseg;
+		    tp->t_dupacks = 0;
 		}
 		(void) tcp_output(tp);
 		break;

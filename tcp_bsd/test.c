@@ -79,6 +79,9 @@ server_bind ( int port )
 	struct sockaddr_in myaddr;
 	int len;
 
+	register struct inpcb *inp;
+        register struct tcpcb *tp;
+
 	so = (struct socket *) k_sock_alloc ();
 	// error = socreate(uap->domain, &so, uap->type, uap->protocol);
 	e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
@@ -117,6 +120,16 @@ server_bind ( int port )
 	    tcb_show ();
 	    return;
 	}
+
+	/* XXX - hack this in so things "work"
+	 */
+	so->so_options |= SO_ACCEPTCONN;
+
+// tcp_fsm.h
+#define	TCPS_LISTEN		1	/* listening for connection */
+	inp = sotoinpcb(so);
+	tp = intotcpcb(inp);
+	tp->t_state = TCPS_LISTEN;
 
 	printf ( "--- Server bind OK\n" );
 	tcb_show ();
@@ -171,6 +184,117 @@ sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
 		sa->sa_len = buflen;
 	}
         return 0;
+}
+
+static void
+soqinsque ( struct socket *head, struct socket *so, int q )
+{
+        struct socket **prev;
+
+        so->so_head = head;
+        if (q == 0) {
+                head->so_q0len++;
+                so->so_q0 = 0;
+                for (prev = &(head->so_q0); *prev; )
+                        prev = &((*prev)->so_q0);
+        } else {
+                head->so_qlen++;
+                so->so_q = 0;
+                for (prev = &(head->so_q); *prev; )
+                        prev = &((*prev)->so_q);
+        }
+        *prev = so;
+}
+
+static int
+soqremque ( struct socket *so, int q )
+{
+        struct socket *head, *prev, *next;
+
+        head = so->so_head;
+        prev = head;
+
+        for (;;) {
+                next = q ? prev->so_q : prev->so_q0;
+                if (next == so)
+                        break;
+                if (next == 0)
+                        return (0);
+                prev = next;
+        }
+        if (q == 0) {
+                prev->so_q0 = next->so_q0;
+                head->so_q0len--;
+        } else {
+                prev->so_q = next->so_q;
+                head->so_qlen--;
+        }
+        next->so_q0 = next->so_q = 0;
+        next->so_head = 0;
+        return (1);
+}
+
+/*
+ * When an attempt at a new connection is noted on a socket
+ * which accepts connections, sonewconn is called.  If the
+ * connection is possible (subject to space constraints, etc.)
+ * then we allocate a new structure, propoerly linked into the
+ * data structure of the original socket, and return this.
+ * Connstatus may be 0, or SO_ISCONFIRMING, or SO_ISCONNECTED.
+ *
+ * Currently, sonewconn() is defined as sonewconn1() in socketvar.h
+ * to catch calls that are missing the (new) second parameter.
+ */
+/* From kern/uipc_socket2.c
+ */
+struct socket *
+sonewconn1 ( struct socket *head, int connstatus)
+{
+        struct socket *so;
+        int soqueue = connstatus ? 1 : 0;
+	int error;
+
+	printf ( "sonewconn1 - %08x %d\n", head, connstatus );
+
+        if (head->so_qlen + head->so_q0len > 3 * head->so_qlimit / 2)
+                return ((struct socket *)0);
+
+        // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_DONTWAIT);
+	so = (struct socket *) k_sock_alloc ();
+        if (so == NULL)
+                return ((struct socket *)0);
+
+        bzero((caddr_t)so, sizeof(*so));
+        so->so_type = head->so_type;
+        so->so_options = head->so_options &~ SO_ACCEPTCONN;
+        so->so_linger = head->so_linger;
+        so->so_state = head->so_state | SS_NOFDREF;
+        so->so_proto = head->so_proto;
+        so->so_timeo = head->so_timeo;
+        so->so_pgid = head->so_pgid;
+
+        (void) soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat);
+        soqinsque(head, so, soqueue);
+
+        // if ((*so->so_proto->pr_usrreq)(so, PRU_ATTACH,
+        //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0)) {
+        error = tcp_usrreq (so, PRU_ATTACH,
+                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	if ( error ) {
+                (void) soqremque(so, soqueue);
+                // (void) free((caddr_t)so, M_SOCKET);
+		k_sock_free ( so );
+                return ((struct socket *)0);
+        }
+
+        if (connstatus) {
+                // sorwakeup(head);
+                // wakeup((caddr_t)&head->so_timeo);
+                so->so_state |= connstatus;
+        }
+
+        return (so);
 }
 
 /* The original is in kern/uipc_socket.c
@@ -396,7 +520,5 @@ ip_stripoptions ( struct mbuf *m )
                 m->m_pkthdr.len -= olen;
         ip->ip_hl = sizeof(struct ip) >> 2;
 }
-
-
 
 /* THE END */

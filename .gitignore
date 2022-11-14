@@ -22,6 +22,7 @@ linux/mm
 linux/mm/Makefile
 linux/mm/*
 linux/include/linux/compiler-gcc_OLD/
+tcp_bsd/kyu.c
 z
 zz
 zzz

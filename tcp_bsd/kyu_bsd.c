@@ -455,8 +455,6 @@ void sorflush ( void ) { panic ( "sorflush" ); }
 
 void soqremque ( void ) { panic ( "soqremque" ); }
 
-struct  socket * sonewconn1 ( struct socket *head, int connstatus) { panic ( "sonewconn1" ); }
-
 // -- in in_pcb.c
 // int in_pcballoc ( struct socket *s, struct inpcb *i ) { panic ( "X" ); }
 // int in_pcbdetach ( struct inpcb * ) { panic ( "X" ); }
@@ -486,24 +484,24 @@ void inetctlerrmap ( void ) { panic ( "inetctlerrmap" ); }
 
 // int in_localaddr ( struct in_addr ) { panic ( "X" ); }
 
-void rtalloc ( struct route * ) { panic ( "rtalloc" ); }
+// void rtalloc ( struct route * ) { panic ( "rtalloc" ); }
 
 // void ip_stripoptions ( struct mbuf *, struct mbuf * ) { panic ( "ip_stripoptions" ); }
 
-struct mbuf * ip_srcroute ( void ) { panic ( "X" ); }
+// struct mbuf * ip_srcroute ( void ) { panic ( "ip_srcroute" ); }
 
 /* from net/if.c */
-struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "X" ); }
-struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "X" ); }
-struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "X" ); }
+struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "ifa_ifwithnet" ); }
+struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithaddr" ); }
+struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithstaddr" ); }
 
 /* from net/route.c */
-void rtfree( struct rtentry *rt ) { panic ( "X" ); }
-int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) { panic ( "X" ); }
+// void rtfree( struct rtentry *rt ) { panic ( "rtfree" ); }
+// int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) { panic ( "rtrequest" ); }
 
 /* from net/rtsock.c */
-void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) { panic ( "X" ); }
+// void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) { panic ( "rt_missmsg" ); }
 
-void ip_freemoptions( register struct ip_moptions * ) { panic ( "X" ); }
+void ip_freemoptions( register struct ip_moptions * ) { panic ( "ip_freemoptions" ); }
 
 /* THE END */

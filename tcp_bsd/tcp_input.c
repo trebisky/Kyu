@@ -36,7 +36,6 @@
 #include <kyu_compat.h>
 #include <mbuf.h>
 
-#ifndef TUBA_INCLUDE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -69,7 +68,6 @@ struct	inpcb *tcp_last_inpcb = &tcb;
 
 extern u_long sb_max;
 
-#endif /* TUBA_INCLUDE */
 #define TCP_PAWS_IDLE	(24 * 24 * 60 * 60 * PR_SLOWHZ)
 
 /* for modulo comparisons of timestamps */
@@ -103,7 +101,6 @@ extern u_long sb_max;
 		tp->t_flags |= TF_ACKNOW; \
 	} \
 }
-#ifndef TUBA_INCLUDE
 
 int
 tcp_reass(tp, ti, m)
@@ -276,7 +273,6 @@ tcp_input(m, iphlen)
 		dump_buf ( (char *) ti, len );
 		goto drop;
 	}
-#endif /* TUBA_INCLUDE */
 
 	printf ( "tcp_input 3\n" );
 	/*
@@ -363,13 +359,16 @@ findpcb:
 	 */
 	if (inp == 0)
 		goto dropwithreset;
+
 	tp = intotcpcb(inp);
 	if (tp == 0)
 		goto dropwithreset;
+
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 	
 	printf ( "tcp_input 8\n" );
+
 	/* Unscale the window into a 32-bit value. */
 	if ((tiflags & TH_SYN) == 0)
 		tiwin = ti->ti_win << tp->snd_scale;
@@ -401,7 +400,10 @@ findpcb:
 			inp = (struct inpcb *)so->so_pcb;
 			inp->inp_laddr = ti->ti_dst;
 			inp->inp_lport = ti->ti_dport;
-#if BSD>=43
+#ifdef KYU
+			/* These are options, hence optional */
+			inp->inp_options = 0;
+#else
 			inp->inp_options = ip_srcroute();
 #endif
 			tp = intotcpcb(inp);
@@ -1357,7 +1359,6 @@ drop:
 	if (dropsocket)
 		(void) soabort(so);
 	return;
-#ifndef TUBA_INCLUDE
 }
 
 void
@@ -1552,6 +1553,20 @@ tcp_xmit_timer(tp, rtt)
  * While looking at the routing entry, we also initialize other path-dependent
  * parameters from pre-set or cached values in the routing entry.
  */
+
+#ifndef ROUTING_STUFF
+/* Kyu doesn't do this routing stuff */
+int
+tcp_mss ( struct tcpcb *tp, u_int offer)
+{
+	// Having this in a variable lets it be "tunable"
+	// return tcp_mssdflt;
+	return TCP_MSS;
+
+}
+#endif
+
+#ifdef ROUTING_STUFF
 int
 tcp_mss(tp, offer)
 	register struct tcpcb *tp;
@@ -1567,6 +1582,7 @@ tcp_mss(tp, offer)
 	extern int tcp_mssdflt;
 
 	inp = tp->t_inpcb;
+
 	ro = &inp->inp_route;
 
 	if ((rt = ro->ro_rt) == (struct rtentry *)0) {
@@ -1686,4 +1702,4 @@ tcp_mss(tp, offer)
 #endif /* RTV_MTU */
 	return (mss);
 }
-#endif /* TUBA_INCLUDE */
+#endif
