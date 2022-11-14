@@ -62,6 +62,14 @@ extern struct protosw tcp_proto;
 static void server_bind ( int );
 void tcb_show ( void );
 
+struct mbuf *mb_free ( struct mbuf * );
+
+/* Can these all be static ?? */
+void sbrelease ( struct sockbuf * );
+void sofree ( struct socket * );
+void sbflush ( struct sockbuf * );
+void sbdrop ( struct sockbuf *, int );
+
 /* currently called during initialization.
  */
 void
@@ -69,6 +77,8 @@ bsd_server_test ( void )
 {
 	server_bind ( 111 );
 }
+
+struct socket *global_so;
 
 static void
 server_bind ( int port )
@@ -132,8 +142,113 @@ server_bind ( int port )
 	tp->t_state = TCPS_LISTEN;
 
 	printf ( "--- Server bind OK\n" );
+
+	/* XXX */
+	global_so = so;
+
 	tcb_show ();
 }
+
+void
+test_connect ( void )
+{
+	printf ( " *** in TEST connect\n" );
+	(void) soclose ( global_so );
+}
+
+/* From kern/uipc_socket2.c ---
+ * they clearly don't belong here, but ...
+ */
+/* strings for sleep message: */
+char    netio[] = "netio";
+char    netcon[] = "netcon";
+char    netcls[] = "netcls";
+
+/*
+ * Close a socket on last file table reference removal.
+ * Initiate disconnect if connected.
+ * Free socket when disconnect complete.
+ */
+ /* from kern/uipc_socket.c */
+int
+soclose ( struct socket *so )
+{
+        int s = splnet();               /* conservative */
+        int error = 0;
+
+        if (so->so_options & SO_ACCEPTCONN) {
+                while (so->so_q0)
+                        (void) soabort(so->so_q0);
+                while (so->so_q)
+                        (void) soabort(so->so_q);
+        }
+
+        if (so->so_pcb == 0)
+                goto discard;
+
+        if (so->so_state & SS_ISCONNECTED) {
+                if ((so->so_state & SS_ISDISCONNECTING) == 0) {
+                        error = sodisconnect(so);
+                        if (error)
+                                goto drop;
+                }
+                if (so->so_options & SO_LINGER) {
+                        if ((so->so_state & SS_ISDISCONNECTING) &&
+                            (so->so_state & SS_NBIO))
+                                goto drop;
+                        while (so->so_state & SS_ISCONNECTED)
+                                if (error = tsleep((caddr_t)&so->so_timeo,
+                                    PSOCK | PCATCH, netcls, so->so_linger))
+                                        break;
+                }
+        }
+
+drop:
+        if (so->so_pcb) {
+                // int error2 = (*so->so_proto->pr_usrreq)(so, PRU_DETACH,
+                //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+		int error2 = tcp_usrreq (so, PRU_DETACH,
+                        (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+                if (error == 0)
+                        error = error2;
+        }
+
+discard:
+        if (so->so_state & SS_NOFDREF)
+                panic("soclose: NOFDREF");
+        so->so_state |= SS_NOFDREF;
+        sofree(so);
+        splx(s);
+        return (error);
+}
+
+int
+sodisconnect ( struct socket *so )
+{
+        int s = splnet();
+        int error;
+
+        if ((so->so_state & SS_ISCONNECTED) == 0) {
+                error = ENOTCONN;
+                goto bad;
+        }
+
+        if (so->so_state & SS_ISDISCONNECTING) {
+                error = EALREADY;
+                goto bad;
+        }
+
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_DISCONNECT,
+        //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	error = tcp_usrreq (so, PRU_DISCONNECT,
+            (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+bad:
+        splx(s);
+        return (error);
+}
+
 
 void
 tcb_show ( void )
@@ -143,17 +258,9 @@ tcb_show ( void )
 	inp = &tcb;
 	while ( inp->inp_next != &tcb ) {
 	    inp = inp->inp_next;
-	    printf ( "INPCB: lport: %d\n", inp->inp_lport );
+	    printf ( "INPCB: %08x -- lport: %d\n", inp, ntohs(inp->inp_lport) );
 	}
 }
-
-struct mbuf *mb_free ( struct mbuf * );
-
-/* Can these all be static ?? */
-void sbrelease ( struct sockbuf * );
-void sofree ( struct socket * );
-void sbflush ( struct sockbuf * );
-void sbdrop ( struct sockbuf *, int );
 
 int
 sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
@@ -233,6 +340,34 @@ soqremque ( struct socket *so, int q )
         next->so_head = 0;
         return (1);
 }
+
+/*
+ * Wakeup processes waiting on a socket buffer.
+ * Do asynchronous notification via SIGIO
+ * if the socket has the SS_ASYNC flag set.
+ */
+void
+sowakeup ( struct socket *so, struct sockbuf *sb )
+{
+        // struct proc *p;
+
+        // selwakeup(&sb->sb_sel);
+        sb->sb_flags &= ~SB_SEL;
+        if (sb->sb_flags & SB_WAIT) {
+                sb->sb_flags &= ~SB_WAIT;
+                // wakeup((caddr_t)&sb->sb_cc);
+        }
+
+#ifdef notdef
+        if (so->so_state & SS_ASYNC) {
+                if (so->so_pgid < 0)
+                        gsignal(-so->so_pgid, SIGIO);
+                else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
+                        psignal(p, SIGIO);
+        }
+#endif
+}
+
 
 /*
  * When an attempt at a new connection is noted on a socket
@@ -361,6 +496,31 @@ sobind ( struct socket *so, struct mbuf *nam )
 
 
 /* ------------- */
+
+#ifdef notyet
+void
+sorflush ( struct socket *so )
+{
+        struct sockbuf *sb = &so->so_rcv;
+        struct protosw *pr = so->so_proto;
+        int s;
+        struct sockbuf asb;
+
+        sb->sb_flags |= SB_NOINTR;
+        (void) sblock(sb, M_WAITOK);
+
+        s = splimp();
+        socantrcvmore(so);
+        sbunlock(sb);
+        asb = *sb;
+        bzero((caddr_t)sb, sizeof (*sb));
+        splx(s);
+
+        // if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
+        //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
+        sbrelease(&asb);
+}
+#endif
 
 void
 sofree ( struct socket *so )
@@ -496,6 +656,92 @@ sbdrop ( struct sockbuf *sb, int len)
                 m->m_nextpkt = next;
         } else
                 sb->sb_mb = next;
+}
+
+/*
+ * Procedures to manipulate state flags of socket
+ * and do appropriate wakeups.  Normal sequence from the
+ * active (originating) side is that soisconnecting() is
+ * called during processing of connect() call,
+ * resulting in an eventual call to soisconnected() if/when the
+ * connection is established.  When the connection is torn down
+ * soisdisconnecting() is called during processing of disconnect() call,
+ * and soisdisconnected() is called when the connection to the peer
+ * is totally severed.  The semantics of these routines are such that
+ * connectionless protocols can call soisconnected() and soisdisconnected()
+ * only, bypassing the in-progress calls when setting up a ``connection''
+ * takes no time.
+ *
+ * From the passive side, a socket is created with
+ * two queues of sockets: so_q0 for connections in progress
+ * and so_q for connections already made and awaiting user acceptance.
+ * As a protocol is preparing incoming connections, it creates a socket
+ * structure queued on so_q0 by calling sonewconn().  When the connection
+ * is established, soisconnected() is called, and transfers the
+ * socket structure to so_q, making it available to accept().
+ *
+ * If a socket is closed with sockets on either
+ * so_q0 or so_q, these sockets are dropped.
+ *
+ * If higher level protocols are implemented in
+ * the kernel, the wakeups done here will sometimes
+ * cause software-interrupt process scheduling.
+ */
+/* From kern/uipc_socket2.c */
+
+void
+soisconnecting(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~(SS_ISCONNECTED|SS_ISDISCONNECTING);
+        so->so_state |= SS_ISCONNECTING;
+}
+
+void
+soisconnected(so)
+        register struct socket *so;
+{
+        register struct socket *head = so->so_head;
+
+        so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
+        so->so_state |= SS_ISCONNECTED;
+        if (head && soqremque(so, 0)) {
+                soqinsque(head, so, 1);
+                sorwakeup(head);
+                // wakeup((caddr_t)&head->so_timeo);
+        } else {
+                // wakeup((caddr_t)&so->so_timeo);
+                sorwakeup(so);
+                sowwakeup(so);
+        }
+
+	/* XXX XXX */
+	test_connect ();
+}
+
+void
+soisdisconnecting(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~SS_ISCONNECTING;
+        so->so_state |= (SS_ISDISCONNECTING|SS_CANTRCVMORE|SS_CANTSENDMORE);
+        // wakeup((caddr_t)&so->so_timeo);
+        sowwakeup(so);
+        sorwakeup(so);
+}
+
+void
+soisdisconnected(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
+        so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
+        // wakeup((caddr_t)&so->so_timeo);
+        sowwakeup(so);
+        sorwakeup(so);
 }
 
 /*

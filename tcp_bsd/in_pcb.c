@@ -274,6 +274,8 @@ in_pcbconnect(inp, nam)
 			if (ia == 0)
 				return (EADDRNOTAVAIL);
 		}
+
+#ifdef MULTICAST_STUFF
 		/*
 		 * If the destination address is multicast and an outgoing
 		 * interface has been set as a multicast option, use the
@@ -294,6 +296,7 @@ in_pcbconnect(inp, nam)
 					return (EADDRNOTAVAIL);
 			}
 		}
+#endif
 		ifaddr = (struct sockaddr_in *)&ia->ia_addr;
 	}
 	if (in_pcblookup(inp->inp_head,
@@ -336,7 +339,7 @@ in_pcbdetach(inp)
 		(void)mb_free(inp->inp_options);
 	//if (inp->inp_route.ro_rt)
 	//	rtfree(inp->inp_route.ro_rt);
-	ip_freemoptions(inp->inp_moptions);
+	// ip_freemoptions(inp->inp_moptions);
 	remque(inp);
 	// FREE(inp, M_PCB);
 	k_inpcb_free ( inp );

@@ -160,7 +160,7 @@ void	 ip_drain __P((void));
 void	 ip_enq __P((struct ipasfrag *, struct ipasfrag *));
 void	 ip_forward __P((struct mbuf *, int));
 void	 ip_freef __P((struct ipq *));
-void	 ip_freemoptions __P((struct ip_moptions *));
+// void	 ip_freemoptions __P((struct ip_moptions *));
 int	 ip_getmoptions __P((int, struct ip_moptions *, struct mbuf **));
 void	 ip_init __P((void));
 int	 ip_mforward __P((struct mbuf *, struct ifnet *));

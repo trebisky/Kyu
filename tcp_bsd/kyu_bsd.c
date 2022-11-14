@@ -443,15 +443,17 @@ void free ( void )
 
 void sbappend ( void ) { panic ( "sbappend" ); }
 
-void soisdisconnected ( void ) { panic ( "soisdisconncted" ); }
-void soisdisconnecting ( void ) { panic ( "soisdisconncting" ); }
-void soisconnected ( void ) { panic ( "soisconnected" ); }
-void soisconnecting ( void ) { panic ( "soisconnecting" ); }
+// void soisdisconnected ( void ) { panic ( "soisdisconncted" ); }
+// void soisdisconnecting ( void ) { panic ( "soisdisconncting" ); }
+// void soisconnected ( void ) { panic ( "soisconnected" ); }
+// void soisconnecting ( void ) { panic ( "soisconnecting" ); }
+
 void socantsendmore ( void ) { panic ( "socantsendore" ); }
 void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
 void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
 void soabort ( void ) { panic ( "soabort" ); }
 void sorflush ( void ) { panic ( "sorflush" ); }
+// void sowakeup ( void ) { panic ( "sowakeup" ); }
 
 void soqremque ( void ) { panic ( "soqremque" ); }
 
@@ -478,8 +480,15 @@ void soqremque ( void ) { panic ( "soqremque" ); }
 
 void ip_pcblookup ( struct route * ) { panic ( "in_pcblookup" ); }
 
-void wakeup ( void ) { panic ( "wakeup" ); }
-void sowakeup ( void ) { panic ( "sowakeup" ); }
+/* tsleep/wakeup are key kernel synch facilities in BSD
+ * found in kern/kern_synch.c
+ * For now, let them be noops.
+ */
+int tsleep ( void *ident, int priority, char *wmesg, int timo ) {}
+
+// void wakeup ( void ) { panic ( "wakeup" ); }
+void wakeup ( void ) { }
+
 void inetctlerrmap ( void ) { panic ( "inetctlerrmap" ); }
 
 // int in_localaddr ( struct in_addr ) { panic ( "X" ); }
@@ -502,6 +511,6 @@ struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwit
 /* from net/rtsock.c */
 // void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) { panic ( "rt_missmsg" ); }
 
-void ip_freemoptions( register struct ip_moptions * ) { panic ( "ip_freemoptions" ); }
+// void ip_freemoptions( register struct ip_moptions * ) { panic ( "ip_freemoptions" ); }
 
 /* THE END */
