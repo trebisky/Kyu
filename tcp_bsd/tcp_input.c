@@ -336,18 +336,24 @@ tcp_input(m, iphlen)
 	 * Locate pcb for segment.
 	 */
 findpcb:
+	/* Use this hint as a starting point */
 	inp = tcp_last_inpcb;
+
 	if (inp->inp_lport != ti->ti_dport ||
 	    inp->inp_fport != ti->ti_sport ||
 	    inp->inp_faddr.s_addr != ti->ti_src.s_addr ||
 	    inp->inp_laddr.s_addr != ti->ti_dst.s_addr) {
+
 		inp = in_pcblookup(&tcb, ti->ti_src, ti->ti_sport,
 		    ti->ti_dst, ti->ti_dport, INPLOOKUP_WILDCARD);
+
 		if (inp)
 			tcp_last_inpcb = inp;
 		++tcpstat.tcps_pcbcachemiss;
 	}
-	printf ( "tcp_input 7B\n" );
+
+	printf ( "tcp_input 7B (%08x)\n", inp );
+	tcb_show ();
 
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then

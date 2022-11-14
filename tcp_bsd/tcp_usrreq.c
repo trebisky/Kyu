@@ -171,7 +171,9 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Give the socket an address.
 	 */
 	case PRU_BIND:
+		printf ( "tcp_usrreq 10\n" );
 		error = in_pcbbind(inp, nam);
+		printf ( "tcp_usrreq 11 %d\n", error );
 		if (error)
 			break;
 		break;

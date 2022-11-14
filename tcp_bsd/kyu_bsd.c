@@ -35,6 +35,7 @@
 #include <tcp_var.h>
 #include <tcp_debug.h>
 
+void    bzero ( void *, u_int );
 struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
 
 /* global variables */
@@ -101,7 +102,7 @@ struct in_addr zeroin_addr = { 0 };
 /* From netinet/ip_input.c
  * this oddity bears some looking at -- gone in NetBSD-1.3
  */
-struct  in_ifaddr *in_ifaddr;                   /* first inet address */
+struct  in_ifaddr *in_ifaddr_head; /* first inet address */
 
 /* Both of these from in_proto.c
  *  In the original there is an array "inetsw" of which the tcp_proto
@@ -185,6 +186,7 @@ tcp_globals_init ( void )
 	/* maximum chars per socket buffer, from socketvar.h */
 	sb_max = SB_MAX;
 
+	bzero ( (char *) &tcb, sizeof(struct inpcb) );
 	tcb.inp_next = tcb.inp_prev = &tcb;
 
 	// ifnet = XXX
@@ -207,6 +209,9 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	// struct netpacket *pkt;
 	struct mbuf *m;
 	struct ip *iip;
+
+	/* list of configured interfaces */
+	in_ifaddr_head = NULL;
 
 	/* byte swap fields in IP header */
 	nbp->iptr->len = ntohs ( nbp->iptr->len );

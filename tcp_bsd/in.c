@@ -86,7 +86,7 @@ in_netof(in)
 	 * Check whether network is a subnet;
 	 * if so, return subnet number.
 	 */
-	for (ia = in_ifaddr; ia; ia = ia->ia_next)
+	for (ia = in_ifaddr_head; ia; ia = ia->ia_next)
 		if (net == ia->ia_net)
 			return (i & ia->ia_subnetmask);
 	return (net);
@@ -111,11 +111,11 @@ in_localaddr(in)
 	register struct in_ifaddr *ia;
 
 	if (subnetsarelocal) {
-		for (ia = in_ifaddr; ia; ia = ia->ia_next)
+		for (ia = in_ifaddr_head; ia; ia = ia->ia_next)
 			if ((i & ia->ia_netmask) == ia->ia_net)
 				return (1);
 	} else {
-		for (ia = in_ifaddr; ia; ia = ia->ia_next)
+		for (ia = in_ifaddr_head; ia; ia = ia->ia_next)
 			if ((i & ia->ia_subnetmask) == ia->ia_subnet)
 				return (1);
 	}

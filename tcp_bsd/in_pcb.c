@@ -96,14 +96,29 @@ in_pcbbind(inp, nam)
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error;
 
-	if (in_ifaddr == 0)
+	printf ( "in_pcbbind 1\n" );
+	// XXX
+	sin = mtod(nam, struct sockaddr_in *);
+	printf ( "  lport = %d\n", sin->sin_port );
+	printf ( "  addr = %08x\n", sin->sin_addr.s_addr );
+
+#ifndef KYU
+	if (in_ifaddr_head == 0)
 		return (EADDRNOTAVAIL);
+#endif
+
+	printf ( "in_pcbbind 2\n" );
+
 	if (inp->inp_lport || inp->inp_laddr.s_addr != INADDR_ANY)
 		return (EINVAL);
+
+	printf ( "in_pcbbind 3\n" );
+
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
 	     (so->so_options & SO_ACCEPTCONN) == 0))
 		wild = INPLOOKUP_WILDCARD;
+
 	if (nam) {
 		sin = mtod(nam, struct sockaddr_in *);
 		if (nam->m_len != sizeof (*sin))
@@ -182,7 +197,10 @@ in_pcbconnect(inp, nam)
 		return (EAFNOSUPPORT);
 	if (sin->sin_port == 0)
 		return (EADDRNOTAVAIL);
-	if (in_ifaddr) {
+
+	/* Do we have configured interfaces?
+	 */
+	if ( in_ifaddr_head ) {
 		/*
 		 * If the destination address is INADDR_ANY,
 		 * use the primary local address.
@@ -193,12 +211,14 @@ in_pcbconnect(inp, nam)
 #define	satosin(sa)	((struct sockaddr_in *)(sa))
 #define sintosa(sin)	((struct sockaddr *)(sin))
 #define ifatoia(ifa)	((struct in_ifaddr *)(ifa))
+
 		if (sin->sin_addr.s_addr == INADDR_ANY)
-		    sin->sin_addr = IA_SIN(in_ifaddr)->sin_addr;
+		    sin->sin_addr = IA_SIN(in_ifaddr_head)->sin_addr;
 		else if (sin->sin_addr.s_addr == (u_long)INADDR_BROADCAST &&
-		  (in_ifaddr->ia_ifp->if_flags & IFF_BROADCAST))
-		    sin->sin_addr = satosin(&in_ifaddr->ia_broadaddr)->sin_addr;
+		  (in_ifaddr_head->ia_ifp->if_flags & IFF_BROADCAST))
+		    sin->sin_addr = satosin(&in_ifaddr_head->ia_broadaddr)->sin_addr;
 	}
+
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
 		register struct route *ro;
 
@@ -242,7 +262,7 @@ in_pcbconnect(inp, nam)
 				ia = ifatoia(ifa_ifwithnet(sintosa(sin)));
 			sin->sin_port = fport;
 			if (ia == 0)
-				ia = in_ifaddr;
+				ia = in_ifaddr_head;
 			if (ia == 0)
 				return (EADDRNOTAVAIL);
 		}
@@ -259,7 +279,7 @@ in_pcbconnect(inp, nam)
 			imo = inp->inp_moptions;
 			if (imo->imo_multicast_ifp != NULL) {
 				ifp = imo->imo_multicast_ifp;
-				for (ia = in_ifaddr; ia; ia = ia->ia_next)
+				for (ia = in_ifaddr_head; ia; ia = ia->ia_next)
 					if (ia->ia_ifp == ifp)
 						break;
 				if (ia == 0)
@@ -473,6 +493,11 @@ in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
 	register struct inpcb *inp, *match = 0;
 	int matchwild = 3, wildcard;
 	u_short fport = fport_arg, lport = lport_arg;
+
+	printf ( "in_pcblookup 0, %08x\n", head );
+	printf ( "in_pcblookup src = %08x, %d %08x\n", faddr.s_addr, fport_arg, fport_arg );
+	printf ( "in_pcblookup local = %08x, %d %08x\n", laddr.s_addr, lport_arg, lport_arg );
+	printf ( "in_pcblookup flags = %d\n", flags );
 
 	for (inp = head->inp_next; inp != head; inp = inp->inp_next) {
 		if (inp->inp_lport != lport)

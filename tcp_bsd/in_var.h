@@ -75,7 +75,7 @@ struct	in_aliasreq {
 			
 
 #ifdef	KERNEL
-extern	struct	in_ifaddr *in_ifaddr;
+extern	struct	in_ifaddr *in_ifaddr_head;
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
 void	in_socktrim __P((struct sockaddr_in *));
 

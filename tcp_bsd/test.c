@@ -4,6 +4,9 @@
  * Tom Trebisky  11-12-2022
  */
 
+// gets us htonl and such
+#include <kyu_compat.h>
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mbuf.h>
@@ -17,6 +20,16 @@
 #include <in_systm.h>
 #include <in.h>
 #include <ip.h>
+
+// for inpcb
+#include <net/route.h>
+#include <ip_var.h>
+#include <in_pcb.h>
+#include <tcp.h>
+#include <tcp_seq.h>
+#include <tcp_timer.h>
+#include <tcpip.h>
+#include <tcp_var.h>
 
 /* -------- */
 #ifdef notdef
@@ -47,6 +60,7 @@ extern struct protosw tcp_proto;
 
 
 static void server_bind ( int );
+void tcb_show ( void );
 
 /* currently called during initialization.
  */
@@ -80,14 +94,16 @@ server_bind ( int port )
 	serv_addr.sin_addr.s_addr = htonl ( INADDR_ANY );
 	serv_addr.sin_port = htons ( MY_TCP_PORT );
 	bind ( sockfd, &serv_addr, sizeof(serv_addr) );
-	e = sockargs(&nam, uap->name, uap->namelen, MT_SONAME))
+	e = sockargs(&nam, uap->name, uap->namelen, MT_SONAME);
 #endif
 
 	len = sizeof(myaddr);
 	bzero ( &myaddr, len );
 	myaddr.sin_family = AF_INET;
-	myaddr.sin_addr.s_addr = INADDR_ANY;
-	myaddr.sin_port = port;
+
+	/* oddly enough these go in network order */
+	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);	/* All zeros */
+	myaddr.sin_port = htons(port);
 
 	e = sockargs(&nam, &myaddr, len, MT_SONAME);
 	if ( e ) {
@@ -98,10 +114,24 @@ server_bind ( int port )
 	e = sobind ( so, nam );
 	if ( e ) {
 	    printf ( "sobind fails\n" );
+	    tcb_show ();
 	    return;
 	}
 
 	printf ( "--- Server bind OK\n" );
+	tcb_show ();
+}
+
+void
+tcb_show ( void )
+{
+	struct inpcb *inp;
+
+	inp = &tcb;
+	while ( inp->inp_next != &tcb ) {
+	    inp = inp->inp_next;
+	    printf ( "INPCB: lport: %d\n", inp->inp_lport );
+	}
 }
 
 struct mbuf *mb_free ( struct mbuf * );
