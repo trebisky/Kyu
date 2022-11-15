@@ -1338,7 +1338,7 @@ thr_delay_q ( int nticks )
 	}
 }
 
-/* repeat over and over with an continuation
+/* repeat over and over with a continuation
  */
 void
 thr_repeat_c ( int nticks, tfptr func, void *arg )

@@ -89,6 +89,7 @@ tcp_bsd_init ( void )
 }
 
 static void tcp_thread ( long );
+static void tcp_timer_func ( long );
 
 static void
 bsd_init ( void )
@@ -103,10 +104,34 @@ bsd_init ( void )
 	// in tcp_subr.c
 	tcp_init ();
 
+	printf ( "timer rate: %d\n", timer_rate_get() );
+	if ( timer_rate_get() != 1000 ) {
+	    printf ( "Unexpected timer rate: %d\n", timer_rate_get() );
+	    panic ( "TCP timer rate" );
+	}
+
 	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
+	(void) thr_new_repeat ( "tcp-rpt", tcp_timer_func, (void *) 0, 13, 0, 100 );
+
 
 	/* XXX */
 	bsd_server_test ();
+}
+
+static int fast_count = 0;
+static int slow_count = 0;
+
+/* This runs every 100 ticks */
+static void
+tcp_timer_func ( long xxx )
+{
+	++fast_count;
+	if ( (fast_count % 2) == 0 )
+	    tcp_fasttimo();
+
+	++slow_count;
+	if ( (slow_count % 5) == 0 )
+	    tcp_slowtimo();
 }
 
 static struct netbuf *tcp_q_head;
