@@ -106,6 +106,16 @@ struct in_addr zeroin_addr = { 0 };
  */
 struct  in_ifaddr *in_ifaddr_head; /* first inet address */
 
+/* From netinet/ip_input.c */
+u_char inetctlerrmap[PRC_NCMDS] = {
+        0,              0,              0,              0,
+        0,              EMSGSIZE,       EHOSTDOWN,      EHOSTUNREACH,
+        EHOSTUNREACH,   EHOSTUNREACH,   ECONNREFUSED,   ECONNREFUSED,
+        EMSGSIZE,       EHOSTUNREACH,   0,              0,
+        0,              0,              0,              0,
+        ENOPROTOOPT
+};
+
 void
 tcp_globals_init ( void )
 {
@@ -204,46 +214,6 @@ void free ( void )
 /* More stubs
  */
 
-// void sbappend ( void ) { panic ( "sbappend" ); }
-
-// void soisdisconnected ( void ) { panic ( "soisdisconncted" ); }
-// void soisdisconnecting ( void ) { panic ( "soisdisconncting" ); }
-// void soisconnected ( void ) { panic ( "soisconnected" ); }
-// void soisconnecting ( void ) { panic ( "soisconnecting" ); }
-
-// void socantsendmore ( void ) { panic ( "socantsendore" ); }
-// void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
-// void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
-
-// void soabort ( void ) { panic ( "soabort" ); }
-// void sorflush ( void ) { panic ( "sorflush" ); }
-// void sowakeup ( void ) { panic ( "sowakeup" ); }
-
-void soqremque ( void ) { panic ( "soqremque" ); }
-
-// -- in in_pcb.c
-// int in_pcballoc ( struct socket *s, struct inpcb *i ) { panic ( "X" ); }
-// int in_pcbdetach ( struct inpcb * ) { panic ( "X" ); }
-
-// int in_setsockaddr ( struct inpcb *, struct mbuf * ) { panic ( "X" ); }
-// int in_setpeeraddr ( struct inpcb *, struct mbuf * ) { panic ( "X" ); }
-
-// void tcp_ctlinput ( int i, struct sockaddr *s, struct ip *x ) { panic ( "X" ); }
-
-// int in_pcbbind ( struct inpcb *n, struct mbuf *m ) { panic ( "X" ); }
-// int in_pcbconnect ( struct inpcb *n, struct mbuf *m ) { panic ( "X" ); }
-// int in_pcbdisconnect ( struct inpcb *n ) { panic ( "X" ); }
-
-// int in_pcbnotify ( struct inpcb *n, struct sockaddr *s, unsigned int, struct in_addr, unsigned int, int, void (*)() ) { panic ( "X" ); }
-// struct inpcb * in_pcblookup ( struct inpcb *, struct in_addr,  unsigned int,  struct in_addr,  unsigned int,  int) { panic ( "X" ); }
-
-// int in_losing ( struct inpcb *n ) { panic ( "X" ); }
-
-// -- in in.c
-// int in_control ( struct socket *n, int x, caddr_t y, struct ifnet *f ) { panic ( "X" ); }
-
-void ip_pcblookup ( struct route * ) { panic ( "in_pcblookup" ); }
-
 /* tsleep/wakeup are key kernel synch facilities in BSD
  * found in kern/kern_synch.c
  * For now, let them be noops.
@@ -253,28 +223,16 @@ int tsleep ( void *ident, int priority, char *wmesg, int timo ) {}
 // void wakeup ( void ) { panic ( "wakeup" ); }
 void wakeup ( void ) { }
 
-void inetctlerrmap ( void ) { panic ( "inetctlerrmap" ); }
-
-// int in_localaddr ( struct in_addr ) { panic ( "X" ); }
-
-// void rtalloc ( struct route * ) { panic ( "rtalloc" ); }
-
-// void ip_stripoptions ( struct mbuf *, struct mbuf * ) { panic ( "ip_stripoptions" ); }
-
-// struct mbuf * ip_srcroute ( void ) { panic ( "ip_srcroute" ); }
-
 /* from net/if.c */
-struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "ifa_ifwithnet" ); }
-struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithaddr" ); }
-struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithstaddr" ); }
+/* These would scan the ifnet list looking for an interface that met
+ * some criteria.
+ */
+// struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "ifa_ifwithnet" ); }
+// struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithaddr" ); }
+// struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithstaddr" ); }
 
-/* from net/route.c */
-// void rtfree( struct rtentry *rt ) { panic ( "rtfree" ); }
-// int rtrequest( int req, struct sockaddr *dst, struct sockaddr *gateway, struct sockaddr *netmask, int flags, struct rtentry **ret_nrt ) { panic ( "rtrequest" ); }
-
-/* from net/rtsock.c */
-// void rt_missmsg( int type, struct rt_addrinfo *rtinfo, int flags, int error) { panic ( "rt_missmsg" ); }
-
-// void ip_freemoptions( register struct ip_moptions * ) { panic ( "ip_freemoptions" ); }
+struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
+struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
+struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
 
 /* THE END */
