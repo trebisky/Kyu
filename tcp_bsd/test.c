@@ -335,6 +335,7 @@ soqinsque ( struct socket *head, struct socket *so, int q )
         struct socket **prev;
 
         so->so_head = head;
+
         if (q == 0) {
                 head->so_q0len++;
                 so->so_q0 = 0;
@@ -571,10 +572,6 @@ solisten ( struct socket *so, int backlog )
         return (0);
 }
 
-/* XXX - tacky to have this a single global
- */
-struct sem *accept_sem = NULL;
-
 /* We do an abbreviated form of the accept call.
  * We don't need to translate fd to sock and vice versa
  * We also don't need to fuss around copying address
@@ -584,12 +581,6 @@ struct socket *
 kyu_accept ( struct socket *so )
 {
 	struct socket *rso;
-
-	if ( ! accept_sem ) {
-	    accept_sem = sem_signal_new ( SEM_FIFO );
-	}
-        if ( ! accept_sem )
-            panic ("Cannot get accept semaphore");
 
         if ((so->so_options & SO_ACCEPTCONN) == 0) {
 		printf ( "socket not ready to accept\n" );
@@ -603,7 +594,8 @@ kyu_accept ( struct socket *so )
                         break;
                 }
                 // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-		sem_block ( accept_sem );
+		printf ( "block in accept: %08x\n", so->kyu_sem );
+		sem_block ( so->kyu_sem );
         }
 
         if (so->so_error) {
@@ -908,6 +900,148 @@ sbdrop ( struct sockbuf *sb, int len)
 }
 
 /*
+ * Routines to add and remove
+ * data from an mbuf queue.
+ *
+ * The routines sbappend() or sbappendrecord() are normally called to
+ * append new mbufs to a socket buffer, after checking that adequate
+ * space is available, comparing the function sbspace() with the amount
+ * of data to be added.  sbappendrecord() differs from sbappend() in
+ * that data supplied is treated as the beginning of a new record.
+ * To place a sender's address, optional access rights, and data in a
+ * socket receive buffer, sbappendaddr() should be used.  To place
+ * access rights and data in a socket receive buffer, sbappendrights()
+ * should be used.  In either case, the new data begins a new record.
+ * Note that unlike sbappend() and sbappendrecord(), these routines check
+ * for the caller that there will be enough space to store the data.
+ * Each fails if there is not enough space, or if it cannot find mbufs
+ * to store additional information in.
+ *
+ * Reliable protocols may use the socket send buffer to hold data
+ * awaiting acknowledgement.  Data is normally copied from a socket
+ * send buffer in a protocol with m_copy for output to a peer,
+ * and then removing the data from the socket buffer with sbdrop()
+ * or sbdroprecord() when the data is acknowledged by the peer.
+ */
+void sbcompress ( struct sockbuf *, struct mbuf *, struct mbuf * );
+void sbappendrecord ( struct sockbuf *, struct mbuf * );
+
+/*
+ * Append mbuf chain m to the last record in the
+ * socket buffer sb.  The additional space associated
+ * the mbuf chain is recorded in sb.  Empty mbufs are
+ * discarded and mbufs are compacted where possible.
+ */
+/* From kern/uipc_socket2.c */
+void
+sbappend (sb, m)
+        struct sockbuf *sb;
+        struct mbuf *m;
+{
+        struct mbuf *n;
+
+        if (m == 0)
+                return;
+
+        if (n = sb->sb_mb) {
+                while (n->m_nextpkt)
+                        n = n->m_nextpkt;
+                do {
+                        if (n->m_flags & M_EOR) {
+                                sbappendrecord(sb, m); /* XXX XXXXXX!!!! */
+                                return;
+                        }
+                } while (n->m_next && (n = n->m_next));
+        }
+        sbcompress(sb, m, n);
+}
+
+/*
+ * As above, except the mbuf chain
+ * begins a new record.
+ */
+void
+sbappendrecord ( struct sockbuf *sb, struct mbuf *m0 )
+{
+        register struct mbuf *m;
+
+        if (m0 == 0)
+                return;
+        if (m = sb->sb_mb)
+                while (m->m_nextpkt)
+                        m = m->m_nextpkt;
+        /*
+         * Put the first mbuf on the queue.
+         * Note this permits zero length records.
+         */
+        sballoc(sb, m0);
+        if (m)
+                m->m_nextpkt = m0;
+        else
+                sb->sb_mb = m0;
+        m = m0->m_next;
+        m0->m_next = 0;
+        if (m && (m0->m_flags & M_EOR)) {
+                m0->m_flags &= ~M_EOR;
+                m->m_flags |= M_EOR;
+        }
+        sbcompress(sb, m, m0);
+}
+
+/*
+ * Compress mbuf chain m into the socket
+ * buffer sb following mbuf n.  If n
+ * is null, the buffer is presumed empty.
+ */
+void
+sbcompress ( struct sockbuf *sb, struct mbuf *m, struct mbuf *n )
+{
+        register int eor = 0;
+        register struct mbuf *o;
+
+        while (m) {
+                eor |= m->m_flags & M_EOR;
+                if (m->m_len == 0 &&
+                    (eor == 0 ||
+                     (((o = m->m_next) || (o = n)) &&
+                      o->m_type == m->m_type))) {
+                        // m = m_free(m);
+                        m = mb_free(m);
+                        continue;
+                }
+                if (n && (n->m_flags & (M_EXT | M_EOR)) == 0 &&
+                    (n->m_data + n->m_len + m->m_len) < &n->m_dat[MLEN] &&
+                    n->m_type == m->m_type) {
+                        bcopy(mtod(m, caddr_t), mtod(n, caddr_t) + n->m_len,
+                            (unsigned)m->m_len);
+                        n->m_len += m->m_len;
+                        sb->sb_cc += m->m_len;
+                        // m = m_free(m);
+                        m = mb_free(m);
+                        continue;
+                }
+                if (n)
+                        n->m_next = m;
+                else
+                        sb->sb_mb = m;
+                sballoc(sb, m);
+                n = m;
+                m->m_flags &= ~M_EOR;
+                m = m->m_next;
+                n->m_next = 0;
+        }
+        if (eor) {
+                if (n)
+                        n->m_flags |= eor;
+                else
+                        printf("semi-panic: sbcompress\n");
+        }
+}
+
+/* sballoc() is a macro in sys/socketvar.h
+ */
+
+/*
  * Procedures to manipulate state flags of socket
  * and do appropriate wakeups.  Normal sequence from the
  * active (originating) side is that soisconnecting() is
@@ -949,20 +1083,23 @@ soisconnecting(so)
 
 void
 soisconnected(so)
-        register struct socket *so;
+        struct socket *so;
 {
-        register struct socket *head = so->so_head;
+        struct socket *head = so->so_head;
 
         so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
         so->so_state |= SS_ISCONNECTED;
+
         if (head && soqremque(so, 0)) {
                 soqinsque(head, so, 1);
                 sorwakeup(head);
 
+		printf ( "soisconnected - wakeup head %08x\n", head->kyu_sem );
                 // wakeup((caddr_t)&head->so_timeo);
-		sem_unblock ( so->kyu_sem );
+		sem_unblock ( head->kyu_sem );
 
         } else {
+		printf ( "soisconnected - wakeup sock\n" );
                 // wakeup((caddr_t)&so->so_timeo);
 		sem_unblock ( so->kyu_sem );
 
@@ -999,6 +1136,50 @@ soisdisconnected(so)
 
         sowwakeup(so);
         sorwakeup(so);
+}
+
+/*
+ * Socantsendmore indicates that no more data will be sent on the
+ * socket; it would normally be applied to a socket when the user
+ * informs the system that no more data is to be sent, by the protocol
+ * code (in case PRU_SHUTDOWN).  Socantrcvmore indicates that no more data
+ * will be received, and will normally be applied to the socket by a
+ * protocol when it detects that the peer will send no more data.
+ * Data queued for reading in the socket may yet be read.
+ */
+
+void
+socantsendmore(so)
+        struct socket *so;
+{
+
+        so->so_state |= SS_CANTSENDMORE;
+        sowwakeup(so);
+}
+
+void
+socantrcvmore(so)
+        struct socket *so;
+{
+
+        so->so_state |= SS_CANTRCVMORE;
+        sorwakeup(so);
+}
+
+/* From kern/uipc_socket.c */
+void
+sohasoutofband(so)
+        register struct socket *so;
+{
+#ifdef notdef
+        struct proc *p;
+
+        if (so->so_pgid < 0)
+                gsignal(-so->so_pgid, SIGURG);
+        else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
+                psignal(p, SIGURG);
+        selwakeup(&so->so_rcv.sb_sel);
+#endif
 }
 
 /*

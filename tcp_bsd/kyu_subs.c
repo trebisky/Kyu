@@ -204,16 +204,17 @@ void free ( void )
 /* More stubs
  */
 
-void sbappend ( void ) { panic ( "sbappend" ); }
+// void sbappend ( void ) { panic ( "sbappend" ); }
 
 // void soisdisconnected ( void ) { panic ( "soisdisconncted" ); }
 // void soisdisconnecting ( void ) { panic ( "soisdisconncting" ); }
 // void soisconnected ( void ) { panic ( "soisconnected" ); }
 // void soisconnecting ( void ) { panic ( "soisconnecting" ); }
 
-void socantsendmore ( void ) { panic ( "socantsendore" ); }
-void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
-void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
+// void socantsendmore ( void ) { panic ( "socantsendore" ); }
+// void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
+// void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
+
 // void soabort ( void ) { panic ( "soabort" ); }
 // void sorflush ( void ) { panic ( "sorflush" ); }
 // void sowakeup ( void ) { panic ( "sowakeup" ); }
