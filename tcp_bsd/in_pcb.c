@@ -96,23 +96,24 @@ in_pcbbind(inp, nam)
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 	int error;
 
+#ifdef notdef
 	printf ( "in_pcbbind 1\n" );
-	// XXX
 	sin = mtod(nam, struct sockaddr_in *);
 	printf ( "  lport = %d\n", sin->sin_port );
 	printf ( "  addr = %08x\n", sin->sin_addr.s_addr );
+#endif
 
 #ifndef KYU
 	if (in_ifaddr_head == 0)
 		return (EADDRNOTAVAIL);
 #endif
 
-	printf ( "in_pcbbind 2\n" );
+	// printf ( "in_pcbbind 2\n" );
 
 	if (inp->inp_lport || inp->inp_laddr.s_addr != INADDR_ANY)
 		return (EINVAL);
 
-	printf ( "in_pcbbind 3\n" );
+	// printf ( "in_pcbbind 3\n" );
 
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
@@ -513,10 +514,12 @@ in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
 	 * Also the port values in the inpcb are expected to be
 	 * in network bytes order!
 	 */
+#ifdef notdef
 	printf ( "in_pcblookup 0, %08x\n", head );
 	printf ( "in_pcblookup src = %08x, %d %08x (%d)\n", faddr.s_addr, fport_arg, fport_arg, ntohs(fport_arg) );
 	printf ( "in_pcblookup local = %08x, %d %08x (%d)\n", laddr.s_addr, lport_arg, lport_arg, ntohs(lport_arg) );
 	printf ( "in_pcblookup flags = %d\n", flags );
+#endif
 
 	for (inp = head->inp_next; inp != head; inp = inp->inp_next) {
 		if (inp->inp_lport != lport)

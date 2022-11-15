@@ -1,16 +1,21 @@
-/* kyu_bsd.c */
+/* kyu_subs.c */
 
 /* support code for BSD 4.4 TCP code in Kyu
+ * mostly hackish cruft and stubs.
  * BSD global variables are here.
  */
 
 #include "kyu.h"
+
 #include "thread.h"
 #include "../net/net.h"		/* Kyu */
 #include "../net/kyu_tcp.h"
 
+// for ntohl and such
+// #include "kyu_compat.h"
+
 #include <sys/param.h>
-// #include <sys/systm.h>
+#include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
@@ -34,9 +39,6 @@
 #include <tcpip.h>
 #include <tcp_var.h>
 #include <tcp_debug.h>
-
-void    bzero ( void *, u_int );
-struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
 
 /* global variables */
 
@@ -104,74 +106,12 @@ struct in_addr zeroin_addr = { 0 };
  */
 struct  in_ifaddr *in_ifaddr_head; /* first inet address */
 
-/* Both of these from in_proto.c
- *  In the original there is an array "inetsw" of which the tcp_proto
- *  entry below is just one of many entries.
- */
-
-/* From net/radix.c
- * -- something to do with routing.
- */
-int
-rn_inithead ( void **head, int off )
-{
-	panic ( "rn_inithead called" );
-}
-
-
-extern struct domain inetdomain;
-
-struct protosw tcp_proto =
-{ SOCK_STREAM,  &inetdomain,    IPPROTO_TCP,    PR_CONNREQUIRED|PR_WANTRCVD,
-  tcp_input,    0,              tcp_ctlinput,   tcp_ctloutput,
-  tcp_usrreq,
-  tcp_init,     tcp_fasttimo,   tcp_slowtimo,   tcp_drain };
-
-struct domain inetdomain =
-    { AF_INET, "internet", 0, 0, 0,
-      // inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      &tcp_proto, &tcp_proto, 0,
-      rn_inithead, 32, sizeof(struct sockaddr_in) };
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
-
-static void bsd_init ( void );
-static void tcp_globals_init ( void );
-static void tcp_bsd_rcv ( struct netbuf *nbp );
-
-struct tcp_ops bsd_ops = {
-	bsd_init,
-	tcp_bsd_rcv
-};
-
-
-/* Kyu calls this during initialization */
-struct tcp_ops *
-tcp_bsd_init ( void )
-{
-	return &bsd_ops;
-}
-
-static void
-bsd_init ( void )
-{
-	printf ( "BSD tcp init called\n" );
-
-	tcp_globals_init ();
-
-	// in mbuf.c
-	mb_init ();
-
-	// in tcp_subr.c
-	tcp_init ();
-
-	bsd_server_test ();
-}
-
-static void
+void
 tcp_globals_init ( void )
 {
+        /* list of configured interfaces */
+        in_ifaddr_head = NULL;
+
 	/* From netiso/tuba_subr.c */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
 	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
@@ -186,187 +126,10 @@ tcp_globals_init ( void )
 	/* maximum chars per socket buffer, from socketvar.h */
 	sb_max = SB_MAX;
 
-	bzero ( (char *) &tcb, sizeof(struct inpcb) );
+	bzero ( (void *) &tcb, sizeof(struct inpcb) );
 	tcb.inp_next = tcb.inp_prev = &tcb;
 
 	// ifnet = XXX
-}
-
-void
-tcp_bsd_show ( void )
-{
-    printf ( "Status for BSD tcp code:\n" );
-    // ...
-}
-
-/* This is where arriving packets get delivered by Kyu
- *  From ip_rcv() in net/net_ip.c
- * Be sure and let Kyu free the packet.
- */
-static void
-tcp_bsd_rcv ( struct netbuf *nbp )
-{
-	// struct netpacket *pkt;
-	struct mbuf *m;
-	struct ip *iip;
-
-	/* list of configured interfaces */
-	in_ifaddr_head = NULL;
-
-	/* byte swap fields in IP header */
-	nbp->iptr->len = ntohs ( nbp->iptr->len );
-	nbp->iptr->id = ntohs ( nbp->iptr->id );
-	nbp->iptr->offset = ntohs ( nbp->iptr->offset );
-
-	// printf ( "TCP: bsd_rcv %d bytes\n", ntohs(nbp->iptr->len) );
-	printf ( "TCP: bsd_rcv %d, %d bytes\n", nbp->ilen, nbp->iptr->len );
-
-	dump_buf ( (char *) nbp->iptr, nbp->ilen );
-
-	m = mb_devget ( (char *) nbp->iptr, nbp->ilen, 0, NULL, 0 );
-	if ( ! m ) {
-	    printf ( "** mb_devget fails\n" );
-	    return;
-	}
-	printf ( "M_devget: %08x %d\n", m, nbp->ilen );
-	dump_buf ( (char *) m, 128 );
-
-	/* Ah, but what goes on during IP processing by the BSD code */
-	/* For one thing, it subtracts the size of the IP header
-	 * off of the length field in the IP header itself.
-	 */
-	iip = mtod(m, struct ip *);
-	iip->ip_len -= sizeof(struct ip);
-
-	tcp_input ( m, nbp->ilen );
-
-	/* do NOT free the netbuf here */
-
-	/* Must give eptr since we may have PREPAD */
-	// pkt = (struct netpacket *) nbp->eptr;
-	// ip_ntoh ( pkt );
-	// tcp_ntoh ( pkt );
-
-	// tcp_in ( pkt );
-
-}
-
-#ifdef notdef
-void
-udp_send ( u32 dest_ip, int sport, int dport, char *buf, int size )
-{
-        struct udp_hdr *udp;
-        struct netbuf *nbp;
-        struct bogus_ip *bip;
-
-        nbp = netbuf_alloc ();
-        if ( ! nbp )
-            return;
-
-        nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-        nbp->dptr = nbp->pptr + sizeof ( struct udp_hdr );
-
-        memcpy ( nbp->dptr, buf, size );
-
-        size += sizeof(struct udp_hdr);
-        nbp->plen = size;
-        nbp->ilen = size + sizeof(struct ip_hdr);
-
-        udp = (struct udp_hdr *) nbp->pptr;
-        udp->sport = htons(sport);
-        udp->dport = htons(dport);
-        udp->len = htons(nbp->plen);
-        udp->sum = 0;
-
-        /* Fill out a bogus IP header just to do
-         * checksum computation.  It will pick up
-         * the proto field from this however.
-         */
-        bip = (struct bogus_ip *) nbp->iptr;
-        memset ( (char *) bip, 0, sizeof(struct bogus_ip) );
-
-        bip->proto = IPPROTO_UDP;
-        bip->len = udp->len;
-        bip->dst = dest_ip;
-        bip->src = host_info.my_ip;
-
-        /*
-        udp->sum = in_cksum ( nbp->iptr, nbp->ilen );
-        */
-        udp->sum = ~in_cksum_i ( nbp->iptr, nbp->ilen, 0 );
-
-        ip_send ( nbp, dest_ip );
-}
-#endif
-
-
-/* Called when TCP wants to hand a packet to IP for transmission
- */
-int
-ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_moptions *O )
-{
-        struct netbuf *nbp;
-        struct ip_hdr *ipp;
-	struct mbuf *mp;
-        int len;
-        int size = 0;
-	char *buf;
-
-	printf ( "TCP(bsd): ip_output\n" );
-	printf ( " ip_output A = %08x\n", A );
-	printf ( " ip_output B = %08x\n", B );
-	printf ( " ip_output R = %08x\n", R );
-	printf ( " ip_output N = %d\n", N );
-	printf ( " ip_output O = %08x\n", O );
-	mbuf_show ( A, "ip_output" );
-	dump_buf ( (char *) A, 128 );
-
-        nbp = netbuf_alloc ();
-        if ( ! nbp )
-            return 1;
-
-	printf ( "IP output 1\n" );
-	buf = (char *) nbp->iptr;
-	for (mp = A; mp; mp = mp->m_next) {
-                len = mp->m_len;
-                if (len == 0)
-                        continue;
-                // bcopy ( mtod(mp, char *), buf, len );
-                memcpy ( buf, mtod(mp, char *), len );
-                buf += len;
-                size += len;
-        }
-	printf ( "IP output 2\n" );
-
-        mb_freem ( A );
-
-	printf ( "IP output 3\n" );
-
-        nbp->ilen = size;
-        nbp->plen = size - sizeof(struct ip_hdr);
-
-	/* BSD has given us a partially completed IP header.
-	 * In particular, it contains src/dst IP numbers.
-	 */
-
-        nbp->pptr = (char *) nbp->iptr + sizeof ( struct ip_hdr );
-
-	// not needed on output.
-        // nbp->dptr = nbp->pptr + sizeof ( struct udp_hdr );
-
-	ipp = nbp->iptr;
-
-        ip_send ( nbp, ipp->dst );
-	printf ( "IP output 4\n" );
-	return 0;
-}
-
-/* Called when TCP wants to send a control message.
- */
-int
-ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm )
-{
-	printf ( "TCP(bsd): ctl output\n" );
 }
 
 /* Something more clever could be done for these,
@@ -451,8 +214,8 @@ void sbappend ( void ) { panic ( "sbappend" ); }
 void socantsendmore ( void ) { panic ( "socantsendore" ); }
 void sohasoutofband ( void ) { panic ( "sohasoutofband" ); }
 void socantrcvmore ( void ) { panic ( "socantrcvmore" ); }
-void soabort ( void ) { panic ( "soabort" ); }
-void sorflush ( void ) { panic ( "sorflush" ); }
+// void soabort ( void ) { panic ( "soabort" ); }
+// void sorflush ( void ) { panic ( "sorflush" ); }
 // void sowakeup ( void ) { panic ( "sowakeup" ); }
 
 void soqremque ( void ) { panic ( "soqremque" ); }

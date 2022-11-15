@@ -134,7 +134,7 @@ struct radix_node_head {
 #define Free(p) free((caddr_t)p, M_RTABLE);
 
 void	 rn_init __P((void));
-int	 rn_inithead __P((void **, int));
+// int	 rn_inithead __P((void **, int));
 int	 rn_refines __P((void *, void *));
 int	 rn_walktree __P((struct radix_node_head *, int (*)(), void *));
 struct radix_node

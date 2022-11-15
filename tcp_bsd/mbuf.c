@@ -6,7 +6,6 @@
  */
 
 #include "kyu.h"
-#include "mbuf.h"
 
 // #include <sys/mbuf.h>
 
@@ -33,6 +32,8 @@
 #include <tcp_timer.h>
 #include <tcpip.h>
 #include <tcp_var.h>
+
+#include "mbuf.h"
 
 /* ------------------ */
 

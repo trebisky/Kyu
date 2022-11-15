@@ -34,7 +34,6 @@
  */
 
 #include <kyu_compat.h>
-#include <mbuf.h>
 
 #include <sys/param.h>
 // #include <sys/proc.h>
@@ -62,6 +61,8 @@
 #include <netinet/tcp_timer.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
+
+#include <mbuf.h>
 
 /* patchable/settable parameters for tcp */
 int 	tcp_mssdflt = TCP_MSS;

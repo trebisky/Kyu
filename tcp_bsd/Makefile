@@ -24,7 +24,8 @@ DEFS += -DKERNEL
 
 include ../Makefile.inc
 
-OBJS = kyu_bsd.o \
+OBJS = kyu_main.o \
+	kyu_subs.o \
 	mbuf.o \
 	tcp_debug.o \
 	tcp_input.o \

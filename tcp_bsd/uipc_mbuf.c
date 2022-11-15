@@ -34,7 +34,6 @@
  */
 
 #include <kyu_compat.h>
-#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +48,8 @@
 // #include <sys/syslog.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
+
+#include <mbuf.h>
 
 // #include <vm/vm.h>
 

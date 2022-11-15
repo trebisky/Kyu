@@ -10,7 +10,7 @@
  *	Tom Trebisky 11/1/2022
  */
 
-/* This is a hook to pull in necessary kyy header files for
+/* This is a hook to pull in necessary kyu header files for
  *  the BSD TCP subsystem.
  */
 

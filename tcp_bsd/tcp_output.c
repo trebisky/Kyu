@@ -34,7 +34,6 @@
  */
 
 #include <kyu_compat.h>
-#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,6 +59,8 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_debug.h>
+
+#include <mbuf.h>
 
 #ifdef notyet
 extern struct mbuf *m_copypack();

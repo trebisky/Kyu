@@ -34,7 +34,6 @@
  */
 
 #include <kyu_compat.h>
-#include <mbuf.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -61,6 +60,8 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_debug.h>
+
+#include <mbuf.h>
 
 int	tcprexmtthresh = 3;
 struct	tcpiphdr tcp_saveti;
@@ -241,7 +242,9 @@ tcp_input(m, iphlen)
 	 */
 	ti = mtod(m, struct tcpiphdr *);
 	printf ( "tcp_input 0 len = %d\n", iphlen );
-	dump_buf ( (char *) ti, 128 );	/* XXX */
+
+	// dumps beyond end of mbuf
+	// dump_buf ( (char *) ti, 128 );
 
 	if (iphlen > sizeof (struct ip))
 		ip_stripoptions ( m );
@@ -263,14 +266,15 @@ tcp_input(m, iphlen)
 	ti->ti_x1 = 0;
 	ti->ti_len = (u_short)tlen;
 	HTONS(ti->ti_len);
-	mbuf_show ( m, "tcp_input 1" );
+
+	// mbuf_show ( m, "tcp_input 1" );
 	printf ( "tcp_input 1 %08x, %d\n", ti, len );
 
 	// if (ti->ti_sum = in_cksum(m, len)) {
 	if (ti->ti_sum = tcp_cksum(m, len)) {
 		tcpstat.tcps_rcvbadsum++;
 		printf ( "tcp_input 2, sum = %d\n", ti->ti_sum );
-		dump_buf ( (char *) ti, len );
+		// dump_buf ( (char *) ti, len );
 		goto drop;
 	}
 
