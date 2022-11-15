@@ -166,18 +166,19 @@ tcp_thread ( long xxx )
 
 	    sem_block ( tcp_lock_sem );
             nbp = NULL;
-	    printf ( " --- LIST1: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
+	    // printf ( " --- LIST1: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
             if ( tcp_q_head ) {
                 nbp = tcp_q_head;
-	    printf ( " --- LIST1B: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
+	    // printf ( " --- LIST1B: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
                 tcp_q_head = nbp->next;
                 if ( ! tcp_q_head )
                     tcp_q_tail = (struct netbuf *) 0;
             }
-	    if ( nbp )
-		printf ( " --- LIST2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
-	    else
-		printf ( " --- LIST2: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
+
+	    //if ( nbp )
+	    //	printf ( " --- LIST2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
+	    //else
+	    //	printf ( " --- LIST2: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
 
 	    sem_unblock ( tcp_lock_sem );
 
@@ -208,7 +209,7 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	printf ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
 	sem_block ( tcp_lock_sem );
-	    printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
+	    // printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
         if ( tcp_q_tail ) {
             tcp_q_tail->next = nbp;
             tcp_q_tail = nbp;
@@ -216,7 +217,7 @@ tcp_bsd_rcv ( struct netbuf *nbp )
             tcp_q_tail = nbp;
             tcp_q_head = nbp;
         }
-	    printf ( " --- LIST++2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
+	    // printf ( " --- LIST++2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
 	sem_unblock ( tcp_lock_sem );
 
         sem_unblock ( tcp_q_sem );

@@ -85,8 +85,6 @@ bsd_server_test ( void )
 	(void) safe_thr_new ( "tcp-test", server_thread, (void *) 0, 15, 0 );
 }
 
-struct socket *global_so;
-
 static void
 server_bind ( int port )
 {
@@ -149,9 +147,6 @@ server_bind ( int port )
 	    return;
 	}
 
-	/* XXX */
-	global_so = so;
-
 	// This is set by listen
 	// so->so_options |= SO_ACCEPTCONN;
 
@@ -171,14 +166,9 @@ server_bind ( int port )
 	for ( ;; ) {
 	    cso = kyu_accept ( so );
 	    printf ( "kyu_accept got a connection %08x\n", cso );
+	    soclose ( cso );
+	    printf ( "socket was closed\n" );
 	}
-}
-
-void
-test_connect ( void )
-{
-	printf ( " *** in TEST connect\n" );
-	(void) soclose ( global_so );
 }
 
 /*
@@ -251,9 +241,12 @@ drop:
         }
 
 discard:
-        if (so->so_state & SS_NOFDREF)
-                panic("soclose: NOFDREF");
+	// Near as I can tell, this marks the socked as not
+	// having a reference in file array (i.e. as an "fd")
+        // if (so->so_state & SS_NOFDREF)
+        //         panic("soclose: NOFDREF");
         so->so_state |= SS_NOFDREF;
+
         sofree(so);
         splx(s);
         return (error);
