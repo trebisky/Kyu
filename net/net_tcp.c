@@ -46,7 +46,9 @@ void
 tcp_rcv ( struct netbuf *nbp )
 {
 	(*tcp_ops->rcv) (nbp);
-	netbuf_free ( nbp );
+	// Cannot free it here if the TCP code
+	// puts it on a queue (and it does).
+	//netbuf_free ( nbp );
 }
 
 void xtest_show ( long );

@@ -66,6 +66,7 @@ struct socket {
 	short	so_qlen;		/* number of connections on so_q */
 	short	so_qlimit;		/* max number queued connections */
 	short	so_timeo;		/* connection timeout */
+	struct	sem *kyu_sem;		/* in lieu of sleep/wakeup */
 	u_short	so_error;		/* error affecting connection */
 	pid_t	so_pgid;		/* pgid for signals */
 	u_long	so_oobmark;		/* chars to oob mark */

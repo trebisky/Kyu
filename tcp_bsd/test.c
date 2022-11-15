@@ -435,6 +435,12 @@ sonewconn1 ( struct socket *head, int connstatus)
                 return ((struct socket *)0);
 
         bzero((caddr_t)so, sizeof(*so));
+
+	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! so->kyu_sem ) {
+	    panic ( "sonewcomm1 - semaphores all gone" );
+	}
+
         so->so_type = head->so_type;
         so->so_options = head->so_options &~ SO_ACCEPTCONN;
         so->so_linger = head->so_linger;
@@ -453,6 +459,8 @@ sonewconn1 ( struct socket *head, int connstatus)
 
 	if ( error ) {
                 (void) soqremque(so, soqueue);
+		sem_destroy ( so->kyu_sem );
+
                 // (void) free((caddr_t)so, M_SOCKET);
 		k_sock_free ( so );
                 return ((struct socket *)0);
@@ -460,7 +468,10 @@ sonewconn1 ( struct socket *head, int connstatus)
 
         if (connstatus) {
                 // sorwakeup(head);
+
                 // wakeup((caddr_t)&head->so_timeo);
+		sem_unblock ( so->kyu_sem );
+
                 so->so_state |= connstatus;
         }
 
@@ -491,6 +502,11 @@ socreate ( struct socket *so, int dom, int type, int proto)
 
         // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_WAIT);
         bzero((caddr_t)so, sizeof(*so));
+
+	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! so->kyu_sem ) {
+	    panic ( "socreate - semaphores all gone" );
+	}
 
         so->so_type = type;	/* SOCK_STREAM */
         so->so_proto = prp;
@@ -768,6 +784,9 @@ sofree ( struct socket *so )
 
         sbrelease(&so->so_snd);
         sorflush(so);
+
+	sem_destroy ( so->kyu_sem );
+
         // FREE(so, M_SOCKET);
 	k_sock_free ( so );
 }
@@ -939,15 +958,17 @@ soisconnected(so)
         if (head && soqremque(so, 0)) {
                 soqinsque(head, so, 1);
                 sorwakeup(head);
+
                 // wakeup((caddr_t)&head->so_timeo);
+		sem_unblock ( so->kyu_sem );
+
         } else {
                 // wakeup((caddr_t)&so->so_timeo);
+		sem_unblock ( so->kyu_sem );
+
                 sorwakeup(so);
                 sowwakeup(so);
         }
-
-	/* XXX XXX */
-	test_connect ();
 }
 
 void
@@ -957,7 +978,10 @@ soisdisconnecting(so)
 
         so->so_state &= ~SS_ISCONNECTING;
         so->so_state |= (SS_ISDISCONNECTING|SS_CANTRCVMORE|SS_CANTSENDMORE);
+
         // wakeup((caddr_t)&so->so_timeo);
+	sem_unblock ( so->kyu_sem );
+
         sowwakeup(so);
         sorwakeup(so);
 }
@@ -969,7 +993,10 @@ soisdisconnected(so)
 
         so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
         so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
+
         // wakeup((caddr_t)&so->so_timeo);
+	sem_unblock ( so->kyu_sem );
+
         sowwakeup(so);
         sorwakeup(so);
 }
