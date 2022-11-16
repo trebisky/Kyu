@@ -33,6 +33,10 @@
  *	@(#)in.c	8.2 (Berkeley) 11/15/93
  */
 
+#include <bsd.h>
+// #include <netinet/in_var.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -53,6 +57,7 @@
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_ether.h>
+#endif
 
 /* KYU defines this.
  * XXX - Kyu may be able to do away with most of this file.

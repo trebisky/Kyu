@@ -5,6 +5,9 @@
  * new set of mbuf routines
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include "kyu.h"
 
 // #include <sys/mbuf.h>
@@ -34,6 +37,7 @@
 #include <tcp_var.h>
 
 #include "mbuf.h"
+#endif
 
 /* ------------------ */
 
@@ -66,6 +70,7 @@
 #include <tcp_debug.h>
 #endif
 
+#ifdef notdef
 #define	MSIZE		128		/* XXX */
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
@@ -151,10 +156,11 @@ struct mbuf {
 #define MT_OOBDATA	15	/* expedited data  */
 
 #define mtod(m,t)	((t)((m)->m_data))
+#endif
 
 extern int max_linkhdr;
 
-static void mb_clget ( struct mbuf * );
+void mb_clget ( struct mbuf * );
 
 /* -------------------------------------------------------------------------------------------- */
 /* -------------------------------------------------------------------------------------------- */
@@ -358,7 +364,7 @@ mbufcl_alloc ( void )
 	void *rv;
 
 	if ( ! mbufcl_list )
-	    panic ( "mb_clget: clusters exhausted"); \
+	    panic ( "mb_cl_alloc: clusters exhausted"); \
 
 	rv = mbufcl_list;
 	mbufcl_list = ( (struct my_list *) rv) -> next;
@@ -504,7 +510,7 @@ mb_gethdr ( int type )
 /* Add a cluster to an mbuf.
  * - one and only use in mb_devget() below
  */
-static void
+void
 mb_clget ( struct mbuf *m )
 {
 	void *p;

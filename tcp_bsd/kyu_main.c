@@ -6,10 +6,15 @@
  * to the BSD tcp code.
  */
 
+#include <bsd.h>
+
 #include "kyu.h"
 #include "thread.h"
 #include "../net/net.h"		/* Kyu */
 #include "../net/kyu_tcp.h"
+
+#ifdef notdef
+#include "kyu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -38,6 +43,7 @@
 #include <tcp_debug.h>
 
 #include "mbuf.h"
+#endif
 
 /* From net/radix.c
  * -- something to do with routing.

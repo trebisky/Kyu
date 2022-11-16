@@ -80,11 +80,29 @@
 #endif
 
 /* Signals. */
-#include <sys/signal.h>
+// #include <sys/signal.h>
 
 /* Machine type dependent parameters. */
-#include <machine/param.h>
-#include <machine/limits.h>
+// #include <machine/param.h>
+
+/* (from machine/param.h)
+ * Constants related to network buffer management.
+ * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * on machines that exchange pages of input or output buffers with mbuf
+ * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
+ * of the hardware page size.
+ */
+#define MSIZE           128             /* size of an mbuf */
+// Kyu
+// #define      MCLBYTES        1024
+// #define      MCLSHIFT        10
+#define MCLBYTES        2048
+#define MCLSHIFT        11
+#define MCLOFSET        (MCLBYTES - 1)
+
+#define NMBCLUSTERS     256             /* map size, max cluster allocation */
+
+// #include <machine/limits.h>
 
 /*
  * Priorities.  Note that with 32 run queues, differences less than 4 are

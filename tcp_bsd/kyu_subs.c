@@ -5,6 +5,9 @@
  * BSD global variables are here.
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include "kyu.h"
 
 #include "thread.h"
@@ -39,6 +42,7 @@
 #include <tcpip.h>
 #include <tcp_var.h>
 #include <tcp_debug.h>
+#endif
 
 /* global variables */
 
@@ -76,8 +80,8 @@ u_long	sb_max;			/* socketvar.h */
 struct  ifnet   *ifnet;		/* net/if.h */
 
 /* from net/route.h */
-struct	route_cb route_cb;
-struct	rtstat	rtstat;
+// struct	route_cb route_cb;
+// struct	rtstat	rtstat;
 // struct	radix_node_head *rt_tables[AF_MAX+1];
 
 /* from ip_var.h */

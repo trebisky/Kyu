@@ -24,6 +24,7 @@ DEFS += -DKERNEL
 
 include ../Makefile.inc
 
+
 OBJS = kyu_main.o \
 	kyu_subs.o \
 	mbuf.o \
@@ -37,6 +38,7 @@ OBJS = kyu_main.o \
 	in.o \
 	tcp_cksum.o \
 	uipc_mbuf.o \
+	socket_io.o \
 	test.o
 
 all: ../tcp_bsd.o
@@ -126,6 +128,7 @@ get:
 #	cp  $(BSD_SRC)/libkern/libkern.h libkern
 
 #	cp  $(BSD_SRC)/kern/uipc_mbuf.c .
+#	cp  $(BSD_SRC)/kern/uipc_socket.c ./socket_io.c
 
 	chmod u+w *.h *.c
 	chmod u+w sys/*

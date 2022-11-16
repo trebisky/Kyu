@@ -44,6 +44,8 @@
 /* Machine type dependent parameters. */
 #include <machine/endian.h>
 
+#define	BYTE_ORDER	LITTLE_ENDIAN
+
 #ifndef _POSIX_SOURCE
 typedef	unsigned char	u_char;
 typedef	unsigned short	u_short;
@@ -89,8 +91,20 @@ __END_DECLS
 #define	makedev(x,y)	((dev_t)(((x)<<8) | (y)))	/* create dev_t */
 #endif
 
-#include <machine/ansi.h>
-#include <machine/types.h>
+// #include <machine/ansi.h>
+#define _BSD_CLOCK_T_   unsigned long           /* clock() */
+#define _BSD_PTRDIFF_T_ int                     /* ptr1 - ptr2 */
+#define _BSD_SIZE_T_    unsigned int            /* sizeof() */
+#define _BSD_SSIZE_T_   int                     /* byte count or error */
+#define _BSD_TIME_T_    long                    /* time() */
+#define _BSD_VA_LIST_   char *                  /* va_list */
+
+#ifdef notdef
+#define _BSD_WCHAR_T_   int                     /* wchar_t */
+#define _BSD_RUNE_T_    int                     /* rune_t */
+#endif
+
+// #include <machine/types.h>
 
 #ifdef	_BSD_CLOCK_T_
 typedef	_BSD_CLOCK_T_	clock_t;

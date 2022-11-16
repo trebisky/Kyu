@@ -4,11 +4,15 @@
  * Tom Trebisky  11-12-2022
  */
 
+#include <bsd.h>
+
 // gets us htonl and such
 #include <kyu.h>
 #include <thread.h>
-#include <kyu_compat.h>
 
+// #include <kyu_compat.h>
+
+#ifdef notdef
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mbuf.h>
@@ -32,6 +36,7 @@
 #include <tcp_timer.h>
 #include <tcpip.h>
 #include <tcp_var.h>
+#endif
 
 /* -------- */
 #ifdef notdef

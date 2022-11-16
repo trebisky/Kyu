@@ -41,6 +41,9 @@
 #define	TANAMES
 #endif
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -66,6 +69,7 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_debug.h>
+#endif
 
 #ifdef TCPDEBUG
 int	tcpconsdebug = 0;

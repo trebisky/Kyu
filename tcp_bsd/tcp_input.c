@@ -33,6 +33,9 @@
  *	@(#)tcp_input.c	8.5 (Berkeley) 4/10/94
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -62,6 +65,7 @@
 #include <netinet/tcp_debug.h>
 
 #include <mbuf.h>
+#endif
 
 int	tcprexmtthresh = 3;
 struct	tcpiphdr tcp_saveti;

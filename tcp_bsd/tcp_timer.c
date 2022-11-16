@@ -33,6 +33,9 @@
  *	@(#)tcp_timer.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -58,6 +61,7 @@
 #include <netinet/tcp_timer.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
+#endif
 
 int	tcp_keepidle = TCPTV_KEEP_IDLE;
 int	tcp_keepintvl = TCPTV_KEEPINTVL;

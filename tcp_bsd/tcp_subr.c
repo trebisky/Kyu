@@ -33,6 +33,9 @@
  *	@(#)tcp_subr.c	8.1 (Berkeley) 6/10/93
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -63,6 +66,7 @@
 #include <netinet/tcp_var.h>
 
 #include <mbuf.h>
+#endif
 
 /* patchable/settable parameters for tcp */
 int 	tcp_mssdflt = TCP_MSS;
@@ -392,11 +396,11 @@ tcp_close(tp)
 	return ((struct tcpcb *)0);
 }
 
-void
-tcp_drain()
-{
-
-}
+/* This would get called in a BSD system to let
+ * TCP know that the system was desperate and wanted
+ * TCP to release any memory it possibly could.
+ */
+void tcp_drain() { }
 
 /*
  * Notify a tcp user of an asynchronous error;

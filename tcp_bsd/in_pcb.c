@@ -33,6 +33,9 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 // #include <mbuf.h>
 
@@ -57,6 +60,7 @@
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#endif
 
 extern struct	in_addr zeroin_addr;
 

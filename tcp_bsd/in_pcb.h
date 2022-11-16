@@ -33,6 +33,10 @@
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
  */
 
+/* Was in net/route.h */
+struct route {
+};
+
 /*
  * Common structure pcb for internet protocol implementation.
  * Here are stored pointers to local and foreign host table

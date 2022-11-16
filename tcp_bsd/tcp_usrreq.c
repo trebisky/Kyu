@@ -33,6 +33,9 @@
  *	@(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
  */
 
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -63,6 +66,7 @@
 #include <netinet/tcp_debug.h>
 
 #include <mbuf.h>
+#endif
 
 /*
  * TCP protocol interface to socket abstraction.
@@ -288,10 +292,12 @@ tcp_usrreq(so, req, m, nam, control)
 		tp = tcp_drop(tp, ECONNABORTED);
 		break;
 
+#ifdef notdef
 	case PRU_SENSE:
 		((struct stat *) m)->st_blksize = so->so_snd.sb_hiwat;
 		(void) splx(s);
 		return (0);
+#endif
 
 	case PRU_RCVOOB:
 		if ((so->so_oobmark == 0 &&
