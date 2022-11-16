@@ -35,21 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-#include <sys/file.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/domain.h>
-#include <sys/kernel.h>
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/resourcevar.h>
-#endif
-
 #define	SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? M_NOWAIT : M_WAITOK)
 
 /* under unix (BSD), write, send, sento, and sendmsg are all ways
@@ -145,6 +130,7 @@ sosend(so, addr, uio, top, control, flags)
 	if (control)
 		clen = control->m_len;
 
+#ifdef notYET
 restart:
 	if (error = sblock(&so->so_snd, SBLOCKWAIT(flags)))
 		goto out;
@@ -270,6 +256,7 @@ nopages:
 			goto release;
 		} while (resid && space > 0);
 	} while (resid);
+#endif /* notYET */
 
 release:
 	sbunlock(&so->so_snd);
