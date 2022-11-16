@@ -76,6 +76,9 @@ void sofree ( struct socket * );
 void sbflush ( struct sockbuf * );
 void sbdrop ( struct sockbuf *, int );
 
+void socantrcvmore ( struct socket * );
+void socantsendmore ( struct socket * );
+
 void
 server_thread ( long xxx )
 {
@@ -740,8 +743,7 @@ sorflush ( struct socket *so )
         int s;
         struct sockbuf asb;
 
-	printf ( "Lazy sorflush\n" );
-#ifdef notdef
+	// printf ( "Lazy sorflush\n" );
         sb->sb_flags |= SB_NOINTR;
         (void) sblock(sb, M_WAITOK);
 
@@ -755,7 +757,6 @@ sorflush ( struct socket *so )
         // if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
         //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
         sbrelease(&asb);
-#endif
 }
 
 void
@@ -806,238 +807,6 @@ bad2:
 bad:
         return (ENOBUFS);
 }
-
-/*
- * Allot mbufs to a sockbuf.
- * Attempt to scale mbmax so that mbcnt doesn't become limiting
- * if buffering efficiency is near the normal case.
- */
-/* The original is in kern/uipc_socket2.c */
-int
-sbreserve ( struct sockbuf *sb, u_long cc )
-{
-
-        if (cc > sb_max * MCLBYTES / (MSIZE + MCLBYTES))
-                return (0);
-
-        sb->sb_hiwat = cc;
-        sb->sb_mbmax = min(cc * 2, sb_max);
-        if (sb->sb_lowat > sb->sb_hiwat)
-                sb->sb_lowat = sb->sb_hiwat;
-        return (1);
-}
-
-/*
- * Free mbufs held by a socket, and reserved mbuf space.
- */
-void
-sbrelease ( struct sockbuf *sb )
-{
-        sbflush(sb);
-        sb->sb_hiwat = sb->sb_mbmax = 0;
-}
-
-/*
- * Free all mbufs in a sockbuf.
- * Check that all resources are reclaimed.
- */
-void
-sbflush ( struct sockbuf *sb )
-{
-        if (sb->sb_flags & SB_LOCK)
-                panic("sbflush");
-
-        while (sb->sb_mbcnt)
-                sbdrop(sb, (int)sb->sb_cc);
-
-        if (sb->sb_cc || sb->sb_mb)
-                panic("sbflush 2");
-}
-
-/*
- * Drop data from (the front of) a sockbuf.
- */
-void
-sbdrop ( struct sockbuf *sb, int len)
-{
-        struct mbuf *m, *mn;
-        struct mbuf *next;
-
-        next = (m = sb->sb_mb) ? m->m_nextpkt : 0;
-        while (len > 0) {
-                if (m == 0) {
-                        if (next == 0)
-                                panic("sbdrop");
-                        m = next;
-                        next = m->m_nextpkt;
-                        continue;
-                }
-                if (m->m_len > len) {
-                        m->m_len -= len;
-                        m->m_data += len;
-                        sb->sb_cc -= len;
-                        break;
-                }
-                len -= m->m_len;
-                sbfree(sb, m);
-                // MFREE(m, mn);
-                // m = mn;
-		m = mb_free ( m );
-        }
-        while (m && m->m_len == 0) {
-                sbfree(sb, m);
-                // MFREE(m, mn);
-                // m = mn;
-		m = mb_free ( m );
-        }
-        if (m) {
-                sb->sb_mb = m;
-                m->m_nextpkt = next;
-        } else
-                sb->sb_mb = next;
-}
-
-/*
- * Routines to add and remove
- * data from an mbuf queue.
- *
- * The routines sbappend() or sbappendrecord() are normally called to
- * append new mbufs to a socket buffer, after checking that adequate
- * space is available, comparing the function sbspace() with the amount
- * of data to be added.  sbappendrecord() differs from sbappend() in
- * that data supplied is treated as the beginning of a new record.
- * To place a sender's address, optional access rights, and data in a
- * socket receive buffer, sbappendaddr() should be used.  To place
- * access rights and data in a socket receive buffer, sbappendrights()
- * should be used.  In either case, the new data begins a new record.
- * Note that unlike sbappend() and sbappendrecord(), these routines check
- * for the caller that there will be enough space to store the data.
- * Each fails if there is not enough space, or if it cannot find mbufs
- * to store additional information in.
- *
- * Reliable protocols may use the socket send buffer to hold data
- * awaiting acknowledgement.  Data is normally copied from a socket
- * send buffer in a protocol with m_copy for output to a peer,
- * and then removing the data from the socket buffer with sbdrop()
- * or sbdroprecord() when the data is acknowledged by the peer.
- */
-void sbcompress ( struct sockbuf *, struct mbuf *, struct mbuf * );
-void sbappendrecord ( struct sockbuf *, struct mbuf * );
-
-/*
- * Append mbuf chain m to the last record in the
- * socket buffer sb.  The additional space associated
- * the mbuf chain is recorded in sb.  Empty mbufs are
- * discarded and mbufs are compacted where possible.
- */
-/* From kern/uipc_socket2.c */
-void
-sbappend (sb, m)
-        struct sockbuf *sb;
-        struct mbuf *m;
-{
-        struct mbuf *n;
-
-        if (m == 0)
-                return;
-
-        if (n = sb->sb_mb) {
-                while (n->m_nextpkt)
-                        n = n->m_nextpkt;
-                do {
-                        if (n->m_flags & M_EOR) {
-                                sbappendrecord(sb, m); /* XXX XXXXXX!!!! */
-                                return;
-                        }
-                } while (n->m_next && (n = n->m_next));
-        }
-        sbcompress(sb, m, n);
-}
-
-/*
- * As above, except the mbuf chain
- * begins a new record.
- */
-void
-sbappendrecord ( struct sockbuf *sb, struct mbuf *m0 )
-{
-        register struct mbuf *m;
-
-        if (m0 == 0)
-                return;
-        if (m = sb->sb_mb)
-                while (m->m_nextpkt)
-                        m = m->m_nextpkt;
-        /*
-         * Put the first mbuf on the queue.
-         * Note this permits zero length records.
-         */
-        sballoc(sb, m0);
-        if (m)
-                m->m_nextpkt = m0;
-        else
-                sb->sb_mb = m0;
-        m = m0->m_next;
-        m0->m_next = 0;
-        if (m && (m0->m_flags & M_EOR)) {
-                m0->m_flags &= ~M_EOR;
-                m->m_flags |= M_EOR;
-        }
-        sbcompress(sb, m, m0);
-}
-
-/*
- * Compress mbuf chain m into the socket
- * buffer sb following mbuf n.  If n
- * is null, the buffer is presumed empty.
- */
-void
-sbcompress ( struct sockbuf *sb, struct mbuf *m, struct mbuf *n )
-{
-        register int eor = 0;
-        register struct mbuf *o;
-
-        while (m) {
-                eor |= m->m_flags & M_EOR;
-                if (m->m_len == 0 &&
-                    (eor == 0 ||
-                     (((o = m->m_next) || (o = n)) &&
-                      o->m_type == m->m_type))) {
-                        // m = m_free(m);
-                        m = mb_free(m);
-                        continue;
-                }
-                if (n && (n->m_flags & (M_EXT | M_EOR)) == 0 &&
-                    (n->m_data + n->m_len + m->m_len) < &n->m_dat[MLEN] &&
-                    n->m_type == m->m_type) {
-                        bcopy(mtod(m, caddr_t), mtod(n, caddr_t) + n->m_len,
-                            (unsigned)m->m_len);
-                        n->m_len += m->m_len;
-                        sb->sb_cc += m->m_len;
-                        // m = m_free(m);
-                        m = mb_free(m);
-                        continue;
-                }
-                if (n)
-                        n->m_next = m;
-                else
-                        sb->sb_mb = m;
-                sballoc(sb, m);
-                n = m;
-                m->m_flags &= ~M_EOR;
-                m = m->m_next;
-                n->m_next = 0;
-        }
-        if (eor) {
-                if (n)
-                        n->m_flags |= eor;
-                else
-                        printf("semi-panic: sbcompress\n");
-        }
-}
-
-/* sballoc() is a macro in sys/socketvar.h
- */
 
 /*
  * Procedures to manipulate state flags of socket
@@ -1147,8 +916,7 @@ soisdisconnected(so)
  */
 
 void
-socantsendmore(so)
-        struct socket *so;
+socantsendmore ( struct socket *so )
 {
 
         so->so_state |= SS_CANTSENDMORE;
@@ -1156,8 +924,7 @@ socantsendmore(so)
 }
 
 void
-socantrcvmore(so)
-        struct socket *so;
+socantrcvmore ( struct socket *so )
 {
 
         so->so_state |= SS_CANTRCVMORE;

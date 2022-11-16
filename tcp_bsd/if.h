@@ -57,6 +57,7 @@
  * routing and gateway routines maintaining information used to locate
  * interfaces.  These routines live in the files if.c and route.c
  */
+
 #ifndef _TIME_ /*  XXX fast fix for SNMP, going away soon */
 #include <sys/time.h>
 #endif
@@ -314,7 +315,7 @@ struct	ifconf {
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
 };
 
-#include <net/if_arp.h>
+// #include <net/if_arp.h>
 
 #ifdef KERNEL
 #define	IFAFREE(ifa) \

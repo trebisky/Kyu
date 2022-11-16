@@ -160,7 +160,7 @@ restart:
 			if (so->so_state & SS_NBIO)
 				snderr(EWOULDBLOCK);
 			sbunlock(&so->so_snd);
-			error = sbwait(&so->so_snd);
+			error = sbwait(&so->so_snd);	/* Blocks */
 			splx(s);
 			if (error)
 				goto out;
@@ -626,7 +626,7 @@ restart:
 			goto release;
 		}
 		sbunlock(&so->so_rcv);
-		error = sbwait(&so->so_rcv);
+		error = sbwait(&so->so_rcv);	/* Blocks */
 		splx(s);
 		if (error)
 			return (error);
@@ -782,7 +782,7 @@ dontblock:
 		    !sosendallatonce(so) && !nextrecord) {
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
-			error = sbwait(&so->so_rcv);
+			error = sbwait(&so->so_rcv);	/* Blocks */
 			if (error) {
 				sbunlock(&so->so_rcv);
 				splx(s);

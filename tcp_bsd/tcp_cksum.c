@@ -34,11 +34,15 @@
  *	@(#)in_cksum.c	8.1 (Berkeley) 6/11/93
  */
 
+#include <bsd.h>
+
+#ifdef notdef 
 #include <sys/param.h>
 #include <sys/mbuf.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#endif
 
 /*
  * Checksum routine for Internet Protocol family headers.

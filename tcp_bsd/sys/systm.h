@@ -162,4 +162,7 @@ void	startprofclock __P((struct proc *));
 void	stopprofclock __P((struct proc *));
 void	setstatclockrate __P((int hzrate));
 
-#include <libkern/libkern.h>
+// #include <libkern/libkern.h>
+#include <sys/libkern.h>
+
+// The END

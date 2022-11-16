@@ -16,8 +16,24 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 
-#include <net/if.h>
+#include <if.h>
 
+#include <in.h>
+#include <in_var.h>
+#include <in_systm.h>
+#include <ip.h>
+#include <in_pcb.h>
+#include <ip_var.h>
+#include <tcp.h>
+#include <tcp_fsm.h>
+#include <tcp_seq.h>
+#include <tcp_timer.h>
+#include <tcpip.h>
+#include <tcp_var.h>
+#include <tcp_debug.h>
+
+#ifdef notdef
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
@@ -31,5 +47,6 @@
 #include <netinet/tcpip.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_debug.h>
+#endif
 
 #include <mbuf.h>

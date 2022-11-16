@@ -39,6 +39,7 @@ OBJS = kyu_main.o \
 	tcp_cksum.o \
 	uipc_mbuf.o \
 	socket_io.o \
+	socket_sb.o \
 	test.o
 
 all: ../tcp_bsd.o
