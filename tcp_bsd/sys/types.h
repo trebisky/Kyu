@@ -42,9 +42,32 @@
 #define	_SYS_TYPES_H_
 
 /* Machine type dependent parameters. */
-#include <machine/endian.h>
+// #include <machine/endian.h>
 
-#define	BYTE_ORDER	LITTLE_ENDIAN
+/*
+ * Definitions for byte order, according to byte significance from low
+ * address to high.
+ */
+#define LITTLE_ENDIAN   1234    /* LSB first: i386, vax */
+#define BIG_ENDIAN      4321    /* MSB first: 68000, ibm, net */
+
+#define BYTE_ORDER      LITTLE_ENDIAN
+
+#if BYTE_ORDER == BIG_ENDIAN
+
+#define NTOHL(x)        (x)
+#define NTOHS(x)        (x)
+#define HTONL(x)        (x)
+#define HTONS(x)        (x)
+
+#else
+
+#define NTOHL(x)        (x) = ntohl((u_long)x)
+#define NTOHS(x)        (x) = ntohs((u_short)x)
+#define HTONL(x)        (x) = htonl((u_long)x)
+#define HTONS(x)        (x) = htons((u_short)x)
+
+#endif
 
 #ifndef _POSIX_SOURCE
 typedef	unsigned char	u_char;
