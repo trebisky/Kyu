@@ -133,6 +133,49 @@ sbdrop ( struct sockbuf *sb, int len)
                 sb->sb_mb = next;
 }
 
+#ifdef notdef
+/*
+ * Wakeup processes waiting on a socket buffer.
+ * Do asynchronous notification via SIGIO
+ * if the socket has the SS_ASYNC flag set.
+ */
+void
+sowakeup ( struct socket *so, struct sockbuf *sb )
+{
+        // struct proc *p;
+
+        // selwakeup(&sb->sb_sel);
+        sb->sb_flags &= ~SB_SEL;
+        if (sb->sb_flags & SB_WAIT) {
+                sb->sb_flags &= ~SB_WAIT;
+                // wakeup((caddr_t)&sb->sb_cc);
+        }
+
+#ifdef signalSTUFF
+        if (so->so_state & SS_ASYNC) {
+                if (so->so_pgid < 0)
+                        gsignal(-so->so_pgid, SIGIO);
+                else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
+                        psignal(p, SIGIO);
+        }
+#endif
+}
+#endif
+
+/* This replaces the above for Kyu
+ * It is only referenced in the macros sorwakeup and sowwakeup
+ *  (in sys/socketvar.h)
+ */
+void
+sbwakeup ( struct sockbuf *sb )
+{
+        sb->sb_flags &= ~SB_SEL;
+        if (sb->sb_flags & SB_WAIT) {
+                sb->sb_flags &= ~SB_WAIT;
+                // wakeup((caddr_t)&sb->sb_cc);
+        }
+}
+
 /*
  * Wait for data to arrive at/drain from a socket buffer.
  */
@@ -148,7 +191,7 @@ sbwait ( struct sockbuf *sb )
  * Lock a sockbuf already known to be locked;
  * return any error returned from sleep (EINTR).
  */
-int
+static int
 sb_lock ( struct sockbuf *sb )
 {
         int error;
@@ -162,6 +205,46 @@ sb_lock ( struct sockbuf *sb )
         sb->sb_flags |= SB_LOCK;
         return (0);
 }
+
+/* release lock on sockbuf sb */
+void
+sbunlock ( struct sockbuf *sb )
+{
+        sb->sb_flags &= ~SB_LOCK;
+        if ( sb->sb_flags & SB_WANT) {
+                sb->sb_flags &= ~SB_WANT;
+                wakeup ((caddr_t)&sb->sb_flags);
+        }
+}
+
+int
+sblock ( struct sockbuf *sb, int wf )
+{
+	return ((sb)->sb_flags & SB_LOCK ? \
+                (((wf) == M_WAITOK) ? sb_lock(sb) : EWOULDBLOCK) : \
+                ((sb)->sb_flags |= SB_LOCK), 0);
+}
+
+#ifdef notdef
+/* These were originally macros in sys/socketvar.h */
+/*
+ * Set lock on sockbuf sb; sleep if lock is already held.
+ * Unless SB_NOINTR is set on sockbuf, sleep is interruptible.
+ * Returns error without lock if sleep is interrupted.
+ */
+#define sblock(sb, wf) ((sb)->sb_flags & SB_LOCK ? \
+                (((wf) == M_WAITOK) ? sb_lock(sb) : EWOULDBLOCK) : \
+                ((sb)->sb_flags |= SB_LOCK), 0)
+
+/* release lock on sockbuf sb */
+#define sbunlock(sb) { \
+        (sb)->sb_flags &= ~SB_LOCK; \
+        if ((sb)->sb_flags & SB_WANT) { \
+                (sb)->sb_flags &= ~SB_WANT; \
+                wakeup((caddr_t)&(sb)->sb_flags); \
+        } \
+}
+#endif
 
 /*
  * Routines to add and remove

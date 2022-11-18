@@ -356,8 +356,8 @@ findpcb:
 		++tcpstat.tcps_pcbcachemiss;
 	}
 
-	printf ( "tcp_input 7B (%08x)\n", inp );
-	tcb_show ();
+	// printf ( "tcp_input 7B (%08x)\n", inp );
+	// tcb_show ();
 
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then

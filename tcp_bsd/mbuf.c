@@ -501,14 +501,15 @@ mb_gethdr ( int type )
 	m->m_type = type;
 	m->m_next = (struct mbuf *) NULL;
 	m->m_nextpkt = (struct mbuf *) NULL;
-	m->m_data = m->m_dat;
+	m->m_data = m->m_pktdat;
 	m->m_flags = M_PKTHDR;
 
 	return m;
 }
 
 /* Add a cluster to an mbuf.
- * - one and only use in mb_devget() below
+ * - used in mb_devget() below
+ * - also used in sosend ()
  */
 void
 mb_clget ( struct mbuf *m )

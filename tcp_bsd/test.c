@@ -289,6 +289,7 @@ bad:
 }
 
 
+/* Needs improvement */
 void
 tcb_show ( void )
 {
@@ -379,33 +380,6 @@ soqremque ( struct socket *so, int q )
         next->so_q0 = next->so_q = 0;
         next->so_head = 0;
         return (1);
-}
-
-/*
- * Wakeup processes waiting on a socket buffer.
- * Do asynchronous notification via SIGIO
- * if the socket has the SS_ASYNC flag set.
- */
-void
-sowakeup ( struct socket *so, struct sockbuf *sb )
-{
-        // struct proc *p;
-
-        // selwakeup(&sb->sb_sel);
-        sb->sb_flags &= ~SB_SEL;
-        if (sb->sb_flags & SB_WAIT) {
-                sb->sb_flags &= ~SB_WAIT;
-                // wakeup((caddr_t)&sb->sb_cc);
-        }
-
-#ifdef notdef
-        if (so->so_state & SS_ASYNC) {
-                if (so->so_pgid < 0)
-                        gsignal(-so->so_pgid, SIGIO);
-                else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
-                        psignal(p, SIGIO);
-        }
-#endif
 }
 
 /*

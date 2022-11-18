@@ -163,6 +163,8 @@ struct socket {
 		(sb)->sb_mbcnt -= (m)->m_ext.ext_size; \
 }
 
+#ifdef notdef
+/* Kyu moved these to socket_sb.c 11-2022 */
 /*
  * Set lock on sockbuf sb; sleep if lock is already held.
  * Unless SB_NOINTR is set on sockbuf, sleep is interruptible.
@@ -180,13 +182,27 @@ struct socket {
 		wakeup((caddr_t)&(sb)->sb_flags); \
 	} \
 }
+#endif
 
+/* On Kyu we replaced sowakeup with sbwakeup.
+ *  and did away with the socket argument that only is
+ *  involved with select() and signals.
+ */
+#define	sorwakeup(so)	{ sbwakeup(&(so)->so_rcv); \
+			  if ((so)->so_upcall) \
+			    (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
+			}
+
+#define	sowwakeup(so)	sbwakeup(&(so)->so_snd)
+
+#ifdef notdef
 #define	sorwakeup(so)	{ sowakeup((so), &(so)->so_rcv); \
 			  if ((so)->so_upcall) \
 			    (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
 			}
 
 #define	sowwakeup(so)	sowakeup((so), &(so)->so_snd)
+#endif
 
 #ifdef KERNEL
 extern u_long	sb_max;

@@ -249,9 +249,8 @@ tcp_bsd_process ( struct netbuf *nbp )
 	nbp->iptr->offset = ntohs ( nbp->iptr->offset );
 
 	// printf ( "TCP: bsd_process %d bytes\n", ntohs(nbp->iptr->len) );
-	printf ( "TCP: bsd_process %d, %d bytes\n", nbp->ilen, nbp->iptr->len );
-
-	dump_buf ( (char *) nbp->iptr, nbp->ilen );
+	// printf ( "TCP: bsd_process %d, %d bytes\n", nbp->ilen, nbp->iptr->len );
+	// dump_buf ( (char *) nbp->iptr, nbp->ilen );
 
 	len = nbp->ilen;
 	m = mb_devget ( (char *) nbp->iptr, len, 0, NULL, 0 );

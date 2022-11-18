@@ -172,6 +172,7 @@ restart:
 
 	do {	/* Big loop */
 		s = splnet();
+
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
 
@@ -189,28 +190,34 @@ restart:
 
 		space = sbspace(&so->so_snd);
 		printf ( "sosend, space = %d\n", space );
+
 		if (flags & MSG_OOB)
 			space += 1024;
+
 		if (atomic && resid > so->so_snd.sb_hiwat ||
 		    clen > so->so_snd.sb_hiwat)
 			snderr(EMSGSIZE);
 
+		/* Block waiting for space if necessary and allowed */
 		if (space < resid + clen && uio &&
 		    (atomic || space < so->so_snd.sb_lowat || space < clen)) {
 			if (so->so_state & SS_NBIO)
 				snderr(EWOULDBLOCK);
+
 			sbunlock(&so->so_snd);
 			error = sbwait(&so->so_snd);	/* Blocks */
+
 			splx(s);
 			if (error)
 				goto out;
 			goto restart;
 		}
+
 		splx(s);
 		mp = &top;
 		space -= clen;
 
-		do {
+		do {	/* Little loop */
 		    if (uio == NULL) {
 			/*
 			 * Data is prepackaged in "top".
@@ -279,6 +286,7 @@ nopages:
 			printf ( "top 2: %s\n", top->m_data );
 
 			top->m_pkthdr.len += len;
+			/* XXX */
 			printf ( "top 1x: %s\n", p );
 			printf ( "top 2x: %s\n", top->m_data );
 			if (error)
@@ -300,6 +308,14 @@ nopages:
 		    printf ( "top 1a: %s\n", p );
 		    printf ( "top 2a: %s\n", top->m_data );
 
+#ifdef notdef
+		    s = splnet();				/* XXX */
+		    error = (*so->so_proto->pr_usrreq)(so,
+			(flags & MSG_OOB) ? PRU_SENDOOB : PRU_SEND,
+			top, addr, control);
+		    splx(s);
+#endif
+
 #ifdef KYU
 		    /* Kyu ignores OOB (for now anyway).
 		     * also assumes these pointers won't be NULL.
@@ -315,13 +331,6 @@ nopages:
 		    error = tcp_output(tp);
 
 		    printf ( "sosend: append: %d\n", error );
-
-#else
-		    s = splnet();				/* XXX */
-		    error = (*so->so_proto->pr_usrreq)(so,
-			(flags & MSG_OOB) ? PRU_SENDOOB : PRU_SEND,
-			top, addr, control);
-		    splx(s);
 #endif
 
 		    // if (dontroute)
@@ -334,6 +343,7 @@ nopages:
 		    if (error)
 			goto release;
 		} while (resid && space > 0);
+
 	} while (resid);
 
 release:

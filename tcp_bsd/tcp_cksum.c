@@ -76,7 +76,7 @@ tcp_cksum ( struct mbuf *m, int len )
 	register int sum = 0;
 	register int mlen = 0;
 
-	printf ( "tcp cksum: %08x (%d)\n", m, len );
+	// printf ( "tcp cksum: %08x (%d)\n", m, len );
 
 	for (;m && len; m = m->m_next) {
 		if (m->m_len == 0)
