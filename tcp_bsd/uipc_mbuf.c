@@ -33,6 +33,11 @@
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
  */
 
+#define MBTYPES
+
+#include <bsd.h>
+
+#ifdef notdef
 #include <kyu_compat.h>
 
 #include <sys/param.h>
@@ -41,7 +46,6 @@
 #include <sys/malloc.h>
 // #include <sys/map.h>
 
-#define MBTYPES
 #include <sys/mbuf.h>
 
 // #include <sys/kernel.h>
@@ -50,6 +54,7 @@
 #include <sys/protosw.h>
 
 #include <mbuf.h>
+#endif
 
 // #include <vm/vm.h>
 

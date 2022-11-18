@@ -69,6 +69,28 @@
 void
 kyu_send ( struct socket *so, char *buf, int len )
 {
+	struct uio k_uio;
+	struct iovec k_vec;
+	int error;
+
+	printf ( "kyu_send - sending %d bytes: %s\n", len, buf );
+
+	k_vec.iov_base = buf;
+	k_vec.iov_len = len;
+
+	k_uio.uio_iov = &k_vec;
+        k_uio.uio_iovcnt = 1;
+
+        k_uio.uio_segflg = UIO_USERSPACE;
+        k_uio.uio_rw = UIO_WRITE;
+
+        k_uio.uio_offset = 0;
+        // k_uio.uio_resid = 0;
+        k_uio.uio_resid = len;
+
+	error = sosend (so, (struct mbuf *)0, &k_uio,
+	    (struct mbuf *)0, (struct mbuf *)0, 0);
+
 	// return (sosend((struct socket *)fp->f_data, (struct mbuf *)0,
         //         uio, (struct mbuf *)0, (struct mbuf *)0, 0));
 }
@@ -93,7 +115,7 @@ kyu_send ( struct socket *so, char *buf, int len )
  */
 int
 sosend(so, addr, uio, top, control, flags)
-	register struct socket *so;
+	struct socket *so;
 	struct mbuf *addr;
 	struct uio *uio;
 	struct mbuf *top;
@@ -102,17 +124,23 @@ sosend(so, addr, uio, top, control, flags)
 {
 	// struct proc *p = curproc;
 	struct mbuf **mp;
-	register struct mbuf *m;
-	register long space, len, resid;
-	int clen = 0, error, s, dontroute, mlen;
-	int atomic = sosendallatonce(so) || top;
+	struct mbuf *m;
+	long space, len, resid;
+	int clen = 0, error, s, mlen;
+	// int dontroute;
+	int atomic;
+	struct inpcb *inp;
+        struct tcpcb *tp;
+	char *p;	// XXX for debug
 
-#define	snderr(errno)	{ error = errno; splx(s); goto release; }
+	atomic = sosendallatonce(so) || top;
 
 	if (uio)
 		resid = uio->uio_resid;
 	else
 		resid = top->m_pkthdr.len;
+
+	printf ( "sosend, resid = %d\n", resid );
 	/*
 	 * In theory resid should be unsigned.
 	 * However, space must be signed, as it might be less than 0
@@ -122,24 +150,34 @@ sosend(so, addr, uio, top, control, flags)
 	 */
 	if (resid < 0)
 		return (EINVAL);
-	dontroute =
-	    (flags & MSG_DONTROUTE) && (so->so_options & SO_DONTROUTE) == 0 &&
-	    (so->so_proto->pr_flags & PR_ATOMIC);
+
+	// dontroute =
+	//     (flags & MSG_DONTROUTE) && (so->so_options & SO_DONTROUTE) == 0 &&
+	//     (so->so_proto->pr_flags & PR_ATOMIC);
+
 	// p->p_stats->p_ru.ru_msgsnd++;
 
 	if (control)
 		clen = control->m_len;
 
-#ifdef notYET
 restart:
 	if (error = sblock(&so->so_snd, SBLOCKWAIT(flags)))
 		goto out;
-	do {
+
+#ifdef notYET
+#endif /* notYET */
+
+#define	snderr(err)	{ error = err; splx(s); goto release; }
+
+
+	do {	/* Big loop */
 		s = splnet();
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
+
 		if (so->so_error)
 			snderr(so->so_error);
+
 		if ((so->so_state & SS_ISCONNECTED) == 0) {
 			if (so->so_proto->pr_flags & PR_CONNREQUIRED) {
 				if ((so->so_state & SS_ISCONFIRMING) == 0 &&
@@ -148,7 +186,9 @@ restart:
 			} else if (addr == 0)
 				snderr(EDESTADDRREQ);
 		}
+
 		space = sbspace(&so->so_snd);
+		printf ( "sosend, space = %d\n", space );
 		if (flags & MSG_OOB)
 			space += 1024;
 		if (atomic && resid > so->so_snd.sb_hiwat ||
@@ -191,6 +231,7 @@ restart:
 				m = mb_get ( MT_DATA );
 				mlen = MLEN;
 			}
+			printf ( "sosend, space, resid = %d, %d\n", space, resid );
 
 			if (resid >= MINCLSIZE && space >= MCLBYTES) {
 				// MCLGET(m, M_WAIT);
@@ -222,32 +263,70 @@ nopages:
 					MH_ALIGN(m, len);
 			}
 
-			error = uiomove(mtod(m, caddr_t), (int)len, uio);
+			// error = uiomove(mtod(m, caddr_t), (int)len, uio);
+			printf ( "Calling xiomove for %d\n", len );
+			error = xiomove(mtod(m, caddr_t), (int)len, uio, 0 );
+
+			p = mtod(m, caddr_t);
+			printf ( "After xiomove: %s\n", p );
 
 			resid = uio->uio_resid;
 			m->m_len = len;
 			*mp = m;
+
+			p = mtod(top, caddr_t);
+			printf ( "top 1: %s\n", p );
+			printf ( "top 2: %s\n", top->m_data );
+
 			top->m_pkthdr.len += len;
+			printf ( "top 1x: %s\n", p );
+			printf ( "top 2x: %s\n", top->m_data );
 			if (error)
 				goto release;
+
 			mp = &m->m_next;
+			printf ( "-- resid = %d\n", resid );
 			if (resid <= 0) {
 				if (flags & MSG_EOR)
 					top->m_flags |= M_EOR;
 				break;
 			}
 		    } while (space > 0 && atomic);
-		    if (dontroute)
-			    so->so_options |= SO_DONTROUTE;
 
+		    // if (dontroute)
+		    // 	    so->so_options |= SO_DONTROUTE;
+
+		    p = mtod(top, caddr_t);
+		    printf ( "top 1a: %s\n", p );
+		    printf ( "top 2a: %s\n", top->m_data );
+
+#ifdef KYU
+		    /* Kyu ignores OOB (for now anyway).
+		     * also assumes these pointers won't be NULL.
+		     */
+		    inp = sotoinpcb(so);
+		    tp = intotcpcb(inp);
+
+		    printf ( "sosend: mb-len: %d\n", top->m_len );
+		    if ( top->m_len )
+			printf ( "sosend: mb-data: %s\n", top->m_data );
+
+		    sbappend(&so->so_snd, top);
+		    error = tcp_output(tp);
+
+		    printf ( "sosend: append: %d\n", error );
+
+#else
 		    s = splnet();				/* XXX */
 		    error = (*so->so_proto->pr_usrreq)(so,
 			(flags & MSG_OOB) ? PRU_SENDOOB : PRU_SEND,
 			top, addr, control);
 		    splx(s);
+#endif
 
-		    if (dontroute)
-			    so->so_options &= ~SO_DONTROUTE;
+		    // if (dontroute)
+		    // 	    so->so_options &= ~SO_DONTROUTE;
+
 		    clen = 0;
 		    control = 0;
 		    top = 0;
@@ -256,7 +335,6 @@ nopages:
 			goto release;
 		} while (resid && space > 0);
 	} while (resid);
-#endif /* notYET */
 
 release:
 	sbunlock(&so->so_snd);
@@ -265,8 +343,116 @@ out:
 		mb_freem(top);
 	if (control)
 		mb_freem(control);
+
+	printf ( "sosend - FINISH: %d\n", error );
 	return (error);
 }
+
+/* My butchered version of what follows.
+ */
+int
+xiomove(cp, n, uio, read)
+        caddr_t cp;
+        int n;
+        struct uio *uio;
+	int read;
+{
+        struct iovec *iov;
+        u_int cnt;
+        int error = 0;
+
+        while (n > 0 && uio->uio_resid) {
+                iov = uio->uio_iov;
+                cnt = iov->iov_len;
+		printf ( "xiomove: %d\n", cnt );
+		printf ( "xiomove: len = %d\n", iov->iov_len );
+		printf ( "xiomove: buf = %s\n", iov->iov_base );
+                if (cnt == 0) {
+                        uio->uio_iov++;
+                        uio->uio_iovcnt--;
+                        continue;
+                }
+                if (cnt > n)
+                        cnt = n;
+
+		// bcopy ( src, dst, len )
+		if ( read )
+		    bcopy((caddr_t)cp, iov->iov_base, cnt);
+		else
+		    bcopy(iov->iov_base, (caddr_t)cp, cnt);
+
+                iov->iov_base += cnt;
+                iov->iov_len -= cnt;
+
+                uio->uio_resid -= cnt;
+                uio->uio_offset += cnt;
+
+                cp += cnt;
+                n -= cnt;
+        }
+
+        return (error);
+}
+
+#ifdef notdef
+/* From kern/kern_subr.c
+ */
+int
+uiomove(cp, n, uio)
+        register caddr_t cp;
+        register int n;
+        register struct uio *uio;
+{
+        register struct iovec *iov;
+        u_int cnt;
+        int error = 0;
+
+#ifdef DIAGNOSTIC
+        if (uio->uio_rw != UIO_READ && uio->uio_rw != UIO_WRITE)
+                panic("uiomove: mode");
+        if (uio->uio_segflg == UIO_USERSPACE && uio->uio_procp != curproc)
+                panic("uiomove proc");
+#endif
+        while (n > 0 && uio->uio_resid) {
+                iov = uio->uio_iov;
+                cnt = iov->iov_len;
+                if (cnt == 0) {
+                        uio->uio_iov++;
+                        uio->uio_iovcnt--;
+                        continue;
+                }
+                if (cnt > n)
+                        cnt = n;
+                switch (uio->uio_segflg) {
+
+                case UIO_USERSPACE:
+                case UIO_USERISPACE:
+                        if (uio->uio_rw == UIO_READ)
+                                error = copyout(cp, iov->iov_base, cnt);
+                        else
+                                error = copyin(iov->iov_base, cp, cnt);
+                        if (error)
+                                return (error);
+                        break;
+
+                case UIO_SYSSPACE:
+                        if (uio->uio_rw == UIO_READ)
+                                bcopy((caddr_t)cp, iov->iov_base, cnt);
+                        else
+                                bcopy(iov->iov_base, (caddr_t)cp, cnt);
+                        break;
+                }
+                iov->iov_base += cnt;
+                iov->iov_len -= cnt;
+                uio->uio_resid -= cnt;
+                uio->uio_offset += cnt;
+                cp += cnt;
+                n -= cnt;
+        }
+        return (error);
+}
+#endif
+
 
 #ifdef notdef
 /*

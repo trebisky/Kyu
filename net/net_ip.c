@@ -87,8 +87,8 @@ ip_rcv ( struct netbuf *nbp )
 	    udp_rcv ( nbp );
 	    netbuf_free ( nbp );
 	} else if ( ipp->proto == IPPROTO_TCP ) {
-	    printf ( "Sizeof eth = %d\n", sizeof(struct eth_hdr) );
-	    printf ( "Sizeof ip = %d\n", sizeof(struct ip_hdr) );
+	    // printf ( "Sizeof eth = %d\n", sizeof(struct eth_hdr) );
+	    // printf ( "Sizeof ip = %d\n", sizeof(struct ip_hdr) );
 	    tcp_rcv ( nbp );
 	} else {
 	    printf ( "IP from %s (size:%d) proto = %d, sum= %04x\n",

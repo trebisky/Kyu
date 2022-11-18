@@ -33,7 +33,7 @@
  *	@(#)socketvar.h	8.1 (Berkeley) 6/2/93
  */
 
-#include <sys/select.h>			/* for struct selinfo */
+#//include <sys/select.h>			/* for struct selinfo */
 
 /*
  * Kernel structure per socket.
@@ -80,7 +80,7 @@ struct socket {
 		u_long	sb_mbmax;	/* max chars of mbufs to use */
 		long	sb_lowat;	/* low water mark */
 		struct	mbuf *sb_mb;	/* the mbuf chain */
-		struct	selinfo sb_sel;	/* process selecting read/write */
+		// struct	selinfo sb_sel;	/* process selecting read/write */
 		short	sb_flags;	/* flags, see below */
 		short	sb_timeo;	/* timeout for read/write */
 	} so_rcv, so_snd;
@@ -203,6 +203,6 @@ extern	char netio[], netcon[], netcls[];
 int	soo_read __P((struct file *fp, struct uio *uio, struct ucred *cred));
 int	soo_write __P((struct file *fp, struct uio *uio, struct ucred *cred));
 int	soo_ioctl __P((struct file *fp, int com, caddr_t data, struct proc *p));
-int	soo_select __P((struct file *fp, int which, struct proc *p));
+// int	soo_select __P((struct file *fp, int which, struct proc *p));
 int 	soo_close __P((struct file *fp, struct proc *p));
 #endif

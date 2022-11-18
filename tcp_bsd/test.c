@@ -172,8 +172,10 @@ server_bind ( int port )
 	// tcb_show ();
 
 	for ( ;; ) {
+	    char *msg = "Dead men tell no tales\r\n";
 	    cso = kyu_accept ( so );
 	    printf ( "kyu_accept got a connection %08x\n", cso );
+	    kyu_send ( cso, msg, strlen(msg) );
 	    soclose ( cso );
 	    printf ( "socket was closed\n" );
 	}

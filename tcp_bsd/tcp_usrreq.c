@@ -110,7 +110,7 @@ tcp_usrreq(so, req, m, nam, control)
 
 	s = splnet();
 	inp = sotoinpcb(so);
-	printf ( "tcp_usrreq 1 (%08x, %08x)\n", so, inp );
+	printf ( "tcp_usrreq 1 so, inp = (%08x, %08x)\n", so, inp );
 
 	/*
 	 * When a TCP is attached to a socket, then there will be
@@ -122,7 +122,7 @@ tcp_usrreq(so, req, m, nam, control)
 		return (EINVAL);		/* XXX */
 	}
 
-	printf ( "tcp_usrreq 2\n" );
+	// printf ( "tcp_usrreq 2\n" );
 
 	if (inp) {
 		tp = intotcpcb(inp);
@@ -142,20 +142,20 @@ tcp_usrreq(so, req, m, nam, control)
 	 * and an internet control block.
 	 */
 	case PRU_ATTACH:
-		printf ( "tcp_usrreq 3\n" );
+		// printf ( "tcp_usrreq 3\n" );
 		if (inp) {
 			error = EISCONN;
 			break;
 		}
-		printf ( "tcp_usrreq 3b\n" );
+		// printf ( "tcp_usrreq 3b\n" );
 		error = tcp_attach(so);
 		if (error)
 			break;
-		printf ( "tcp_usrreq 4\n" );
+		// printf ( "tcp_usrreq 4\n" );
 		if ((so->so_options & SO_LINGER) && so->so_linger == 0)
 			so->so_linger = TCP_LINGERTIME;
 		tp = sototcpcb(so);
-		printf ( "tcp_usrreq 5\n" );
+		// printf ( "tcp_usrreq 5\n" );
 		break;
 
 	/*
@@ -176,9 +176,9 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Give the socket an address.
 	 */
 	case PRU_BIND:
-		printf ( "tcp_usrreq 10\n" );
+		// printf ( "tcp_usrreq 10\n" );
 		error = in_pcbbind(inp, nam);
-		printf ( "tcp_usrreq 11 %d\n", error );
+		// printf ( "tcp_usrreq 11 %d\n", error );
 		if (error)
 			break;
 		break;
@@ -361,10 +361,11 @@ tcp_usrreq(so, req, m, nam, control)
 	}
 	
 
-	printf ( "tcp_usrreq 6\n" );
+	// printf ( "tcp_usrreq 6\n" );
 
 	if (tp && (so->so_options & SO_DEBUG))
 		tcp_trace(TA_USER, ostate, tp, (struct tcpiphdr *)0, req);
+
 	splx(s);
 	return (error);
 }

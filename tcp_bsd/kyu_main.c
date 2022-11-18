@@ -154,7 +154,6 @@ static void
 tcp_thread ( long xxx )
 {
 	struct netbuf *nbp;
-	int count = 0;
 
 	tcp_q_head = (struct netbuf *) 0;
 	tcp_q_tail = (struct netbuf *) 0;
@@ -190,8 +189,6 @@ tcp_thread ( long xxx )
 
             if ( nbp ) {
 		printf ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
-		if ( ++count > 10 )
-		    panic ( "LIMIT" );
                 tcp_bsd_process ( nbp );
                 continue;
             }
