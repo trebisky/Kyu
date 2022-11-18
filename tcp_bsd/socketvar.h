@@ -33,7 +33,13 @@
  *	@(#)socketvar.h	8.1 (Berkeley) 6/2/93
  */
 
-#//include <sys/select.h>			/* for struct selinfo */
+//#include <sys/select.h>			/* for struct selinfo */
+
+/* default for max chars in sockbuf */
+/* Used in sanity checks in tcp_input and tcp_output
+ * It used to be a variable that could be patched.
+ */
+#define	SB_MAX		(256*1024)
 
 /*
  * Kernel structure per socket.
@@ -83,8 +89,10 @@ struct socket {
 		// struct	selinfo sb_sel;	/* process selecting read/write */
 		short	sb_flags;	/* flags, see below */
 		short	sb_timeo;	/* timeout for read/write */
+		struct	sem *sb_lock;	/* Kyu */
+		struct	sem *sb_sleep;	/* Kyu */
 	} so_rcv, so_snd;
-#define	SB_MAX		(256*1024)	/* default for max chars in sockbuf */
+
 #define	SB_LOCK		0x01		/* lock on data queue */
 #define	SB_WANT		0x02		/* someone is waiting to lock */
 #define	SB_WAIT		0x04		/* someone is waiting for data/space */
@@ -94,8 +102,8 @@ struct socket {
 #define	SB_NOINTR	0x40		/* operations not interruptible */
 
 	caddr_t	so_tpcb;		/* Wisc. protocol control block XXX */
-	void	(*so_upcall) __P((struct socket *so, caddr_t arg, int waitf));
-	caddr_t	so_upcallarg;		/* Arg for above */
+	// void	(*so_upcall) __P((struct socket *so, caddr_t arg, int waitf));
+	// caddr_t	so_upcallarg;
 };
 
 /*
@@ -187,11 +195,9 @@ struct socket {
 /* On Kyu we replaced sowakeup with sbwakeup.
  *  and did away with the socket argument that only is
  *  involved with select() and signals.
+ * We did away with upcall also
  */
-#define	sorwakeup(so)	{ sbwakeup(&(so)->so_rcv); \
-			  if ((so)->so_upcall) \
-			    (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
-			}
+#define	sorwakeup(so)	sbwakeup(&(so)->so_rcv)
 
 #define	sowwakeup(so)	sbwakeup(&(so)->so_snd)
 

@@ -71,7 +71,7 @@
 
 /* More types and definitions used throughout the kernel. */
 #ifdef KERNEL
-#include <sys/cdefs.h>
+// #include <sys/cdefs.h>
 #include <sys/errno.h>
 #include <sys/time.h>
 // #include <sys/resource.h>

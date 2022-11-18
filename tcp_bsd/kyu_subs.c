@@ -75,7 +75,8 @@ int max_protohdr;		/* mbuf.h */
 int max_hdr;			/* mbuf.h */
 int max_datalen;		/* mbuf.h */
 
-u_long	sb_max;			/* socketvar.h */
+/* socketvar.h */
+// u_long	sb_max;
 
 struct  ifnet   *ifnet;		/* net/if.h */
 
@@ -138,7 +139,7 @@ tcp_globals_init ( void )
 	max_datalen = MHLEN - max_hdr;
 
 	/* maximum chars per socket buffer, from socketvar.h */
-	sb_max = SB_MAX;
+	// sb_max = SB_MAX;
 
 	bzero ( (void *) &tcb, sizeof(struct inpcb) );
 	tcb.inp_next = tcb.inp_prev = &tcb;

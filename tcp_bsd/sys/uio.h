@@ -73,7 +73,7 @@ struct uio {
 #endif /* KERNEL */
 
 #ifndef	KERNEL
-#include <sys/cdefs.h>
+// #include <sys/cdefs.h>
 
 __BEGIN_DECLS
 ssize_t	readv __P((int, const struct iovec *, int));

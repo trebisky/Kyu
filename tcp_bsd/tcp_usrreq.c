@@ -450,8 +450,8 @@ tcp_ctloutput(op, so, level, optname, mp)
 	return (error);
 }
 
-u_long	tcp_sendspace = 1024*8;
-u_long	tcp_recvspace = 1024*8;
+// u_long	tcp_sendspace = 1024*8;
+// u_long	tcp_recvspace = 1024*8;
 
 /*
  * Attach TCP protocol to socket, allocating
@@ -468,11 +468,16 @@ tcp_attach(so)
 
 	printf ( "tcp_attach 0\n" );
 
+	sb_init ( so );
+
+#ifdef notdef
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
-		error = soreserve(so, tcp_sendspace, tcp_recvspace);
+		// error = soreserve(so, tcp_sendspace, tcp_recvspace);
+		error = sb_init ( so );
 		if (error)
 			return (error);
 	}
+#endif
 	printf ( "tcp_attach 1\n" );
 
 	error = in_pcballoc(so, &tcb);

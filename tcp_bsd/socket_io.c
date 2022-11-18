@@ -35,6 +35,13 @@
 
 #include <bsd.h>
 
+#include <kyu.h>
+#include <thread.h>
+
+void socantrcvmore ( struct socket * );
+static void soqinsque ( struct socket *, struct socket *, int );
+int soqremque ( struct socket *, int );
+
 #define	SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? M_NOWAIT : M_WAITOK)
 
 /* under unix (BSD), write, send, sento, and sendmsg are all ways
@@ -274,21 +281,20 @@ nopages:
 			printf ( "Calling xiomove for %d\n", len );
 			error = xiomove(mtod(m, caddr_t), (int)len, uio, 0 );
 
-			p = mtod(m, caddr_t);
-			printf ( "After xiomove: %s\n", p );
+			// p = mtod(m, caddr_t);
+			// printf ( "After xiomove: %s\n", p );
 
 			resid = uio->uio_resid;
 			m->m_len = len;
 			*mp = m;
 
-			p = mtod(top, caddr_t);
-			printf ( "top 1: %s\n", p );
-			printf ( "top 2: %s\n", top->m_data );
+			// p = mtod(top, caddr_t);
+			// printf ( "top 1: %s\n", p );
+			// printf ( "top 2: %s\n", top->m_data );
 
 			top->m_pkthdr.len += len;
-			/* XXX */
-			printf ( "top 1x: %s\n", p );
-			printf ( "top 2x: %s\n", top->m_data );
+			// printf ( "top 1x: %s\n", p );
+			// printf ( "top 2x: %s\n", top->m_data );
 			if (error)
 				goto release;
 
@@ -304,9 +310,9 @@ nopages:
 		    // if (dontroute)
 		    // 	    so->so_options |= SO_DONTROUTE;
 
-		    p = mtod(top, caddr_t);
-		    printf ( "top 1a: %s\n", p );
-		    printf ( "top 2a: %s\n", top->m_data );
+		    // p = mtod(top, caddr_t);
+		    // printf ( "top 1a: %s\n", p );
+		    // printf ( "top 2a: %s\n", top->m_data );
 
 #ifdef notdef
 		    s = splnet();				/* XXX */
@@ -330,7 +336,7 @@ nopages:
 		    sbappend(&so->so_snd, top);
 		    error = tcp_output(tp);
 
-		    printf ( "sosend: append: %d\n", error );
+		    // printf ( "sosend: append: %d\n", error );
 #endif
 
 		    // if (dontroute)
@@ -354,7 +360,8 @@ out:
 	if (control)
 		mb_freem(control);
 
-	printf ( "sosend - FINISH: %d\n", error );
+	if ( error )
+	    printf ( "sosend - FINISH: %d\n", error );
 	return (error);
 }
 
@@ -463,7 +470,337 @@ uiomove(cp, n, uio)
 }
 #endif
 
+/*
+ * When an attempt at a new connection is noted on a socket
+ * which accepts connections, sonewconn is called.  If the
+ * connection is possible (subject to space constraints, etc.)
+ * then we allocate a new structure, propoerly linked into the
+ * data structure of the original socket, and return this.
+ * Connstatus may be 0, or SO_ISCONFIRMING, or SO_ISCONNECTED.
+ *
+ * Currently, sonewconn() is defined as sonewconn1() in socketvar.h
+ * to catch calls that are missing the (new) second parameter.
+ */
+/* From kern/uipc_socket2.c
+ */
+struct socket *
+sonewconn1 ( struct socket *head, int connstatus)
+{
+        struct socket *so;
+        int soqueue = connstatus ? 1 : 0;
+	int error;
 
+	printf ( "sonewconn1 - %08x %d\n", head, connstatus );
+
+        if (head->so_qlen + head->so_q0len > 3 * head->so_qlimit / 2)
+                return ((struct socket *)0);
+
+        // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_DONTWAIT);
+	so = (struct socket *) k_sock_alloc ();
+        if (so == NULL)
+                return ((struct socket *)0);
+
+        bzero((caddr_t)so, sizeof(*so));
+
+	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! so->kyu_sem ) {
+	    panic ( "sonewcomm1 - semaphores all gone" );
+	}
+
+        so->so_type = head->so_type;
+        so->so_options = head->so_options &~ SO_ACCEPTCONN;
+        so->so_linger = head->so_linger;
+        so->so_state = head->so_state | SS_NOFDREF;
+        so->so_proto = head->so_proto;
+        so->so_timeo = head->so_timeo;
+        so->so_pgid = head->so_pgid;
+
+	// This call is/was weird, it passes sb_hiwat, yet soreserve sets it.
+	// Kyu: I just did away with this weirdness.
+        // (void) soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat);
+        sb_init ( so );
+
+        soqinsque(head, so, soqueue);
+
+        // if ((*so->so_proto->pr_usrreq)(so, PRU_ATTACH,
+        //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0)) {
+        error = tcp_usrreq (so, PRU_ATTACH,
+                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	if ( error ) {
+                (void) soqremque(so, soqueue);
+		sem_destroy ( so->kyu_sem );
+
+                // (void) free((caddr_t)so, M_SOCKET);
+		k_sock_free ( so );
+                return ((struct socket *)0);
+        }
+
+        if (connstatus) {
+                // sorwakeup(head);
+
+                // wakeup((caddr_t)&head->so_timeo);
+		sem_unblock ( so->kyu_sem );
+
+                so->so_state |= connstatus;
+        }
+
+        return (so);
+}
+
+
+/* ------------- */
+/* ------------- */
+/* ------------- */
+
+static void
+soqinsque ( struct socket *head, struct socket *so, int q )
+{
+        struct socket **prev;
+
+        so->so_head = head;
+
+        if (q == 0) {
+                head->so_q0len++;
+                so->so_q0 = 0;
+                for (prev = &(head->so_q0); *prev; )
+                        prev = &((*prev)->so_q0);
+        } else {
+                head->so_qlen++;
+                so->so_q = 0;
+                for (prev = &(head->so_q); *prev; )
+                        prev = &((*prev)->so_q);
+        }
+        *prev = so;
+}
+
+int
+soqremque ( struct socket *so, int q )
+{
+        struct socket *head, *prev, *next;
+
+        head = so->so_head;
+        prev = head;
+
+        for (;;) {
+                next = q ? prev->so_q : prev->so_q0;
+                if (next == so)
+                        break;
+                if (next == 0)
+                        return (0);
+                prev = next;
+        }
+        if (q == 0) {
+                prev->so_q0 = next->so_q0;
+                head->so_q0len--;
+        } else {
+                prev->so_q = next->so_q;
+                head->so_qlen--;
+        }
+        next->so_q0 = next->so_q = 0;
+        next->so_head = 0;
+        return (1);
+}
+
+void
+sorflush ( struct socket *so )
+{
+        struct sockbuf *sb = &so->so_rcv;
+        struct protosw *pr = so->so_proto;
+        int s;
+        struct sockbuf asb;
+
+	// printf ( "Lazy sorflush\n" );
+        sb->sb_flags |= SB_NOINTR;
+        (void) sblock(sb, M_WAITOK);
+
+        s = splimp();
+        socantrcvmore(so);
+        sbunlock(sb);
+        asb = *sb;
+        bzero((caddr_t)sb, sizeof (*sb));
+        splx(s);
+
+        // if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
+        //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
+        sbrelease(&asb);
+}
+
+void
+sofree ( struct socket *so )
+{
+	printf ( "sofree called\n" );
+
+        if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
+                return;
+
+        if (so->so_head) {
+                if (!soqremque(so, 0) && !soqremque(so, 1))
+                        panic("sofree dq");
+                so->so_head = 0;
+        }
+
+        sbrelease(&so->so_snd);
+        sorflush(so);
+
+	sem_destroy ( so->kyu_sem );
+
+        // FREE(so, M_SOCKET);
+	k_sock_free ( so );
+}
+
+/*
+ * Procedures to manipulate state flags of socket
+ * and do appropriate wakeups.  Normal sequence from the
+ * active (originating) side is that soisconnecting() is
+ * called during processing of connect() call,
+ * resulting in an eventual call to soisconnected() if/when the
+ * connection is established.  When the connection is torn down
+ * soisdisconnecting() is called during processing of disconnect() call,
+ * and soisdisconnected() is called when the connection to the peer
+ * is totally severed.  The semantics of these routines are such that
+ * connectionless protocols can call soisconnected() and soisdisconnected()
+ * only, bypassing the in-progress calls when setting up a ``connection''
+ * takes no time.
+ *
+ * From the passive side, a socket is created with
+ * two queues of sockets: so_q0 for connections in progress
+ * and so_q for connections already made and awaiting user acceptance.
+ * As a protocol is preparing incoming connections, it creates a socket
+ * structure queued on so_q0 by calling sonewconn().  When the connection
+ * is established, soisconnected() is called, and transfers the
+ * socket structure to so_q, making it available to accept().
+ *
+ * If a socket is closed with sockets on either
+ * so_q0 or so_q, these sockets are dropped.
+ *
+ * If higher level protocols are implemented in
+ * the kernel, the wakeups done here will sometimes
+ * cause software-interrupt process scheduling.
+ */
+/* From kern/uipc_socket2.c */
+
+void
+soisconnecting(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~(SS_ISCONNECTED|SS_ISDISCONNECTING);
+        so->so_state |= SS_ISCONNECTING;
+}
+
+void
+soisconnected(so)
+        struct socket *so;
+{
+        struct socket *head = so->so_head;
+
+        so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
+        so->so_state |= SS_ISCONNECTED;
+
+        if (head && soqremque(so, 0)) {
+                soqinsque(head, so, 1);
+                sorwakeup(head);
+
+		printf ( "soisconnected - wakeup head %08x\n", head->kyu_sem );
+                // wakeup((caddr_t)&head->so_timeo);
+		sem_unblock ( head->kyu_sem );
+
+        } else {
+		printf ( "soisconnected - wakeup sock\n" );
+                // wakeup((caddr_t)&so->so_timeo);
+		sem_unblock ( so->kyu_sem );
+
+                sorwakeup(so);
+                sowwakeup(so);
+        }
+}
+
+void
+soisdisconnecting(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~SS_ISCONNECTING;
+        so->so_state |= (SS_ISDISCONNECTING|SS_CANTRCVMORE|SS_CANTSENDMORE);
+
+        // wakeup((caddr_t)&so->so_timeo);
+	sem_unblock ( so->kyu_sem );
+
+        sowwakeup(so);
+        sorwakeup(so);
+}
+
+void
+soisdisconnected(so)
+        register struct socket *so;
+{
+
+        so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
+        so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
+
+        // wakeup((caddr_t)&so->so_timeo);
+	sem_unblock ( so->kyu_sem );
+
+        sowwakeup(so);
+        sorwakeup(so);
+}
+
+/*
+ * Socantsendmore indicates that no more data will be sent on the
+ * socket; it would normally be applied to a socket when the user
+ * informs the system that no more data is to be sent, by the protocol
+ * code (in case PRU_SHUTDOWN).  Socantrcvmore indicates that no more data
+ * will be received, and will normally be applied to the socket by a
+ * protocol when it detects that the peer will send no more data.
+ * Data queued for reading in the socket may yet be read.
+ */
+
+void
+socantsendmore ( struct socket *so )
+{
+
+        so->so_state |= SS_CANTSENDMORE;
+        sowwakeup(so);
+}
+
+void
+socantrcvmore ( struct socket *so )
+{
+
+        so->so_state |= SS_CANTRCVMORE;
+        sorwakeup(so);
+}
+
+/* From kern/uipc_socket.c */
+void
+sohasoutofband(so)
+        register struct socket *so;
+{
+#ifdef notdef
+        struct proc *p;
+
+        if (so->so_pgid < 0)
+                gsignal(-so->so_pgid, SIGURG);
+        else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
+                psignal(p, SIGURG);
+        selwakeup(&so->so_rcv.sb_sel);
+#endif
+}
+
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+
+
+#ifdef NONONO
 #ifdef notdef
 /*
  * Socket operation routines.
@@ -1048,8 +1385,10 @@ sorflush(so)
 	asb = *sb;
 	bzero((caddr_t)sb, sizeof (*sb));
 	splx(s);
+
 	if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
 		(*pr->pr_domain->dom_dispose)(asb.sb_mb);
+
 	sbrelease(&asb);
 }
 
@@ -1265,3 +1604,4 @@ sohasoutofband(so)
 	selwakeup(&so->so_rcv.sb_sel);
 }
 #endif
+#endif /* NONONO */

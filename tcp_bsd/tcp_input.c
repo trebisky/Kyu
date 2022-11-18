@@ -1186,7 +1186,7 @@ step6:
 		 * soreceive.  It's hard to imagine someone
 		 * actually wanting to send this much urgent data.
 		 */
-		if (ti->ti_urp + so->so_rcv.sb_cc > sb_max) {
+		if (ti->ti_urp + so->so_rcv.sb_cc > SB_MAX) {
 			ti->ti_urp = 0;			/* XXX */
 			tiflags &= ~TH_URG;		/* XXX */
 			goto dodata;			/* XXX */

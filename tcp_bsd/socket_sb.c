@@ -36,12 +36,85 @@
 
 #include <bsd.h>
 
+#include <kyu.h>
+#include <thread.h>
+
+void sbrelease ( struct sockbuf * );
 void sbdrop ( struct sockbuf *, int );
 void sbcompress ( struct sockbuf *, struct mbuf *, struct mbuf * );
 void sbappendrecord ( struct sockbuf *, struct mbuf * );
 
+static int soreserve ( struct socket *, u_long, u_long );
+
 /* sballoc() is a macro in sys/socketvar.h
  */
+
+/* Size of socket buffers is given here.
+ * This used to be in tcp_usrreq.c and referenced in
+ * tcp_attach ()
+ */
+static u_long  tcp_sendspace = 1024*8;
+static u_long  tcp_recvspace = 1024*8;
+
+void
+sb_init ( struct socket *so )
+{
+	struct sockbuf *sb;
+
+	printf ( "SB init called for %08x\n", so );
+
+	if ( soreserve ( so, tcp_sendspace, tcp_recvspace ) )
+	    panic ( "sb_init - cannot reserve space" );
+
+	sb = &so->so_rcv;
+	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
+        if ( ! sb->sb_sleep )
+            panic ("Cannot get sb sleep semaphore");
+
+	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
+        if ( ! sb->sb_lock )
+            panic ("Cannot get sb lock semaphore");
+
+	sb = &so->so_snd;
+	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
+        if ( ! sb->sb_sleep )
+            panic ("Cannot get sb sleep semaphore");
+
+	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
+        if ( ! sb->sb_lock )
+            panic ("Cannot get sb lock semaphore");
+
+}
+
+/* The original is in kern/uipc_socket2.c
+ * This is the closest thing to sb_init()
+ * that I can find.
+ */
+static int
+soreserve ( struct socket *so, u_long sndcc, u_long rcvcc )
+{
+
+        if (sbreserve(&so->so_snd, sndcc) == 0)
+                goto bad;
+        if (sbreserve(&so->so_rcv, rcvcc) == 0)
+                goto bad2;
+
+        if (so->so_rcv.sb_lowat == 0)
+                so->so_rcv.sb_lowat = 1;
+
+        if (so->so_snd.sb_lowat == 0)
+                so->so_snd.sb_lowat = MCLBYTES;
+
+        if (so->so_snd.sb_lowat > so->so_snd.sb_hiwat)
+                so->so_snd.sb_lowat = so->so_snd.sb_hiwat;
+
+        return (0);
+
+bad2:
+        sbrelease(&so->so_snd);
+bad:
+        return (ENOBUFS);
+}
 
 /*
  * Allot mbufs to a sockbuf.
@@ -53,13 +126,17 @@ int
 sbreserve ( struct sockbuf *sb, u_long cc )
 {
 
-        if (cc > sb_max * MCLBYTES / (MSIZE + MCLBYTES))
-                return (0);
+	// What the heck is this about ??
+        // if (cc > sb_max * MCLBYTES / (MSIZE + MCLBYTES))
+        //         return (0);
 
         sb->sb_hiwat = cc;
-        sb->sb_mbmax = min(cc * 2, sb_max);
+        sb->sb_mbmax = min(cc * 2, SB_MAX);
+
         if (sb->sb_lowat > sb->sb_hiwat)
                 sb->sb_lowat = sb->sb_hiwat;
+
+	// Always works these days
         return (1);
 }
 
@@ -202,6 +279,7 @@ sb_lock ( struct sockbuf *sb )
                     (sb->sb_flags & SB_NOINTR) ? PSOCK : PSOCK|PCATCH, netio, 0))
                         return (error);
         }
+
         sb->sb_flags |= SB_LOCK;
         return (0);
 }
@@ -220,10 +298,16 @@ sbunlock ( struct sockbuf *sb )
 int
 sblock ( struct sockbuf *sb, int wf )
 {
-	return ((sb)->sb_flags & SB_LOCK ? \
-                (((wf) == M_WAITOK) ? sb_lock(sb) : EWOULDBLOCK) : \
-                ((sb)->sb_flags |= SB_LOCK), 0);
+	if ( sb->sb_flags & SB_LOCK )
+	    if ((wf) == M_WAITOK)
+		return sb_lock (sb);
+	    else
+		return EWOULDBLOCK;
+
+	sb->sb_flags |= SB_LOCK;
+	return 0;
 }
+
 
 #ifdef notdef
 /* These were originally macros in sys/socketvar.h */

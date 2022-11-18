@@ -5,6 +5,8 @@
  */
 #include <kyu_compat.h>
 
+#define __P(protos)     protos
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -12,8 +14,8 @@
 
 #include <sys/protosw.h>
 #include <sys/domain.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
+#include <socket.h>
+#include <socketvar.h>
 #include <sys/errno.h>
 
 #include <if.h>
