@@ -165,13 +165,10 @@ int	 ip_getmoptions __P((int, struct ip_moptions *, struct mbuf **));
 void	 ip_init __P((void));
 int	 ip_mforward __P((struct mbuf *, struct ifnet *));
 int	 ip_optcopy __P((struct ip *, struct ip *));
-int	 ip_output __P((struct mbuf *,
-	    struct mbuf *, struct route *, int, struct ip_moptions *));
+int	 ip_output __P((struct mbuf *, struct mbuf *, struct route *, int, struct ip_moptions *));
 int	 ip_pcbopts __P((struct mbuf **, struct mbuf *));
-struct ip *
-	 ip_reass __P((struct ipasfrag *, struct ipq *));
-struct in_ifaddr *
-	 ip_rtaddr __P((struct in_addr));
+struct ip * ip_reass __P((struct ipasfrag *, struct ipq *));
+struct in_ifaddr * ip_rtaddr __P((struct in_addr));
 int	 ip_setmoptions __P((int, struct ip_moptions **, struct mbuf *));
 void	 ip_slowtimo __P((void));
 // struct mbuf * ip_srcroute __P((void));

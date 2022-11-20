@@ -706,6 +706,7 @@ netbuf_free ( struct netbuf *old )
 /* ------------------------------------------- */
 
 /* New way, gets pointer to bytes in network order */
+/* Assuming this runs on a little endian machine */
 char *
 ip2str ( unsigned char *ip_arg )
 {
@@ -728,6 +729,7 @@ ip2str ( unsigned char *ip_arg )
 	return buf;
 }
 
+/* Expects argument in network order */
 char *
 ip2str32 ( u32 ip_arg )
 {
@@ -754,6 +756,13 @@ ip2str32 ( u32 ip_arg )
 	*p = '\0';
 
 	return buf;
+}
+
+/* Argument in host order */
+char *
+ip2str32_h ( u32 ip_arg )
+{
+	return ip2str32 ( htonl(ip_arg) );
 }
 
 char *

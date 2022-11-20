@@ -103,14 +103,6 @@ u_long	tcp_now;		/* for RFC 1323 timestamps */
 struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
 
-/* Handy address full of all zeros */
-struct in_addr zeroin_addr = { 0 };
-
-/* From netinet/ip_input.c
- * this oddity bears some looking at -- gone in NetBSD-1.3
- */
-struct  in_ifaddr *in_ifaddr_head; /* first inet address */
-
 /* From netinet/ip_input.c */
 u_char inetctlerrmap[PRC_NCMDS] = {
         0,              0,              0,              0,
@@ -121,11 +113,38 @@ u_char inetctlerrmap[PRC_NCMDS] = {
         ENOPROTOOPT
 };
 
+static struct  in_ifaddr our_ifaddr;
+
+static void
+ifaddr_setup ( void )
+{
+	struct sockaddr_in *sp;
+
+        /* list of configured interfaces */
+        // in_ifaddr_head = NULL;
+	bzero ( (void *) &our_ifaddr, sizeof(struct in_ifaddr) );
+	our_ifaddr.ia_next = NULL;
+
+	sp = & our_ifaddr.ia_addr;
+	sp->sin_family = AF_INET;
+	sp->sin_addr.s_addr = get_our_ip();	/* in net order */
+	sp->sin_len = sizeof(struct in_addr);
+
+        in_ifaddr_head = &our_ifaddr;
+
+	/*
+	u_char  sin_len;
+        u_char  sin_family;
+        u_short sin_port;
+        struct  in_addr sin_addr;
+        char    sin_zero[8];
+	*/
+}
+
 void
 tcp_globals_init ( void )
 {
-        /* list of configured interfaces */
-        in_ifaddr_head = NULL;
+	ifaddr_setup ();
 
 	/* From netiso/tuba_subr.c */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
@@ -239,5 +258,13 @@ void wakeup ( void ) { }
 struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
 struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
 struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
+
+/* Handy address full of all zeros */
+struct in_addr zeroin_addr = { 0 };
+
+/* From netinet/ip_input.c
+ * this oddity bears some looking at -- gone in NetBSD-1.3
+ */
+struct  in_ifaddr *in_ifaddr_head; /* first inet address */
 
 /* THE END */

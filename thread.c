@@ -1651,7 +1651,9 @@ change_thread ( struct thread *new_tp, int options )
 		panic ( "change_thread, switch_c" );
 		break;
 	    default:
-		panic ( "change_thread, unknown mode: %d for thread %s\n", cur_thread->mode, cur_thread->name );
+		printf ( "change_thread, cur_thread:  %08x\n", cur_thread );
+		printf ( "change_thread, unknown mode: %d for thread %s\n", cur_thread->mode, cur_thread->name );
+		panic ( "change_thread, unknown mode" );
 		break;
 	}
 	/* NOTREACHED */

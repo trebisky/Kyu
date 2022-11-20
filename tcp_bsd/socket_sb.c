@@ -164,7 +164,11 @@ void
 sbrelease ( struct sockbuf *sb )
 {
         sbflush(sb);
-        sb->sb_hiwat = sb->sb_mbmax = 0;
+	sem_destroy ( sb->sb_lock );
+	sem_destroy ( sb->sb_sleep );
+
+        // sb->sb_hiwat = 0;
+	sb->sb_mbmax = 0;
 }
 
 /*
@@ -242,14 +246,17 @@ sowakeup ( struct socket *so, struct sockbuf *sb )
 /* This replaces the above for Kyu
  * It is only referenced in the macros sorwakeup and sowwakeup
  *  (in sys/socketvar.h)
+ * We get rid of the "so" argument (only needed for signals).
+ * And we are not trying to handle any select() behavior.
  */
 void
 sbwakeup ( struct sockbuf *sb )
 {
-        sb->sb_flags &= ~SB_SEL;
+        // sb->sb_flags &= ~SB_SEL;
         if (sb->sb_flags & SB_WAIT) {
                 sb->sb_flags &= ~SB_WAIT;
                 // wakeup((caddr_t)&sb->sb_cc);
+		sem_unblock ( sb->sb_sleep );
         }
 }
 
@@ -260,10 +267,13 @@ int
 sbwait ( struct sockbuf *sb )
 {
         sb->sb_flags |= SB_WAIT;
-        return (tsleep((caddr_t)&sb->sb_cc,
-            (sb->sb_flags & SB_NOINTR) ? PSOCK : PSOCK | PCATCH, netio, sb->sb_timeo));
+	sem_block ( sb->sb_sleep );
+
+        // return (tsleep((caddr_t)&sb->sb_cc,
+        //     (sb->sb_flags & SB_NOINTR) ? PSOCK : PSOCK | PCATCH, netio, sb->sb_timeo));
 }
 
+#ifdef notdef
 /*
  * Lock a sockbuf already known to be locked;
  * return any error returned from sleep (EINTR).
@@ -307,7 +317,21 @@ sblock ( struct sockbuf *sb, int wf )
 	sb->sb_flags |= SB_LOCK;
 	return 0;
 }
+#endif
 
+/* Leave the details to Kyu semaphores */
+void
+sbunlock ( struct sockbuf *sb )
+{
+	sem_unblock ( sb->sb_lock );
+}
+
+int
+sblock ( struct sockbuf *sb, int wf )
+{
+	sem_block ( sb->sb_lock );
+	return 0;
+}
 
 #ifdef notdef
 /* These were originally macros in sys/socketvar.h */

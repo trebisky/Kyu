@@ -110,7 +110,7 @@ tcp_usrreq(so, req, m, nam, control)
 
 	s = splnet();
 	inp = sotoinpcb(so);
-	printf ( "tcp_usrreq 1 so, inp = (%08x, %08x)\n", so, inp );
+	printf ( "tcp_usrreq 1: req, so, inp = %d, %08x, %08x\n", req, so, inp );
 
 	/*
 	 * When a TCP is attached to a socket, then there will be
@@ -201,31 +201,39 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Send initial segment on connection.
 	 */
 	case PRU_CONNECT:
+		printf ( "Tconnect 0\n" );
 		if (inp->inp_lport == 0) {
 			error = in_pcbbind(inp, (struct mbuf *)0);
 			if (error)
 				break;
 		}
+		printf ( "Tconnect 1\n" );
 		error = in_pcbconnect(inp, nam);
 		if (error)
 			break;
+		printf ( "Tconnect 2\n" );
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			in_pcbdisconnect(inp);
 			error = ENOBUFS;
 			break;
 		}
+		printf ( "Tconnect 3\n" );
+
 		/* Compute window scaling to request.  */
 		while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
 		    (TCP_MAXWIN << tp->request_r_scale) < so->so_rcv.sb_hiwat)
 			tp->request_r_scale++;
+
 		soisconnecting(so);
 		tcpstat.tcps_connattempt++;
 		tp->t_state = TCPS_SYN_SENT;
 		tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
 		tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
+		printf ( "Tconnect 4\n" );
 		tcp_sendseqinit(tp);
 		error = tcp_output(tp);
+		printf ( "Tconnect 5\n" );
 		break;
 
 	/*

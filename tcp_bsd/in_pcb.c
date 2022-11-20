@@ -188,7 +188,7 @@ in_pcbbind(inp, nam)
  * then pick one.
  */
 int
-in_pcbconnect(inp, nam)
+in_pcbconnect (inp, nam)
 	register struct inpcb *inp;
 	struct mbuf *nam;
 {
@@ -196,12 +196,14 @@ in_pcbconnect(inp, nam)
 	struct sockaddr_in *ifaddr;
 	register struct sockaddr_in *sin = mtod(nam, struct sockaddr_in *);
 
+	printf ( "in_pcbconnect 0\n" );
 	if (nam->m_len != sizeof (*sin))
 		return (EINVAL);
 	if (sin->sin_family != AF_INET)
 		return (EAFNOSUPPORT);
 	if (sin->sin_port == 0)
 		return (EADDRNOTAVAIL);
+	printf ( "in_pcbconnect 1\n" );
 
 	/* Do we have configured interfaces?
 	 */
@@ -225,11 +227,13 @@ in_pcbconnect(inp, nam)
 	}
 
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
+		ia = (struct in_ifaddr *)0;
 
 #ifdef ROUTING_STUFF
+		/* Kyu doesn't do this routing stuff.
+		 */
 		register struct route *ro;
 
-		ia = (struct in_ifaddr *)0;
 		/* 
 		 * If route is known or can be allocated now,
 		 * our src addr is taken from the i/f, else punt.
@@ -260,25 +264,28 @@ in_pcbconnect(inp, nam)
 		 */
 		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 			ia = ifatoia(ro->ro_rt->rt_ifa);
-#else
-		/* Kyu doesn't do this routing stuff.
-		 */
-		ia = (struct in_ifaddr *)0;
 #endif
+	printf ( "in_pcbconnect 2\n" );
 
+		/* Always 0 for Kyu */
 		if (ia == 0) {
 			u_short fport = sin->sin_port;
 
 			sin->sin_port = 0;
-			ia = ifatoia(ifa_ifwithdstaddr(sintosa(sin)));
+
+			ia = ifatoia ( ifa_ifwithdstaddr (sintosa(sin)));
 			if (ia == 0)
-				ia = ifatoia(ifa_ifwithnet(sintosa(sin)));
+				ia = ifatoia ( ifa_ifwithnet (sintosa(sin)));
+
 			sin->sin_port = fport;
+
 			if (ia == 0)
 				ia = in_ifaddr_head;
+
 			if (ia == 0)
 				return (EADDRNOTAVAIL);
 		}
+	printf ( "in_pcbconnect 3\n" );
 
 #ifdef MULTICAST_STUFF
 		/*
@@ -304,6 +311,9 @@ in_pcbconnect(inp, nam)
 #endif
 		ifaddr = (struct sockaddr_in *)&ia->ia_addr;
 	}
+
+	printf ( "in_pcbconnect 4\n" );
+
 	if (in_pcblookup(inp->inp_head,
 	    sin->sin_addr,
 	    sin->sin_port,
@@ -311,13 +321,17 @@ in_pcbconnect(inp, nam)
 	    inp->inp_lport,
 	    0))
 		return (EADDRINUSE);
+
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
 		if (inp->inp_lport == 0)
 			(void)in_pcbbind(inp, (struct mbuf *)0);
 		inp->inp_laddr = ifaddr->sin_addr;
 	}
+
 	inp->inp_faddr = sin->sin_addr;
 	inp->inp_fport = sin->sin_port;
+	printf ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );
+	printf ( "in_pcbconnect 5l %08x, %d\n", inp->inp_laddr, inp->inp_lport );
 	return (0);
 }
 

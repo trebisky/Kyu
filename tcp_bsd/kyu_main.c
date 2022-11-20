@@ -118,10 +118,6 @@ bsd_init ( void )
 
 	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
 	(void) thr_new_repeat ( "tcp-rpt", tcp_timer_func, (void *) 0, 13, 0, 100 );
-
-
-	/* XXX */
-	bsd_server_test ();
 }
 
 static int fast_count = 0;

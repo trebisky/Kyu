@@ -6,17 +6,23 @@
 #include <kyu_compat.h>
 
 #define __P(protos)     protos
+#define NULL    0
 
-#include <sys/param.h>
+#define BSD     199306          /* System version (year & month). */
+#define BSD4_3  1
+#define BSD4_4  1
+
+#include <sys/types.h>
+#include <sys/time.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
-// #include <sys/mbuf.h>
+#include <sys/errno.h>
 
-#include <sys/protosw.h>
-#include <sys/domain.h>
+#include <domain.h>
+#include <protosw.h>
+#include <uio.h>
+
 #include <socket.h>
 #include <socketvar.h>
-#include <sys/errno.h>
 
 #include <if.h>
 
@@ -26,6 +32,7 @@
 #include <ip.h>
 #include <in_pcb.h>
 #include <ip_var.h>
+
 #include <tcp.h>
 #include <tcp_fsm.h>
 #include <tcp_seq.h>
@@ -33,22 +40,5 @@
 #include <tcpip.h>
 #include <tcp_var.h>
 #include <tcp_debug.h>
-
-#ifdef notdef
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/in_var.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_debug.h>
-#endif
 
 #include <mbuf.h>

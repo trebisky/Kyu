@@ -33,9 +33,29 @@
  *	@(#)mbuf.h	8.3 (Berkeley) 1/21/94
  */
 
-#ifndef M_WAITOK
-#include <sys/malloc.h>
-#endif
+// #ifndef M_WAITOK
+// #include <sys/malloc.h>
+// #endif
+#define M_WAITOK        0x0000
+#define M_NOWAIT        0x0001
+
+// Normally these would be in param.h
+/* (from machine/param.h)
+ * Constants related to network buffer management.
+ * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * on machines that exchange pages of input or output buffers with mbuf
+ * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
+ * of the hardware page size.
+ */
+#define MSIZE           128             /* size of an mbuf */
+// Kyu
+// #define      MCLBYTES        1024
+// #define      MCLSHIFT        10
+#define MCLBYTES        2048
+#define MCLSHIFT        11
+#define MCLOFSET        (MCLBYTES - 1)
+
+#define NMBCLUSTERS     256             /* map size, max cluster allocation */
 
 /*
  * Mbufs are of a single size, MSIZE (machine/machparam.h), which

@@ -55,6 +55,9 @@ user_init ( long xx )
 	mmt_paddle_init ();
 #endif
 
+	/* For BSD testing */
+	tcp_test_hook ();
+
 	/* Run the test "shell" as the user thread */
 	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_SHELL, 0 );
 

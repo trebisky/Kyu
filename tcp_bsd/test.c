@@ -10,68 +10,18 @@
 #include <kyu.h>
 #include <thread.h>
 
-// #include <kyu_compat.h>
-
-#ifdef notdef
-#include <sys/param.h>
-#include <sys/types.h>
-#include <sys/mbuf.h>
-#include <sys/systm.h>
-
-#include <sys/socketvar.h>
-#include <sys/socket.h>
-#include <sys/protosw.h>
-
-// for stripoptions
-#include <in_systm.h>
-#include <in.h>
-#include <ip.h>
-
-// for inpcb
-#include <net/route.h>
-#include <ip_var.h>
-#include <in_pcb.h>
-#include <tcp.h>
-#include <tcp_seq.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-#endif
-
-/* -------- */
-#ifdef notdef
-#include "../net/net.h"		/* Kyu */
-#include "../net/kyu_tcp.h"
-
-#include <sys/param.h>
-#include <sys/malloc.h>
-// #include <sys/errno.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <in_pcb.h>
-#include <ip_var.h>
-
-#include <tcp.h>
-#include <tcp_seq.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-#include <tcp_debug.h>
-#endif
-
 extern struct protosw tcp_proto;
 
-
-static void server_bind ( int );
-struct socket * kyu_accept ( struct socket * );
+static void bind_test ( int );
 void tcb_show ( void );
+
+struct socket *tcp_bind ( int );
+struct socket *tcp_accept ( struct socket * );
+struct socket *tcp_connect ( char *, int );
 
 struct mbuf *mb_free ( struct mbuf * );
 
 /* Can these all be static ?? */
-void sbrelease ( struct sockbuf * );
 void sofree ( struct socket * );
 void sbflush ( struct sockbuf * );
 void sbdrop ( struct sockbuf *, int );
@@ -79,10 +29,47 @@ void sbdrop ( struct sockbuf *, int );
 void socantrcvmore ( struct socket * );
 void socantsendmore ( struct socket * );
 
+void bsd_server_test ( void );
+void bsd_client_test ( void );
+
+/* Called from user.c at the end of Kyu initialization.
+ */
+void
+tcp_test_hook ( void )
+{
+	printf ( "TCP test hook\n" );
+
+	bsd_server_test ();
+
+	thr_delay ( 3000 );
+
+	bsd_client_test ();
+}
+
+/* ----------------------------- */
+/* ----------------------------- */
+
+void
+client_thread ( long xxx )
+{
+	struct socket *so;
+
+	printf ( "Start connect to %s (%d)\n", "192.168.0.5", 13 );
+	so = tcp_connect ( "192.168.0.5", 13 );
+	printf ( "Connect returns: %08x\n", so );
+	(void) soclose ( so );
+}
+
+void
+bsd_client_test ( void )
+{
+	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
+}
+
 void
 server_thread ( long xxx )
 {
-	server_bind ( 111 );
+	bind_test ( 111 );
 }
 
 /* currently called during initialization.
@@ -90,73 +77,17 @@ server_thread ( long xxx )
 void
 bsd_server_test ( void )
 {
-	(void) safe_thr_new ( "tcp-test", server_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "tcp-server", server_thread, (void *) 0, 15, 0 );
 }
 
 static void
-server_bind ( int port )
+bind_test ( int port )
 {
 	struct socket *so;
-	int e;
-	struct mbuf *nam;
-	struct sockaddr_in myaddr;
-	int len;
 	struct socket *cso;
+	int fip;
 
-	register struct inpcb *inp;
-        register struct tcpcb *tp;
-
-	/* ------------- make a socket */
-	so = (struct socket *) k_sock_alloc ();
-	// error = socreate(uap->domain, &so, uap->type, uap->protocol);
-	e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
-	if ( e ) {
-	    printf ( "socreate fails\n" );
-	    return;
-	}
-
-	/* ------------- now do a bind */
-#ifdef notdef
-	struct sockaddr_in serv_addr;
-	bzero ( &serv_addr, sizeof(serv_addr) );
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl ( INADDR_ANY );
-	serv_addr.sin_port = htons ( MY_TCP_PORT );
-	bind ( sockfd, &serv_addr, sizeof(serv_addr) );
-	e = sockargs(&nam, uap->name, uap->namelen, MT_SONAME);
-#endif
-
-	len = sizeof(myaddr);
-	bzero ( &myaddr, len );
-	myaddr.sin_family = AF_INET;
-
-	/* oddly enough these go in network order */
-	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);	/* All zeros */
-	myaddr.sin_port = htons(port);
-
-	e = sockargs(&nam, &myaddr, len, MT_SONAME);
-	if ( e ) {
-	    printf ( "sockargs fails\n" );
-	    return;
-	}
-
-	e = sobind ( so, nam );
-	if ( e ) {
-	    printf ( "sobind fails\n" );
-	    tcb_show ();
-	    return;
-	}
-
-	/* ------------- now do a listen */
-
-	e = solisten ( so, 10 );
-	if ( e ) {
-	    printf ( "solisten fails\n" );
-	    return;
-	}
-
-	// This is set by listen
-	// so->so_options |= SO_ACCEPTCONN;
+	so = tcp_bind ( port );
 
 	/* ------------- finally do an accept */
 	/* Accept is the most interesting perhaps.
@@ -173,13 +104,20 @@ server_bind ( int port )
 
 	for ( ;; ) {
 	    char *msg = "Dead men tell no tales\r\n";
-	    cso = kyu_accept ( so );
-	    printf ( "kyu_accept got a connection %08x\n", cso );
-	    kyu_send ( cso, msg, strlen(msg) );
-	    soclose ( cso );
+	    cso = tcp_accept ( so );
+
+	    fip = tcp_getpeer_ip ( cso );
+	    // printf ( "kyu_accept got a connection: %08x\n", cso );
+	    printf ( "kyu_accept got a connection from: %s\n", ip2str32_h(fip) );
+	    // tcb_show ();
+
+	    tcp_send ( cso, msg, strlen(msg) );
+	    (void) soclose ( cso );
 	    printf ( "socket was closed\n" );
 	}
 }
+
+
 
 /*
  * Must be called at splnet...
@@ -212,6 +150,11 @@ soclose ( struct socket *so )
         int s = splnet();               /* conservative */
         int error = 0;
 
+	printf ( "soclose called with %08x\n", so );
+
+	if ( ! so )
+	    return 0;
+
         if (so->so_options & SO_ACCEPTCONN) {
                 while (so->so_q0)
                         (void) soabort(so->so_q0);
@@ -233,9 +176,11 @@ soclose ( struct socket *so )
                             (so->so_state & SS_NBIO))
                                 goto drop;
                         while (so->so_state & SS_ISCONNECTED)
-                                if (error = tsleep((caddr_t)&so->so_timeo,
-                                    PSOCK | PCATCH, netcls, so->so_linger))
-                                        break;
+			    printf ( "block in close: %08x\n", so->kyu_sem );
+			    sem_block ( so->kyu_sem );
+                                //if (error = tsleep((caddr_t)&so->so_timeo,
+                                //    PSOCK | PCATCH, netcls, so->so_linger))
+                                //        break;
                 }
         }
 
@@ -251,7 +196,7 @@ drop:
         }
 
 discard:
-	// Near as I can tell, this marks the socked as not
+	// Near as I can tell, this marks the socket as not
 	// having a reference in file array (i.e. as an "fd")
         // if (so->so_state & SS_NOFDREF)
         //         panic("soclose: NOFDREF");
@@ -259,6 +204,7 @@ discard:
 
         sofree(so);
         splx(s);
+
         return (error);
 }
 
@@ -286,20 +232,6 @@ sodisconnect ( struct socket *so )
 bad:
         splx(s);
         return (error);
-}
-
-
-/* Needs improvement */
-void
-tcb_show ( void )
-{
-	struct inpcb *inp;
-
-	inp = &tcb;
-	while ( inp->inp_next != &tcb ) {
-	    inp = inp->inp_next;
-	    printf ( "INPCB: %08x -- lport: %d\n", inp, ntohs(inp->inp_lport) );
-	}
 }
 
 int
@@ -425,169 +357,6 @@ solisten ( struct socket *so, int backlog )
         splx(s);
         return (0);
 }
-
-/* We do an abbreviated form of the accept call.
- * We don't need to translate fd to sock and vice versa
- * We also don't need to fuss around copying address
- * information from kernel to user space.
- */
-struct socket *
-kyu_accept ( struct socket *so )
-{
-	struct socket *rso;
-
-        if ((so->so_options & SO_ACCEPTCONN) == 0) {
-		printf ( "socket not ready to accept\n" );
-                // return (EINVAL);
-                return NULL;
-        }
-
-        while (so->so_qlen == 0 && so->so_error == 0) {
-                if (so->so_state & SS_CANTRCVMORE) {
-                        so->so_error = ECONNABORTED;
-                        break;
-                }
-                // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-		printf ( "block in accept: %08x\n", so->kyu_sem );
-		sem_block ( so->kyu_sem );
-        }
-
-        if (so->so_error) {
-                // error = so->so_error;
-                so->so_error = 0;
-                // return (error);
-                return NULL;
-        }
-
-	/* Pull the socket we are accepting off the queue.
-	 */
-        rso = so->so_q;
-        if ( soqremque(rso, 1) == 0)
-                panic("accept");
-
-	// if we wanted the peer name, this call
-	// would get it for us, albeit into an mbuf.
-	// this is PRU_ACCEPT.
-	// inp = sotoinpcb(rso);
-	// in_setpeeraddr(inp, nam);
-
-	return rso;
-}
-
-#ifdef notdef
-/* From: kern/uipc_syscalls.c
- */
-accept1(p, uap, retval)
-        struct proc *p;
-        register struct accept_args *uap;
-        int *retval;
-{
-        struct file *fp;
-        struct mbuf *nam;
-        int namelen, error, s;
-        register struct socket *so;
-
-        if (uap->name && (error = copyin((caddr_t)uap->anamelen,
-            (caddr_t)&namelen, sizeof (namelen))))
-                return (error);
-
-        if (error = getsock(p->p_fd, uap->s, &fp))
-                return (error);
-
-        s = splnet();
-        so = (struct socket *)fp->f_data;
-
-        if ((so->so_options & SO_ACCEPTCONN) == 0) {
-                splx(s);
-                return (EINVAL);
-        }
-        if ((so->so_state & SS_NBIO) && so->so_qlen == 0) {
-                splx(s);
-                return (EWOULDBLOCK);
-        }
-
-        while (so->so_qlen == 0 && so->so_error == 0) {
-                if (so->so_state & SS_CANTRCVMORE) {
-                        so->so_error = ECONNABORTED;
-                        break;
-                }
-                if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-                        splx(s);
-                        return (error);
-                }
-        }
-
-        if (so->so_error) {
-                error = so->so_error;
-                so->so_error = 0;
-                splx(s);
-                return (error);
-        }
-
-        if (error = falloc(p, &fp, retval)) {
-                splx(s);
-                return (error);
-        }
-
-        { struct socket *aso = so->so_q;
-          if (soqremque(aso, 1) == 0)
-                panic("accept");
-          so = aso;
-        }
-	fp->f_type = DTYPE_SOCKET;
-        fp->f_flag = FREAD|FWRITE;
-        fp->f_ops = &socketops;
-        fp->f_data = (caddr_t)so;
-
-        nam = m_get(M_WAIT, MT_SONAME);
-
-	// The soaccept call just does this,
-	// fetching the peer address.
-        // (void) soaccept(so, nam);
-	// Note that so is now aso from the above.
-	// the peer name from so rather than 
-	inp = sotoinpcb(so);
-	in_setpeeraddr(inp, nam);
-
-        if (uap->name) {
-#ifdef COMPAT_OLDSOCK
-                if (uap->compat_43)
-                        mtod(nam, struct osockaddr *)->sa_family =
-                            mtod(nam, struct sockaddr *)->sa_family;
-#endif
-                if (namelen > nam->m_len)
-                        namelen = nam->m_len;
-                /* SHOULD COPY OUT A CHAIN HERE */
-                if ((error = copyout(mtod(nam, caddr_t), (caddr_t)uap->name,
-                    (u_int)namelen)) == 0)
-                        error = copyout((caddr_t)&namelen,
-                            (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
-        }
-
-        m_freem(nam);
-        splx(s);
-        return (error);
-}
-
-int
-soaccept ( struct socket *so, struct mbuf *nam)
-{
-        int s = splnet();
-        int error;
-
-        if ((so->so_state & SS_NOFDREF) == 0)
-	    panic("soaccept: !NOFDREF");
-        so->so_state &= ~SS_NOFDREF;
-
-        // error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT,
-        //    (struct mbuf *)0, nam, (struct mbuf *)0);
-        error = tcp_usrreq (so, PRU_ACCEPT,
-            (struct mbuf *)0, nam, (struct mbuf *)0);
-
-        splx(s);
-        return (error);
-}
-#endif
 
 /*
  * Strip out IP options, at higher
