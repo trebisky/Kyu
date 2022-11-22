@@ -51,6 +51,8 @@ tcp_rcv ( struct netbuf *nbp )
 	//netbuf_free ( nbp );
 }
 
+#ifdef notHERE
+/* moved to tcp_bsd/test.c 11-21-2022 */
 void xtest_show ( long );
 
 /* XXX - stolen from tcp_xinu, needs rework */
@@ -73,5 +75,6 @@ xtest_show ( long xxx )
 {
 	printf ( "TCP show -- sorry, not ready yet\n" );
 }
+#endif
 
 /* THE END */

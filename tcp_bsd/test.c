@@ -9,11 +9,100 @@
 // gets us htonl and such
 #include <kyu.h>
 #include <thread.h>
+#include <tests.h>
 
-extern struct protosw tcp_proto;
+void tcb_show ( void );
+
+void bsd_test_show ( long );
+void bsd_test_server ( long );
+void bsd_test_connect ( long );
+
+/* XXX - stolen from tcp_xinu, needs rework */
+/* Exported to main test code */
+/* Arguments are now ignored */
+struct test tcp_test_list[] = {
+        bsd_test_show,          "Show TCB table",                       0,
+        bsd_test_server,        "Start pirate server",                  0,
+	bsd_test_connect,	"Connect test",				0,
+#ifdef notdef
+        xtest_client_echo,      "Echo client [n]",                      0,
+        xtest_client_echo2,     "Echo client (single connection) [n]",  0,
+        xtest_client_daytime,   "Daytime client [n]",                   0,
+        xtest_server_daytime,   "Start daytime server",                 0,
+        xtest_server_classic,   "Start classic server",                 0,
+#endif
+        0,                      0,                                      0
+};
+
+void
+bsd_test_show ( long xxx )
+{
+	tcb_show ();
+}
+
+/* For debugging */
+void
+tcb_show ( void )
+{
+        struct inpcb *inp;
+
+        inp = &tcb;
+        while ( inp->inp_next != &tcb ) {
+            inp = inp->inp_next;
+            printf ( "INPCB: %08x -- local, foreign: %s %d .. %s %d\n", inp,
+                ip2str32(inp->inp_laddr.s_addr),
+                ntohs(inp->inp_lport),
+                ip2str32(inp->inp_faddr.s_addr),
+                ntohs(inp->inp_fport) );
+        }
+}
+
+/* ============================ */
 
 static void bind_test ( int );
-void tcb_show ( void );
+
+void
+server_thread ( long xxx )
+{
+	bind_test ( 111 );
+}
+
+void
+bsd_test_server ( long xxx )
+{
+	(void) safe_thr_new ( "tcp-server", server_thread, (void *) 0, 15, 0 );
+}
+
+/* ============================ */
+
+static void connect_test ( char *, int );
+
+void
+client_thread ( long xxx )
+{
+	// int port = 13;
+	// int port = 2345;
+	int port = 111;
+
+	// char *host = "192.168.0.6";
+	char *host = "127.0.0.1";
+
+	connect_test ( host, port );
+}
+
+void
+bsd_test_connect ( long xxx )
+{
+	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
+}
+
+/* ================================================================================ */
+/* ================================================================================ */
+/* ================================================================================ */
+/* ================================================================================ */
+/* ================================================================================ */
+
+extern struct protosw tcp_proto;
 
 struct socket *tcp_bind ( int );
 struct socket *tcp_accept ( struct socket * );
@@ -29,55 +118,39 @@ void sbdrop ( struct sockbuf *, int );
 void socantrcvmore ( struct socket * );
 void socantsendmore ( struct socket * );
 
-void bsd_server_test ( void );
 void bsd_client_test ( void );
 
 /* Called from user.c at the end of Kyu initialization.
+ * (old way -- before menu above)
  */
 void
 tcp_test_hook ( void )
 {
 	printf ( "TCP test hook\n" );
 
-	bsd_server_test ();
+	// bsd_server_test ();
 
-	thr_delay ( 3000 );
+	// thr_delay ( 3000 );
 
-	bsd_client_test ();
+	// bsd_client_test ();
 }
 
 /* ----------------------------- */
 /* ----------------------------- */
 
 void
-client_thread ( long xxx )
+connect_test ( char *host, int port )
 {
 	struct socket *so;
 
-	printf ( "Start connect to %s (%d)\n", "192.168.0.5", 13 );
-	so = tcp_connect ( "192.168.0.5", 13 );
+	printf ( "Start connect to %s (%d)\n", host, port );
+	so = tcp_connect ( host, port );
 	printf ( "Connect returns: %08x\n", so );
+
 	(void) soclose ( so );
-}
+	printf ( "Connect closed and finished\n" );
 
-void
-bsd_client_test ( void )
-{
-	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
-}
-
-void
-server_thread ( long xxx )
-{
-	bind_test ( 111 );
-}
-
-/* currently called during initialization.
- */
-void
-bsd_server_test ( void )
-{
-	(void) safe_thr_new ( "tcp-server", server_thread, (void *) 0, 15, 0 );
+	printf ( "TCP connect test finished\n" );
 }
 
 static void
@@ -117,7 +190,11 @@ bind_test ( int port )
 	}
 }
 
+/* ========================================================================= */
+/* ========================================================================= */
+/* ========================================================================= */
 
+/* below here belongs someplace else */
 
 /*
  * Must be called at splnet...

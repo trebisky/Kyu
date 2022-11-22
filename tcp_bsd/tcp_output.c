@@ -35,37 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/errno.h>
-
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#define	TCPOUTFLAGS
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_debug.h>
-
-#include <mbuf.h>
-#endif
-
 /* -- tjt -- moved here from tcp_fsm.h
  * Flags used when sending segments in tcp_output.
  * Basic flags (TH_RST,TH_ACK,TH_SYN,TH_FIN) are totally
@@ -101,6 +70,7 @@ tcp_output(tp)
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
 
+	printf ( "-tcp_output\n" );
 	/*
 	 * Determine length of data that should be transmitted,
 	 * and flags that will be used.
@@ -115,6 +85,7 @@ tcp_output(tp)
 		 * slow start to get ack "clock" running again.
 		 */
 		tp->snd_cwnd = tp->t_maxseg;
+
 again:
 	sendalot = 0;
 	off = tp->snd_nxt - tp->snd_una;
@@ -490,6 +461,8 @@ send:
 	if (len + optlen)
 		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
 		    optlen + len));
+
+	// XXX
 	// ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
 	ti->ti_sum = tcp_cksum(m, (int)(hdrlen + len));
 
@@ -558,23 +531,25 @@ send:
 	 * the template, but need a way to checksum without them.
 	 */
 	m->m_pkthdr.len = hdrlen + len;
-#ifdef notdef /* TUBA */
-	if (tp->t_tuba_pcb)
-		error = tuba_output(m, tp);
-	else
-#endif
-    {
+
 	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
 	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
 	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
-#if BSD >= 43
-	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    so->so_options & SO_DONTROUTE, 0);
-#else
-	error = ip_output(m, (struct mbuf *)0, &tp->t_inpcb->inp_route, 
-	    so->so_options & SO_DONTROUTE);
-#endif
-    }
+
+	// XXX - Don't we need to redo this if we are
+	//   fooling with ttl and tos in the IP header ?
+	// Apparenly not and it is the WRONG thing to do.
+	// ti->ti_sum = tcp_cksum(m, (int)(hdrlen + len));
+	// I tried this and everything stopped working due to
+	// a wrong checksum, so I don't understand and need
+	// to learn some things.
+
+	printf ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
+
+	error = ip_output ( m, tp->t_inpcb->inp_options,
+	    &tp->t_inpcb->inp_route,
+	    so->so_options & SO_DONTROUTE, 0 );
+
 	if (error) {
 out:
 		if (error == ENOBUFS) {

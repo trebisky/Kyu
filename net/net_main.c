@@ -35,6 +35,8 @@ u32 cholla_ip = 0x3464c480;	/* cholla: 128.196.100.52 */
 /* Best if this is a linux machine that can run Wireshark */
 u32 test_ip = 0xC0A80005;	/* trona: 192.168.0.5 */
 
+u32 loopback_ip;
+
 static unsigned char broad[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 static void slow_net ( long );
@@ -131,6 +133,10 @@ host_info_init ( void )
 	net_addr_get ( host_info.our_mac );
 	init_ephem_port ();
 
+	(void) net_dots ( "127.0.0.1", &loopback_ip );
+
+	/* Hopefully this gets overwritten by DHCP
+	 */
 	// (void) net_dots ( "192.168.0.11", &host_info.my_ip );	/* bbb */
 	(void) net_dots ( "192.168.0.61", &host_info.my_ip );		/* orange_pi */
 	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
@@ -313,6 +319,31 @@ net_rcv_noint ( struct netbuf *nbp )
 	sem_unblock ( inq_sem );
 }
 #endif
+
+/* The above, reinstated 11-21-2022 to support
+ * the loopback interface.  We want to put a packet into
+ * the IP queue, but are not running at interrupt level.
+ */
+void
+net_rcv_noint ( struct netbuf *nbp )
+{
+	nbp->next = (struct netbuf *) 0;
+
+	INT_lock;
+    	if ( inq_tail ) {
+	    inq_tail->next = nbp;
+	    inq_tail = nbp;
+	} else {
+	    inq_tail = nbp;
+	    inq_head = nbp;
+	}
+	INT_unlock;
+
+	/*
+	cpu_signal ( inq_sem );
+	*/
+	sem_unblock ( inq_sem );
+}
 
 /* Called from interrupt level to place a
  * packet on input queue and awaken handler thread.

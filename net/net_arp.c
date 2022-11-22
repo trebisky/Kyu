@@ -249,9 +249,10 @@ ip_arp_send ( struct netbuf *nbp )
 	}
 
 	/*  XXX - here is the sum total of our IP routing.
-	 * maybe this should be going to the gateway.
+	 *  Anything not on our local net goes to the getway
 	 */
 	if ( (dest_ip & host_info.net_mask) != host_info.my_net ) {
+	    printf ( "Route to gateway -- %08x %08x\n", dest_ip, host_info.my_net );
 	    dest_ip = host_info.gate_ip;
 	}
 

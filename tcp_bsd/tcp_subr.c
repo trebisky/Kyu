@@ -103,9 +103,9 @@ tcp_template(tp)
 	struct tcpcb *tp;
 {
 	register struct inpcb *inp = tp->t_inpcb;
+	register struct tcpiphdr *n;
 // KYU
 //	register struct mbuf *m;
-	register struct tcpiphdr *n;
 
 #ifdef KYU
 	if ((n = tp->t_template) == 0) {
@@ -127,6 +127,7 @@ tcp_template(tp)
 	n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
 	n->ti_src = inp->inp_laddr;
 	n->ti_dst = inp->inp_faddr;
+	printf ( "TCP template sets dst to %08x\n", n->ti_dst );
 	n->ti_sport = inp->inp_lport;
 	n->ti_dport = inp->inp_fport;
 	n->ti_seq = 0;
@@ -165,6 +166,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	int win = 0;
 	struct route *ro = 0;
 
+	printf ( "TCP respond\n" );
 	if (tp) {
 		win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
 		ro = &tp->t_inpcb->inp_route;
@@ -218,7 +220,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	ti->ti_sum = tcp_cksum(m, tlen);
 	((struct ip *)ti)->ip_len = tlen;
 	((struct ip *)ti)->ip_ttl = ip_defttl;
-	printf ( "TCP respond\n" );
+	printf ( "TCP respond send %d\n", tlen );
 	(void) ip_output(m, NULL, ro, 0, NULL);
 }
 

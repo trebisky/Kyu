@@ -231,8 +231,10 @@ tcp_usrreq(so, req, m, nam, control)
 		tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
 		tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
 		printf ( "Tconnect 4\n" );
+
 		tcp_sendseqinit(tp);
 		error = tcp_output(tp);
+
 		printf ( "Tconnect 5\n" );
 		break;
 

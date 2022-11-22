@@ -117,7 +117,7 @@ bsd_init ( void )
 	}
 
 	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
-	(void) thr_new_repeat ( "tcp-rpt", tcp_timer_func, (void *) 0, 13, 0, 100 );
+	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, 13, 0, 100 );
 }
 
 static int fast_count = 0;
@@ -285,7 +285,6 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         int size = 0;
 	char *buf;
 
-#ifdef notdef
 	printf ( "TCP(bsd): ip_output\n" );
 	printf ( " ip_output A = %08x\n", A );
 	printf ( " ip_output B = %08x\n", B );
@@ -294,6 +293,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 	printf ( " ip_output O = %08x\n", O );
 	mbuf_show ( A, "ip_output" );
 	dump_buf ( (char *) A, 128 );
+#ifdef notdef
 #endif
 
         nbp = netbuf_alloc ();
@@ -331,6 +331,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 
 	ipp = nbp->iptr;
 
+	printf ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
 	// Hand it to the Kyu IP layer
         ip_send ( nbp, ipp->dst );
 

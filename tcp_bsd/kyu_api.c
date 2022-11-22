@@ -44,7 +44,9 @@ tcp_connect ( char *name, int port )
         myaddr.sin_family = AF_INET;
 
         /* oddly enough these go in network order */
-        myaddr.sin_addr.s_addr = htonl(server_ip);
+	/* (and net_dots() returns network order) */
+        // myaddr.sin_addr.s_addr = htonl(server_ip);
+        myaddr.sin_addr.s_addr = server_ip;
         myaddr.sin_port = htons(port);
 
 	/* This allocates an mbuf and copies the
@@ -256,24 +258,6 @@ tcp_accept ( struct socket *so )
 	// in_setpeeraddr(inp, nam);
 
 	return rso;
-}
-
-
-/* For debugging */
-void
-tcb_show ( void )
-{
-        struct inpcb *inp;
-
-        inp = &tcb;
-        while ( inp->inp_next != &tcb ) {
-            inp = inp->inp_next;
-            printf ( "INPCB: %08x -- lport: %d .. %s %d\n", inp,
-                ntohs(inp->inp_lport),
-                // ip2str32(ntohl(inp->inp_faddr.s_addr)),
-                ip2str32(inp->inp_faddr.s_addr),
-                ntohs(inp->inp_fport) );
-        }
 }
 
 /* THE END */

@@ -21,14 +21,40 @@
 
 extern struct host_info host_info;
 
+extern u32 loopback_ip;
+
+static char *
+proto_name ( int proto )
+{
+	static char buf[8];
+
+	if ( proto == IPPROTO_ICMP )
+	    return "icmp";
+	if ( proto == IPPROTO_UDP )
+	    return "udp";
+	if ( proto == IPPROTO_TCP )
+	    return "tcp";
+	sprintf ( buf, "%d", proto );
+	return buf;
+}
+
+/* Called for every packet with our mac address and with ether type IP
+ */
 void
 ip_rcv ( struct netbuf *nbp )
 {
 	struct ip_hdr *ipp;
 	int cksum;
 
-	cksum = in_cksum ( nbp->iptr, sizeof(struct ip_hdr) );
 	ipp = nbp->iptr;
+	cksum = in_cksum ( nbp->iptr, sizeof(struct ip_hdr) );
+
+	printf ( "ip_rcv - packet from %s (%d) proto = %s, sum= %04x\n",
+	    ip2str32 ( ipp->src ), nbp->ilen, proto_name(ipp->proto), cksum );
+	dump_buf ( nbp->eptr, 64 );
+
+	// cksum = in_cksum ( nbp->iptr, sizeof(struct ip_hdr) );
+	// ipp = nbp->iptr;
 
 	if ( cksum ) {
 	    printf ( "bad IP packet from %s (%d) proto = %d, sum= %04x\n",
@@ -37,6 +63,9 @@ ip_rcv ( struct netbuf *nbp )
 	    return;
 	}
 
+	/* We aren't handling fragmented IP packets.
+	 * I feel sort of guilty, but we skipped this "for now"
+	 */
 	if ( ipp->offset & IP_OFFMASK_SWAP ) {
 	    printf ( "Fragmented (%04x) IP packet from %s (%d) proto = %d, sum= %04x\n",
 		    ipp->offset, ip2str32 ( ipp->src ), nbp->ilen, ipp->proto, cksum );
@@ -140,6 +169,12 @@ void
 ip_send ( struct netbuf *nbp, u32 dest_ip )
 {
 	struct ip_hdr *ipp;
+
+	if ( dest_ip == loopback_ip ) {
+	    printf ( "Sending IP packet to loopback\n" );
+	    net_rcv_noint ( nbp );
+	    return;
+	}
 
 	// changed for Xinu TCP
 	// ipp = (struct ip_hdr *) nbp->iptr;

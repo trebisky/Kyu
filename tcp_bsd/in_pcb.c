@@ -328,6 +328,7 @@ in_pcbconnect (inp, nam)
 		inp->inp_laddr = ifaddr->sin_addr;
 	}
 
+	printf ( "---------------- Set inp_faddr to %08x (in pcb_connect)\n", inp->inp_faddr );
 	inp->inp_faddr = sin->sin_addr;
 	inp->inp_fport = sin->sin_port;
 	printf ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );

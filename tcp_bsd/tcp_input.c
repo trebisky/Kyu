@@ -35,38 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/errno.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_debug.h>
-
-#include <mbuf.h>
-#endif
-
 int	tcprexmtthresh = 3;
 struct	tcpiphdr tcp_saveti;
 struct	inpcb *tcp_last_inpcb = &tcb;
@@ -275,9 +243,12 @@ tcp_input(m, iphlen)
 	printf ( "tcp_input 1 %08x, %d\n", ti, len );
 
 	// if (ti->ti_sum = in_cksum(m, len)) {
-	if (ti->ti_sum = tcp_cksum(m, len)) {
+	// if (ti->ti_sum = tcp_cksum(m, len)) {
+	ti->ti_sum = tcp_cksum(m, len);
+	printf ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
+	if ( ti->ti_sum ) {
 		tcpstat.tcps_rcvbadsum++;
-		printf ( "tcp_input 2, sum = %d\n", ti->ti_sum );
+		printf ( " *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
 		// dump_buf ( (char *) ti, len );
 		goto drop;
 	}

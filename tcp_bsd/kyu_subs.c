@@ -46,28 +46,6 @@
 
 /* global variables */
 
-#ifdef notdef
-/* For malloc/free */
-int mbtypes[] = {                               /* from mbuf.h */
-        M_FREE,         /* MT_FREE      0          should be on free list */
-        M_MBUF,         /* MT_DATA      1          dynamic (data) allocation */
-        M_MBUF,         /* MT_HEADER    2          packet header */
-        M_SOCKET,       /* MT_SOCKET    3          socket structure */
-        M_PCB,          /* MT_PCB       4          protocol control block */
-        M_RTABLE,       /* MT_RTABLE    5          routing tables */
-        M_HTABLE,       /* MT_HTABLE    6          IMP host tables */
-        0,              /* MT_ATABLE    7          address resolution tables */
-        M_MBUF,         /* MT_SONAME    8          socket name */
-        0,              /*              9 */
-        M_SOOPTS,       /* MT_SOOPTS    10         socket options */
-        M_FTABLE,       /* MT_FTABLE    11         fragment reassembly header */
-        M_MBUF,         /* MT_RIGHTS    12         access rights */
-        M_IFADDR,       /* MT_IFADDR    13         interface address */
-        M_MBUF,         /* MT_CONTROL   14         extra-data protocol message */
-        M_MBUF,         /* MT_OOBDATA   15         expedited data  */
-};
-#endif
-
 struct  mbstat mbstat;		/* mbuf.h */
 // union   mcluster *mclfree;
 int max_linkhdr;		/* mbuf.h */
@@ -127,7 +105,7 @@ ifaddr_setup ( void )
 
 	sp = & our_ifaddr.ia_addr;
 	sp->sin_family = AF_INET;
-	sp->sin_addr.s_addr = get_our_ip();	/* in net order */
+	sp->sin_addr.s_addr = ntohl(get_our_ip());	/* order */
 	sp->sin_len = sizeof(struct in_addr);
 
         in_ifaddr_head = &our_ifaddr;
