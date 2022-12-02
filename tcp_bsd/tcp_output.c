@@ -70,7 +70,7 @@ tcp_output(tp)
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
 
-	printf ( "-tcp_output\n" );
+	bpf2 ( "-tcp_output\n" );
 	/*
 	 * Determine length of data that should be transmitted,
 	 * and flags that will be used.
@@ -462,7 +462,25 @@ send:
 		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
 		    optlen + len));
 
-	// XXX
+	// Here is a gross hack XXX
+	// tjt  11-22-2022
+	// This should get done in tcp_template() in tcp_subr.c
+	// but that has a bug right now.
+	// We need to get this right before checksum calculation.
+	if ( ! ti->ti_src.s_addr )
+	    ti->ti_src.s_addr = htonl ( get_our_ip () );
+
+#ifdef notdef
+	{
+	    struct	in_addr laddr;	/* local host table entry */
+
+	    laddr.s_addr = htonl ( get_our_ip () );
+
+	    if ( ! ti->ti_src.s_addr )
+		ti->ti_src = laddr;
+	}
+#endif
+
 	// ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
 	ti->ti_sum = tcp_cksum(m, (int)(hdrlen + len));
 
@@ -532,19 +550,25 @@ send:
 	 */
 	m->m_pkthdr.len = hdrlen + len;
 
+	/* This is going in in host byte order,
+	 * but the checksum was done in network byte order
+	 * (as it should have been).  Why put this in again?
+	 * and why put it in in the wrong order?
+	 * Whatever the case, Kyu replaces it with the
+	 * correct length and in network order, so no worry.
+	 */
 	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
+
 	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
 	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
 
-	// XXX - Don't we need to redo this if we are
-	//   fooling with ttl and tos in the IP header ?
-	// Apparenly not and it is the WRONG thing to do.
-	// ti->ti_sum = tcp_cksum(m, (int)(hdrlen + len));
-	// I tried this and everything stopped working due to
-	// a wrong checksum, so I don't understand and need
-	// to learn some things.
+	bpf2 ( " =========================== TCP output send %d\n", hdrlen+len );
+	bpf2 ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
 
-	printf ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
+	printf ( "tcp_output -- IP header ...\n" );
+	dump_buf ( (char *) ti, 20 );
+
+	tcp_show_pkt ( m, "tcp_output" );
 
 	error = ip_output ( m, tp->t_inpcb->inp_options,
 	    &tp->t_inpcb->inp_route,

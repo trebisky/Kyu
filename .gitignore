@@ -35,3 +35,5 @@ kyu.lds
 ./Makefile
 ./Makefile.inc
 Zsizes
+bsd
+bsd_tcp

@@ -101,10 +101,10 @@ in_pcbbind(inp, nam)
 	int error;
 
 #ifdef notdef
-	printf ( "in_pcbbind 1\n" );
+	bpf3 ( "in_pcbbind 1\n" );
 	sin = mtod(nam, struct sockaddr_in *);
-	printf ( "  lport = %d\n", sin->sin_port );
-	printf ( "  addr = %08x\n", sin->sin_addr.s_addr );
+	bpf3 ( "  lport = %d\n", sin->sin_port );
+	bpf3 ( "  addr = %08x\n", sin->sin_addr.s_addr );
 #endif
 
 #ifndef KYU
@@ -112,12 +112,12 @@ in_pcbbind(inp, nam)
 		return (EADDRNOTAVAIL);
 #endif
 
-	// printf ( "in_pcbbind 2\n" );
+	// bpf3 ( "in_pcbbind 2\n" );
 
 	if (inp->inp_lport || inp->inp_laddr.s_addr != INADDR_ANY)
 		return (EINVAL);
 
-	// printf ( "in_pcbbind 3\n" );
+	// bpf3 ( "in_pcbbind 3\n" );
 
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
@@ -196,14 +196,14 @@ in_pcbconnect (inp, nam)
 	struct sockaddr_in *ifaddr;
 	register struct sockaddr_in *sin = mtod(nam, struct sockaddr_in *);
 
-	printf ( "in_pcbconnect 0\n" );
+	bpf3 ( "in_pcbconnect 0\n" );
 	if (nam->m_len != sizeof (*sin))
 		return (EINVAL);
 	if (sin->sin_family != AF_INET)
 		return (EAFNOSUPPORT);
 	if (sin->sin_port == 0)
 		return (EADDRNOTAVAIL);
-	printf ( "in_pcbconnect 1\n" );
+	bpf3 ( "in_pcbconnect 1\n" );
 
 	/* Do we have configured interfaces?
 	 */
@@ -265,7 +265,7 @@ in_pcbconnect (inp, nam)
 		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 			ia = ifatoia(ro->ro_rt->rt_ifa);
 #endif
-	printf ( "in_pcbconnect 2\n" );
+	bpf3 ( "in_pcbconnect 2\n" );
 
 		/* Always 0 for Kyu */
 		if (ia == 0) {
@@ -285,7 +285,7 @@ in_pcbconnect (inp, nam)
 			if (ia == 0)
 				return (EADDRNOTAVAIL);
 		}
-	printf ( "in_pcbconnect 3\n" );
+	bpf3 ( "in_pcbconnect 3\n" );
 
 #ifdef MULTICAST_STUFF
 		/*
@@ -312,7 +312,7 @@ in_pcbconnect (inp, nam)
 		ifaddr = (struct sockaddr_in *)&ia->ia_addr;
 	}
 
-	printf ( "in_pcbconnect 4\n" );
+	bpf3 ( "in_pcbconnect 4\n" );
 
 	if (in_pcblookup(inp->inp_head,
 	    sin->sin_addr,
@@ -328,11 +328,13 @@ in_pcbconnect (inp, nam)
 		inp->inp_laddr = ifaddr->sin_addr;
 	}
 
-	printf ( "---------------- Set inp_faddr to %08x (in pcb_connect)\n", inp->inp_faddr );
+	bpf2 ( "---------------- Set inp_faddr to %08x (in pcb_connect)\n", inp->inp_faddr );
+
 	inp->inp_faddr = sin->sin_addr;
 	inp->inp_fport = sin->sin_port;
-	printf ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );
-	printf ( "in_pcbconnect 5l %08x, %d\n", inp->inp_laddr, inp->inp_lport );
+
+	bpf2 ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );
+	bpf2 ( "in_pcbconnect 5l %08x, %d\n", inp->inp_laddr, inp->inp_lport );
 	return (0);
 }
 
@@ -534,10 +536,10 @@ in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
 	 * in network bytes order!
 	 */
 #ifdef notdef
-	printf ( "in_pcblookup 0, %08x\n", head );
-	printf ( "in_pcblookup src = %08x, %d %08x (%d)\n", faddr.s_addr, fport_arg, fport_arg, ntohs(fport_arg) );
-	printf ( "in_pcblookup local = %08x, %d %08x (%d)\n", laddr.s_addr, lport_arg, lport_arg, ntohs(lport_arg) );
-	printf ( "in_pcblookup flags = %d\n", flags );
+	bpf3 ( "in_pcblookup 0, %08x\n", head );
+	bpf3 ( "in_pcblookup src = %08x, %d %08x (%d)\n", faddr.s_addr, fport_arg, fport_arg, ntohs(fport_arg) );
+	bpf3 ( "in_pcblookup local = %08x, %d %08x (%d)\n", laddr.s_addr, lport_arg, lport_arg, ntohs(lport_arg) );
+	bpf3 ( "in_pcblookup flags = %d\n", flags );
 #endif
 
 	for (inp = head->inp_next; inp != head; inp = inp->inp_next) {

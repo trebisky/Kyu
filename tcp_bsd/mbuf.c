@@ -7,158 +7,11 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include "kyu.h"
-
-// #include <sys/mbuf.h>
-
-// For MCLBYTES
-#include <sys/param.h>
-#include <sys/types.h>
-
-// for min
-#include <sys/systm.h>
-
-// for struct socket
-#include <sys/socketvar.h>
-// for struct inpcb
-#include <sys/socket.h>
-#include <net/route.h>
-#include <net/if.h>
-#include <in.h>
-#include <in_systm.h>
-#include <ip.h>
-#include <in_pcb.h>
-// for tcpcb
-#include <ip_var.h>
-#include <tcp.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-
-#include "mbuf.h"
-#endif
-
-/* ------------------ */
-
-#ifdef notdef
-#include "thread.h"
-#include "../net/net.h"		/* Kyu */
-#include "../net/kyu_tcp.h"
-
-#include <sys/param.h>
-// #include <sys/systm.h>
-#include <sys/socket.h>
-// #include <sys/socketvar.h>
-// #include <sys/protosw.h>
-// #include <sys/errno.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <in.h>
-#include <in_systm.h>
-#include <ip.h>
-#include <in_pcb.h>
-#include <ip_var.h>
-
-#include <tcp.h>
-#include <tcp_seq.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-#include <tcp_debug.h>
-#endif
-
-#ifdef notdef
-#define	MSIZE		128		/* XXX */
-#define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
-#define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
-#define	MINCLSIZE	(MHLEN + MLEN)	/* smallest amount to put in cluster */
-
-/* header at beginning of each mbuf: */
-struct m_hdr {		/* 20 bytes */
-	struct	mbuf *mh_next;		/* next buffer in chain */
-	struct	mbuf *mh_nextpkt;	/* next chain in queue/record */
-	int	mh_len;			/* amount of data in this mbuf */
-	caddr_t	mh_data;		/* location of data */
-	short	mh_type;		/* type of data in this mbuf */
-	short	mh_flags;		/* flags; see below */
-};
-
-/* record/packet header in first mbuf of chain; valid if M_PKTHDR set */
-struct	pkthdr {
-	int	len;		/* total packet length */
-	struct	ifnet *rcvif;	/* rcv interface */
-};
-
-/* description of external storage mapped into mbuf, valid if M_EXT set */
-struct m_ext {
-	caddr_t	ext_buf;		/* start of buffer */
-	void	(*ext_free)();		/* free routine if not the usual */
-	unsigned int	ext_size;	/* size of buffer, for ext_free */
-};
-
-struct mbuf {
-	struct	m_hdr m_hdr;
-	union {
-		struct {
-			struct	pkthdr MH_pkthdr;	/* M_PKTHDR set */
-			union {
-				struct	m_ext MH_ext;	/* M_EXT set */
-				char	MH_databuf[MHLEN];
-			} MH_dat;
-		} MH;
-		char	M_databuf[MLEN];		/* !M_PKTHDR, !M_EXT */
-	} M_dat;
-};
-
-#define	m_next		m_hdr.mh_next
-#define	m_nextpkt	m_hdr.mh_nextpkt
-#define	m_act		m_nextpkt
-#define	m_len		m_hdr.mh_len
-#define	m_data		m_hdr.mh_data
-#define	m_type		m_hdr.mh_type
-#define	m_flags		m_hdr.mh_flags
-
-#define	m_pkthdr	M_dat.MH.MH_pkthdr
-#define	m_ext		M_dat.MH.MH_dat.MH_ext
-#define	m_pktdat	M_dat.MH.MH_dat.MH_databuf
-#define	m_dat		M_dat.M_databuf
-
-/* mbuf flags */
-#define	M_EXT		0x0001	/* has associated external storage */
-#define	M_PKTHDR	0x0002	/* start of record */
-#define	M_EOR		0x0004	/* end of record */
-
-/* mbuf pkthdr flags, also in m_flags */
-#define	M_BCAST		0x0100	/* send/received as link-level broadcast */
-#define	M_MCAST		0x0200	/* send/received as link-level multicast */
-
-/* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST)
-
-/* mbuf types */
-#define	MT_FREE		0	/* should be on free list */
-#define	MT_DATA		1	/* dynamic (data) allocation */
-#define	MT_HEADER	2	/* packet header */
-#define	MT_SOCKET	3	/* socket structure */
-#define	MT_PCB		4	/* protocol control block */
-#define	MT_RTABLE	5	/* routing tables */
-#define	MT_HTABLE	6	/* IMP host tables */
-#define	MT_ATABLE	7	/* address resolution tables */
-#define	MT_SONAME	8	/* socket name */
-#define	MT_SOOPTS	10	/* socket options */
-#define	MT_FTABLE	11	/* fragment reassembly header */
-#define	MT_RIGHTS	12	/* access rights */
-#define	MT_IFADDR	13	/* interface address */
-#define MT_CONTROL	14	/* extra-data protocol message */
-#define MT_OOBDATA	15	/* expedited data  */
-
-#define mtod(m,t)	((t)((m)->m_data))
-#endif
-
-extern int max_linkhdr;
+/* See mbuf.h */
+int max_linkhdr;
+int max_protohdr;
+int max_hdr;
+// int max_datalen;
 
 void mb_clget ( struct mbuf * );
 
@@ -198,7 +51,7 @@ k_mbuf_alloc ( void )
 	}
 
 	rv = kyu_malloc ( MSIZE );	/* 128 */
-	printf ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
+	bpf3 ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
 	memset ( rv, 0xab, MSIZE );
 	return rv;
 }
@@ -233,7 +86,7 @@ k_sock_alloc ( void )
 	}
 
 	rv = kyu_malloc ( n );
-	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
+	bpf3 ( "kyu_sock_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
 	return rv;
 }
@@ -260,7 +113,7 @@ k_inpcb_alloc ( void )
 	}
 
 	rv = kyu_malloc ( n );
-	printf ( "kyu_inpcb_alloc: %d %08x\n", n, rv );
+	bpf3 ( "kyu_inpcb_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
 	return rv;
 }
@@ -287,7 +140,7 @@ k_tcpcb_alloc ( void )
 	}
 
 	rv = kyu_malloc ( n );
-	printf ( "kyu_tcpcb_alloc: %d %08x\n", n, rv );
+	bpf3 ( "kyu_tcpcb_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
 	return rv;
 }
@@ -399,6 +252,9 @@ mbuf_show ( struct mbuf *mp, char *msg )
 {
 	int off;
 
+	if ( ! bpf_debug ( 3 ) )
+	    return;
+
 	printf ( "mbuf_show (%s): %08x\n", msg, mp );
 	printf ( " size(hdr): %d\n", sizeof(struct m_hdr) );
 	printf ( " size(int): %d\n", sizeof(int) );
@@ -426,6 +282,35 @@ mb_init ( void )
 	struct mbuf *m;
 
 	mb_cl_init ();
+
+	/* The following stuff is all about leaving space at the start
+	 * of an mbuf for link (i.e. ethernet) and protocol headers
+	 * to avoid copies.  Given the way we handle things under Kyu,
+	 * I think these could all be zero.
+	 */
+	/* From netiso/tuba_subr.c */
+	/* 80 bytes ! */
+	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
+	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
+
+	/* Enough room for ethernet header */
+	max_linkhdr = 16;
+
+	/* From kern/uipc_domain.c */
+	max_protohdr = TUBAHDRSIZE;
+
+	/* This may sometimes be used to leave space at the start of an mbuf
+	 * for an ethernet header to be prepended, avoiding a copy to move
+	 * the packet data.
+	 */
+	max_hdr = max_linkhdr + max_protohdr;
+
+	/* MHLEN is defined in mbuf.h */
+	// Never used
+	// max_datalen = MHLEN - max_hdr;
+
+	/* maximum chars per socket buffer, from socketvar.h */
+	// sb_max = SB_MAX;
 
 	/* More of a diagnostic than anything else */
 	m = mb_get ( MT_DATA );
@@ -535,10 +420,14 @@ mb_devget ( char *buf, int totlen, int off0,
 	struct ifnet *ifp, void (*copy)()  )
 {
 	struct mbuf *m;
-	struct mbuf *top = 0, **mp = &top;
-	int off = off0, len;
+	struct mbuf *top = 0;
+	struct mbuf **mp;
+	int off = off0;
+	int len;
 	char *cp;
 	char *epkt;
+
+	mp = &top;
 
 	cp = buf;
 	epkt = cp + totlen;
@@ -549,6 +438,7 @@ mb_devget ( char *buf, int totlen, int off0,
 
 	// MGETHDR(m, M_DONTWAIT, MT_DATA);
 	m = mb_gethdr ( MT_DATA );
+	// mbuf_game ( m, "mb_devget 1" );
 
 	if (m == 0)
 		return (0);
@@ -561,6 +451,7 @@ mb_devget ( char *buf, int totlen, int off0,
 		if (top) {
 			// MGET(m, M_DONTWAIT, MT_DATA);
 			m = mb_get ( MT_DATA );
+			// mbuf_game ( m, "mb_devget 2" );
 			if (m == 0) {
 				// m_freem(top);
 				mb_freem(top);
@@ -568,10 +459,12 @@ mb_devget ( char *buf, int totlen, int off0,
 			}
 			m->m_len = MLEN;
 		}
+
 		len = min(totlen, epkt - cp);
 		if (len >= MINCLSIZE) {
 			// MCLGET(m, M_DONTWAIT);
 			mb_clget ( m );
+			// mbuf_game ( m, "mb_devget 2b" );
 
 			/* ?? won't this always be true? */
 			if (m->m_flags & M_EXT)
@@ -603,6 +496,7 @@ mb_devget ( char *buf, int totlen, int off0,
 			cp = buf;
 	}
 
+	// mbuf_game ( top, "mb_devget 3" );
 	return (top);
 }
 

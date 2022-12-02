@@ -64,8 +64,11 @@ static int net_state;
 
 struct host_info host_info;
 
+/* queue of IP packets
+ */
 static struct netbuf *inq_head;
 static struct netbuf *inq_tail;
+static int inq_count;
 
 static struct sem *inq_sem;
 /*
@@ -212,6 +215,7 @@ net_init ( void )
 
     inq_head = (struct netbuf *) 0;
     inq_tail = (struct netbuf *) 0;
+    inq_count = 0;
 
     /*
     inq_sem = cpu_new ();
@@ -337,7 +341,9 @@ net_rcv_noint ( struct netbuf *nbp )
 	    inq_tail = nbp;
 	    inq_head = nbp;
 	}
+	inq_count++;
 	INT_unlock;
+	printf ( "Packet (loopback) added to IP queue: %d\n", inq_count );
 
 	/*
 	cpu_signal ( inq_sem );
@@ -360,6 +366,7 @@ net_rcv ( struct netbuf *nbp )
 	    inq_tail = nbp;
 	    inq_head = nbp;
 	}
+	inq_count++;
 
 	cpu_signal ( inq_sem );
 	// sem_unblock ( inq_sem );
@@ -382,6 +389,7 @@ net_thread ( long xxx )
 		inq_head = nbp->next;
 		if ( ! inq_head )
 		    inq_tail = (struct netbuf *) 0;
+		inq_count--;	
 	    }
 
 	    if ( nbp ) {
@@ -504,6 +512,7 @@ net_show ( void )
 	printf ( "Gateway: %s\n", ip2str32 ( host_info.gate_ip ) );
 
 	printf ( "Packets processed: %d total (%d oddballs)\n", total_count, oddball_count );
+	printf ( "Packets in IP queue: %d\n", inq_count );
 
 	if ( num_eth ) board_net_show ();
 

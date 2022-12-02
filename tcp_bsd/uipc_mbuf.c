@@ -360,6 +360,7 @@ m_pullup(n, len)
 			n->m_flags &= ~M_PKTHDR;
 		}
 	}
+
 	space = &m->m_dat[MLEN] - (m->m_data + m->m_len);
 	do {
 		count = min(min(max(len, max_protohdr), space), n->m_len);

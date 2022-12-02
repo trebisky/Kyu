@@ -48,10 +48,6 @@
 
 struct  mbstat mbstat;		/* mbuf.h */
 // union   mcluster *mclfree;
-int max_linkhdr;		/* mbuf.h */
-int max_protohdr;		/* mbuf.h */
-int max_hdr;			/* mbuf.h */
-int max_datalen;		/* mbuf.h */
 
 /* socketvar.h */
 // u_long	sb_max;
@@ -123,20 +119,6 @@ void
 tcp_globals_init ( void )
 {
 	ifaddr_setup ();
-
-	/* From netiso/tuba_subr.c */
-	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
-	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
-
-	/* From kern/uipc_domain.c */
-	max_protohdr = TUBAHDRSIZE;
-	max_linkhdr = 16;
-	max_hdr = max_linkhdr + max_protohdr;
-	/* MHLEN is defined in mbuf.h */
-	max_datalen = MHLEN - max_hdr;
-
-	/* maximum chars per socket buffer, from socketvar.h */
-	// sb_max = SB_MAX;
 
 	bzero ( (void *) &tcb, sizeof(struct inpcb) );
 	tcb.inp_next = tcb.inp_prev = &tcb;
@@ -216,6 +198,7 @@ void free ( void )
 /* More stubs
  */
 
+#ifdef notdef
 /* tsleep/wakeup are key kernel synch facilities in BSD
  * found in kern/kern_synch.c
  * For now, let them be noops.
@@ -224,6 +207,7 @@ int tsleep ( void *ident, int priority, char *wmesg, int timo ) {}
 
 // void wakeup ( void ) { panic ( "wakeup" ); }
 void wakeup ( void ) { }
+#endif
 
 /* from net/if.c */
 /* These would scan the ifnet list looking for an interface that met

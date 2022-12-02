@@ -181,6 +181,139 @@ present:
 	return (flags);
 }
 
+/* This gets padded somehow to 16 bytes, so we add our own
+ * pad to ensure this is under our control.
+ */
+struct pseudo {
+        unsigned int dst;
+        unsigned int src;
+        unsigned short len;
+        unsigned short type;
+        unsigned short sum;
+	unsigned short pad;
+};
+
+/* Non destructive.
+ */
+static int
+ez_tcp_cksum ( struct tcpiphdr *ti )
+{
+        struct pseudo ps;
+        int rv = 0;
+        int len = ((struct ip *)ti)->ip_len;
+
+        ps.dst = ti->ti_dst.s_addr;
+        ps.src = ti->ti_src.s_addr;
+        ps.len = htons(len);
+        ps.type = htons(6);     // TCP
+        ps.sum = ((struct ip *)ti)->ip_sum;
+	ps.pad = 0;
+
+        rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
+        return in_cksum_i ( (char *) &ti->ti_t, len, rv );
+}
+
+void
+mbuf_game ( struct mbuf *m, char *msg )
+{
+	// struct mbuf *xm;
+	char *p;
+
+	printf ( " =============================================================\n" );
+	printf ( " = mbuf display ... %s\n", msg );
+
+	// xm = (struct mbuf *) 0;
+	// printf ( "XM pkthdr = %08x\n", &xm->m_pkthdr );
+	// printf ( "XM pktdat = %08x\n", xm->m_pktdat );
+
+	printf ( " mbuf at: %08x\n", m );
+	printf ( "mbuf len = %d\n", m->m_len );
+	p = mtod(m, char *);
+	printf ( " mbuf data at: %08x\n", p );
+	printf ( " mbuf flags: %x\n", m->m_flags );
+
+	// dump_buf ( (char *) m, 128 );
+	dump_buf ( (char *) m, 64 );
+	printf ( "\n" );
+
+	dump_buf ( (char *) p, m->m_len );
+
+	printf ( " =============================================================\n" );
+	// printf ( "Finished with mbuf game\n" );
+}
+
+void
+cksum_game ( struct mbuf *min, char *msg )
+{
+	struct mbuf m_local;
+	struct mbuf *m;
+	struct tcpiphdr *ti;
+	int tlen;
+	int len;
+	int sum;
+	// char *p;
+	char cmsg[64];
+
+	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
+	printf ( "Start checksum game ... %s\n", msg );
+	mbuf_game ( min, msg );
+	// p = mtod(min, char *);
+
+	m_local = *min;
+	m = &m_local;
+	if ( m->m_flags & M_PKTHDR )
+	    m->m_data = m->m_pktdat;
+	else
+	    m->m_data = m->m_dat;
+
+	strcpy ( cmsg, msg );
+	strcat ( cmsg, " (copy)" );
+
+	// printf ( " copy mbuf: %08x\n", m );
+	mbuf_game ( m, cmsg );
+	ti = mtod(m, struct tcpiphdr *);
+	// printf ( " copy mbuf data at: %08x\n", ti );
+	printf ( "\n" );
+
+	printf ( " copy mbuf data pp: %08x\n", (mtod(m, char *)) );
+	printf ( " first byte in buffer: %02x\n", *(mtod(m, char *)) );
+	printf ( " copy mbuf flags: %x\n", m->m_flags );
+	// dump_buf ( (char *) m, 128 );
+
+	printf ( "pkdata: %08x\n", m->m_pktdat );
+	printf ( "sizeof mbuf: %d\n", sizeof(struct mbuf) );
+	printf ( "sizeof m_hdr: %d\n", sizeof(struct m_hdr) );
+	printf ( "sizeof pkthdr: %d\n", sizeof(struct pkthdr) );
+	// printf ( "sizeof m_ext: %d\n", sizeof(struct m_ext) );
+
+	// printf ( "sizeof pseudo: %d\n", sizeof(struct pseudo) );
+	// return 16 (even before padding added)
+
+	// tlen = ntohs( ((struct ip *)ti)->ip_len );
+	tlen = ((struct ip *)ti)->ip_len;
+	printf ( "tlen = %04x\n", tlen );
+	len = sizeof (struct ip) + tlen;
+	printf ( "tlen, len = %d, %d\n", tlen, len );
+
+	ti->ti_next = ti->ti_prev = 0;
+	ti->ti_x1 = 0;
+	ti->ti_len = (u_short) tlen;
+	HTONS(ti->ti_len);
+
+	sum = tcp_cksum(m, len);
+	printf ( "BSD checksum = %04x\n", sum );
+
+#ifdef notdef
+	m_local = *min;
+	ti = mtod ( m, struct tcpiphdr *);
+	sum = ez_tcp_cksum ( ti );
+	printf ( "EZ checksum = %04x\n", sum );
+#endif
+
+	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
+	// printf ( "Finished with checksum game\n" );
+}
+
 /*
  * TCP input routine, follows pages 65-76 of the
  * protocol specification dated September, 1981 very closely.
@@ -208,12 +341,16 @@ tcp_input(m, iphlen)
 
 	tcpstat.tcps_rcvtotal++;
 
+	tcp_show_pkt ( m, "tcp_input" );
+	cksum_game ( m, "tcp_input" );
+	tcp_show_pkt ( m, "tcp_input" );
+
 	/*
 	 * Get IP and TCP header together in first mbuf.
 	 * Note: IP leaves IP header in first mbuf.
 	 */
 	ti = mtod(m, struct tcpiphdr *);
-	printf ( "tcp_input 0 len = %d\n", iphlen );
+	bpf3 ( "tcp_input 0 len = %d\n", iphlen );
 
 	// dumps beyond end of mbuf
 	// dump_buf ( (char *) ti, 128 );
@@ -231,6 +368,23 @@ tcp_input(m, iphlen)
 
 	/*
 	 * Checksum extended TCP header and data.
+	 *
+	 * Take note of endless trickery going on here.
+	 * The TCP checksum includes certain parts of
+	 *  the IP checksum.  References talk about using
+	 *  a "pseudo header", but nothing that is explicitly
+	 *  such is used in the code you see here.
+	 * ti_next and ti_prev zero the first 8 bytes,
+	 * Handling of len and cksum is done via an
+	 *  obscure trick.  The len field is left zero,
+	 *  but the len is set (via some name swapping in
+	 *  the tcpiphdr) in what is the checksum field.
+	 * Efficient, but confusing and even correct.
+	 * The x1 byte gets set to zero (clears tos)
+	 *  which leaves the TCP protocol value of 6 intact
+	 * So, you don't see sum explicitly get set to 0
+	 *  in what follows, but that is the price you
+	 *  pay for cleverly optimized code.
 	 */
 	tlen = ((struct ip *)ti)->ip_len;
 	len = sizeof (struct ip) + tlen;
@@ -240,20 +394,20 @@ tcp_input(m, iphlen)
 	HTONS(ti->ti_len);
 
 	// mbuf_show ( m, "tcp_input 1" );
-	printf ( "tcp_input 1 %08x, %d\n", ti, len );
+	bpf3 ( "tcp_input 1 %08x, %d\n", ti, len );
 
 	// if (ti->ti_sum = in_cksum(m, len)) {
 	// if (ti->ti_sum = tcp_cksum(m, len)) {
 	ti->ti_sum = tcp_cksum(m, len);
-	printf ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
+	bpf2 ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
 	if ( ti->ti_sum ) {
 		tcpstat.tcps_rcvbadsum++;
-		printf ( " *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
+		printf ( " *** *** *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
 		// dump_buf ( (char *) ti, len );
 		goto drop;
 	}
 
-	printf ( "tcp_input 3\n" );
+	bpf3 ( "tcp_input 3\n" );
 	/*
 	 * Check that TCP offset makes sense,
 	 * pull out TCP options and adjust length.		XXX
@@ -261,14 +415,14 @@ tcp_input(m, iphlen)
 	off = ti->ti_off << 2;
 	if (off < sizeof (struct tcphdr) || off > tlen) {
 		tcpstat.tcps_rcvbadoff++;
-		printf ( "tcp_input 4\n" );
+		bpf3 ( "tcp_input 4\n" );
 		goto drop;
 	}
-	printf ( "tcp_input 5\n" );
+	bpf3 ( "tcp_input 5\n" );
 	tlen -= off;
 	ti->ti_len = tlen;
 	if (off > sizeof (struct tcphdr)) {
-		printf ( "tcp_input 6\n" );
+		bpf3 ( "tcp_input 6\n" );
 		if (m->m_len < sizeof(struct ip) + off) {
 			if ((m = m_pullup(m, sizeof (struct ip) + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
@@ -296,7 +450,7 @@ tcp_input(m, iphlen)
 			optp = NULL;	/* we've parsed the options */
 		}
 	}
-	printf ( "tcp_input 7A\n" );
+	bpf3 ( "tcp_input 7A\n" );
 	tiflags = ti->ti_flags;
 
 	/*
@@ -327,7 +481,7 @@ findpcb:
 		++tcpstat.tcps_pcbcachemiss;
 	}
 
-	// printf ( "tcp_input 7B (%08x)\n", inp );
+	// bpf3 ( "tcp_input 7B (%08x)\n", inp );
 	// tcb_show ();
 
 	/*
@@ -346,7 +500,7 @@ findpcb:
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 	
-	printf ( "tcp_input 8\n" );
+	bpf3 ( "tcp_input 8\n" );
 
 	/* Unscale the window into a 32-bit value. */
 	if ((tiflags & TH_SYN) == 0)
@@ -1303,7 +1457,7 @@ dropafterack:
 	return;
 
 dropwithreset:
-	printf ( "tcp_input 9 (drop with reset)\n" );
+	bpf1 ( "tcp_input 9 (drop with reset)\n" );
 	/*
 	 * Generate a RST, dropping incoming segment.
 	 * Make ACK acceptable to originator of segment.
@@ -1326,7 +1480,7 @@ dropwithreset:
 	return;
 
 drop:
-	printf ( "tcp_input 10 (just drop)\n" );
+	bpf1 ( "tcp_input 10 (just drop)\n" );
 	/*
 	 * Drop space held by incoming segment and return.
 	 */

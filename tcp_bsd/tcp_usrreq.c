@@ -110,7 +110,7 @@ tcp_usrreq(so, req, m, nam, control)
 
 	s = splnet();
 	inp = sotoinpcb(so);
-	printf ( "tcp_usrreq 1: req, so, inp = %d, %08x, %08x\n", req, so, inp );
+	bpf3 ( "tcp_usrreq 1: req, so, inp = %d, %08x, %08x\n", req, so, inp );
 
 	/*
 	 * When a TCP is attached to a socket, then there will be
@@ -122,7 +122,7 @@ tcp_usrreq(so, req, m, nam, control)
 		return (EINVAL);		/* XXX */
 	}
 
-	// printf ( "tcp_usrreq 2\n" );
+	// bpf3 ( "tcp_usrreq 2\n" );
 
 	if (inp) {
 		tp = intotcpcb(inp);
@@ -142,20 +142,20 @@ tcp_usrreq(so, req, m, nam, control)
 	 * and an internet control block.
 	 */
 	case PRU_ATTACH:
-		// printf ( "tcp_usrreq 3\n" );
+		// bpf3 ( "tcp_usrreq 3\n" );
 		if (inp) {
 			error = EISCONN;
 			break;
 		}
-		// printf ( "tcp_usrreq 3b\n" );
+		// bpf3 ( "tcp_usrreq 3b\n" );
 		error = tcp_attach(so);
 		if (error)
 			break;
-		// printf ( "tcp_usrreq 4\n" );
+		// bpf3 ( "tcp_usrreq 4\n" );
 		if ((so->so_options & SO_LINGER) && so->so_linger == 0)
 			so->so_linger = TCP_LINGERTIME;
 		tp = sototcpcb(so);
-		// printf ( "tcp_usrreq 5\n" );
+		// bpf3 ( "tcp_usrreq 5\n" );
 		break;
 
 	/*
@@ -176,9 +176,9 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Give the socket an address.
 	 */
 	case PRU_BIND:
-		// printf ( "tcp_usrreq 10\n" );
+		// bpf3 ( "tcp_usrreq 10\n" );
 		error = in_pcbbind(inp, nam);
-		// printf ( "tcp_usrreq 11 %d\n", error );
+		// bpf3 ( "tcp_usrreq 11 %d\n", error );
 		if (error)
 			break;
 		break;
@@ -201,24 +201,24 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Send initial segment on connection.
 	 */
 	case PRU_CONNECT:
-		printf ( "Tconnect 0\n" );
+		bpf2 ( "Tconnect 0\n" );
 		if (inp->inp_lport == 0) {
 			error = in_pcbbind(inp, (struct mbuf *)0);
 			if (error)
 				break;
 		}
-		printf ( "Tconnect 1\n" );
+		bpf2 ( "Tconnect 1\n" );
 		error = in_pcbconnect(inp, nam);
 		if (error)
 			break;
-		printf ( "Tconnect 2\n" );
+		bpf2 ( "Tconnect 2\n" );
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			in_pcbdisconnect(inp);
 			error = ENOBUFS;
 			break;
 		}
-		printf ( "Tconnect 3\n" );
+		bpf2 ( "Tconnect 3\n" );
 
 		/* Compute window scaling to request.  */
 		while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
@@ -230,12 +230,12 @@ tcp_usrreq(so, req, m, nam, control)
 		tp->t_state = TCPS_SYN_SENT;
 		tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
 		tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
-		printf ( "Tconnect 4\n" );
+		bpf2 ( "Tconnect 4\n" );
 
 		tcp_sendseqinit(tp);
 		error = tcp_output(tp);
 
-		printf ( "Tconnect 5\n" );
+		bpf2 ( "Tconnect 5\n" );
 		break;
 
 	/*
@@ -371,7 +371,7 @@ tcp_usrreq(so, req, m, nam, control)
 	}
 	
 
-	// printf ( "tcp_usrreq 6\n" );
+	// bpf3 ( "tcp_usrreq 6\n" );
 
 	if (tp && (so->so_options & SO_DEBUG))
 		tcp_trace(TA_USER, ostate, tp, (struct tcpiphdr *)0, req);
@@ -476,7 +476,7 @@ tcp_attach(so)
 	struct inpcb *inp;
 	int error;
 
-	printf ( "tcp_attach 0\n" );
+	bpf3 ( "tcp_attach 0\n" );
 
 	sb_init ( so );
 
@@ -488,18 +488,18 @@ tcp_attach(so)
 			return (error);
 	}
 #endif
-	printf ( "tcp_attach 1\n" );
+	bpf3 ( "tcp_attach 1\n" );
 
 	error = in_pcballoc(so, &tcb);
 	if (error)
 		return (error);
 
-	printf ( "tcp_attach 2\n" );
+	bpf3 ( "tcp_attach 2\n" );
 
 	inp = sotoinpcb(so);
 	tp = tcp_newtcpcb(inp);
 	if (tp == 0) {
-		printf ( "tcp_attach 2e\n" );
+		bpf3 ( "tcp_attach 2e\n" );
 		int nofd = so->so_state & SS_NOFDREF;	/* XXX */
 
 		so->so_state &= ~SS_NOFDREF;	/* don't free the socket yet */
@@ -507,7 +507,7 @@ tcp_attach(so)
 		so->so_state |= nofd;
 		return (ENOBUFS);
 	}
-	printf ( "tcp_attach 3\n" );
+	bpf3 ( "tcp_attach 3\n" );
 	tp->t_state = TCPS_CLOSED;
 	return (0);
 }

@@ -27,12 +27,12 @@ tcp_connect ( char *name, int port )
         so = (struct socket *) k_sock_alloc ();
         e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
         if ( e ) {
-            printf ( "socreate fails for connect\n" );
+            bpf2 ( "socreate fails for connect\n" );
             return NULL;
         }
 
 	if ( ! net_dots ( name, &server_ip ) ) {
-	    printf ( "tcp_connect dots fails\n" );
+	    bpf2 ( "tcp_connect dots fails\n" );
             return NULL;
 	}
 
@@ -54,7 +54,7 @@ tcp_connect ( char *name, int port )
 	 */
         e = sockargs(&nam, &myaddr, len, MT_SONAME);
         if ( e ) {
-            printf ( "connect - sockargs fails\n" );
+            bpf2 ( "connect - sockargs fails\n" );
             return NULL;
         }
 
@@ -65,7 +65,7 @@ tcp_connect ( char *name, int port )
         if ( e ) {
 	    so->so_state &= ~SS_ISCONNECTING;
 	    mb_freem ( nam );
-	    printf ( "connect - soconnect fails %d\n", e );
+	    bpf2 ( "connect - soconnect fails %d\n", e );
 	    return NULL;
 	}
 
@@ -73,7 +73,7 @@ tcp_connect ( char *name, int port )
         // while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
         //         if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0))
         //                 break;
-	printf ( "block in connect: %08x\n", so->kyu_sem );
+	bpf2 ( "block in connect: %08x\n", so->kyu_sem );
 
         while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
 	    sem_block ( so->kyu_sem );
@@ -91,19 +91,19 @@ kyu_soconnect ( struct socket *so, struct mbuf *nam)
         int s;
         int error;
 
-	printf ( "kyu_soconnect 0\n" );
+	bpf2 ( "kyu_soconnect 0\n" );
 
         if (so->so_options & SO_ACCEPTCONN)
 	    return (EOPNOTSUPP);
         if ( so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING) )
 	    error = EISCONN;
 
-	printf ( "kyu_soconnect 1\n" );
+	bpf2 ( "kyu_soconnect 1\n" );
 
 	error = tcp_usrreq ( so, PRU_CONNECT,
 	    (struct mbuf *)0, nam, (struct mbuf *)0);
 
-	printf ( "kyu_soconnect 2 %d\n", error );
+	bpf2 ( "kyu_soconnect 2 %d\n", error );
 
 #ifdef notdef
         // s = splnet();
@@ -165,7 +165,7 @@ tcp_bind ( int port )
 	// error = socreate(uap->domain, &so, uap->type, uap->protocol);
 	e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
 	if ( e ) {
-	    printf ( "socreate fails\n" );
+	    printf ( "bind - socreate fails\n" );
 	    return NULL;
 	}
 
@@ -190,7 +190,7 @@ tcp_bind ( int port )
 
 	e = sockargs(&nam, &myaddr, len, MT_SONAME);
 	if ( e ) {
-	    printf ( "sockargs fails\n" );
+	    printf ( "bind - sockargs fails\n" );
 	    return NULL;
 	}
 
@@ -234,7 +234,7 @@ tcp_accept ( struct socket *so )
                         break;
                 }
                 // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-		printf ( "block in accept: %08x\n", so->kyu_sem );
+		bpf2 ( "block in accept: %08x\n", so->kyu_sem );
 		sem_block ( so->kyu_sem );
         }
 

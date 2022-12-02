@@ -80,7 +80,7 @@ tcp_send ( struct socket *so, char *buf, int len )
 	struct iovec k_vec;
 	int error;
 
-	printf ( "kyu_send - sending %d bytes: %s\n", len, buf );
+	bpf1 ( "kyu_send - sending %d bytes: %s\n", len, buf );
 
 	k_vec.iov_base = buf;
 	k_vec.iov_len = len;
@@ -147,7 +147,7 @@ sosend(so, addr, uio, top, control, flags)
 	else
 		resid = top->m_pkthdr.len;
 
-	printf ( "sosend, resid = %d\n", resid );
+	bpf3 ( "sosend, resid = %d\n", resid );
 	/*
 	 * In theory resid should be unsigned.
 	 * However, space must be signed, as it might be less than 0
@@ -196,7 +196,7 @@ restart:
 		}
 
 		space = sbspace(&so->so_snd);
-		printf ( "sosend, space = %d\n", space );
+		bpf3 ( "sosend, space = %d\n", space );
 
 		if (flags & MSG_OOB)
 			space += 1024;
@@ -245,7 +245,7 @@ restart:
 				m = mb_get ( MT_DATA );
 				mlen = MLEN;
 			}
-			printf ( "sosend, space, resid = %d, %d\n", space, resid );
+			bpf3 ( "sosend, space, resid = %d, %d\n", space, resid );
 
 			if (resid >= MINCLSIZE && space >= MCLBYTES) {
 				// MCLGET(m, M_WAIT);
@@ -278,29 +278,29 @@ nopages:
 			}
 
 			// error = uiomove(mtod(m, caddr_t), (int)len, uio);
-			// printf ( "Calling xiomove for %d\n", len );
+			// bpf3 ( "Calling xiomove for %d\n", len );
 
 			error = xiomove(mtod(m, caddr_t), (int)len, uio, 0 );
 
 			// p = mtod(m, caddr_t);
-			// printf ( "After xiomove: %s\n", p );
+			// bpf3 ( "After xiomove: %s\n", p );
 
 			resid = uio->uio_resid;
 			m->m_len = len;
 			*mp = m;
 
 			// p = mtod(top, caddr_t);
-			// printf ( "top 1: %s\n", p );
-			// printf ( "top 2: %s\n", top->m_data );
+			// bpf3 ( "top 1: %s\n", p );
+			// bpf3 ( "top 2: %s\n", top->m_data );
 
 			top->m_pkthdr.len += len;
-			// printf ( "top 1x: %s\n", p );
-			// printf ( "top 2x: %s\n", top->m_data );
+			// bpf3 ( "top 1x: %s\n", p );
+			// bpf3 ( "top 2x: %s\n", top->m_data );
 			if (error)
 				goto release;
 
 			mp = &m->m_next;
-			printf ( "-- resid = %d\n", resid );
+			bpf3 ( "-- resid = %d\n", resid );
 			if (resid <= 0) {
 				if (flags & MSG_EOR)
 					top->m_flags |= M_EOR;
@@ -312,8 +312,8 @@ nopages:
 		    // 	    so->so_options |= SO_DONTROUTE;
 
 		    // p = mtod(top, caddr_t);
-		    // printf ( "top 1a: %s\n", p );
-		    // printf ( "top 2a: %s\n", top->m_data );
+		    // bpf3 ( "top 1a: %s\n", p );
+		    // bpf3 ( "top 2a: %s\n", top->m_data );
 
 #ifdef notdef
 		    s = splnet();				/* XXX */
@@ -331,14 +331,14 @@ nopages:
 		    tp = intotcpcb(inp);
 
 		    if ( top->m_len )
-			printf ( "sosend: mb-data: (%d) %s\n", top->m_len, top->m_data );
+			bpf3 ( "sosend: mb-data: (%d) %s\n", top->m_len, top->m_data );
 		    else
-			printf ( "sosend: mb-len: %d\n", top->m_len );
+			bpf3 ( "sosend: mb-len: %d\n", top->m_len );
 
 		    sbappend(&so->so_snd, top);
 		    error = tcp_output(tp);
 
-		    // printf ( "sosend: append: %d\n", error );
+		    // bpf3 ( "sosend: append: %d\n", error );
 #endif
 
 		    // if (dontroute)
@@ -363,7 +363,7 @@ out:
 		mb_freem(control);
 
 	if ( error )
-	    printf ( "sosend - FINISH: %d\n", error );
+	    bpf3 ( "sosend - FINISH: %d\n", error );
 	return (error);
 }
 
@@ -383,9 +383,9 @@ xiomove(cp, n, uio, read)
         while (n > 0 && uio->uio_resid) {
                 iov = uio->uio_iov;
                 cnt = iov->iov_len;
-		// printf ( "xiomove: %d\n", cnt );
-		// printf ( "xiomove: len = %d\n", iov->iov_len );
-		// printf ( "xiomove: buf = %s\n", iov->iov_base );
+		// bpf3 ( "xiomove: %d\n", cnt );
+		// bpf3 ( "xiomove: len = %d\n", iov->iov_len );
+		// bpf3 ( "xiomove: buf = %s\n", iov->iov_base );
                 if (cnt == 0) {
                         uio->uio_iov++;
                         uio->uio_iovcnt--;
@@ -489,7 +489,7 @@ sonewconn ( struct socket *head, int connstatus )
         int soqueue = connstatus ? 1 : 0;
 	int error;
 
-	printf ( "sonewconn - %08x %d\n", head, connstatus );
+	bpf3 ( "sonewconn - %08x %d\n", head, connstatus );
 
         if (head->so_qlen + head->so_q0len > 3 * head->so_qlimit / 2)
                 return ((struct socket *)0);
@@ -609,7 +609,6 @@ sorflush ( struct socket *so )
         int s;
         struct sockbuf asb;
 
-	// printf ( "Lazy sorflush\n" );
         sb->sb_flags |= SB_NOINTR;
         (void) sblock(sb, M_WAITOK);
 
@@ -628,7 +627,7 @@ sorflush ( struct socket *so )
 void
 sofree ( struct socket *so )
 {
-	printf ( "sofree called\n" );
+	bpf3 ( "sofree called\n" );
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
                 return;
@@ -701,12 +700,12 @@ soisconnected(so)
                 soqinsque(head, so, 1);
                 sorwakeup(head);
 
-		printf ( "soisconnected - wakeup head %08x\n", head->kyu_sem );
+		bpf3 ( "soisconnected - wakeup head %08x\n", head->kyu_sem );
                 // wakeup((caddr_t)&head->so_timeo);
 		sem_unblock ( head->kyu_sem );
 
         } else {
-		printf ( "soisconnected - wakeup sock\n" );
+		bpf3 ( "soisconnected - wakeup sock\n" );
                 // wakeup((caddr_t)&so->so_timeo);
 		sem_unblock ( so->kyu_sem );
 
@@ -786,5 +785,279 @@ sohasoutofband(so)
         selwakeup(&so->so_rcv.sb_sel);
 #endif
 }
+
+/* =================================================================================================== */
+/* =================================================================================================== */
+/* =================================================================================================== */
+/* =================================================================================================== */
+
+extern struct protosw tcp_proto;
+
+/* Put the following into a better more logical order and merge with the above.
+ */
+
+/*
+ * Must be called at splnet...
+ */
+int
+soabort ( struct socket *so )
+{
+	int rv = tcp_usrreq (so, PRU_ABORT,
+                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	return rv;
+}
+
+/* From kern/uipc_socket2.c ---
+ * they clearly don't belong here, but ...
+ */
+/* strings for sleep message: */
+char    netio[] = "netio";
+char    netcon[] = "netcon";
+char    netcls[] = "netcls";
+
+/*
+ * Close a socket on last file table reference removal.
+ * Initiate disconnect if connected.
+ * Free socket when disconnect complete.
+ */
+ /* from kern/uipc_socket.c */
+int
+soclose ( struct socket *so )
+{
+        int s = splnet();               /* conservative */
+        int error = 0;
+
+	bpf3 ( "soclose called with %08x\n", so );
+
+	if ( ! so )
+	    return 0;
+
+        if (so->so_options & SO_ACCEPTCONN) {
+                while (so->so_q0)
+                        (void) soabort(so->so_q0);
+                while (so->so_q)
+                        (void) soabort(so->so_q);
+        }
+
+        if (so->so_pcb == 0)
+                goto discard;
+
+        if (so->so_state & SS_ISCONNECTED) {
+                if ((so->so_state & SS_ISDISCONNECTING) == 0) {
+                        error = sodisconnect(so);
+                        if (error)
+                                goto drop;
+                }
+                if (so->so_options & SO_LINGER) {
+                        if ((so->so_state & SS_ISDISCONNECTING) &&
+                            (so->so_state & SS_NBIO))
+                                goto drop;
+                        while (so->so_state & SS_ISCONNECTED)
+			    bpf3 ( "block in close: %08x\n", so->kyu_sem );
+			    sem_block ( so->kyu_sem );
+                                //if (error = tsleep((caddr_t)&so->so_timeo,
+                                //    PSOCK | PCATCH, netcls, so->so_linger))
+                                //        break;
+                }
+        }
+
+drop:
+        if (so->so_pcb) {
+                // int error2 = (*so->so_proto->pr_usrreq)(so, PRU_DETACH,
+                //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+		int error2 = tcp_usrreq (so, PRU_DETACH,
+                        (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+                if (error == 0)
+                        error = error2;
+        }
+
+discard:
+	// Near as I can tell, this marks the socket as not
+	// having a reference in file array (i.e. as an "fd")
+        // if (so->so_state & SS_NOFDREF)
+        //         panic("soclose: NOFDREF");
+        so->so_state |= SS_NOFDREF;
+
+        sofree(so);
+        splx(s);
+
+        return (error);
+}
+
+int
+sodisconnect ( struct socket *so )
+{
+        int s = splnet();
+        int error;
+
+        if ((so->so_state & SS_ISCONNECTED) == 0) {
+                error = ENOTCONN;
+                goto bad;
+        }
+
+        if (so->so_state & SS_ISDISCONNECTING) {
+                error = EALREADY;
+                goto bad;
+        }
+
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_DISCONNECT,
+        //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	error = tcp_usrreq (so, PRU_DISCONNECT,
+            (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+bad:
+        splx(s);
+        return (error);
+}
+
+int
+sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
+{
+        struct sockaddr *sa;
+        struct mbuf *m;
+        int error;
+
+        if ( (u_int)buflen > MLEN ) {
+                return (EINVAL);
+        }
+
+        // m = m_get(M_WAIT, type);
+        m = (struct mbuf *) mb_get(type);
+        if (m == NULL)
+                return (ENOBUFS);
+
+        m->m_len = buflen;
+        bcopy ( buf, mtod(m, caddr_t), (u_int)buflen);
+        // error = copyin(buf, mtod(m, caddr_t), (u_int)buflen);
+        // if (error) {
+        //      (void) mb_free(m);
+	//	return error;
+	//	}
+	*mp = m;
+	if (type == MT_SONAME) {
+		sa = mtod(m, struct sockaddr *);
+		sa->sa_len = buflen;
+	}
+        return 0;
+}
+
+/* The original is in kern/uipc_socket.c
+ */
+int
+socreate ( struct socket *so, int dom, int type, int proto)
+// socreate ( int dom, struct socket **aso, int type, int proto)
+{
+        // struct proc *p = curproc;               /* XXX */
+        register struct protosw *prp;
+        // register struct socket *so;
+        register int error;
+
+	prp = &tcp_proto;
+        // if (proto)
+        //         prp = pffindproto(dom, proto, type);
+        // else
+        //         prp = pffindtype(dom, type);
+	// 
+        // if (prp == 0 || prp->pr_usrreq == 0)
+        //	return (EPROTONOSUPPORT);
+        // if (prp->pr_type != type)
+	//	return (EPROTOTYPE);
+
+        // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_WAIT);
+        bzero((caddr_t)so, sizeof(*so));
+
+	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! so->kyu_sem ) {
+	    panic ( "socreate - semaphores all gone" );
+	}
+
+        so->so_type = type;	/* SOCK_STREAM */
+        so->so_proto = prp;
+
+        // if (p->p_ucred->cr_uid == 0)
+        //         so->so_state = SS_PRIV;
+
+        // error = (*prp->pr_usrreq)(so, PRU_ATTACH,
+        //         (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
+
+        error = tcp_usrreq (so, PRU_ATTACH,
+                (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
+
+        if (error) {
+                so->so_state |= SS_NOFDREF;
+                sofree(so);
+                return 1;
+        }
+        // *aso = so;
+        return (0);
+}
+
+int
+sobind ( struct socket *so, struct mbuf *nam )
+{
+        // int s = splnet();
+        int error;
+
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_BIND,
+        //         (struct mbuf *)0, nam, (struct mbuf *)0);
+        error = tcp_usrreq (so, PRU_BIND,
+                (struct mbuf *)0, nam, (struct mbuf *)0);
+
+        // splx(s);
+        return (error);
+}
+
+int
+solisten ( struct socket *so, int backlog )
+{
+        int s = splnet();
+	int error;
+
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN,
+        //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+        error = tcp_usrreq (so, PRU_LISTEN,
+                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+        if (error) {
+                splx(s);
+                return (error);
+        }
+
+        if (so->so_q == 0)
+                so->so_options |= SO_ACCEPTCONN;
+
+        if (backlog < 0)
+                backlog = 0;
+        so->so_qlimit = min(backlog, SOMAXCONN);
+
+        splx(s);
+        return (0);
+}
+
+/*
+ * Strip out IP options, at higher
+ * level protocol in the kernel.
+ */
+/* From netinet/ip_input.c */
+void
+ip_stripoptions ( struct mbuf *m )
+{
+        int i;
+        struct ip *ip = mtod(m, struct ip *);
+        caddr_t opts;
+        int olen;
+
+        olen = (ip->ip_hl<<2) - sizeof (struct ip);
+        opts = (caddr_t)(ip + 1);
+        i = m->m_len - (sizeof (struct ip) + olen);
+        bcopy(opts  + olen, opts, (unsigned)i);
+        m->m_len -= olen;
+        if (m->m_flags & M_PKTHDR)
+                m->m_pkthdr.len -= olen;
+        ip->ip_hl = sizeof(struct ip) >> 2;
+}
+
+/* THE END */
 
 // THE END

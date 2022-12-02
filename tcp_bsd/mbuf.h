@@ -268,7 +268,7 @@ extern	struct	mbstat mbstat;
 extern int	max_linkhdr;		/* largest link-level header */
 extern int	max_protohdr;		/* largest protocol header */
 extern int	max_hdr;		/* largest link+protocol header */
-extern int	max_datalen;		/* MHLEN - max_hdr */
+// extern int	max_datalen;
 
 // extern	int mbtypes[];
 

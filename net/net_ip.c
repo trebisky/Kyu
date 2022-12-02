@@ -23,6 +23,14 @@ extern struct host_info host_info;
 
 extern u32 loopback_ip;
 
+static int ip_debug = 0;
+
+void
+set_ip_debug ( int val )
+{
+	ip_debug = val;
+}
+
 static char *
 proto_name ( int proto )
 {
@@ -49,9 +57,14 @@ ip_rcv ( struct netbuf *nbp )
 	ipp = nbp->iptr;
 	cksum = in_cksum ( nbp->iptr, sizeof(struct ip_hdr) );
 
-	printf ( "ip_rcv - packet from %s (%d) proto = %s, sum= %04x\n",
-	    ip2str32 ( ipp->src ), nbp->ilen, proto_name(ipp->proto), cksum );
-	dump_buf ( nbp->eptr, 64 );
+	if ( ip_debug ) {
+	    printf ( "ip_rcv - packet from %s (%d) proto = %s, sum= %04x\n",
+		ip2str32 ( ipp->src ), nbp->ilen, proto_name(ipp->proto), cksum );
+	    printf ( "eth: " );
+	    dump_buf ( nbp->eptr, 14 );
+	    printf ( " --\n" );
+	    dump_buf ( nbp->iptr, nbp->ilen );
+	}
 
 	// cksum = in_cksum ( nbp->iptr, sizeof(struct ip_hdr) );
 	// ipp = nbp->iptr;
@@ -170,12 +183,6 @@ ip_send ( struct netbuf *nbp, u32 dest_ip )
 {
 	struct ip_hdr *ipp;
 
-	if ( dest_ip == loopback_ip ) {
-	    printf ( "Sending IP packet to loopback\n" );
-	    net_rcv_noint ( nbp );
-	    return;
-	}
-
 	// changed for Xinu TCP
 	// ipp = (struct ip_hdr *) nbp->iptr;
 	ipp = (struct ip_hdr *) ((char *) nbp->eptr + sizeof ( struct eth_hdr ));
@@ -197,12 +204,32 @@ ip_send ( struct netbuf *nbp, u32 dest_ip )
 	ipp->ttl = 64;
 
 	/* proto is already filled in by caller */
+	/* XXX - this may not work out well for TCP as
+	 * these are included in the TCP checksum.
+	 * As long as this matches what BSD set, OK.
+	 */
 
 	ipp->src = host_info.my_ip;
 	ipp->dst = dest_ip;
 
 	ipp->sum = 0;
 	ipp->sum = in_cksum ( (char *) ipp, sizeof ( struct ip_hdr ) );
+
+	if ( ip_debug ) {
+	    printf ( "IP ip_send - ready to go: ...\n" );
+	    dump_buf ( (char *) ipp, 20 );
+	}
+
+	if ( dest_ip == loopback_ip ) {
+	    // Must do this or our IP code will toss the packet
+	    memcpy ( nbp->eptr->dst, host_info.our_mac, ETH_ADDR_SIZE );
+	    // Must do this also
+	    nbp->eptr->type = ETH_IP_SWAP;
+
+	    printf ( "Sending IP packet to loopback\n" );
+	    net_rcv_noint ( nbp );
+	    return;
+	}
 
 	ip_arp_send ( nbp );
 }

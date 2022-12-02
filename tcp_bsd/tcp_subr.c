@@ -85,6 +85,7 @@ tcp_init()
 	tcp_iss = 1;		/* wrong */
 	tcb.inp_next = tcb.inp_prev = &tcb;
 
+	/* Adjust these if needed */
 	if (max_protohdr < sizeof(struct tcpiphdr))
 		max_protohdr = sizeof(struct tcpiphdr);
 
@@ -127,7 +128,7 @@ tcp_template(tp)
 	n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
 	n->ti_src = inp->inp_laddr;
 	n->ti_dst = inp->inp_faddr;
-	printf ( "TCP template sets dst to %08x\n", n->ti_dst );
+	bpf2 ( "TCP template sets dst to %08x\n", n->ti_dst );
 	n->ti_sport = inp->inp_lport;
 	n->ti_dport = inp->inp_fport;
 	n->ti_seq = 0;
@@ -166,7 +167,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	int win = 0;
 	struct route *ro = 0;
 
-	printf ( "TCP respond\n" );
+	bpf2 ( "TCP respond\n" );
 	if (tp) {
 		win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
 		ro = &tp->t_inpcb->inp_route;
@@ -197,6 +198,7 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 		xchg(ti->ti_dport, ti->ti_sport, u_short);
 #undef xchg
 	}
+
 	ti->ti_len = htons((u_short)(sizeof (struct tcphdr) + tlen));
 	tlen += sizeof (struct tcpiphdr);
 	m->m_len = tlen;
@@ -214,13 +216,17 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	else
 		ti->ti_win = htons((u_short)win);
 	ti->ti_urp = 0;
+	ti->ti_sum = 0;
+
 	// Kyu
-	// ti->ti_sum = 0;
 	// ti->ti_sum = in_cksum(m, tlen);
 	ti->ti_sum = tcp_cksum(m, tlen);
+	bpf2 ( "tcp respond checksum calculated: %x\n", ti->ti_sum );
+
 	((struct ip *)ti)->ip_len = tlen;
 	((struct ip *)ti)->ip_ttl = ip_defttl;
-	printf ( "TCP respond send %d\n", tlen );
+	bpf2 ( " =========================== TCP respond send %d\n", tlen );
+
 	(void) ip_output(m, NULL, ro, 0, NULL);
 }
 

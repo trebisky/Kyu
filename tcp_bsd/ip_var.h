@@ -40,10 +40,15 @@ struct ipovly {
 	caddr_t	ih_next, ih_prev;	/* for protocol sequence q's */
 	u_char	ih_x1;			/* (unused) */
 	u_char	ih_pr;			/* protocol */
-	short	ih_len;			/* protocol length */
+	short	ih_len;			/* XXX - protocol length */
 	struct	in_addr ih_src;		/* source internet address */
 	struct	in_addr ih_dst;		/* destination internet address */
 };
+
+/* The "protocol length" in the structure above is really the checksum field
+ * in an actual IP packet.  The length is just written there during
+ * the trickery of checksum calculations.
+ */
 
 /*
  * Ip reassembly queue structure.  Each fragment

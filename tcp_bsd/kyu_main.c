@@ -13,37 +13,172 @@
 #include "../net/net.h"		/* Kyu */
 #include "../net/kyu_tcp.h"
 
-#ifdef notdef
-#include "kyu.h"
+#include <stdarg.h>
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/mbuf.h>
-#include <sys/malloc.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/domain.h>
-// #include <sys/errno.h>
+/* Too many debug messages are getting out of control, hence this
+ * taken from kyu: prf.c
+ * Levels are defined in kyu_compat.h
+ */
 
-#include <net/if.h>
-#include <net/route.h>
+#define PRINTF_BUF_SIZE 128
 
-#include <in.h>
-#include <in_systm.h>
-#include <ip.h>
-#include <in_pcb.h>
-#include <ip_var.h>
+static int bpf_level = 0;
 
-#include <tcp.h>
-#include <tcp_seq.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-#include <tcp_debug.h>
+void
+bpf_setlevel ( int arg )
+{
+	bpf_level = arg;
+}
 
-#include "mbuf.h"
-#endif
+/* To debug or not to debug */
+int
+bpf_debug ( int level )
+{
+	if ( bpf_level < level )
+	    return 0;
+	return 1;
+}
+
+void
+bpf_dump ( int level, char *buf, int n )
+{
+	if ( bpf_level < level )
+	    return;
+	dump_buf ( buf, n );
+}
+
+void
+// printf ( const char *fmt, ... )
+bpf ( int level, const char *fmt, ... )
+{
+        char buf[PRINTF_BUF_SIZE];
+        va_list args;
+
+	if ( bpf_level < level )
+	    return;
+
+        va_start ( args, fmt );
+        (void) vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+        va_end ( args );
+
+        console_puts ( buf );
+}
+
+void
+bpf1 ( const char *fmt, ... )
+{
+        char buf[PRINTF_BUF_SIZE];
+        va_list args;
+
+	if ( bpf_level < 1 )
+	    return;
+
+        va_start ( args, fmt );
+        (void) vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+        va_end ( args );
+
+        console_puts ( buf );
+}
+
+void
+bpf2 ( const char *fmt, ... )
+{
+        char buf[PRINTF_BUF_SIZE];
+        va_list args;
+
+	if ( bpf_level < 2 )
+	    return;
+
+        va_start ( args, fmt );
+        (void) vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+        va_end ( args );
+
+        console_puts ( buf );
+}
+
+void
+bpf3 ( const char *fmt, ... )
+{
+        char buf[PRINTF_BUF_SIZE];
+        va_list args;
+
+	if ( bpf_level < 3 )
+	    return;
+
+        va_start ( args, fmt );
+        (void) vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+        va_end ( args );
+
+        console_puts ( buf );
+}
+
+struct pseudo {
+	unsigned int dst;
+	unsigned int src;
+	unsigned short len;
+	unsigned short type;
+	unsigned short sum;
+};
+
+int
+ez_tcp_cksum_x ( struct tcpiphdr *ti )
+{
+	struct pseudo ps;
+	int rv = 0;
+	int len = ((struct ip *)ti)->ip_len;
+
+	ps.dst = ti->ti_dst.s_addr;
+	ps.src = ti->ti_src.s_addr;
+	ps.len = htons(len);
+	ps.type = 6;
+	ps.sum = 0;
+
+	rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
+	return in_cksum_i ( (char *) &ti->ti_t, len, rv );
+}
+
+int
+ez_tcp_cksum ( struct tcpiphdr *ti )
+{
+	struct pseudo ps;
+	int rv = 0;
+	int len = ((struct ip *)ti)->ip_len;
+
+	ps.dst = ti->ti_dst.s_addr;
+	ps.src = ti->ti_src.s_addr;
+	ps.len = htons(len);
+	ps.type = htons(6);	// TCP
+	ps.sum = ((struct ip *)ti)->ip_sum;
+
+	rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
+	return in_cksum_i ( (char *) &ti->ti_t, len, rv );
+}
+
+void
+tcp_show_pkt ( struct mbuf *m, char *msg )
+{
+	struct tcpiphdr *ti;
+	int sum;
+
+	printf ( "TCP packet from; %s (%d bytes)\n", msg, m->m_len );
+
+	ti = mtod(m, struct tcpiphdr *);
+	dump_buf ( (char *) ti, 32 );
+	// printf ( " ti len: %d\n", ti->ti_len ); actually checksun
+	printf ( " ip len: %d\n", ((struct ip *)ti)->ip_len );
+	printf ( " ip sum: 0x%04x\n", ((struct ip *)ti)->ip_sum );
+	printf ( " ti src: %s\n", ip2str32 ( ti->ti_src.s_addr ) );
+	printf ( " ti dst: %s\n", ip2str32 ( ti->ti_dst.s_addr ) );
+	printf ( " flags : %04x\n", ti->ti_flags );
+	// pointless because ..
+	// printf ( " IP checksum: %d\n", tcp_cksum ( m, 20 ) );
+	printf ( " TCP checksum: 0x%04x\n", ez_tcp_cksum_x ( ti ) );
+	printf ( " TCP checksum: 0x%04x\n", ez_tcp_cksum ( ti ) );
+}
+
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
 
 /* From net/radix.c
  * -- something to do with routing.
@@ -100,7 +235,8 @@ static void tcp_timer_func ( long );
 static void
 bsd_init ( void )
 {
-	printf ( "BSD tcp init called\n" );
+	bpf_setlevel ( 2 );
+	bpf3 ( "BSD tcp init called\n" );
 
 	tcp_globals_init ();
 
@@ -110,7 +246,7 @@ bsd_init ( void )
 	// in tcp_subr.c
 	tcp_init ();
 
-	printf ( "timer rate: %d\n", timer_rate_get() );
+	bpf3 ( "timer rate: %d\n", timer_rate_get() );
 	if ( timer_rate_get() != 1000 ) {
 	    printf ( "Unexpected timer rate: %d\n", timer_rate_get() );
 	    panic ( "TCP timer rate" );
@@ -184,14 +320,14 @@ tcp_thread ( long xxx )
 	    sem_unblock ( tcp_lock_sem );
 
             if ( nbp ) {
-		printf ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
+		bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
                 continue;
             }
 
             /* Wait for another packet.
              */
-	    printf ( "TCP thread waiting\n" );
+	    bpf2 ( "TCP thread waiting\n" );
             sem_block_cpu ( tcp_q_sem );
 	}
 
@@ -205,7 +341,7 @@ static void
 tcp_bsd_rcv ( struct netbuf *nbp )
 {
         nbp->next = (struct netbuf *) 0;
-	printf ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
+	bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
 	sem_block ( tcp_lock_sem );
 	    // printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
@@ -222,12 +358,14 @@ tcp_bsd_rcv ( struct netbuf *nbp )
         sem_unblock ( tcp_q_sem );
 }
 
+#ifdef notdef
 void
 tcp_bsd_show ( void )
 {
     printf ( "Status for BSD tcp code:\n" );
     // ...
 }
+#endif
 
 /* Here is where the TCP thread processes incoming packets
  */
@@ -238,6 +376,9 @@ tcp_bsd_process ( struct netbuf *nbp )
 	struct mbuf *m;
 	struct ip *iip;
 	int len;
+
+	// pointless - any bad IP checksums would have already been dropped.
+	// printf ( "IP checksum before swapping: %04x\n", in_cksum ( xx, xx );
 
 	/* byte swap fields in IP header */
 	nbp->iptr->len = ntohs ( nbp->iptr->len );
@@ -254,6 +395,7 @@ tcp_bsd_process ( struct netbuf *nbp )
 	    printf ( "** mb_devget fails\n" );
 	    return;
 	}
+	mbuf_game ( m, "tcp_bsd_process" );
 
 	/* We can free it now since we have copied everything into
 	 * an mbuf.
@@ -266,6 +408,7 @@ tcp_bsd_process ( struct netbuf *nbp )
 	/* Ah, but what goes on during IP processing by the BSD code */
 	/* For one thing, it subtracts the size of the IP header
 	 * off of the length field in the IP header itself.
+	 * So we should do this to "emulate" that behavior.
 	 */
 	iip = mtod(m, struct ip *);
 	iip->ip_len -= sizeof(struct ip);
@@ -285,16 +428,16 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         int size = 0;
 	char *buf;
 
-	printf ( "TCP(bsd): ip_output\n" );
-	printf ( " ip_output A = %08x\n", A );
-	printf ( " ip_output B = %08x\n", B );
-	printf ( " ip_output R = %08x\n", R );
-	printf ( " ip_output N = %d\n", N );
-	printf ( " ip_output O = %08x\n", O );
+	bpf3 ( "TCP(bsd): ip_output\n" );
+	bpf3 ( " ip_output A = %08x\n", A );
+	bpf3 ( " ip_output B = %08x\n", B );
+	bpf3 ( " ip_output R = %08x\n", R );
+	bpf3 ( " ip_output N = %d\n", N );
+	bpf3 ( " ip_output O = %08x\n", O );
+
 	mbuf_show ( A, "ip_output" );
-	dump_buf ( (char *) A, 128 );
-#ifdef notdef
-#endif
+	// dump_buf ( (char *) A, 128 );
+	bpf_dump ( 3, (char *) A, 128 );
 
         nbp = netbuf_alloc ();
         if ( ! nbp )
@@ -331,11 +474,11 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 
 	ipp = nbp->iptr;
 
-	printf ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
+	bpf2 ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
 	// Hand it to the Kyu IP layer
         ip_send ( nbp, ipp->dst );
 
-	// printf ( "IP output 4\n" );
+	// bpf3 ( "IP output 4\n" );
 	return 0;
 }
 
@@ -344,7 +487,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 int
 ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm )
 {
-	// printf ( "TCP(bsd): ctl output\n" );
+	// bpf1 ( "TCP(bsd): ctl output\n" );
 	panic ( "TCP(bsd): ctl output\n" );
 }
 

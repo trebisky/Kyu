@@ -515,11 +515,14 @@ sys_init ( long xxx )
 #endif
 
 /* These things must be after net_init() because
- * they will try to do tftp.
+ * they will try to do tftp to get the symbol table.
  */
 #ifdef WANT_SHELL
 	shell_init ();
 #endif
+
+	/* While we are working on BSD TCP */
+	set_ip_debug ( 1 );
 
 	/* allow initialization of things that
 	 * require the network to be alive.

@@ -61,7 +61,7 @@ sb_init ( struct socket *so )
 {
 	struct sockbuf *sb;
 
-	printf ( "SB init called for %08x\n", so );
+	bpf3 ( "SB init called for %08x\n", so );
 
 	if ( soreserve ( so, tcp_sendspace, tcp_recvspace ) )
 	    panic ( "sb_init - cannot reserve space" );

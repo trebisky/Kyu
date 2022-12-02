@@ -76,9 +76,10 @@ tcp_cksum ( struct mbuf *m, int len )
 	register int sum = 0;
 	register int mlen = 0;
 
-	// printf ( "tcp cksum: %08x (%d)\n", m, len );
-
 	for (;m && len; m = m->m_next) {
+
+		bpf2 ( "tcp_cksum: mbuf: %08x (%d,%d bytes)\n", m, len, mlen );
+
 		if (m->m_len == 0)
 			continue;
 		w = mtod(m, u_short *);
@@ -141,3 +142,5 @@ tcp_cksum ( struct mbuf *m, int len )
 	}
 	return (~sum & 0xffff);
 }
+
+// THE END
