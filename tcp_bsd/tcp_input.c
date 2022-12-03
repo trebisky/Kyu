@@ -181,16 +181,12 @@ present:
 	return (flags);
 }
 
-/* This gets padded somehow to 16 bytes, so we add our own
- * pad to ensure this is under our control.
- */
+/* 12 bytes, no padding monkey business */
 struct pseudo {
         unsigned int dst;
         unsigned int src;
         unsigned short len;
         unsigned short type;
-        unsigned short sum;
-	unsigned short pad;
 };
 
 /* Non destructive.
@@ -202,15 +198,18 @@ ez_tcp_cksum ( struct tcpiphdr *ti )
         int rv = 0;
         int len = ((struct ip *)ti)->ip_len;
 
+	// printf ( "sizeof pseudo: %d\n", sizeof(struct pseudo) );
+
         ps.dst = ti->ti_dst.s_addr;
         ps.src = ti->ti_src.s_addr;
         ps.len = htons(len);
         ps.type = htons(6);     // TCP
-        ps.sum = ((struct ip *)ti)->ip_sum;
-	ps.pad = 0;
+
+	printf ( "Pseudo header: ..\n" );
+	dump_buf ( &ps, sizeof(struct pseudo) );
 
         rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
-        return in_cksum_i ( (char *) &ti->ti_t, len, rv );
+        return ~in_cksum_i ( (char *) &ti->ti_t, len, rv ) & 0xffff;
 }
 
 void
@@ -243,6 +242,22 @@ mbuf_game ( struct mbuf *m, char *msg )
 }
 
 void
+sleazy_mbuf_copy ( struct mbuf *dst, struct mbuf *src )
+{
+	int off;
+
+	*dst = *src;
+
+	/* Crazy hack needed here.
+	 * The data offset is just not what we might expect
+	 * and without duplicating code in mb_devget() just
+	 * manipulating the offset like this is the best thing.
+	 */
+	off = src->m_data - (char *)src;
+	dst->m_data = (char *)dst + off;
+}
+
+void
 cksum_game ( struct mbuf *min, char *msg )
 {
 	struct mbuf m_local;
@@ -251,6 +266,7 @@ cksum_game ( struct mbuf *min, char *msg )
 	int tlen;
 	int len;
 	int sum;
+	// int off;
 	// char *p;
 	char cmsg[64];
 
@@ -259,56 +275,57 @@ cksum_game ( struct mbuf *min, char *msg )
 	mbuf_game ( min, msg );
 	// p = mtod(min, char *);
 
-	m_local = *min;
 	m = &m_local;
-	if ( m->m_flags & M_PKTHDR )
-	    m->m_data = m->m_pktdat;
-	else
-	    m->m_data = m->m_dat;
+	sleazy_mbuf_copy ( m, min );
 
 	strcpy ( cmsg, msg );
 	strcat ( cmsg, " (copy)" );
-
 	// printf ( " copy mbuf: %08x\n", m );
 	mbuf_game ( m, cmsg );
+
 	ti = mtod(m, struct tcpiphdr *);
 	// printf ( " copy mbuf data at: %08x\n", ti );
 	printf ( "\n" );
 
-	printf ( " copy mbuf data pp: %08x\n", (mtod(m, char *)) );
-	printf ( " first byte in buffer: %02x\n", *(mtod(m, char *)) );
-	printf ( " copy mbuf flags: %x\n", m->m_flags );
+	// printf ( " copy mbuf data pp: %08x\n", (mtod(m, char *)) );
+	// printf ( " first byte in buffer: %02x\n", *(mtod(m, char *)) );
+	// printf ( " copy mbuf flags: %x\n", m->m_flags );
 	// dump_buf ( (char *) m, 128 );
 
-	printf ( "pkdata: %08x\n", m->m_pktdat );
-	printf ( "sizeof mbuf: %d\n", sizeof(struct mbuf) );
-	printf ( "sizeof m_hdr: %d\n", sizeof(struct m_hdr) );
-	printf ( "sizeof pkthdr: %d\n", sizeof(struct pkthdr) );
-	// printf ( "sizeof m_ext: %d\n", sizeof(struct m_ext) );
-
-	// printf ( "sizeof pseudo: %d\n", sizeof(struct pseudo) );
-	// return 16 (even before padding added)
-
-	// tlen = ntohs( ((struct ip *)ti)->ip_len );
 	tlen = ((struct ip *)ti)->ip_len;
 	printf ( "tlen = %04x\n", tlen );
+	// printf ( "tlen R = %04x\n", tlen );
+	// tlen = ntohs( ((struct ip *)ti)->ip_len );
+	// printf ( "tlen S = %04x\n", tlen );
+
 	len = sizeof (struct ip) + tlen;
 	printf ( "tlen, len = %d, %d\n", tlen, len );
 
+	/* Emulate the BSD way of acting like we had
+	 * a pseudo header.
+	 * This is destructive (which is why we make a copy).
+	 */
 	ti->ti_next = ti->ti_prev = 0;
 	ti->ti_x1 = 0;
 	ti->ti_len = (u_short) tlen;
 	HTONS(ti->ti_len);
 
-	sum = tcp_cksum(m, len);
-	printf ( "BSD checksum = %04x\n", sum );
+	printf ( "TCP pseudo IP: ...\n" );
+	dump_buf ( (char *) ti, 20 );
 
-#ifdef notdef
-	m_local = *min;
+	sum = tcp_cksum(m, len);
+	printf ( "BSD checksum (%d) = %04x\n", len, sum );
+
+        sum =  ~in_cksum_i ( (char *) ti, len, 0 ) & 0xffff;
+	printf ( "KYU checksum (%d) = %04x\n", len, sum );
+        sum =  in_cksum ( (char *) ti, len );
+	printf ( "KYU checksum (%d) = %04x\n", len, sum );
+
+	sleazy_mbuf_copy ( m, min );
+	// m_local = *min;
 	ti = mtod ( m, struct tcpiphdr *);
 	sum = ez_tcp_cksum ( ti );
 	printf ( "EZ checksum = %04x\n", sum );
-#endif
 
 	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
 	// printf ( "Finished with checksum game\n" );

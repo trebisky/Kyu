@@ -29,7 +29,7 @@ in_cksum ( unsigned short *data, int len )
 	while ( sum >> 16 )
 	    sum = (sum & 0xffff) + (sum >> 16);
 
-	return ~sum;
+	return ~sum & 0xffff;
 }
 
 /* Does not return ones complement */
