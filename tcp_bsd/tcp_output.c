@@ -87,9 +87,9 @@ tcp_output(tp)
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
-	int ckstat;	// XXX
+	// int ckstat;	// XXX
 
-	bpf2 ( "-tcp_output\n" );
+	// bpf2 ( "-tcp_output\n" );
 	/*
 	 * Determine length of data that should be transmitted,
 	 * and flags that will be used.
@@ -483,18 +483,6 @@ send:
 		    optlen + len));
 
 #ifdef notdef
-	// This should be done at a much deeper level.
-	// maybe tcp_template() or deeper yet.
-	// Here is a gross hack XXX
-	// tjt  11-22-2022
-	// This should get done in tcp_template() in tcp_subr.c
-	// but that has a bug right now.
-	// We need to get this right before checksum calculation.
-	if ( ! ti->ti_src.s_addr )
-	    ti->ti_src.s_addr = htonl ( get_our_ip () );
-#endif
-
-#ifdef notdef
 	{
 	    struct	in_addr laddr;	/* local host table entry */
 
@@ -586,8 +574,8 @@ send:
 	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
 	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
 
-	bpf2 ( " =========================== TCP output send %d\n", hdrlen+len );
-	bpf2 ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
+	// bpf2 ( " =========================== TCP output send %d\n", hdrlen+len );
+	// bpf2 ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
 
 	// printf ( "tcp_output -- IP header ...\n" );
 	// dump_buf ( (char *) ti, 20 );
@@ -595,7 +583,8 @@ send:
 	// tcp_show_pkt ( m, "tcp_output" );
 
 	// ckstat = cksum_game ( m, hdrlen+len, "tcp_output" );
-	ckstat = cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );
+	// ckstat = cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );
+	(void) cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );
 
 	// if ( ckstat ) {
 	//     printf ( "tcp_output -- refuse to send faulty packet ***\n" );
@@ -688,10 +677,10 @@ tcp_template(tp)
 	n->ti_dst = inp->inp_faddr;
 
 	/* Hack -- 12-4-2022 */
-	if ( ! n->ti_src.s_addr )
+	if ( ! n->ti_src.s_addr ) {
 	    n->ti_src.s_addr = htonl ( get_our_ip () );
-
-	bpf2 ( "TCP template sets dst to %08x\n", n->ti_dst );
+	    bpf2 ( "TCP template sets src to %08x\n", n->ti_dst );
+	}
 
 	n->ti_sport = inp->inp_lport;
 	n->ti_dport = inp->inp_fport;

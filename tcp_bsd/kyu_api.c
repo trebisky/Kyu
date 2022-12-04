@@ -73,7 +73,8 @@ tcp_connect ( char *name, int port )
         // while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
         //         if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0))
         //                 break;
-	bpf2 ( "block in connect: %08x\n", so->kyu_sem );
+
+	// bpf2 ( "block in connect: %08x\n", so->kyu_sem );
 
         while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
 	    sem_block ( so->kyu_sem );
@@ -91,19 +92,19 @@ kyu_soconnect ( struct socket *so, struct mbuf *nam)
         int s;
         int error;
 
-	bpf2 ( "kyu_soconnect 0\n" );
+	// bpf2 ( "kyu_soconnect 0\n" );
 
         if (so->so_options & SO_ACCEPTCONN)
 	    return (EOPNOTSUPP);
         if ( so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING) )
 	    error = EISCONN;
 
-	bpf2 ( "kyu_soconnect 1\n" );
+	// bpf2 ( "kyu_soconnect 1\n" );
 
 	error = tcp_usrreq ( so, PRU_CONNECT,
 	    (struct mbuf *)0, nam, (struct mbuf *)0);
 
-	bpf2 ( "kyu_soconnect 2 %d\n", error );
+	// bpf2 ( "kyu_soconnect 2 %d\n", error );
 
 #ifdef notdef
         // s = splnet();
@@ -234,7 +235,7 @@ tcp_accept ( struct socket *so )
                         break;
                 }
                 // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-		bpf2 ( "block in accept: %08x\n", so->kyu_sem );
+		// bpf2 ( "block in accept: %08x\n", so->kyu_sem );
 		sem_block ( so->kyu_sem );
         }
 

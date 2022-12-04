@@ -116,9 +116,9 @@ tcp_respond ( struct tcpcb *tp, struct tcpiphdr *ti, struct mbuf *m,
 	int win = 0;
 	struct route *ro = 0;
 	int sum;
-	int clen;	// XXX
+	// int clen;	// XXX
 
-	bpf2 ( "TCP respond, m = %08x\n", m );
+	// bpf2 ( "TCP respond, m = %08x\n", m );
 
 	if (tp) {
 		win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
@@ -162,11 +162,11 @@ tcp_respond ( struct tcpcb *tp, struct tcpiphdr *ti, struct mbuf *m,
 	 * Then tlen will be set to 40 bytes (IP and TCP both)
 	 */
 
-	clen = (sizeof (struct tcphdr) + tlen);
+	// clen = (sizeof (struct tcphdr) + tlen);
 	ti->ti_len = htons((u_short)(sizeof (struct tcphdr) + tlen));
 
 	tlen += sizeof (struct tcpiphdr);
-	printf ( "TCP respond, Clen, tlen = %d, %d\n",  clen, tlen );
+	// printf ( "TCP respond, Clen, tlen = %d, %d\n",  clen, tlen );
 
 	m->m_len = tlen;
 	m->m_pkthdr.len = tlen;
@@ -191,14 +191,14 @@ tcp_respond ( struct tcpcb *tp, struct tcpiphdr *ti, struct mbuf *m,
 	// This is the TCP checksum not the IP checksum
 
 	ti->ti_sum = tcp_cksum(m, tlen);
-	bpf2 ( "tcp respond checksum calculated: %x\n", ti->ti_sum );
-	sum = tcp_cksum(m, tlen);
-	bpf2 ( "tcp respond checksum verified: %x\n", sum );
+	// bpf2 ( "tcp respond checksum calculated: %x\n", ti->ti_sum );
+	// sum = tcp_cksum(m, tlen);
+	// bpf2 ( "tcp respond checksum verified: %x\n", sum );
 
 	/* Make it a proper IP header again */
 	((struct ip *)ti)->ip_len = tlen;	/* XXX - No htons() here */
 	((struct ip *)ti)->ip_ttl = ip_defttl;
-	bpf2 ( " =========================== TCP respond send %d\n", tlen );
+	// bpf2 ( " =========================== TCP respond send %d\n", tlen );
 
 	// (void) cksum_game ( m, tlen, "tcp_respond" );
 	(void) cksum_verify_outgoing ( m, tlen, "tcp_respond" );

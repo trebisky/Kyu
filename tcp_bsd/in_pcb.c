@@ -196,14 +196,16 @@ in_pcbconnect (inp, nam)
 	struct sockaddr_in *ifaddr;
 	register struct sockaddr_in *sin = mtod(nam, struct sockaddr_in *);
 
-	bpf3 ( "in_pcbconnect 0\n" );
+	// bpf3 ( "in_pcbconnect 0\n" );
+
 	if (nam->m_len != sizeof (*sin))
 		return (EINVAL);
 	if (sin->sin_family != AF_INET)
 		return (EAFNOSUPPORT);
 	if (sin->sin_port == 0)
 		return (EADDRNOTAVAIL);
-	bpf3 ( "in_pcbconnect 1\n" );
+
+	// bpf3 ( "in_pcbconnect 1\n" );
 
 	/* Do we have configured interfaces?
 	 */
@@ -265,7 +267,7 @@ in_pcbconnect (inp, nam)
 		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 			ia = ifatoia(ro->ro_rt->rt_ifa);
 #endif
-	bpf3 ( "in_pcbconnect 2\n" );
+	// bpf3 ( "in_pcbconnect 2\n" );
 
 		/* Always 0 for Kyu */
 		if (ia == 0) {
@@ -285,7 +287,8 @@ in_pcbconnect (inp, nam)
 			if (ia == 0)
 				return (EADDRNOTAVAIL);
 		}
-	bpf3 ( "in_pcbconnect 3\n" );
+
+	// bpf3 ( "in_pcbconnect 3\n" );
 
 #ifdef MULTICAST_STUFF
 		/*
@@ -312,7 +315,7 @@ in_pcbconnect (inp, nam)
 		ifaddr = (struct sockaddr_in *)&ia->ia_addr;
 	}
 
-	bpf3 ( "in_pcbconnect 4\n" );
+	// bpf3 ( "in_pcbconnect 4\n" );
 
 	if (in_pcblookup(inp->inp_head,
 	    sin->sin_addr,
@@ -328,13 +331,13 @@ in_pcbconnect (inp, nam)
 		inp->inp_laddr = ifaddr->sin_addr;
 	}
 
-	bpf2 ( "---------------- Set inp_faddr to %08x (in pcb_connect)\n", inp->inp_faddr );
+	// bpf2 ( "---------------- Set inp_faddr to %08x (in pcb_connect)\n", inp->inp_faddr );
 
 	inp->inp_faddr = sin->sin_addr;
 	inp->inp_fport = sin->sin_port;
 
-	bpf2 ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );
-	bpf2 ( "in_pcbconnect 5l %08x, %d\n", inp->inp_laddr, inp->inp_lport );
+	// bpf2 ( "in_pcbconnect 5f %08x, %d\n", inp->inp_faddr, inp->inp_fport );
+	// bpf2 ( "in_pcbconnect 5l %08x, %d\n", inp->inp_laddr, inp->inp_lport );
 	return (0);
 }
 

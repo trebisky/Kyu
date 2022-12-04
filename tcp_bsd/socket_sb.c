@@ -214,6 +214,27 @@ sbdrop ( struct sockbuf *sb, int len)
                 sb->sb_mb = next;
 }
 
+
+/*
+ * Drop a record off the front of a sockbuf
+ * and move the next record to the front.
+ */
+void
+sbdroprecord ( struct sockbuf *sb )
+{
+        struct mbuf *m, *mn;
+
+        m = sb->sb_mb;
+        if (m) {
+                sb->sb_mb = m->m_nextpkt;
+                do {
+                        sbfree(sb, m);
+                        // MFREE(m, mn);
+			mn = mb_free ( m );
+                } while (m = mn);
+        }
+}
+
 #ifdef notdef
 /*
  * Wakeup processes waiting on a socket buffer.

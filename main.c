@@ -522,7 +522,7 @@ sys_init ( long xxx )
 #endif
 
 	/* While we are working on BSD TCP */
-	set_ip_debug ( 1 );
+	// set_ip_debug ( 1 );
 
 	/* allow initialization of things that
 	 * require the network to be alive.

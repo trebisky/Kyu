@@ -41,8 +41,468 @@
 void socantrcvmore ( struct socket * );
 static void soqinsque ( struct socket *, struct socket *, int );
 int soqremque ( struct socket *, int );
+void soshutdown ( struct socket * );
+void sorflush ( struct socket * );
 
 #define	SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? M_NOWAIT : M_WAITOK)
+
+/* XXX - todo
+ *
+ * Some fine day.
+ *
+ * A number of things can be done to simplify (if nothing else) this code.
+ * For one thing, protosw should eventually be eradicated.
+ * This could lead to significant simplification of tcp_usrreq.c and
+ * migration of that code to locations where it is currently referenced.
+ *
+ * The uiomove/xiomove business should be eradicated.
+ * This is for scatter/gather IO which I have no intent of
+ *  providing for.
+ */
+
+/* tcp_shutdown()
+ * We found this sitting alongside of recv and send
+ * and perhaps it will come in handy someday.
+ */
+
+void
+tcp_shutdown ( struct socket *so )
+{
+	soshutdown ( so );
+}
+
+void
+soshutdown ( struct socket *so )
+{
+	sorflush(so);
+        (void) tcp_usrreq (so, PRU_SHUTDOWN,
+                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+#ifdef notdef
+	struct protosw *pr = so->so_proto;
+	how++;
+	if (how & FREAD)
+		sorflush(so);
+	if (how & FWRITE)
+		return ((*pr->pr_usrreq)(so, PRU_SHUTDOWN,
+		    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0));
+	return (0);
+#endif
+}
+
+
+/* Here is tcp_recv() -- what I hope to be the last addition
+ * to TCP for kyu.
+ *
+ * Under BSD (and linux) the syscalls are:
+ * 
+ *  recv ( so, buf, len, flags ) == read() with flags = 0
+ *  recvfrom ( so, buf, len, flags, NULL, 0 ) == recv()
+ *  recvmsg ( so, msghdr, flags ) -- scatter/gather with iovec
+ *
+ *  supporting code is in kern/uipc_syscalls.c
+ *  in particular recvit(), which calls soreceive()
+ *  this is in kern/uipc_socket.c
+ */
+
+/* Prototype */
+int
+soreceive (
+	struct socket *,
+	struct mbuf **,
+	struct uio *,
+	struct mbuf **,
+	struct mbuf **,
+	int *
+    );
+
+int
+tcp_recv ( struct socket *so, char *buf, int max )
+{
+	struct uio k_uio;
+	struct iovec k_vec;
+	int stat;
+	int n;
+
+	// bpf1 ( "kyu_recv - max = %d bytes\n", max );
+
+	k_vec.iov_base = buf;
+	k_vec.iov_len = max;
+
+	k_uio.uio_iov = &k_vec;
+        k_uio.uio_iovcnt = 1;
+
+	// obsolete now given xiomove
+        // k_uio.uio_segflg = UIO_USERSPACE;
+        // k_uio.uio_rw = UIO_READ;
+
+        k_uio.uio_offset = 0;
+        k_uio.uio_resid = max;
+
+	/* soo_read() does this:
+	return (soreceive((struct socket *)fp->f_data, (struct mbuf **)0,
+                uio, (struct mbuf **)0, (struct mbuf **)0, (int *)0));
+		*/
+
+	stat = soreceive ( so, (struct mbuf **)0, &k_uio,
+	    (struct mbuf **)0, (struct mbuf **)0, (int *)0 );
+
+	/* Typical output on two successive calls.
+	 * the first had 26 bytes delivered
+	 *  kyu_recv - iov = 0, 102 102, 26
+	 *  kyu_recv - base = 40567f6e
+	 *  kyu_recv - max = 128 bytes
+	 *  kyu_recv - iov = 0, 128 128, 0
+	 */
+
+	// bpf1 ( "kyu_recv - iov = %d, %d %d, %d\n", stat, k_vec.iov_len, k_uio.uio_resid, k_uio.uio_offset );
+	// bpf1 ( "kyu_recv - base = %08x\n", k_vec.iov_base );
+
+	n = k_uio.uio_offset;
+
+	return n;
+}
+
+/*
+ * Implement receive operations on a socket.
+ * We depend on the way that records are added to the sockbuf
+ * by sbappend*.  In particular, each record (mbufs linked through m_next)
+ * must begin with an address if the protocol so specifies,
+ * followed by an optional mbuf or mbufs containing ancillary data,
+ * and then zero or more mbufs of data.
+ * In order to avoid blocking network interrupts for the entire time here,
+ * we splx() while doing the actual copy to user space.
+ * Although the sockbuf is locked, new data may still be appended,
+ * and thus we must maintain consistency of the sockbuf during that time.
+ *
+ * The caller may receive the data as a single mbuf chain by supplying
+ * an mbuf **mp0 for use in returning the chain.  The uio is then used
+ * only for the count in uio_resid.
+ */
+
+//soreceive(so, paddr, uio, mp0, controlp, flagsp)
+
+int
+soreceive (
+	struct socket *so,
+	struct mbuf **paddr,	// generally 0
+	struct uio *uio,
+	// The following are generally all 0
+	struct mbuf **mp0, struct mbuf **controlp, int *flagsp )
+{
+	struct mbuf *m, **mp;
+	int flags, len, error, s, offset;
+	struct mbuf *nextrecord;
+	int moff, type;
+	int orig_resid = uio->uio_resid;
+
+	struct protosw *pr = so->so_proto;
+
+	mp = mp0;
+	if (paddr)
+		*paddr = 0;
+	if (controlp)
+		*controlp = 0;
+	if (flagsp)
+		flags = *flagsp &~ MSG_EOR;
+	else
+		flags = 0;
+
+	if (flags & MSG_OOB) {
+		// m = m_get(M_WAIT, MT_DATA);
+		m = (struct mbuf *) mb_get ( MT_DATA );
+
+		error = (*pr->pr_usrreq)(so, PRU_RCVOOB,
+		    m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
+
+		if (error)
+			goto bad;
+		do {
+			// error = uiomove(mtod(m, caddr_t),
+			//     (int) min(uio->uio_resid, m->m_len), uio);
+			error = xiomove ( mtod(m, caddr_t),
+			    (int) min(uio->uio_resid, m->m_len), uio, 1 );
+
+			// m = m_free(m);
+			m = mb_free(m);
+		} while (uio->uio_resid && error == 0 && m);
+
+bad:
+		if (m)
+			mb_freem(m);
+			// m_freem(m);
+		return (error);
+	}
+
+	if (mp)
+		*mp = (struct mbuf *)0;
+
+	if (so->so_state & SS_ISCONFIRMING && uio->uio_resid)
+		(*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
+		    (struct mbuf *)0, (struct mbuf *)0);
+
+restart:
+	if (error = sblock(&so->so_rcv, SBLOCKWAIT(flags)))
+		return (error);
+	s = splnet();
+
+	m = so->so_rcv.sb_mb;
+	/*
+	 * If we have less data than requested, block awaiting more
+	 * (subject to any timeout) if:
+	 *   1. the current count is less than the low water mark, or
+	 *   2. MSG_WAITALL is set, and it is possible to do the entire
+	 *	receive operation at once if we block (resid <= hiwat).
+	 *   3. MSG_DONTWAIT is not set
+	 * If MSG_WAITALL is set but resid is larger than the receive buffer,
+	 * we have to do the receive in sections, and thus risk returning
+	 * a short count if a timeout or signal occurs after we start.
+	 */
+	if (m == 0 || ((flags & MSG_DONTWAIT) == 0 &&
+	    so->so_rcv.sb_cc < uio->uio_resid) &&
+	    (so->so_rcv.sb_cc < so->so_rcv.sb_lowat ||
+	    ((flags & MSG_WAITALL) && uio->uio_resid <= so->so_rcv.sb_hiwat)) &&
+	    m->m_nextpkt == 0 && (pr->pr_flags & PR_ATOMIC) == 0) {
+#ifdef DIAGNOSTIC
+		if (m == 0 && so->so_rcv.sb_cc)
+			panic("receive 1");
+#endif
+		if (so->so_error) {
+			if (m)
+				goto dontblock;
+			error = so->so_error;
+			if ((flags & MSG_PEEK) == 0)
+				so->so_error = 0;
+			goto release;
+		}
+		if (so->so_state & SS_CANTRCVMORE) {
+			if (m)
+				goto dontblock;
+			else
+				goto release;
+		}
+		for (; m; m = m->m_next)
+			if (m->m_type == MT_OOBDATA  || (m->m_flags & M_EOR)) {
+				m = so->so_rcv.sb_mb;
+				goto dontblock;
+			}
+		if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) == 0 &&
+		    (so->so_proto->pr_flags & PR_CONNREQUIRED)) {
+			error = ENOTCONN;
+			goto release;
+		}
+		if (uio->uio_resid == 0)
+			goto release;
+		if ((so->so_state & SS_NBIO) || (flags & MSG_DONTWAIT)) {
+			error = EWOULDBLOCK;
+			goto release;
+		}
+		sbunlock(&so->so_rcv);
+		error = sbwait(&so->so_rcv);
+		splx(s);
+		if (error)
+			return (error);
+		goto restart;
+	}
+
+dontblock:
+
+	// if (uio->uio_procp)
+	// 	uio->uio_procp->p_stats->p_ru.ru_msgrcv++;
+
+	nextrecord = m->m_nextpkt;
+	if (pr->pr_flags & PR_ADDR) {
+#ifdef DIAGNOSTIC
+		if (m->m_type != MT_SONAME)
+			panic("receive 1a");
+#endif
+		orig_resid = 0;
+		if (flags & MSG_PEEK) {
+			if (paddr)
+				*paddr = m_copy(m, 0, m->m_len);
+			m = m->m_next;
+		} else {
+			sbfree(&so->so_rcv, m);
+			if (paddr) {
+				*paddr = m;
+				so->so_rcv.sb_mb = m->m_next;
+				m->m_next = 0;
+				m = so->so_rcv.sb_mb;
+			} else {
+				// MFREE(m, so->so_rcv.sb_mb);
+				// m = so->so_rcv.sb_mb;
+				m = so->so_rcv.sb_mb = mb_free ( m );
+			}
+		}
+	}
+
+	while (m && m->m_type == MT_CONTROL && error == 0) {
+		if (flags & MSG_PEEK) {
+			if (controlp)
+				*controlp = m_copy(m, 0, m->m_len);
+			m = m->m_next;
+		} else {
+			sbfree(&so->so_rcv, m);
+			if (controlp) {
+				if (pr->pr_domain->dom_externalize &&
+				    mtod(m, struct cmsghdr *)->cmsg_type ==
+				    SCM_RIGHTS)
+				   error = (*pr->pr_domain->dom_externalize)(m);
+				*controlp = m;
+				so->so_rcv.sb_mb = m->m_next;
+				m->m_next = 0;
+				m = so->so_rcv.sb_mb;
+			} else {
+				// MFREE(m, so->so_rcv.sb_mb);
+				// m = so->so_rcv.sb_mb;
+				m = so->so_rcv.sb_mb = mb_free ( m );
+			}
+		}
+		if (controlp) {
+			orig_resid = 0;
+			controlp = &(*controlp)->m_next;
+		}
+	}
+
+	if (m) {
+		if ((flags & MSG_PEEK) == 0)
+			m->m_nextpkt = nextrecord;
+		type = m->m_type;
+		if (type == MT_OOBDATA)
+			flags |= MSG_OOB;
+	}
+
+	moff = 0;
+	offset = 0;
+	while (m && uio->uio_resid > 0 && error == 0) {
+		if (m->m_type == MT_OOBDATA) {
+			if (type != MT_OOBDATA)
+				break;
+		} else if (type == MT_OOBDATA)
+			break;
+#ifdef DIAGNOSTIC
+		else if (m->m_type != MT_DATA && m->m_type != MT_HEADER)
+			panic("receive 3");
+#endif
+		so->so_state &= ~SS_RCVATMARK;
+		len = uio->uio_resid;
+		if (so->so_oobmark && len > so->so_oobmark - offset)
+			len = so->so_oobmark - offset;
+		if (len > m->m_len - moff)
+			len = m->m_len - moff;
+		/*
+		 * If mp is set, just pass back the mbufs.
+		 * Otherwise copy them out via the uio, then free.
+		 * Sockbuf must be consistent here (points to current mbuf,
+		 * it points to next record) when we drop priority;
+		 * we must note any additions to the sockbuf when we
+		 * block interrupts again.
+		 */
+		if (mp == 0) {
+			splx(s);
+			// error = uiomove(mtod(m, caddr_t) + moff, (int)len, uio);
+			error = xiomove ( mtod(m, caddr_t) + moff, (int)len, uio, 1);
+			s = splnet();
+		} else
+			uio->uio_resid -= len;
+		if (len == m->m_len - moff) {
+			if (m->m_flags & M_EOR)
+				flags |= MSG_EOR;
+			if (flags & MSG_PEEK) {
+				m = m->m_next;
+				moff = 0;
+			} else {
+				nextrecord = m->m_nextpkt;
+				sbfree(&so->so_rcv, m);
+				if (mp) {
+					*mp = m;
+					mp = &m->m_next;
+					so->so_rcv.sb_mb = m = m->m_next;
+					*mp = (struct mbuf *)0;
+				} else {
+					// MFREE(m, so->so_rcv.sb_mb);
+					// m = so->so_rcv.sb_mb;
+					m = so->so_rcv.sb_mb = mb_free ( m );
+				}
+				if (m)
+					m->m_nextpkt = nextrecord;
+			}
+		} else {
+			if (flags & MSG_PEEK)
+				moff += len;
+			else {
+				if (mp)
+					*mp = m_copym(m, 0, len, M_WAIT);
+				m->m_data += len;
+				m->m_len -= len;
+				so->so_rcv.sb_cc -= len;
+			}
+		}
+		if (so->so_oobmark) {
+			if ((flags & MSG_PEEK) == 0) {
+				so->so_oobmark -= len;
+				if (so->so_oobmark == 0) {
+					so->so_state |= SS_RCVATMARK;
+					break;
+				}
+			} else {
+				offset += len;
+				if (offset == so->so_oobmark)
+					break;
+			}
+		}
+		if (flags & MSG_EOR)
+			break;
+		/*
+		 * If the MSG_WAITALL flag is set (for non-atomic socket),
+		 * we must not quit until "uio->uio_resid == 0" or an error
+		 * termination.  If a signal/timeout occurs, return
+		 * with a short count but without error.
+		 * Keep sockbuf locked against other readers.
+		 */
+		while (flags & MSG_WAITALL && m == 0 && uio->uio_resid > 0 &&
+		    !sosendallatonce(so) && !nextrecord) {
+			if (so->so_error || so->so_state & SS_CANTRCVMORE)
+				break;
+			error = sbwait(&so->so_rcv);
+			if (error) {
+				sbunlock(&so->so_rcv);
+				splx(s);
+				return (0);
+			}
+			if (m = so->so_rcv.sb_mb)
+				nextrecord = m->m_nextpkt;
+		}
+	}
+
+	if (m && pr->pr_flags & PR_ATOMIC) {
+		flags |= MSG_TRUNC;
+		if ((flags & MSG_PEEK) == 0)
+			(void) sbdroprecord(&so->so_rcv);
+	}
+	if ((flags & MSG_PEEK) == 0) {
+		if (m == 0)
+			so->so_rcv.sb_mb = nextrecord;
+		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
+			(*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
+			    (struct mbuf *)flags, (struct mbuf *)0,
+			    (struct mbuf *)0);
+	}
+	if (orig_resid == uio->uio_resid && orig_resid &&
+	    (flags & MSG_EOR) == 0 && (so->so_state & SS_CANTRCVMORE) == 0) {
+		sbunlock(&so->so_rcv);
+		splx(s);
+		goto restart;
+	}
+		
+	if (flagsp)
+		*flagsp |= flags;
+
+release:
+	sbunlock(&so->so_rcv);
+	splx(s);
+	return (error);
+}
 
 /* under unix (BSD), write, send, sento, and sendmsg are all ways
  * of writing to a network connection.
@@ -88,6 +548,7 @@ tcp_send ( struct socket *so, char *buf, int len )
 	k_uio.uio_iov = &k_vec;
         k_uio.uio_iovcnt = 1;
 
+	// obsolete now given xiomove
         k_uio.uio_segflg = UIO_USERSPACE;
         k_uio.uio_rw = UIO_WRITE;
 
@@ -432,6 +893,7 @@ uiomove(cp, n, uio)
         if (uio->uio_segflg == UIO_USERSPACE && uio->uio_procp != curproc)
                 panic("uiomove proc");
 #endif
+
         while (n > 0 && uio->uio_resid) {
                 iov = uio->uio_iov;
                 cnt = iov->iov_len;

@@ -451,13 +451,15 @@ cksum_game ( struct mbuf *min, int incoming, char *msg )
 int
 cksum_verify_incoming ( struct mbuf *min, int xlen, char *msg )
 {
-	return cksum_game ( min, 1, msg );
+	// return cksum_game ( min, 1, msg );
+	return 0;
 }
 
 int
 cksum_verify_outgoing ( struct mbuf *min, int xlen, char *msg )
 {
-	return cksum_game ( min, 0, msg );
+	// return cksum_game ( min, 0, msg );
+	return 0;
 }
 
 void
@@ -492,17 +494,15 @@ tcp_show_pkt ( struct mbuf *m, char *msg )
  * protocol specification dated September, 1981 very closely.
  */
 void
-tcp_input(m, iphlen)
-	register struct mbuf *m;
-	int iphlen;
+tcp_input ( struct mbuf *m, int iphlen)
 {
-	register struct tcpiphdr *ti;
-	register struct inpcb *inp;
+	struct tcpiphdr *ti;
+	struct inpcb *inp;
 	caddr_t optp = NULL;
 	int optlen;
 	int len, tlen, off;
-	register struct tcpcb *tp = 0;
-	register int tiflags;
+	struct tcpcb *tp = 0;
+	int tiflags;
 	struct socket *so;
 	int todrop, acked, ourfinisacked, needoutput = 0;
 	short ostate;
@@ -514,13 +514,13 @@ tcp_input(m, iphlen)
 
 	tcpstat.tcps_rcvtotal++;
 
-	printf ( "  ********************************\n" );
-	printf ( "  ********* tcp_input ************\n" );
-	printf ( "  ********************************\n" );
+	// printf ( "  ********************************\n" );
+	// printf ( "  ********* tcp_input ************\n" );
+	// printf ( "  ********************************\n" );
 
-	printf ( "TCP_INPUT iphlem = %d\n", iphlen );
+	// printf ( "TCP_INPUT iphlem = %d\n", iphlen );
 
-	tcp_show_pkt ( m, "tcp_input" );
+	// tcp_show_pkt ( m, "tcp_input" );
 
 	// (void) cksum_game ( m, iphlen, "tcp_input" );
 	(void) cksum_verify_incoming ( m, iphlen, "tcp_input" );
@@ -575,9 +575,9 @@ tcp_input(m, iphlen)
 
 	tlen = ((struct ip *)ti)->ip_len;
 
-	bpf3 ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
-	printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
-	printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+	// bpf3 ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+	// printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+	// printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
 
 	len = sizeof (struct ip) + tlen;
 	ti->ti_next = ti->ti_prev = 0;
@@ -586,12 +586,12 @@ tcp_input(m, iphlen)
 	HTONS(ti->ti_len);
 
 	// mbuf_show ( m, "tcp_input 1" );
-	bpf3 ( "tcp_input 1 %08x, %d\n", ti, len );
+	// bpf3 ( "tcp_input 1 %08x, %d\n", ti, len );
 
 	// if (ti->ti_sum = in_cksum(m, len)) {
 	// if (ti->ti_sum = tcp_cksum(m, len)) {
 	ti->ti_sum = tcp_cksum(m, len);
-	bpf2 ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
+	// bpf2 ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
 	if ( ti->ti_sum ) {
 		tcpstat.tcps_rcvbadsum++;
 		printf ( " *** *** *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
@@ -599,7 +599,7 @@ tcp_input(m, iphlen)
 		goto drop;
 	}
 
-	bpf3 ( "tcp_input 3\n" );
+	// bpf3 ( "tcp_input 3\n" );
 	/*
 	 * Check that TCP offset makes sense,
 	 * pull out TCP options and adjust length.		XXX
@@ -607,14 +607,14 @@ tcp_input(m, iphlen)
 	off = ti->ti_off << 2;
 	if (off < sizeof (struct tcphdr) || off > tlen) {
 		tcpstat.tcps_rcvbadoff++;
-		bpf3 ( "tcp_input 4\n" );
+		// bpf3 ( "tcp_input 4\n" );
 		goto drop;
 	}
-	bpf3 ( "tcp_input 5\n" );
+	// bpf3 ( "tcp_input 5\n" );
 	tlen -= off;
 	ti->ti_len = tlen;
 	if (off > sizeof (struct tcphdr)) {
-		bpf3 ( "tcp_input 6\n" );
+		// bpf3 ( "tcp_input 6\n" );
 		if (m->m_len < sizeof(struct ip) + off) {
 			if ((m = m_pullup(m, sizeof (struct ip) + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
@@ -642,7 +642,7 @@ tcp_input(m, iphlen)
 			optp = NULL;	/* we've parsed the options */
 		}
 	}
-	bpf3 ( "tcp_input 7A\n" );
+	// bpf3 ( "tcp_input 7A\n" );
 	tiflags = ti->ti_flags;
 
 	/*
@@ -692,7 +692,7 @@ findpcb:
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 	
-	bpf3 ( "tcp_input 8\n" );
+	// bpf3 ( "tcp_input 8\n" );
 
 	/* Unscale the window into a 32-bit value. */
 	if ((tiflags & TH_SYN) == 0)
@@ -1649,7 +1649,7 @@ dropafterack:
 	return;
 
 dropwithreset:
-	bpf1 ( "tcp_input 9 (drop with reset)\n" );
+	// bpf1 ( "tcp_input 9 (drop with reset)\n" );
 	/*
 	 * Generate a RST, dropping incoming segment.
 	 * Make ACK acceptable to originator of segment.
@@ -1672,7 +1672,7 @@ dropwithreset:
 	return;
 
 drop:
-	bpf1 ( "tcp_input 10 (just drop)\n" );
+	// bpf1 ( "tcp_input 10 (just drop)\n" );
 	/*
 	 * Drop space held by incoming segment and return.
 	 */

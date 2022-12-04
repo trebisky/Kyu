@@ -148,14 +148,30 @@ void socantsendmore ( struct socket * );
 /* ----------------------------- */
 /* ----------------------------- */
 
+#define TEST_BUF_SIZE	128
+
 void
 connect_test ( char *host, int port )
 {
 	struct socket *so;
+	char buf[TEST_BUF_SIZE];
+	int i, n;
 
-	bpf1 ( "Start connect to %s (%d)\n", host, port );
+	bpf1 ( "Start connect to %s (port %d)\n", host, port );
 	so = tcp_connect ( host, port );
-	bpf1 ( "Connect returns: %08x\n", so );
+	// bpf1 ( "Connect returns: %08x\n", so );
+
+	for ( i=0; i<5; i++ ) {
+	    thr_delay ( 1000 );		// 1 second
+	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
+	    printf ( "%d bytes received\n", n );
+	    if ( n > 0 ) {
+		buf[n-2] = '\n';
+		buf[n-1] = '\0';
+		printf ( "%s", buf );
+		// dump_buf ( buf, n );
+	    }
+	}
 
 	(void) soclose ( so );
 	bpf1 ( "Connect closed and finished\n" );

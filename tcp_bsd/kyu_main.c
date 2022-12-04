@@ -256,14 +256,14 @@ tcp_thread ( long xxx )
 	    sem_unblock ( tcp_lock_sem );
 
             if ( nbp ) {
-		bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
+		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
                 continue;
             }
 
             /* Wait for another packet.
              */
-	    bpf2 ( "TCP thread waiting\n" );
+	    // bpf2 ( "TCP thread waiting\n" );
             sem_block_cpu ( tcp_q_sem );
 	}
 
@@ -277,7 +277,7 @@ static void
 tcp_bsd_rcv ( struct netbuf *nbp )
 {
         nbp->next = (struct netbuf *) 0;
-	bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
+	// bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
 	sem_block ( tcp_lock_sem );
 	    // printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
@@ -331,7 +331,8 @@ tcp_bsd_process ( struct netbuf *nbp )
 	    printf ( "** mb_devget fails\n" );
 	    return;
 	}
-	mbuf_game ( m, "tcp_bsd_process" );
+
+	// mbuf_game ( m, "tcp_bsd_process" );
 
 	/* We can free it now since we have copied everything into
 	 * an mbuf.
@@ -366,6 +367,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         int size = 0;
 	char *buf;
 
+#ifdef notdef
 	bpf3 ( "TCP(bsd): ip_output\n" );
 	bpf3 ( " ip_output A = %08x\n", A );
 	bpf3 ( " ip_output B = %08x\n", B );
@@ -376,6 +378,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 	mbuf_show ( A, "ip_output" );
 	// dump_buf ( (char *) A, 128 );
 	bpf_dump ( 3, (char *) A, 128 );
+#endif
 
         nbp = netbuf_alloc ();
         if ( ! nbp )
@@ -412,7 +415,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 
 	ipp = nbp->iptr;
 
-	bpf2 ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
+	// bpf2 ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
 	// Hand it to the Kyu IP layer
         ip_send ( nbp, ipp->dst );
 
