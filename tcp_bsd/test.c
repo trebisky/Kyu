@@ -95,12 +95,16 @@ static void connect_test ( char *, int );
 void
 client_thread ( long xxx )
 {
-	// int port = 13;
+	// I just picked 111 at random for experimentation,
+	// but it turns out to be "ONC RPC"
+	// which is part of Sun NFS and is running on
+	// my linux machine (for some ancient reason).
+	// int port = 111;
 	// int port = 2345;
-	int port = 111;
+	int port = 13;		// Daytime
 
-	// char *host = "192.168.0.6";
-	char *host = "127.0.0.1";
+	char *host = "192.168.0.5";
+	// char *host = "127.0.0.1";
 
 	bpf1 ( "***\n" );
 	bpf1 ( "Start connect test *******************\n" );

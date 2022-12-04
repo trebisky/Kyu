@@ -482,6 +482,9 @@ send:
 		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
 		    optlen + len));
 
+#ifdef notdef
+	// This should be done at a much deeper level.
+	// maybe tcp_template() or deeper yet.
 	// Here is a gross hack XXX
 	// tjt  11-22-2022
 	// This should get done in tcp_template() in tcp_subr.c
@@ -489,6 +492,7 @@ send:
 	// We need to get this right before checksum calculation.
 	if ( ! ti->ti_src.s_addr )
 	    ti->ti_src.s_addr = htonl ( get_our_ip () );
+#endif
 
 #ifdef notdef
 	{
@@ -679,11 +683,19 @@ tcp_template(tp)
 	n->ti_x1 = 0;
 	n->ti_pr = IPPROTO_TCP;
 	n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
+
 	n->ti_src = inp->inp_laddr;
 	n->ti_dst = inp->inp_faddr;
+
+	/* Hack -- 12-4-2022 */
+	if ( ! n->ti_src.s_addr )
+	    n->ti_src.s_addr = htonl ( get_our_ip () );
+
 	bpf2 ( "TCP template sets dst to %08x\n", n->ti_dst );
+
 	n->ti_sport = inp->inp_lport;
 	n->ti_dport = inp->inp_fport;
+
 	n->ti_seq = 0;
 	n->ti_ack = 0;
 	n->ti_x2 = 0;
