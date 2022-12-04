@@ -191,24 +191,36 @@ struct pseudo {
 
 /* Non destructive.
  */
-static int
-ez_tcp_cksum ( struct tcpiphdr *ti )
+int
+ez_tcp_cksum ( struct tcpiphdr *ti, int incoming )
 {
         struct pseudo ps;
         int rv = 0;
-        int len = ((struct ip *)ti)->ip_len;
+        int ilen;
+	int len;
+
+        ilen = ((struct ip *)ti)->ip_len;
+
+	/* We want just the count of the TCP part */
+	if ( incoming )
+	    len = ilen;		// incoming has IP header size already subtracted
+	else
+	    len = ilen - sizeof(struct ip);
 
 	// printf ( "sizeof pseudo: %d\n", sizeof(struct pseudo) );
+	printf ( " EZ cksum payload length is len (ilen) = %d (%d)\n", len, ilen );
 
         ps.dst = ti->ti_dst.s_addr;
         ps.src = ti->ti_src.s_addr;
         ps.len = htons(len);
         ps.type = htons(6);     // TCP
 
-	printf ( "Pseudo header: ..\n" );
-	dump_buf ( &ps, sizeof(struct pseudo) );
+	// printf ( "Pseudo header: ..\n" );
+	// dump_buf ( &ps, sizeof(struct pseudo) );
 
         rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
+
+	/* This sum over same count as placed in pseudo header above */
         return ~in_cksum_i ( (char *) &ti->ti_t, len, rv ) & 0xffff;
 }
 
@@ -218,7 +230,7 @@ mbuf_game ( struct mbuf *m, char *msg )
 	// struct mbuf *xm;
 	char *p;
 
-	printf ( " =============================================================\n" );
+	printf ( " ========================================================\n" );
 	printf ( " = mbuf display ... %s\n", msg );
 
 	// xm = (struct mbuf *) 0;
@@ -237,10 +249,13 @@ mbuf_game ( struct mbuf *m, char *msg )
 
 	dump_buf ( (char *) p, m->m_len );
 
-	printf ( " =============================================================\n" );
+	printf ( " ========================================================\n" );
 	// printf ( "Finished with mbuf game\n" );
 }
 
+/* Sleazy because of unchecked assumptions.
+ * in particular, assumes packet fits into the first mbuf
+ */
 void
 sleazy_mbuf_copy ( struct mbuf *dst, struct mbuf *src )
 {
@@ -257,33 +272,110 @@ sleazy_mbuf_copy ( struct mbuf *dst, struct mbuf *src )
 	dst->m_data = (char *)dst + off;
 }
 
-void
-cksum_game ( struct mbuf *min, char *msg )
+int
+safe_tcp_cksum ( struct mbuf *min, int incoming )
 {
 	struct mbuf m_local;
 	struct mbuf *m;
 	struct tcpiphdr *ti;
+	int mlen;
 	int tlen;
 	int len;
-	int sum;
-	// int off;
-	// char *p;
-	char cmsg[64];
-
-	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
-	printf ( "Start checksum game ... %s\n", msg );
-	mbuf_game ( min, msg );
-	// p = mtod(min, char *);
 
 	m = &m_local;
 	sleazy_mbuf_copy ( m, min );
 
-	strcpy ( cmsg, msg );
-	strcat ( cmsg, " (copy)" );
-	// printf ( " copy mbuf: %08x\n", m );
-	mbuf_game ( m, cmsg );
-
 	ti = mtod(m, struct tcpiphdr *);
+
+	// printf ( "tlen R = %04x\n", tlen );
+	// tlen = ntohs( ((struct ip *)ti)->ip_len );
+	// printf ( "tlen S = %04x\n", tlen );
+
+	/*
+	 * This comment it out of date and needs rewrite XXX
+	 * tlen and mlen are useless for us.
+	 *
+	 * This is right (and matches mlen) for incoming packets.
+	 * But for outgoing packets it is wrong.
+	 * For outgoing packets the len in the header
+	 * includes the IP header size -- as it should.
+	 * The reason is that for incoming packeets, once
+	 * we get to tcp_input(), the len field in the IP
+	 * header has been "adjusted" by subtracting the
+	 * size of the IP header.  This is what the BSD code
+	 * does and what tcp_input() expects, but it does
+	 * confuse things here.
+	 * So, for my purposes here, I just use mlen, which
+	 * always seems to be correct.
+	 */
+
+	mlen = m->m_len;	// information only
+
+	/* Don't blame me, these BSD guys did weird stuff */
+	if ( incoming ) {
+	    tlen = ((struct ip *)ti)->ip_len;	/* maybe 40 */
+	    len = tlen + sizeof (struct ip);	/* maybe 60 */
+	} else {
+	    len = ((struct ip *)ti)->ip_len;	/* maybe 40 */
+	    tlen = len - sizeof (struct ip);	/* maybe 20 */
+	}
+
+	printf ( "tlen, tlen, mlen, len = %04x, %d, %d [%d]\n", tlen, tlen, mlen, len );
+
+	/* Emulate the BSD way of acting like we had
+	 * a pseudo header.
+	 * This is destructive (which is why we made a copy).
+	 */
+	ti->ti_next = ti->ti_prev = 0;
+	ti->ti_x1 = 0;
+	ti->ti_len = (u_short) tlen;	/* perhaps 40 */
+	HTONS(ti->ti_len);
+
+	// printf ( "TCP pseudo IP: ...\n" );
+	// dump_buf ( (char *) ti, 20 );
+
+	return tcp_cksum ( m, len );	/* perhaps 60 */
+}
+
+/* 
+ * We need the incoming argument because BSD does different hairball things
+ * with the length in the IP header.  For input packets, it has had the
+ * ip header length (20) subtracted.  For output packets, it is the whole
+ * thing.
+ */
+int
+cksum_game ( struct mbuf *min, int incoming, char *msg )
+{
+	// struct mbuf m_local;
+	struct mbuf *m;
+	struct tcpiphdr *ti;
+	int tlen;
+	int mlen;
+	int sum;
+	// char cmsg[64];
+	int rv = 0;
+
+	// xlen -= sizeof(struct ip);
+
+	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
+	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
+	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
+	printf ( "Start checksum game ... %s\n", msg );
+
+	mbuf_game ( min, msg );
+
+	// m = &m_local;
+	// sleazy_mbuf_copy ( m, min );
+	m = min;
+
+	mlen = m->m_len;
+	ti = mtod(m, struct tcpiphdr *);
+
+#ifdef notdef
+	// strcpy ( cmsg, msg );
+	// strcat ( cmsg, " (copy)" );
+	// mbuf_game ( m, cmsg );
+
 	// printf ( " copy mbuf data at: %08x\n", ti );
 	printf ( "\n" );
 
@@ -293,17 +385,11 @@ cksum_game ( struct mbuf *min, char *msg )
 	// dump_buf ( (char *) m, 128 );
 
 	tlen = ((struct ip *)ti)->ip_len;
-	printf ( "tlen = %04x\n", tlen );
-	// printf ( "tlen R = %04x\n", tlen );
-	// tlen = ntohs( ((struct ip *)ti)->ip_len );
-	// printf ( "tlen S = %04x\n", tlen );
-
-	len = sizeof (struct ip) + tlen;
-	printf ( "tlen, len = %d, %d\n", tlen, len );
+	printf ( "tlen, tlen, mlen, len = %04x, %d, %d %d\n", tlen, tlen, mlen, len );
 
 	/* Emulate the BSD way of acting like we had
 	 * a pseudo header.
-	 * This is destructive (which is why we make a copy).
+	 * This is destructive (which is why we made a copy).
 	 */
 	ti->ti_next = ti->ti_prev = 0;
 	ti->ti_x1 = 0;
@@ -313,22 +399,92 @@ cksum_game ( struct mbuf *min, char *msg )
 	printf ( "TCP pseudo IP: ...\n" );
 	dump_buf ( (char *) ti, 20 );
 
-	sum = tcp_cksum(m, len);
-	printf ( "BSD checksum (%d) = %04x\n", len, sum );
+	sum = tcp_cksum(m, mlen);
+#endif
 
-        sum =  ~in_cksum_i ( (char *) ti, len, 0 ) & 0xffff;
-	printf ( "KYU checksum (%d) = %04x\n", len, sum );
-        sum =  in_cksum ( (char *) ti, len );
-	printf ( "KYU checksum (%d) = %04x\n", len, sum );
+	sum = safe_tcp_cksum ( m, incoming );
+	printf ( "BSD checksum (%d) = %04x\n", 999, sum );
+	rv += sum;
 
-	sleazy_mbuf_copy ( m, min );
-	// m_local = *min;
-	ti = mtod ( m, struct tcpiphdr *);
-	sum = ez_tcp_cksum ( ti );
+#ifdef notdef
+	/* For this to work, we need the header butchered
+	 * in the fashion the BSD code does, but this is
+	 * now encapsulated inside safe_tcp_cksum()
+	 */
+	// matches what follows, so no longer need both
+        // sum =  ~in_cksum_i ( (char *) ti, len, 0 ) & 0xffff;
+	// printf ( "KYU checksum (%d) = %04x\n", len, sum );
+        sum =  in_cksum ( (char *) ti, mlen );
+	printf ( "KYU checksum (%d) = %04x\n", mlen, sum );
+	rv += sum;
+#endif
+
+	// sleazy_mbuf_copy ( m, min );
+	// ti = mtod ( m, struct tcpiphdr *);
+
+	sum = ez_tcp_cksum ( ti, incoming );
 	printf ( "EZ checksum = %04x\n", sum );
+	rv += sum;
 
+	if ( rv ) {
+	    printf ( " ?????????????????????? bad checksum\n" );
+	    printf ( " ?????????????????????? bad checksum\n" );
+	    printf ( " ?????????????????????? bad checksum\n" );
+	    printf ( " ?????????????????????? bad checksum\n" );
+	}
+
+	printf ( "Finished with checksum game\n" );
 	printf ( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n" );
-	// printf ( "Finished with checksum game\n" );
+	return rv;
+}
+
+/* I am ready to curse these BSD developers.
+ * They were willing to cut any corner, perhaps in a effort to write
+ * the most efficient code to run on memory limited 1 MIPS Vax machines.
+ * Sometimes the count in the ip header is one thing, and then
+ * other times it is another.  Everything is host order, usually,
+ * except for that darn count.  And don't even get me started about
+ * the crazy games they play doing the checksum calculation, and then
+ * they entirely change the meaning of the "len" field immediately after.
+ */
+
+int
+cksum_verify_incoming ( struct mbuf *min, int xlen, char *msg )
+{
+	return cksum_game ( min, 1, msg );
+}
+
+int
+cksum_verify_outgoing ( struct mbuf *min, int xlen, char *msg )
+{
+	return cksum_game ( min, 0, msg );
+}
+
+void
+tcp_show_pkt ( struct mbuf *m, char *msg )
+{
+	struct tcpiphdr *ti;
+	int sum;
+
+	printf ( "TCP packet from; %s (mlen = %d bytes)\n", msg, m->m_len );
+
+	ti = mtod(m, struct tcpiphdr *);
+	dump_buf ( (char *) ti, 32 );
+	// printf ( " ti len: %d\n", ti->ti_len ); actually checksun
+	printf ( " ip len: %d\n", ((struct ip *)ti)->ip_len );
+	printf ( " ip sum: 0x%04x\n", ((struct ip *)ti)->ip_sum );
+	printf ( " ti src: %s\n", ip2str32 ( ti->ti_src.s_addr ) );
+	printf ( " ti dst: %s\n", ip2str32 ( ti->ti_dst.s_addr ) );
+	printf ( " flags : %04x\n", ti->ti_flags );
+
+	// pointless because ..
+	// printf ( " IP checksum: %d\n", tcp_cksum ( m, 20 ) );
+	// printf ( " TCP checksum: 0x%04x\n", ez_tcp_cksum_x ( ti ) );
+
+	// sum = ez_tcp_cksum ( ti );
+	// printf ( " TCP checksum: 0x%04x\n", sum );
+	// if ( sum )
+	//     printf ( "   ^^^^^^^^^^  ^^^^^^^^^^  **** BAD checksum\n" );
 }
 
 /*
@@ -358,16 +514,24 @@ tcp_input(m, iphlen)
 
 	tcpstat.tcps_rcvtotal++;
 
+	printf ( "  ********************************\n" );
+	printf ( "  ********* tcp_input ************\n" );
+	printf ( "  ********************************\n" );
+
+	printf ( "TCP_INPUT iphlem = %d\n", iphlen );
+
 	tcp_show_pkt ( m, "tcp_input" );
-	cksum_game ( m, "tcp_input" );
-	tcp_show_pkt ( m, "tcp_input" );
+
+	// (void) cksum_game ( m, iphlen, "tcp_input" );
+	(void) cksum_verify_incoming ( m, iphlen, "tcp_input" );
+
+	// tcp_show_pkt ( m, "tcp_input" );
 
 	/*
 	 * Get IP and TCP header together in first mbuf.
 	 * Note: IP leaves IP header in first mbuf.
 	 */
 	ti = mtod(m, struct tcpiphdr *);
-	bpf3 ( "tcp_input 0 len = %d\n", iphlen );
 
 	// dumps beyond end of mbuf
 	// dump_buf ( (char *) ti, 128 );
@@ -375,6 +539,7 @@ tcp_input(m, iphlen)
 	if (iphlen > sizeof (struct ip))
 		ip_stripoptions ( m );
 		// ip_stripoptions(m, (struct mbuf *)0);
+
 	if (m->m_len < sizeof (struct tcpiphdr)) {
 		if ((m = m_pullup(m, sizeof (struct tcpiphdr))) == 0) {
 			tcpstat.tcps_rcvshort++;
@@ -402,8 +567,18 @@ tcp_input(m, iphlen)
 	 * So, you don't see sum explicitly get set to 0
 	 *  in what follows, but that is the price you
 	 *  pay for cleverly optimized code.
+	 *
+	 * Also note that the ip_len field in the header is:
+	 *  - in host byte order
+	 *  - has had the ip header size already subtracted off
 	 */
+
 	tlen = ((struct ip *)ti)->ip_len;
+
+	bpf3 ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+	printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+	printf ( " tcp_input: length in header, iphlen = %d, %d\n", tlen, iphlen );
+
 	len = sizeof (struct ip) + tlen;
 	ti->ti_next = ti->ti_prev = 0;
 	ti->ti_x1 = 0;

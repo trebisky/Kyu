@@ -85,61 +85,14 @@ tcp_init()
 	tcp_iss = 1;		/* wrong */
 	tcb.inp_next = tcb.inp_prev = &tcb;
 
-	/* Adjust these if needed */
+	/* Adjust these if needed
+	 *  (probably not)
+	 */
 	if (max_protohdr < sizeof(struct tcpiphdr))
 		max_protohdr = sizeof(struct tcpiphdr);
 
 	if (max_linkhdr + sizeof(struct tcpiphdr) > MHLEN)
 		panic("tcp_init");
-}
-
-/*
- * Create template to be used to send tcp packets on a connection.
- * Call after host entry created, allocates an mbuf and fills
- * in a skeletal tcp/ip header, minimizing the amount of work
- * necessary when the connection is used.
- */
-struct tcpiphdr *
-tcp_template(tp)
-	struct tcpcb *tp;
-{
-	register struct inpcb *inp = tp->t_inpcb;
-	register struct tcpiphdr *n;
-// KYU
-//	register struct mbuf *m;
-
-#ifdef KYU
-	if ((n = tp->t_template) == 0) {
-		n = &tp->t_static_template;
-	}
-#else
-	if ((n = tp->t_template) == 0) {
-		// m = m_get(M_DONTWAIT, MT_HEADER);
-		m = mb_get ( MT_HEADER );
-		if (m == NULL)
-			return (0);
-		m->m_len = sizeof (struct tcpiphdr);
-		n = mtod(m, struct tcpiphdr *);
-	}
-#endif
-	n->ti_next = n->ti_prev = 0;
-	n->ti_x1 = 0;
-	n->ti_pr = IPPROTO_TCP;
-	n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
-	n->ti_src = inp->inp_laddr;
-	n->ti_dst = inp->inp_faddr;
-	bpf2 ( "TCP template sets dst to %08x\n", n->ti_dst );
-	n->ti_sport = inp->inp_lport;
-	n->ti_dport = inp->inp_fport;
-	n->ti_seq = 0;
-	n->ti_ack = 0;
-	n->ti_x2 = 0;
-	n->ti_off = 5;
-	n->ti_flags = 0;
-	n->ti_win = 0;
-	n->ti_sum = 0;
-	n->ti_urp = 0;
-	return (n);
 }
 
 /*
@@ -156,22 +109,22 @@ tcp_template(tp)
  * segment are as specified by the parameters.
  */
 void
-tcp_respond(tp, ti, m, ack, seq, flags)
-	struct tcpcb *tp;
-	register struct tcpiphdr *ti;
-	register struct mbuf *m;
-	tcp_seq ack, seq;
-	int flags;
+tcp_respond ( struct tcpcb *tp, struct tcpiphdr *ti, struct mbuf *m,
+		tcp_seq ack, tcp_seq seq, int flags)
 {
-	register int tlen;
+	int tlen;
 	int win = 0;
 	struct route *ro = 0;
+	int sum;
+	int clen;	// XXX
 
-	bpf2 ( "TCP respond\n" );
+	bpf2 ( "TCP respond, m = %08x\n", m );
+
 	if (tp) {
 		win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
 		ro = &tp->t_inpcb->inp_route;
 	}
+
 	if (m == 0) {
 		// m = m_gethdr(M_DONTWAIT, MT_HEADER);
 		m = mb_gethdr ( MT_HEADER );
@@ -199,11 +152,26 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 #undef xchg
 	}
 
+	/* We don't use the t_template header in this routine!
+	 * This initial setup performs the BSD butchery of the IP header
+	 * to allow the TCP checksum calculation.
+	 * tlen will be 0 coming in here.
+	 * So, one of these response packets will have no data
+	 * A typical case will set 20 bytes as the length
+	 * in the packet (just the tcp header)
+	 * Then tlen will be set to 40 bytes (IP and TCP both)
+	 */
+
+	clen = (sizeof (struct tcphdr) + tlen);
 	ti->ti_len = htons((u_short)(sizeof (struct tcphdr) + tlen));
+
 	tlen += sizeof (struct tcpiphdr);
+	printf ( "TCP respond, Clen, tlen = %d, %d\n",  clen, tlen );
+
 	m->m_len = tlen;
 	m->m_pkthdr.len = tlen;
 	m->m_pkthdr.rcvif = (struct ifnet *) 0;
+
 	ti->ti_next = ti->ti_prev = 0;
 	ti->ti_x1 = 0;
 	ti->ti_seq = htonl(seq);
@@ -220,12 +188,20 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 
 	// Kyu
 	// ti->ti_sum = in_cksum(m, tlen);
+	// This is the TCP checksum not the IP checksum
+
 	ti->ti_sum = tcp_cksum(m, tlen);
 	bpf2 ( "tcp respond checksum calculated: %x\n", ti->ti_sum );
+	sum = tcp_cksum(m, tlen);
+	bpf2 ( "tcp respond checksum verified: %x\n", sum );
 
-	((struct ip *)ti)->ip_len = tlen;
+	/* Make it a proper IP header again */
+	((struct ip *)ti)->ip_len = tlen;	/* XXX - No htons() here */
 	((struct ip *)ti)->ip_ttl = ip_defttl;
 	bpf2 ( " =========================== TCP respond send %d\n", tlen );
+
+	// (void) cksum_game ( m, tlen, "tcp_respond" );
+	(void) cksum_verify_outgoing ( m, tlen, "tcp_respond" );
 
 	(void) ip_output(m, NULL, ro, 0, NULL);
 }
@@ -485,3 +461,5 @@ tcp_quench(inp, errno)
 	if (tp)
 		tp->snd_cwnd = tp->t_maxseg;
 }
+
+// THE END

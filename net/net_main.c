@@ -351,7 +351,7 @@ net_rcv_noint ( struct netbuf *nbp )
 	sem_unblock ( inq_sem );
 }
 
-/* Called from interrupt level to place a
+/* Called by the device driver at interrupt level to place a
  * packet on input queue and awaken handler thread.
  */
 void

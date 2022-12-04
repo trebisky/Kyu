@@ -112,70 +112,6 @@ bpf3 ( const char *fmt, ... )
         console_puts ( buf );
 }
 
-struct pseudo {
-	unsigned int dst;
-	unsigned int src;
-	unsigned short len;
-	unsigned short type;
-	unsigned short sum;
-};
-
-int
-ez_tcp_cksum_x ( struct tcpiphdr *ti )
-{
-	struct pseudo ps;
-	int rv = 0;
-	int len = ((struct ip *)ti)->ip_len;
-
-	ps.dst = ti->ti_dst.s_addr;
-	ps.src = ti->ti_src.s_addr;
-	ps.len = htons(len);
-	ps.type = 6;
-	ps.sum = 0;
-
-	rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
-	return in_cksum_i ( (char *) &ti->ti_t, len, rv );
-}
-
-int
-ez_tcp_cksum ( struct tcpiphdr *ti )
-{
-	struct pseudo ps;
-	int rv = 0;
-	int len = ((struct ip *)ti)->ip_len;
-
-	ps.dst = ti->ti_dst.s_addr;
-	ps.src = ti->ti_src.s_addr;
-	ps.len = htons(len);
-	ps.type = htons(6);	// TCP
-	ps.sum = ((struct ip *)ti)->ip_sum;
-
-	rv =  in_cksum_i ( (char *) &ps, sizeof(struct pseudo), 0 );
-	return in_cksum_i ( (char *) &ti->ti_t, len, rv );
-}
-
-void
-tcp_show_pkt ( struct mbuf *m, char *msg )
-{
-	struct tcpiphdr *ti;
-	int sum;
-
-	printf ( "TCP packet from; %s (%d bytes)\n", msg, m->m_len );
-
-	ti = mtod(m, struct tcpiphdr *);
-	dump_buf ( (char *) ti, 32 );
-	// printf ( " ti len: %d\n", ti->ti_len ); actually checksun
-	printf ( " ip len: %d\n", ((struct ip *)ti)->ip_len );
-	printf ( " ip sum: 0x%04x\n", ((struct ip *)ti)->ip_sum );
-	printf ( " ti src: %s\n", ip2str32 ( ti->ti_src.s_addr ) );
-	printf ( " ti dst: %s\n", ip2str32 ( ti->ti_dst.s_addr ) );
-	printf ( " flags : %04x\n", ti->ti_flags );
-	// pointless because ..
-	// printf ( " IP checksum: %d\n", tcp_cksum ( m, 20 ) );
-	printf ( " TCP checksum: 0x%04x\n", ez_tcp_cksum_x ( ti ) );
-	printf ( " TCP checksum: 0x%04x\n", ez_tcp_cksum ( ti ) );
-}
-
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
@@ -409,6 +345,8 @@ tcp_bsd_process ( struct netbuf *nbp )
 	/* For one thing, it subtracts the size of the IP header
 	 * off of the length field in the IP header itself.
 	 * So we should do this to "emulate" that behavior.
+	 * This caused me no end of confusion later since the len field
+	 * in the IP datagram that tcp_input has is then "wrong"
 	 */
 	iip = mtod(m, struct ip *);
 	iip->ip_len -= sizeof(struct ip);

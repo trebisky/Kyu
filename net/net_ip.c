@@ -225,12 +225,16 @@ ip_send ( struct netbuf *nbp, u32 dest_ip )
 	    memcpy ( nbp->eptr->dst, host_info.our_mac, ETH_ADDR_SIZE );
 	    // Must do this also
 	    nbp->eptr->type = ETH_IP_SWAP;
+	    // This too
+	    nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
 
 	    printf ( "Sending IP packet to loopback\n" );
+	    printf ( " ilen = %d\n", nbp->ilen );
 	    net_rcv_noint ( nbp );
 	    return;
 	}
 
+	/* Send over the wire */
 	ip_arp_send ( nbp );
 }
 

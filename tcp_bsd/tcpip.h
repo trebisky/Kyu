@@ -35,11 +35,18 @@
 
 /*
  * Tcp+ip header, after ip options removed.
+ *
+ *  XXX - BEWARE!!  The following structure does not include
+ *		a proper IP header, but rather the BSD butchered
+ *		ipovly structure that allows for their checksum
+ *		computation scheme.
  */
+
 struct tcpiphdr {
 	struct 	ipovly ti_i;		/* overlaid ip structure */
 	struct	tcphdr ti_t;		/* tcp header */
 };
+
 #define	ti_next		ti_i.ih_next
 #define	ti_prev		ti_i.ih_prev
 #define	ti_x1		ti_i.ih_x1
@@ -47,6 +54,7 @@ struct tcpiphdr {
 #define	ti_len		ti_i.ih_len
 #define	ti_src		ti_i.ih_src
 #define	ti_dst		ti_i.ih_dst
+
 #define	ti_sport	ti_t.th_sport
 #define	ti_dport	ti_t.th_dport
 #define	ti_seq		ti_t.th_seq

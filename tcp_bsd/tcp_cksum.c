@@ -78,7 +78,7 @@ tcp_cksum ( struct mbuf *m, int len )
 
 	for (;m && len; m = m->m_next) {
 
-		bpf2 ( "tcp_cksum: mbuf: %08x (%d,%d bytes)\n", m, len, mlen );
+		bpf2 ( "tcp_cksum: mbuf: %08x (len, mb_len, mlen = %d, %d,%d bytes)\n", m, len, m->m_len, mlen );
 
 		if (m->m_len == 0)
 			continue;

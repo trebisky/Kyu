@@ -54,6 +54,24 @@ extern struct mbuf *m_copypack();
 
 #define MAX_TCPOPTLEN	32	/* max # bytes that go in options */
 
+void
+tcp_setpersist(tp)
+	register struct tcpcb *tp;
+{
+	register int t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
+
+	if (tp->t_timer[TCPT_REXMT])
+		panic("tcp_output REXMT");
+	/*
+	 * Start/restart persistance timer.
+	 */
+	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
+	    t * tcp_backoff[tp->t_rxtshift],
+	    TCPTV_PERSMIN, TCPTV_PERSMAX);
+	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
+		tp->t_rxtshift++;
+}
+
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */
@@ -69,6 +87,7 @@ tcp_output(tp)
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
+	int ckstat;	// XXX
 
 	bpf2 ( "-tcp_output\n" );
 	/*
@@ -394,6 +413,7 @@ send:
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}
+
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	ti = mtod(m, struct tcpiphdr *);
 	if (tp->t_template == 0)
@@ -565,10 +585,18 @@ send:
 	bpf2 ( " =========================== TCP output send %d\n", hdrlen+len );
 	bpf2 ( "TCP output -- checksum =  %x %d\n", ti->ti_sum, hdrlen + len );
 
-	printf ( "tcp_output -- IP header ...\n" );
-	dump_buf ( (char *) ti, 20 );
+	// printf ( "tcp_output -- IP header ...\n" );
+	// dump_buf ( (char *) ti, 20 );
 
-	tcp_show_pkt ( m, "tcp_output" );
+	// tcp_show_pkt ( m, "tcp_output" );
+
+	// ckstat = cksum_game ( m, hdrlen+len, "tcp_output" );
+	ckstat = cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );
+
+	// if ( ckstat ) {
+	//     printf ( "tcp_output -- refuse to send faulty packet ***\n" );
+	//     return 1;
+	// }
 
 	error = ip_output ( m, tp->t_inpcb->inp_options,
 	    &tp->t_inpcb->inp_route,
@@ -604,20 +632,68 @@ out:
 	return (0);
 }
 
-void
-tcp_setpersist(tp)
-	register struct tcpcb *tp;
-{
-	register int t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
+/*
+ * Create template to be used to send tcp packets on a connection.
+ * Call after host entry created, allocates an mbuf and fills
+ * in a skeletal tcp/ip header, minimizing the amount of work
+ * necessary when the connection is used.
+ *
+ * Kyu - this used to be in tcp_subr.c, but I find it useful to have
+ *  it here alongside tcp_output() to admire and study.
+ *  For Kyu, I modified things so this no longer allocates an mbuf
+ *  to hold the template tcpiphdr structure.  I put a "static"
+ *  template structure inside the tcpcb structure itself.
+ *  This of course makes the tcpcb bigger, but I could care less.
+ *  One particular advantage is that there is no need to explicitly
+ *  deallocate it later (which required the non-portable inverse 
+ *  lookup "dtom" macro).  It is also simpler and nicer.  
+ *
+ * This is called in tcp_usrreq when a CONNECT is being done,
+ *  and the call looks like this:
+ *
+ *	tp->t_template = tcp_template(tp);
+ */
 
-	if (tp->t_timer[TCPT_REXMT])
-		panic("tcp_output REXMT");
-	/*
-	 * Start/restart persistance timer.
-	 */
-	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
-	    t * tcp_backoff[tp->t_rxtshift],
-	    TCPTV_PERSMIN, TCPTV_PERSMAX);
-	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
-		tp->t_rxtshift++;
+struct tcpiphdr *
+tcp_template(tp)
+	struct tcpcb *tp;
+{
+	register struct inpcb *inp = tp->t_inpcb;
+	register struct tcpiphdr *n;
+// KYU
+//	register struct mbuf *m;
+
+#ifdef KYU
+	n = &tp->t_static_template;
+#else
+	if ((n = tp->t_template) == 0) {
+		// m = m_get(M_DONTWAIT, MT_HEADER);
+		m = mb_get ( MT_HEADER );
+		if (m == NULL)
+			return (0);
+		m->m_len = sizeof (struct tcpiphdr);
+		n = mtod(m, struct tcpiphdr *);
+	}
+#endif
+	n->ti_next = n->ti_prev = 0;
+	n->ti_x1 = 0;
+	n->ti_pr = IPPROTO_TCP;
+	n->ti_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
+	n->ti_src = inp->inp_laddr;
+	n->ti_dst = inp->inp_faddr;
+	bpf2 ( "TCP template sets dst to %08x\n", n->ti_dst );
+	n->ti_sport = inp->inp_lport;
+	n->ti_dport = inp->inp_fport;
+	n->ti_seq = 0;
+	n->ti_ack = 0;
+	n->ti_x2 = 0;
+	n->ti_off = 5;
+	n->ti_flags = 0;
+	n->ti_win = 0;
+	n->ti_sum = 0;
+	n->ti_urp = 0;
+
+	return (n);
 }
+
+/* THE END */
