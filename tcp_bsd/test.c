@@ -19,6 +19,7 @@ struct socket * tcp_accept ( struct socket * );
 void bsd_test_show ( long );
 void bsd_test_server ( long );
 void bsd_test_blab ( long );
+void bsd_test_echo ( long );
 void bsd_test_connect ( long );
 void bsd_test_debug ( long );
 
@@ -29,6 +30,7 @@ struct test tcp_test_list[] = {
         bsd_test_show,          "Show TCB table",                       0,
         bsd_test_server,        "Start pirate server",                  0,
         bsd_test_blab,          "Start blab server",                    0,
+        bsd_test_echo,          "Start echo server",                    0,
 	bsd_test_connect,	"Connect test",				0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
@@ -75,6 +77,58 @@ tcb_show ( void )
                 ip2str32(inp->inp_faddr.s_addr),
                 ntohs(inp->inp_fport) );
         }
+}
+
+/* ============================ */
+
+#define ECHO_PORT	113
+
+static void
+run_echo ( struct socket *so )
+{
+	char msg[128];
+	int n;
+
+	for ( ;; ) {
+	    n = tcp_recv ( so, msg, 128 );
+	    if ( n == 0 ) {
+		thr_delay ( 1 );
+		continue;
+	    }
+	    tcp_send ( so, msg, n );
+	    if ( msg[0] == 'q' )
+		break;
+	}
+
+	strcpy ( msg, "All Done\n" );
+	tcp_send ( so, msg, strlen(msg) );
+}
+
+void
+echo_thread ( long xxx )
+{
+	struct socket *so;
+	struct socket *cso;
+	int fip;
+
+	so = tcp_bind ( ECHO_PORT );
+
+	for ( ;; ) {
+	    cso = tcp_accept ( so );
+	    fip = tcp_getpeer_ip ( cso );
+	    printf ( "echo server got a connection from: %s\n", ip2str32_h(fip) );
+
+	    /* Really shoud run this in new thread */
+	    run_echo ( cso );
+
+	    (void) soclose ( cso );
+	}
+}
+
+void
+bsd_test_echo ( long xxx )
+{
+	(void) safe_thr_new ( "echo-server", echo_thread, (void *) 0, 15, 0 );
 }
 
 /* ============================ */
