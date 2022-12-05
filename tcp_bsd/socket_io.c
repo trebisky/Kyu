@@ -540,7 +540,7 @@ tcp_send ( struct socket *so, char *buf, int len )
 	struct iovec k_vec;
 	int error;
 
-	bpf1 ( "kyu_send - sending %d bytes: %s\n", len, buf );
+	// bpf1 ( "kyu_send - sending %d bytes: %s\n", len, buf );
 
 	k_vec.iov_base = buf;
 	k_vec.iov_len = len;
@@ -549,8 +549,8 @@ tcp_send ( struct socket *so, char *buf, int len )
         k_uio.uio_iovcnt = 1;
 
 	// obsolete now given xiomove
-        k_uio.uio_segflg = UIO_USERSPACE;
-        k_uio.uio_rw = UIO_WRITE;
+        // k_uio.uio_segflg = UIO_USERSPACE;
+        // k_uio.uio_rw = UIO_WRITE;
 
         k_uio.uio_offset = 0;
         // k_uio.uio_resid = 0;

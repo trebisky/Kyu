@@ -13,8 +13,12 @@
 
 void tcb_show ( void );
 
+struct socket * tcp_bind ( int );
+struct socket * tcp_accept ( struct socket * );
+
 void bsd_test_show ( long );
 void bsd_test_server ( long );
+void bsd_test_blab ( long );
 void bsd_test_connect ( long );
 void bsd_test_debug ( long );
 
@@ -24,6 +28,7 @@ void bsd_test_debug ( long );
 struct test tcp_test_list[] = {
         bsd_test_show,          "Show TCB table",                       0,
         bsd_test_server,        "Start pirate server",                  0,
+        bsd_test_blab,          "Start blab server",                    0,
 	bsd_test_connect,	"Connect test",				0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
@@ -70,6 +75,53 @@ tcb_show ( void )
                 ip2str32(inp->inp_faddr.s_addr),
                 ntohs(inp->inp_fport) );
         }
+}
+
+/* ============================ */
+
+#define BLAB_PORT	112
+
+static void
+blabber ( struct socket *so )
+{
+	char msg[128];
+	int i;
+
+	for ( i=0; i < 25; i++ ) {
+	    sprintf ( msg, "Blab: %d\n", i );
+	    tcp_send ( so, msg, strlen(msg) );
+	    thr_delay ( 1000 );
+	}
+
+	strcpy ( msg, "All Done\n" );
+	tcp_send ( so, msg, strlen(msg) );
+}
+
+void
+blab_thread ( long xxx )
+{
+	struct socket *so;
+	struct socket *cso;
+	int fip;
+
+	so = tcp_bind ( BLAB_PORT );
+
+	for ( ;; ) {
+	    cso = tcp_accept ( so );
+	    fip = tcp_getpeer_ip ( cso );
+	    printf ( "blab server got a connection from: %s\n", ip2str32_h(fip) );
+
+	    /* Really shoud run this in new thread */
+	    blabber ( cso );
+
+	    (void) soclose ( cso );
+	}
+}
+
+void
+bsd_test_blab ( long xxx )
+{
+	(void) safe_thr_new ( "blab-server", blab_thread, (void *) 0, 15, 0 );
 }
 
 /* ============================ */
