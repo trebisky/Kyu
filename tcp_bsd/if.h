@@ -59,7 +59,7 @@
  */
 
 #ifndef _TIME_ /*  XXX fast fix for SNMP, going away soon */
-#include <sys/time.h>
+// #include <sys/time.h>
 #endif
 
 #ifdef __STDC__
@@ -112,7 +112,7 @@ struct ifnet {
 		u_long	ifi_omcasts;	/* packets sent via multicast */
 		u_long	ifi_iqdrops;	/* dropped on input, this interface */
 		u_long	ifi_noproto;	/* destined for unsupported protocol */
-		struct	timeval ifi_lastchange;/* last updated */
+		// struct	timeval ifi_lastchange;/* last updated */
 	}	if_data;
 /* procedure handles */
 	int	(*if_init)		/* init routine */

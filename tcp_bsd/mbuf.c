@@ -86,7 +86,7 @@ k_sock_alloc ( void )
 	}
 
 	rv = kyu_malloc ( n );
-	bpf3 ( "kyu_sock_alloc: %d %08x\n", n, rv );
+	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
 	return rv;
 }

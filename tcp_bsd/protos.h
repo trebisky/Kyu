@@ -38,37 +38,16 @@
  *	@(#)systm.h	8.4 (Berkeley) 2/23/94
  */
 
-/*
- * The `securelevel' variable controls the security level of the system.
- * It can only be decreased by process 1 (/sbin/init).
- *
- * Security levels are as follows:
- *   -1	permannently insecure mode - always run system in level 0 mode.
- *    0	insecure mode - immutable and append-only flags make be turned off.
- *	All devices may be read or written subject to permission modes.
- *    1	secure mode - immutable and append-only flags may not be changed;
- *	raw disks of mounted filesystems, /dev/mem, and /dev/kmem are
- *	read-only.
- *    2	highly secure mode - same as (1) plus raw disks are always
- *	read-only whether mounted or not. This level precludes tampering 
- *	with filesystems by unmounting them, but also inhibits running
- *	newfs while the system is secured.
- *
- * In normal operation, the system runs in level 0 mode while single user
- * and in level 1 mode while multiuser. If level 2 mode is desired while
- * running multiuser, it can be set in the multiuser startup script
- * (/etc/rc.local) using sysctl(1). If it is desired to run the system
- * in level 0 mode while multiuser, initialize the variable securelevel
- * in /sys/kern/kern_sysctl.c to -1. Note that it is NOT initialized to
- * zero as that would allow the vmunix binary to be patched to -1.
- * Without initialization, securelevel loads in the BSS area which only
- * comes into existence when the kernel is loaded and hence cannot be
- * patched by a stalking hacker.
+/* XXX XXX - for Kyu, this was systm.h
+ * I renamed it "protos.h" and chopped a lot out of it.
+ * -- and I keep chopping --
+ * I also copied libkern.h into here rather than including it.
+ * 12-5-2022
  */
-extern int securelevel;		/* system security level */
-extern const char *panicstr;	/* panic message */
-extern char version[];		/* system version */
-extern char copyright[];	/* system copyright */
+
+//extern const char *panicstr;	/* panic message */
+//extern char version[];		/* system version */
+//extern char copyright[];	/* system copyright */
 
 extern int nblkdev;		/* number of entries in bdevsw */
 extern int nchrdev;		/* number of entries in cdevsw */
@@ -146,7 +125,7 @@ int	fuiword __P((void *base));
 int	suword __P((void *base, int word));
 int	suiword __P((void *base, int word));
 
-int	hzto __P((struct timeval *tv));
+// int	hzto __P((struct timeval *tv));
 void	timeout __P((void (*func)(void *), void *arg, int ticks));
 void	untimeout __P((void (*func)(void *), void *arg));
 void	realitexpire __P((void *));
@@ -163,6 +142,71 @@ void	stopprofclock __P((struct proc *));
 void	setstatclockrate __P((int hzrate));
 
 // #include <libkern/libkern.h>
-#include <sys/libkern.h>
+// #include <sys/libkern.h>
+
+/* libkern.h follows verbatim
+ */
+
+static inline int
+imax(a, b)
+	int a, b;
+{
+	return (a > b ? a : b);
+}
+static inline int
+imin(a, b)
+	int a, b;
+{
+	return (a < b ? a : b);
+}
+static inline long
+lmax(a, b)
+	long a, b;
+{
+	return (a > b ? a : b);
+}
+static inline long
+lmin(a, b)
+	long a, b;
+{
+	return (a < b ? a : b);
+}
+static inline u_int
+max(a, b)
+	u_int a, b;
+{
+	return (a > b ? a : b);
+}
+static inline u_int
+min(a, b)
+	u_int a, b;
+{
+	return (a < b ? a : b);
+}
+static inline u_long
+ulmax(a, b)
+	u_long a, b;
+{
+	return (a > b ? a : b);
+}
+static inline u_long
+ulmin(a, b)
+	u_long a, b;
+{
+	return (a < b ? a : b);
+}
+
+/* Prototypes for non-quad routines. */
+int	 bcmp __P((const void *, const void *, size_t));
+int	 ffs __P((int));
+int	 locc __P((int, char *, u_int));
+u_long	 random __P((void));
+char	*rindex __P((const char *, int));
+int	 scanc __P((u_int, u_char *, u_char *, int));
+int	 skpc __P((int, int, char *));
+char	*strcat __P((char *, const char *));
+char	*strcpy __P((char *, const char *));
+size_t	 strlen __P((const char *));
+char	*strncpy __P((char *, const char *, size_t));
 
 // The END

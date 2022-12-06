@@ -12,10 +12,11 @@
 #define BSD4_3  1
 #define BSD4_4  1
 
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/systm.h>
-#include <sys/errno.h>
+#include <types.h>
+//#include <sys/time.h>
+#include <protos.h>
+// #include <sys/systm.h>
+#include <errno.h>
 
 #include <domain.h>
 #include <protosw.h>

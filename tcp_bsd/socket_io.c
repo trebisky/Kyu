@@ -1089,7 +1089,7 @@ sorflush ( struct socket *so )
 void
 sofree ( struct socket *so )
 {
-	bpf3 ( "sofree called\n" );
+	printf ( "sofree called: %08x\n", so );
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
                 return;
@@ -1200,10 +1200,49 @@ soisdisconnected(so)
         so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
 
         // wakeup((caddr_t)&so->so_timeo);
+	// OK, but who would be waiting for this?
 	sem_unblock ( so->kyu_sem );
 
         sowwakeup(so);
         sorwakeup(so);
+}
+
+/* Kyu hack -- 12/5/2022
+ * (it doesn't work)
+ * I see the state set to 0x03 when the socket is OK.
+ * When the peer closes, I see the state go to 0x23
+ * (the can't receive more bit is set)
+ */
+int
+is_socket_connected ( struct socket *so )
+{
+	return ( so->so_state & SS_ISCONNECTED );
+}
+
+int
+is_socket_receiving ( struct socket *so )
+{
+	return ( ! (so->so_state & SS_CANTRCVMORE) );
+}
+
+#ifdef notdef
+#define	SS_NOFDREF		0x001	/* no file table ref any more */
+#define	SS_ISCONNECTED		0x002	/* socket connected to a peer */
+#define	SS_ISCONNECTING		0x004	/* in process of connecting to peer */
+#define	SS_ISDISCONNECTING	0x008	/* in process of disconnecting */
+#define	SS_CANTSENDMORE		0x010	/* can't send more data to peer */
+#define	SS_CANTRCVMORE		0x020	/* can't receive more data from peer */
+#define	SS_RCVATMARK		0x040	/* at mark on input */
+#define	SS_PRIV			0x080	/* privileged for broadcast, raw... */
+#define	SS_NBIO			0x100	/* non-blocking ops */
+#define	SS_ASYNC		0x200	/* async i/o notify */
+#define	SS_ISCONFIRMING		0x4
+#endif
+
+int
+get_socket_state ( struct socket *so )
+{
+	return ( so->so_state );
 }
 
 /*
@@ -1281,6 +1320,9 @@ char    netcls[] = "netcls";
  * Close a socket on last file table reference removal.
  * Initiate disconnect if connected.
  * Free socket when disconnect complete.
+ *
+ * We get tempted for Kyu to call this tcp_close(), but that
+ *  name is already taken, with different semantics.
  */
  /* from kern/uipc_socket.c */
 int
@@ -1337,6 +1379,7 @@ drop:
 discard:
 	// Near as I can tell, this marks the socket as not
 	// having a reference in file array (i.e. as an "fd")
+	// In Kyu this bit is always set.
         // if (so->so_state & SS_NOFDREF)
         //         panic("soclose: NOFDREF");
         so->so_state |= SS_NOFDREF;
