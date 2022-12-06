@@ -136,6 +136,8 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	if ( cmd[0] == 'q' )
 	    return 1;
 
+	printf ( "Got: %s\n", cmd );
+
 	// printf ( "len = %d\n", strlen(cmd) );
 	// dump_buf ( cmd, strlen(cmd) );
 
@@ -158,16 +160,16 @@ run_wangdoodle ( struct socket *so )
 	int s;
 	int idle = 0;
 
-	// printf ( "start wangdoodle: %08x\n", so );
+	printf ( "start wangdoodle: so = %08x\n", so );
 
 	for ( ;; ) {
 	    if ( idle == 0 ) {
 		s = get_socket_state ( so );
-		printf ( "Socket state: %08x\n", s );
+		// printf ( "Socket state: %08x\n", s );
 	    }
 	    if ( idle > 2000 ) {
 		s = get_socket_state ( so );
-		printf ( "Socket state: %08x\n", s );
+		// printf ( "Socket state: %08x\n", s );
 		printf ( "Timeout -- exit thread\n" );
 		break;
 	    }
@@ -179,7 +181,8 @@ run_wangdoodle ( struct socket *so )
 	    // if ( ! is_socket_connected ( so ) )
 	    if ( ! is_socket_receiving ( so ) ) {
 		printf ( "Bail out, not receiving\n" );
-		(void) soclose ( so );
+		// causes Data abort
+		// (void) soclose ( so );
 		break;
 	    }
 
@@ -204,13 +207,10 @@ run_wangdoodle ( struct socket *so )
 
 	    if ( one_wangdoodle ( so, msg ) ) {
 		/* Here we close the connection */
+		printf ( "quit by user request\n" );
 		(void) soclose ( so );
 		break;
 	    }
-
-	    // tcp_send ( so, msg, n );
-	    // if ( msg[0] == 'q' )
-	    // 	break;
 	}
 
 	printf ( "wangdoodle done\n" );

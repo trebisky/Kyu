@@ -20,7 +20,7 @@
 
 #include <domain.h>
 #include <protosw.h>
-#include <uio.h>
+// #include <uio.h>
 
 #include <socket.h>
 #include <socketvar.h>

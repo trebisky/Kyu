@@ -246,7 +246,7 @@ struct sockproto {
 struct msghdr {
 	caddr_t	msg_name;		/* optional address */
 	u_int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
+	// struct	iovec *msg_iov;		/* scatter/gather array */
 	u_int	msg_iovlen;		/* # elements in msg_iov */
 	caddr_t	msg_control;		/* ancillary data, see below */
 	u_int	msg_controllen;		/* ancillary data buffer len */
@@ -304,7 +304,7 @@ struct osockaddr {
 struct omsghdr {
 	caddr_t	msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
+	//struct	iovec *msg_iov;		/* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
 	caddr_t	msg_accrights;		/* access rights sent/received */
 	int	msg_accrightslen;

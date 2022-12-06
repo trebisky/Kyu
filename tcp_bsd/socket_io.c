@@ -38,6 +38,44 @@
 #include <kyu.h>
 #include <thread.h>
 
+/* All this used to be in uio.h, but was moved here for Kyu
+ * since this is the only place we use it.
+ * (and it is nice to see it right alongside where it is used)
+ * Someday perhaps we will do away with it.
+ * (all well and good in BSD, but we live a simpler life).
+ */
+
+#ifdef notdef
+enum	uio_rw { UIO_READ, UIO_WRITE };
+
+/* Segment flag values. */
+enum uio_seg {
+	UIO_USERSPACE,		/* from user data space */
+	UIO_SYSSPACE,		/* from system space */
+	UIO_USERISPACE		/* from user I space */
+};
+#endif
+
+/*
+ * XXX --- iov_base should be a void *.
+ */
+struct iovec {
+	char	*iov_base;	/* Base address. */
+	size_t	 iov_len;	/* Length. */
+};
+
+struct uio {
+	struct	iovec *uio_iov;
+	int	uio_iovcnt;
+	off_t	uio_offset;
+	int	uio_resid;
+	//enum	uio_seg uio_segflg;
+	//enum	uio_rw uio_rw;
+	// struct	proc *uio_procp;
+};
+
+/* End of uio.h stuff */
+
 void socantrcvmore ( struct socket * );
 static void soqinsque ( struct socket *, struct socket *, int );
 int soqremque ( struct socket *, int );
@@ -886,13 +924,6 @@ uiomove(cp, n, uio)
         register struct iovec *iov;
         u_int cnt;
         int error = 0;
-
-#ifdef DIAGNOSTIC
-        if (uio->uio_rw != UIO_READ && uio->uio_rw != UIO_WRITE)
-                panic("uiomove: mode");
-        if (uio->uio_segflg == UIO_USERSPACE && uio->uio_procp != curproc)
-                panic("uiomove proc");
-#endif
 
         while (n > 0 && uio->uio_resid) {
                 iov = uio->uio_iov;
