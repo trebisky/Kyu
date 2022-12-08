@@ -250,7 +250,9 @@ soreceive (
 		// m = m_get(M_WAIT, MT_DATA);
 		m = (struct mbuf *) mb_get ( MT_DATA );
 
-		error = (*pr->pr_usrreq)(so, PRU_RCVOOB,
+		// error = (*pr->pr_usrreq)(so, PRU_RCVOOB,
+		//     m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
+		error = tcp_usrreq (so, PRU_RCVOOB,
 		    m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
 
 		if (error)
@@ -276,8 +278,11 @@ bad:
 		*mp = (struct mbuf *)0;
 
 	if (so->so_state & SS_ISCONFIRMING && uio->uio_resid)
-		(*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
-		    (struct mbuf *)0, (struct mbuf *)0);
+		(void) tcp_usrreq (so, PRU_RCVD,
+		    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+		// (*pr->pr_usrreq)(so, PRU_RCVD,
+		// (struct mbuf *)0,
+		//     (struct mbuf *)0, (struct mbuf *)0);
 
 restart:
 	if (error = sblock(&so->so_rcv, SBLOCKWAIT(flags)))
@@ -382,10 +387,10 @@ dontblock:
 		} else {
 			sbfree(&so->so_rcv, m);
 			if (controlp) {
-				if (pr->pr_domain->dom_externalize &&
-				    mtod(m, struct cmsghdr *)->cmsg_type ==
-				    SCM_RIGHTS)
-				   error = (*pr->pr_domain->dom_externalize)(m);
+				// if (pr->pr_domain->dom_externalize &&
+				//     mtod(m, struct cmsghdr *)->cmsg_type ==
+				//     SCM_RIGHTS)
+				//    error = (*pr->pr_domain->dom_externalize)(m);
 				*controlp = m;
 				so->so_rcv.sb_mb = m->m_next;
 				m->m_next = 0;
@@ -522,9 +527,10 @@ dontblock:
 		if (m == 0)
 			so->so_rcv.sb_mb = nextrecord;
 		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
-			(*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
-			    (struct mbuf *)flags, (struct mbuf *)0,
-			    (struct mbuf *)0);
+		    (void) tcp_usrreq (so, PRU_RCVD,
+			(struct mbuf *)0, (struct mbuf *)flags, (struct mbuf *)0 );
+		    // (*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
+		    //	 (struct mbuf *)flags, (struct mbuf *)0, (struct mbuf *)0);
 	}
 	if (orig_resid == uio->uio_resid && orig_resid &&
 	    (flags & MSG_EOR) == 0 && (so->so_state & SS_CANTRCVMORE) == 0) {
@@ -1114,6 +1120,7 @@ sorflush ( struct socket *so )
 
         // if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
         //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
+
         sbrelease(&asb);
 }
 
@@ -1323,8 +1330,6 @@ sohasoutofband(so)
 /* =================================================================================================== */
 /* =================================================================================================== */
 
-extern struct protosw tcp_proto;
-
 /* Put the following into a better more logical order and merge with the above.
  */
 
@@ -1477,6 +1482,14 @@ sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
 	}
         return 0;
 }
+
+// extern struct protosw tcp_proto;
+
+// We shrank it down to this.
+struct protosw tcp_proto =
+{
+    PR_CONNREQUIRED|PR_WANTRCVD,	// flags
+};
 
 /* The original is in kern/uipc_socket.c
  */

@@ -37,25 +37,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-// #include <sys/proc.h>
-#include <sys/malloc.h>
-// #include <sys/map.h>
-
-#include <sys/mbuf.h>
-
-// #include <sys/kernel.h>
-// #include <sys/syslog.h>
-#include <sys/domain.h>
-#include <sys/protosw.h>
-
-#include <mbuf.h>
-#endif
-
 // #include <vm/vm.h>
 
 // extern	vm_map_t mb_map;

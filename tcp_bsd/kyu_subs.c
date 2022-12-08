@@ -7,43 +7,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include "kyu.h"
-
-#include "thread.h"
-#include "../net/net.h"		/* Kyu */
-#include "../net/kyu_tcp.h"
-
-// for ntohl and such
-// #include "kyu_compat.h"
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/mbuf.h>
-#include <sys/malloc.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/domain.h>
-// #include <sys/errno.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <in.h>
-#include <in_systm.h>
-#include <ip.h>
-#include <in_pcb.h>
-#include <ip_var.h>
-
-#include <tcp.h>
-#include <tcp_seq.h>
-#include <tcp_timer.h>
-#include <tcpip.h>
-#include <tcp_var.h>
-#include <tcp_debug.h>
-#endif
-
 /* global variables */
 
 struct  mbstat mbstat;		/* mbuf.h */

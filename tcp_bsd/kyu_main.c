@@ -132,19 +132,59 @@ rn_inithead ( void **head, int off )
  *  entry below is just one of many entries.
  */
 
-extern struct domain inetdomain;
+// extern struct domain inetdomain;
 
+#ifdef notdef
 struct protosw tcp_proto =
-{ SOCK_STREAM,  &inetdomain,    IPPROTO_TCP,    PR_CONNREQUIRED|PR_WANTRCVD,
+{
+    // SOCK_STREAM,
+    // &inetdomain,
+    // IPPROTO_TCP,
   tcp_input,    0,              tcp_ctlinput,   tcp_ctloutput,
   tcp_usrreq,
-  tcp_init,     tcp_fasttimo,   tcp_slowtimo,   tcp_drain };
+  tcp_init,     tcp_fasttimo,   tcp_slowtimo,   tcp_drain
+};
+#endif
 
+#ifdef notdef
+struct	domain {
+	int	dom_family;		/* AF_xxx */
+	char	*dom_name;
+	void	(*dom_init)		/* initialize domain data structures */
+		__P((void));
+	int	(*dom_externalize)	/* externalize access rights */
+		__P((struct mbuf *));
+	int	(*dom_dispose)		/* dispose of internalized rights */
+		__P((struct mbuf *));
+	struct	protosw *dom_protosw, *dom_protoswNPROTOSW;
+	struct	domain *dom_next;
+	int	(*dom_rtattach)		/* initialize routing table */
+		__P((void **, int));
+	int	dom_rtoffset;		/* an arg to rtattach, in bits */
+	int	dom_maxrtkey;		/* for routing layer */
+};
+
+#ifdef KERNEL
+// struct	domain *domains;
+#endif
+#endif
+
+#ifdef notdef
 struct domain inetdomain =
-    { AF_INET, "internet", 0, 0, 0,
+    { AF_INET,		// dom_family
+      "internet",		// dom+name
+      0,			// fptr - dom_init
+      0,			// fptr - dom_externalize
+      0,			// fptr - dom_dispose
       // inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      &tcp_proto, &tcp_proto, 0,
-      rn_inithead, 32, sizeof(struct sockaddr_in) };
+      &tcp_proto,
+      &tcp_proto,
+      0,		// dom_next
+      rn_inithead,	// dom_rtattach
+      32,		// troffset
+      sizeof(struct sockaddr_in)	// maxrtkey
+      };
+#endif
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */

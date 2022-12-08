@@ -384,7 +384,7 @@ tcp_close(tp)
  * TCP know that the system was desperate and wanted
  * TCP to release any memory it possibly could.
  */
-void tcp_drain() { }
+// void tcp_drain() { }
 
 /*
  * Notify a tcp user of an asynchronous error;

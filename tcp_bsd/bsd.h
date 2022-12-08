@@ -18,7 +18,7 @@
 // #include <sys/systm.h>
 #include <errno.h>
 
-#include <domain.h>
+// #include <domain.h>
 #include <protosw.h>
 // #include <uio.h>
 
