@@ -36,37 +36,247 @@
 #include <bsd.h>
 
 #ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_debug.h>
-
-#include <mbuf.h>
+// From protosw.h
+/*
+ * The arguments to usrreq are:
+ *      (*protosw[].pr_usrreq)(up, req, m, nam, opt);
+ * where up is a (struct socket *), req is one of these requests,
+ * m is a optional mbuf chain containing a message,
+ * nam is an optional mbuf chain containing an address,
+ * and opt is a pointer to a socketopt structure or nil.
+ * The protocol is responsible for disposal of the mbuf chain m,
+ * the caller is responsible for any space held by nam and opt.
+ * A non-zero return from usrreq gives an
+ * UNIX error number which should be passed to higher level software.
+ */
+#define PRU_ATTACH              0       /* attach protocol to up */
+#define PRU_DETACH              1       /* detach protocol from up */
+#define PRU_BIND                2       /* bind socket to address */
+#define PRU_LISTEN              3       /* listen for connection */
+#define PRU_CONNECT             4       /* establish connection to peer */
+#define PRU_ACCEPT              5       /* accept connection from peer */
+#define PRU_DISCONNECT          6       /* disconnect from peer */
+#define PRU_SHUTDOWN            7       /* won't send any more data */
+#define PRU_RCVD                8       /* have taken data; more room now */
+#define PRU_SEND                9       /* send this data */
+#define PRU_ABORT               10      /* abort (fast DISCONNECT, DETATCH) */
+#define PRU_CONTROL             11      /* control operations on protocol */
+#define PRU_SENSE               12      /* Never used: return status into m */
+#define PRU_RCVOOB              13      /* retrieve out of band data */
+#define PRU_SENDOOB             14      /* send out of band data */
+#define PRU_SOCKADDR            15      /* Never used: fetch socket's address */
+#define PRU_PEERADDR            16      /* Never used: fetch peer's address */
+#define PRU_CONNECT2            17      /* Never used: connect two sockets */
+/* begin for protocols internal use */
+#define PRU_FASTTIMO            18      /* Never used: 200ms timeout */
+#define PRU_SLOWTIMO            19      /* 500ms timeout */
+#define PRU_PROTORCV            20      /* Never used: receive from below */
+#define PRU_PROTOSEND           21      /* Never used: send to below */
 #endif
+
+/* At this time Kyu never uses PRU_CONTROL.
+ * BSD used it to handle ioctl() calls to set interface information.
+ */
+
+static int tcp_usrreq ( struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf * );
+
+/* Originally the protosw existed to support multiple protocols
+ * and they would call protocol specific routines for the
+ * functions enumerated here.  Since we only support TCP in
+ * this code, I want to do away with protosw.h entirely.
+ * This will probably be a 3 phase cleanup.
+ * 1 - introduce the proto_* routines here.
+ * 2 - migrate code from the general tcp_usrreq into them.
+ * 3 - in many/some cases move that code to where it is used
+ */
+
+int
+proto_attach ( struct socket *so )
+{
+	return tcp_usrreq (so, PRU_ATTACH,
+	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+}
+
+int
+proto_detach ( struct socket *so )
+{
+	return tcp_usrreq (so, PRU_DETACH,
+	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+}
+
+int
+proto_bind ( struct socket *so, struct mbuf *nam )
+{
+	return tcp_usrreq (so, PRU_BIND,
+	    (struct mbuf *)0, nam, (struct mbuf *)0);
+}
+
+int
+proto_listen ( struct socket *so )
+{
+	return tcp_usrreq (so, PRU_LISTEN,
+	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+}
+
+int
+proto_connect ( struct socket *so, struct mbuf *nam )
+{
+	return tcp_usrreq (so, PRU_CONNECT,
+	    (struct mbuf *)0, nam, (struct mbuf *)0);
+}
+
+#ifdef notdef
+int
+proto_accept ( struct socket *so, struct mbuf *nam )
+{
+	struct inpcb *inp;
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return (EINVAL);
+
+	in_setpeeraddr(inp, nam);
+	return 0;
+}
+#endif
+
+int
+proto_disconnect ( struct socket *so )
+{
+	return tcp_usrreq (so, PRU_DISCONNECT,
+	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+}
+
+/*
+ * Mark the connection as being incapable of further output.
+ */
+void
+proto_shutdown ( struct socket *so )
+{
+	struct tcpcb *tp;
+	struct inpcb *inp;
+
+	// (void) tcp_usrreq (so, PRU_SHUTDOWN,
+	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	socantsendmore ( so );
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return;
+
+	tp = intotcpcb(inp);
+
+	tp = tcp_usrclosed ( tp );
+	if ( tp )
+	    (void) tcp_output ( tp );
+}
+
+/*
+ * After a receive, possibly send window update to peer.
+ */
+int
+proto_rcvd ( struct socket *so )
+{
+	struct tcpcb *tp;
+	struct inpcb *inp;
+
+	// return tcp_usrreq (so, PRU_RCVD,
+	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return (EINVAL);
+	tp = intotcpcb(inp);
+
+	(void) tcp_output(tp);
+	return 0;
+}
+
+#ifdef notdef
+/*
+ * Do a send by putting data in output queue and updating urgent
+ * marker if URG set.  Possibly send more data.
+ */
+int
+proto_send ( struct socket *so, struct mbuf *m )
+{
+	struct tcpcb *tp;
+	struct inpcb *inp;
+
+	// return tcp_usrreq (so, PRU_SEND,
+	//     m, (struct mbuf *)0, (struct mbuf *)0);
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return (EINVAL);
+	tp = intotcpcb(inp);
+
+	sbappend(&so->so_snd, m);
+	return tcp_output(tp);
+}
+
+/* Needs verification (and testing).
+ * not currently used.
+ */
+int
+proto_sendoob ( struct socket *so, struct mbuf *m )
+{
+	return tcp_usrreq (so, PRU_SEND,
+	    m, (struct mbuf *)0, (struct mbuf *)0);
+}
+
+#endif
+
+/* Called, but not in use yet */
+int
+proto_recvoob ( struct socket *so, struct mbuf *m, int peek )
+{
+	return tcp_usrreq (so, PRU_RCVOOB,
+	    m, (struct mbuf *)peek, (struct mbuf *)0);
+}
+
+
+void
+proto_abort ( struct socket *so )
+{
+	struct tcpcb *tp;
+	struct inpcb *inp;
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return;
+	tp = intotcpcb(inp);
+
+	// return tcp_usrreq (so, PRU_ABORT,
+	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	tp = tcp_drop(tp, ECONNABORTED);
+}
+
+/*
+ * TCP slow timer went off; going through this
+ * routine for tracing's sake.
+ */
+void
+proto_slowtimo ( struct socket *so, int index )
+{
+	struct tcpcb *tp;
+	struct inpcb *inp;
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 )
+	    return;
+	tp = intotcpcb(inp);
+
+	tp = tcp_timers ( tp, index );
+
+	/* for debug's sake */
+	// req |= (long)nam << 8;
+}
+
+/* ---------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------- */
 
 /*
  * TCP protocol interface to socket abstraction.
@@ -79,11 +289,8 @@ extern	char *tcpstates[];
  * (called from the software clock routine), then timertype tells which timer.
  */
 /*ARGSUSED*/
-int
-tcp_usrreq(so, req, m, nam, control)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
+static int
+tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struct mbuf *control)
 {
 	register struct inpcb *inp;
 	register struct tcpcb *tp;

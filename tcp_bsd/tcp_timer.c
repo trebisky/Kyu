@@ -118,9 +118,12 @@ tcp_slowtimo()
 			continue;
 		for (i = 0; i < TCPT_NTIMERS; i++) {
 			if (tp->t_timer[i] && --tp->t_timer[i] == 0) {
-				(void) tcp_usrreq(tp->t_inpcb->inp_socket,
-				    PRU_SLOWTIMO, (struct mbuf *)0,
-				    (struct mbuf *)i, (struct mbuf *)0);
+
+				proto_slowtimo ( tp->t_inpcb->inp_socket, i );
+
+				//(void) tcp_usrreq(tp->t_inpcb->inp_socket,
+				//    PRU_SLOWTIMO, (struct mbuf *)0,
+				//    (struct mbuf *)i, (struct mbuf *)0);
 				if (ipnxt->inp_prev != ip)
 					goto tpgone;
 			}
@@ -160,11 +163,9 @@ int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
  * TCP timer processing.
  */
 struct tcpcb *
-tcp_timers(tp, timer)
-	register struct tcpcb *tp;
-	int timer;
+tcp_timers ( struct tcpcb *tp, int timer )
 {
-	register int rexmt;
+	int rexmt;
 
 	switch (timer) {
 

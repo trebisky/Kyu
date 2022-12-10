@@ -41,6 +41,7 @@ struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
 
 /* From netinet/ip_input.c */
+#define PRC_NCMDS               21
 u_char inetctlerrmap[PRC_NCMDS] = {
         0,              0,              0,              0,
         0,              EMSGSIZE,       EHOSTDOWN,      EHOSTUNREACH,

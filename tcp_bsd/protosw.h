@@ -33,6 +33,7 @@
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
  */
 
+#ifdef notdef
 /*
  * Protocol switch table.
  *
@@ -60,7 +61,6 @@ struct protosw {
 	// struct	domain *pr_domain;	/* domain protocol a member of */
 	// short	pr_protocol;		/* protocol number */
 	short	pr_flags;		/* see below */
-#ifdef notdef
 /* protocol-protocol hooks */
 	void	(*pr_input)();		/* input to protocol (from below) */
 	int	(*pr_output)();		/* output to protocol (from above) */
@@ -74,8 +74,8 @@ struct protosw {
 	void	(*pr_slowtimo)();	/* slow timeout (500ms) */
 	void	(*pr_drain)();		/* flush any excess space possible */
 	int	(*pr_sysctl)();		/* sysctl for protocol */
-#endif
 };
+#endif
 
 #define	PR_SLOWHZ	2		/* 2 slow timeouts per second */
 #define	PR_FASTHZ	5		/* 5 fast timeouts per second */

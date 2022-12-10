@@ -41,6 +41,14 @@
  */
 #define	SB_MAX		(256*1024)
 
+/* Notes on so_proto_flags  12-7-2022
+ * Once upon a time there was so_proto, which pointed to a
+ * struct protosw.  This got pruned down to where it only held
+ * pr_flags, and was only being used in this structure, so
+ * the flags were just moved into so_proto_flags and the
+ * whole protosw structure and header file done away with.
+ */
+
 /*
  * Kernel structure per socket.
  * Contains send and receive buffer queues,
@@ -54,6 +62,7 @@ struct socket {
 	short	so_state;		/* internal state flags SS_*, below */
 	caddr_t	so_pcb;			/* protocol control block */
 	struct	protosw *so_proto;	/* protocol handle */
+	int so_proto_flags;		/* NEW 12-7-2022 */
 /*
  * Variables for connection queueing.
  * Socket where accepts occur is so_head in all subsidiary sockets.
@@ -138,22 +147,22 @@ struct socket {
 	 (int)((sb)->sb_mbmax - (sb)->sb_mbcnt)))
 
 /* do we have to send all at once on a socket? */
-#define	sosendallatonce(so) \
-    ((so)->so_proto->pr_flags & PR_ATOMIC)
+// #define	sosendallatonce(so) \
+//    ((so)->so_proto->pr_flags & PR_ATOMIC)
 
 /* can we read something from so? */
-#define	soreadable(so) \
-    ((so)->so_rcv.sb_cc >= (so)->so_rcv.sb_lowat || \
-	((so)->so_state & SS_CANTRCVMORE) || \
-	(so)->so_qlen || (so)->so_error)
+// #define	soreadable(so) \
+//     ((so)->so_rcv.sb_cc >= (so)->so_rcv.sb_lowat || \
+// 	((so)->so_state & SS_CANTRCVMORE) || \
+// 	(so)->so_qlen || (so)->so_error)
 
 /* can we write something to so? */
-#define	sowriteable(so) \
-    (sbspace(&(so)->so_snd) >= (so)->so_snd.sb_lowat && \
-	(((so)->so_state&SS_ISCONNECTED) || \
-	  ((so)->so_proto->pr_flags&PR_CONNREQUIRED)==0) || \
-     ((so)->so_state & SS_CANTSENDMORE) || \
-     (so)->so_error)
+// #define	sowriteable(so) \
+//     (sbspace(&(so)->so_snd) >= (so)->so_snd.sb_lowat && \
+// 	(((so)->so_state&SS_ISCONNECTED) || \
+// 	  ((so)->so_proto->pr_flags&PR_CONNREQUIRED)==0) || \
+//      ((so)->so_state & SS_CANTSENDMORE) || \
+//      (so)->so_error)
 
 /* adjust counters in sb reflecting allocation of m */
 #define	sballoc(sb, m) { \

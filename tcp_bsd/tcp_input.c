@@ -1668,7 +1668,7 @@ dropwithreset:
 	}
 	/* destroy temporarily created socket */
 	if (dropsocket)
-		(void) soabort(so);
+		soabort(so);
 	return;
 
 drop:
@@ -1680,9 +1680,11 @@ drop:
 		tcp_trace(TA_DROP, ostate, tp, &tcp_saveti, 0);
 	// m_freem(m);
 	mb_freem(m);
+
 	/* destroy temporarily created socket */
 	if (dropsocket)
-		(void) soabort(so);
+		soabort(so);
+
 	return;
 }
 

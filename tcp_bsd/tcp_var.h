@@ -275,7 +275,7 @@ struct tcpcb *
 void	 tcp_trace __P((int, int, struct tcpcb *, struct tcpiphdr *, int));
 struct tcpcb *
 	 tcp_usrclosed __P((struct tcpcb *));
-int	 tcp_usrreq __P((struct socket *,
-	    int, struct mbuf *, struct mbuf *, struct mbuf *));
+//int	 tcp_usrreq __P((struct socket *,
+//	    int, struct mbuf *, struct mbuf *, struct mbuf *));
 void	 tcp_xmit_timer __P((struct tcpcb *, int));
 #endif

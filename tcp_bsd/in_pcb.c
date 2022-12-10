@@ -119,8 +119,9 @@ in_pcbbind(inp, nam)
 
 	// bpf3 ( "in_pcbbind 3\n" );
 
+	//    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
-	    ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
+	    ((so->so_proto_flags & PR_CONNREQUIRED) == 0 ||
 	     (so->so_options & SO_ACCEPTCONN) == 0))
 		wild = INPLOOKUP_WILDCARD;
 

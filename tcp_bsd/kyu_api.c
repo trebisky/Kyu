@@ -101,8 +101,9 @@ kyu_soconnect ( struct socket *so, struct mbuf *nam)
 
 	// bpf2 ( "kyu_soconnect 1\n" );
 
-	error = tcp_usrreq ( so, PRU_CONNECT,
-	    (struct mbuf *)0, nam, (struct mbuf *)0);
+	// error = tcp_usrreq ( so, PRU_CONNECT,
+	//     (struct mbuf *)0, nam, (struct mbuf *)0);
+	error = proto_connect ( so, nam );
 
 	// bpf2 ( "kyu_soconnect 2 %d\n", error );
 
@@ -114,8 +115,9 @@ kyu_soconnect ( struct socket *so, struct mbuf *nam)
          * This allows user to disconnect by connecting to, e.g.,
          * a null address.
          */
+        //    ((so->so_proto->pr_flags & PR_CONNREQUIRED) ||
         if (so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING) &&
-            ((so->so_proto->pr_flags & PR_CONNREQUIRED) ||
+            ((so->so_proto_flags & PR_CONNREQUIRED) ||
             (error = sodisconnect(so))))
                 error = EISCONN;
         else
@@ -254,7 +256,8 @@ tcp_accept ( struct socket *so )
 
 	// if we wanted the peer name, this call
 	// would get it for us, albeit into an mbuf.
-	// this is PRU_ACCEPT.
+
+	// this is what PRU_ACCEPT would do ...
 	// inp = sotoinpcb(rso);
 	// in_setpeeraddr(inp, nam);
 

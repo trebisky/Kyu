@@ -113,8 +113,9 @@ void
 soshutdown ( struct socket *so )
 {
 	sorflush(so);
-        (void) tcp_usrreq (so, PRU_SHUTDOWN,
-                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+        // (void) tcp_usrreq (so, PRU_SHUTDOWN,
+        //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	proto_shutdown ( so );
 
 #ifdef notdef
 	struct protosw *pr = so->so_proto;
@@ -201,6 +202,9 @@ tcp_recv ( struct socket *so, char *buf, int max )
 	return n;
 }
 
+#define	sosendallatonce(so) \
+   ((so)->so_proto_flags & PR_ATOMIC)
+
 /*
  * Implement receive operations on a socket.
  * We depend on the way that records are added to the sockbuf
@@ -252,8 +256,9 @@ soreceive (
 
 		// error = (*pr->pr_usrreq)(so, PRU_RCVOOB,
 		//     m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
-		error = tcp_usrreq (so, PRU_RCVOOB,
-		    m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
+		// error = tcp_usrreq (so, PRU_RCVOOB,
+		//     m, (struct mbuf *)(flags & MSG_PEEK), (struct mbuf *)0);
+		error = proto_recvoob ( so, m, flags & MSG_PEEK );
 
 		if (error)
 			goto bad;
@@ -278,8 +283,9 @@ bad:
 		*mp = (struct mbuf *)0;
 
 	if (so->so_state & SS_ISCONFIRMING && uio->uio_resid)
-		(void) tcp_usrreq (so, PRU_RCVD,
-		    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+		proto_rcvd ( so );
+		// (void) tcp_usrreq (so, PRU_RCVD,
+		//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
 		// (*pr->pr_usrreq)(so, PRU_RCVD,
 		// (struct mbuf *)0,
 		//     (struct mbuf *)0, (struct mbuf *)0);
@@ -305,7 +311,7 @@ restart:
 	    so->so_rcv.sb_cc < uio->uio_resid) &&
 	    (so->so_rcv.sb_cc < so->so_rcv.sb_lowat ||
 	    ((flags & MSG_WAITALL) && uio->uio_resid <= so->so_rcv.sb_hiwat)) &&
-	    m->m_nextpkt == 0 && (pr->pr_flags & PR_ATOMIC) == 0) {
+	    m->m_nextpkt == 0 && (so->so_proto_flags & PR_ATOMIC) == 0) {
 #ifdef DIAGNOSTIC
 		if (m == 0 && so->so_rcv.sb_cc)
 			panic("receive 1");
@@ -330,7 +336,7 @@ restart:
 				goto dontblock;
 			}
 		if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) == 0 &&
-		    (so->so_proto->pr_flags & PR_CONNREQUIRED)) {
+		    (so->so_proto_flags & PR_CONNREQUIRED)) {
 			error = ENOTCONN;
 			goto release;
 		}
@@ -354,7 +360,7 @@ dontblock:
 	// 	uio->uio_procp->p_stats->p_ru.ru_msgrcv++;
 
 	nextrecord = m->m_nextpkt;
-	if (pr->pr_flags & PR_ADDR) {
+	if (so->so_proto_flags & PR_ADDR) {
 #ifdef DIAGNOSTIC
 		if (m->m_type != MT_SONAME)
 			panic("receive 1a");
@@ -518,7 +524,7 @@ dontblock:
 		}
 	}
 
-	if (m && pr->pr_flags & PR_ATOMIC) {
+	if (m && so->so_proto_flags & PR_ATOMIC) {
 		flags |= MSG_TRUNC;
 		if ((flags & MSG_PEEK) == 0)
 			(void) sbdroprecord(&so->so_rcv);
@@ -526,9 +532,13 @@ dontblock:
 	if ((flags & MSG_PEEK) == 0) {
 		if (m == 0)
 			so->so_rcv.sb_mb = nextrecord;
-		if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
-		    (void) tcp_usrreq (so, PRU_RCVD,
-			(struct mbuf *)0, (struct mbuf *)flags, (struct mbuf *)0 );
+		if (so->so_proto_flags & PR_WANTRCVD && so->so_pcb)
+		    proto_rcvd ( so );
+
+		    // (void) tcp_usrreq (so, PRU_RCVD,
+		    // 	(struct mbuf *)0, (struct mbuf *)flags, (struct mbuf *)0 );
+		    // XXX note extra arg in the following
+		    // RCVD ignores the flags argument anyhow for TCP
 		    // (*pr->pr_usrreq)(so, PRU_RCVD, (struct mbuf *)0,
 		    //	 (struct mbuf *)flags, (struct mbuf *)0, (struct mbuf *)0);
 	}
@@ -665,7 +675,7 @@ sosend(so, addr, uio, top, control, flags)
 
 	// dontroute =
 	//     (flags & MSG_DONTROUTE) && (so->so_options & SO_DONTROUTE) == 0 &&
-	//     (so->so_proto->pr_flags & PR_ATOMIC);
+	//     (so->so_proto_flags & PR_ATOMIC);
 
 	// p->p_stats->p_ru.ru_msgsnd++;
 
@@ -692,7 +702,7 @@ restart:
 			snderr(so->so_error);
 
 		if ((so->so_state & SS_ISCONNECTED) == 0) {
-			if (so->so_proto->pr_flags & PR_CONNREQUIRED) {
+			if (so->so_proto_flags & PR_CONNREQUIRED) {
 				if ((so->so_state & SS_ISCONFIRMING) == 0 &&
 				    !(resid == 0 && clen != 0))
 					snderr(ENOTCONN);
@@ -1023,8 +1033,9 @@ sonewconn ( struct socket *head, int connstatus )
 
         // if ((*so->so_proto->pr_usrreq)(so, PRU_ATTACH,
         //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0)) {
-        error = tcp_usrreq (so, PRU_ATTACH,
-                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+        // error = tcp_usrreq (so, PRU_ATTACH,
+        //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+        error = proto_attach (so );
 
 	if ( error ) {
                 (void) soqremque(so, soqueue);
@@ -1104,21 +1115,23 @@ void
 sorflush ( struct socket *so )
 {
         struct sockbuf *sb = &so->so_rcv;
-        struct protosw *pr = so->so_proto;
+        // struct protosw *pr = so->so_proto;
         int s;
         struct sockbuf asb;
 
         sb->sb_flags |= SB_NOINTR;
+
         (void) sblock(sb, M_WAITOK);
 
         s = splimp();
         socantrcvmore(so);
         sbunlock(sb);
+
         asb = *sb;
         bzero((caddr_t)sb, sizeof (*sb));
         splx(s);
 
-        // if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
+        // if (so->so_proto_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
         //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
 
         sbrelease(&asb);
@@ -1144,6 +1157,7 @@ sofree ( struct socket *so )
 	sem_destroy ( so->kyu_sem );
 
         // FREE(so, M_SOCKET);
+	printf ( "k_sock_free called: %08x\n", so );
 	k_sock_free ( so );
 }
 
@@ -1335,13 +1349,14 @@ sohasoutofband(so)
 
 /*
  * Must be called at splnet...
+ * called from tcp_input ();
  */
-int
+void
 soabort ( struct socket *so )
 {
-	int rv = tcp_usrreq (so, PRU_ABORT,
-                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
-	return rv;
+	// (void) tcp_usrreq (so, PRU_ABORT,
+        //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	proto_abort ( so );
 }
 
 /* From kern/uipc_socket2.c ---
@@ -1374,9 +1389,9 @@ soclose ( struct socket *so )
 
         if (so->so_options & SO_ACCEPTCONN) {
                 while (so->so_q0)
-                        (void) soabort(so->so_q0);
+                        soabort(so->so_q0);
                 while (so->so_q)
-                        (void) soabort(so->so_q);
+                        soabort(so->so_q);
         }
 
         if (so->so_pcb == 0)
@@ -1405,8 +1420,10 @@ drop:
         if (so->so_pcb) {
                 // int error2 = (*so->so_proto->pr_usrreq)(so, PRU_DETACH,
                 //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
-		int error2 = tcp_usrreq (so, PRU_DETACH,
-                        (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+		// int error2 = tcp_usrreq (so, PRU_DETACH,
+                //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+		int error2 = proto_detach ( so );
 
                 if (error == 0)
                         error = error2;
@@ -1444,8 +1461,10 @@ sodisconnect ( struct socket *so )
 
         // error = (*so->so_proto->pr_usrreq)(so, PRU_DISCONNECT,
         //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
-	error = tcp_usrreq (so, PRU_DISCONNECT,
-            (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	// error = tcp_usrreq (so, PRU_DISCONNECT,
+        //     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	error = proto_disconnect ( so );
 
 bad:
         splx(s);
@@ -1485,11 +1504,13 @@ sockargs ( struct mbuf **mp, caddr_t buf, int buflen, int type)
 
 // extern struct protosw tcp_proto;
 
+#ifdef notdef
 // We shrank it down to this.
 struct protosw tcp_proto =
 {
     PR_CONNREQUIRED|PR_WANTRCVD,	// flags
 };
+#endif
 
 /* The original is in kern/uipc_socket.c
  */
@@ -1498,11 +1519,11 @@ socreate ( struct socket *so, int dom, int type, int proto)
 // socreate ( int dom, struct socket **aso, int type, int proto)
 {
         // struct proc *p = curproc;               /* XXX */
-        register struct protosw *prp;
+        // register struct protosw *prp;
         // register struct socket *so;
         register int error;
 
-	prp = &tcp_proto;
+	// prp = &tcp_proto;
         // if (proto)
         //         prp = pffindproto(dom, proto, type);
         // else
@@ -1522,7 +1543,8 @@ socreate ( struct socket *so, int dom, int type, int proto)
 	}
 
         so->so_type = type;	/* SOCK_STREAM */
-        so->so_proto = prp;
+        //so->so_proto = prp;
+	so->so_proto_flags = PR_CONNREQUIRED | PR_WANTRCVD;
 
         // if (p->p_ucred->cr_uid == 0)
         //         so->so_state = SS_PRIV;
@@ -1530,8 +1552,10 @@ socreate ( struct socket *so, int dom, int type, int proto)
         // error = (*prp->pr_usrreq)(so, PRU_ATTACH,
         //         (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
 
-        error = tcp_usrreq (so, PRU_ATTACH,
-                (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
+        // error = tcp_usrreq (so, PRU_ATTACH,
+        //         (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
+
+        error = proto_attach (so );
 
         if (error) {
                 so->so_state |= SS_NOFDREF;
@@ -1550,8 +1574,10 @@ sobind ( struct socket *so, struct mbuf *nam )
 
         // error = (*so->so_proto->pr_usrreq)(so, PRU_BIND,
         //         (struct mbuf *)0, nam, (struct mbuf *)0);
-        error = tcp_usrreq (so, PRU_BIND,
-                (struct mbuf *)0, nam, (struct mbuf *)0);
+        // error = tcp_usrreq (so, PRU_BIND,
+        //         (struct mbuf *)0, nam, (struct mbuf *)0);
+
+	error = proto_bind ( so, nam );
 
         // splx(s);
         return (error);
@@ -1565,8 +1591,10 @@ solisten ( struct socket *so, int backlog )
 
         // error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN,
         //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
-        error = tcp_usrreq (so, PRU_LISTEN,
-                (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+        // error = tcp_usrreq (so, PRU_LISTEN,
+        //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+
+	error = proto_listen ( so );
 
         if (error) {
                 splx(s);
