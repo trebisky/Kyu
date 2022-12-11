@@ -66,8 +66,8 @@ tcp_setpersist(tp)
 	 * Start/restart persistance timer.
 	 */
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
-	    t * tcp_backoff[tp->t_rxtshift],
-	    TCPTV_PERSMIN, TCPTV_PERSMAX);
+		t * tcp_backoff[tp->t_rxtshift], TCPTV_PERSMIN, TCPTV_PERSMAX);
+
 	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
 		tp->t_rxtshift++;
 }
@@ -76,14 +76,13 @@ tcp_setpersist(tp)
  * Tcp output routine: figure out what should be sent and send it.
  */
 int
-tcp_output(tp)
-	register struct tcpcb *tp;
+tcp_output ( struct tcpcb *tp )
 {
-	register struct socket *so = tp->t_inpcb->inp_socket;
-	register long len, win;
+	struct socket *so = tp->t_inpcb->inp_socket;
+	long len, win;
 	int off, flags, error;
-	register struct mbuf *m;
-	register struct tcpiphdr *ti;
+	struct mbuf *m;
+	struct tcpiphdr *ti;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
@@ -590,6 +589,10 @@ send:
 	//     printf ( "tcp_output -- refuse to send faulty packet ***\n" );
 	//     return 1;
 	// }
+
+	// *******
+	// ******* Here is where we actually send something
+	// *******
 
 	error = ip_output ( m, tp->t_inpcb->inp_options,
 	    &tp->t_inpcb->inp_route,

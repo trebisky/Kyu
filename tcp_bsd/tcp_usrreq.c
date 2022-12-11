@@ -35,7 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
 // From protosw.h
 /*
  * The arguments to usrreq are:
@@ -72,7 +71,6 @@
 #define PRU_SLOWTIMO            19      /* 500ms timeout */
 #define PRU_PROTORCV            20      /* Never used: receive from below */
 #define PRU_PROTOSEND           21      /* Never used: send to below */
-#endif
 
 /* At this time Kyu never uses PRU_CONTROL.
  * BSD used it to handle ioctl() calls to set interface information.
@@ -257,6 +255,7 @@ proto_abort ( struct socket *so )
 /*
  * TCP slow timer went off; going through this
  * routine for tracing's sake.
+ *    PRU_SLOWTIMO
  */
 void
 proto_slowtimo ( struct socket *so, int index )
@@ -564,6 +563,7 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 		in_setpeeraddr(inp, nam);
 		break;
 
+#ifdef notdef
 	/*
 	 * TCP slow timer went off; going through this
 	 * routine for tracing's sake.
@@ -572,6 +572,7 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 		tp = tcp_timers(tp, (long)nam);
 		req |= (long)nam << 8;		/* for debug's sake */
 		break;
+#endif
 
 	default:
 		panic("tcp_usrreq");
@@ -587,6 +588,8 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 	return (error);
 }
 
+#ifdef notdef
+// used by getsockopt and setsockopt calls
 int
 tcp_ctloutput(op, so, level, optname, mp)
 	int op;
@@ -666,6 +669,7 @@ tcp_ctloutput(op, so, level, optname, mp)
 	splx(s);
 	return (error);
 }
+#endif
 
 // u_long	tcp_sendspace = 1024*8;
 // u_long	tcp_recvspace = 1024*8;
@@ -784,3 +788,5 @@ tcp_usrclosed(tp)
 		soisdisconnected(tp->t_inpcb->inp_socket);
 	return (tp);
 }
+
+/* THE END */

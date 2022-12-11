@@ -1581,11 +1581,13 @@ dodata:							/* XXX */
 	 * that the connection is closing.
 	 */
 	if (tiflags & TH_FIN) {
+
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 			socantrcvmore(so);
 			tp->t_flags |= TF_ACKNOW;
 			tp->rcv_nxt++;
 		}
+
 		switch (tp->t_state) {
 
 	 	/*

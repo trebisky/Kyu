@@ -91,6 +91,7 @@ struct protosw {
 #define	PR_WANTRCVD	0x08		/* want PRU_RCVD calls */
 #define	PR_RIGHTS	0x10		/* passes capabilities */
 
+#ifdef notdef
 /*
  * The arguments to usrreq are:
  *	(*protosw[].pr_usrreq)(up, req, m, nam, opt);
@@ -140,6 +141,8 @@ char *prurequests[] = {
 };
 #endif
 
+// This "PRC" stuff is all about dealing with ICMP notifications.
+// Currently Kyu entirely neglects this.
 /*
  * The arguments to the ctlinput routine are
  *	(*protosw[].pr_ctlinput)(cmd, sa, arg);
@@ -207,6 +210,6 @@ char	*prcorequests[] = {
 };
 #endif
 
-#ifdef KERNEL
-extern	struct protosw *pffindproto(), *pffindtype();
-#endif
+#endif /* notdef */
+
+// THE END

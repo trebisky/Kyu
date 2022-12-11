@@ -30,7 +30,7 @@ void bsd_test_debug ( long );
 /* Exported to main test code */
 /* Arguments are now ignored */
 struct test tcp_test_list[] = {
-        bsd_test_show,          "Show TCB table",                       0,
+        bsd_test_show,          "Show TCP info",                        0,
         bsd_test_server,        "Start pirate server",                  0,
         bsd_test_blab,          "Start blab server",                    0,
         bsd_test_echo,          "Start echo server",                    0,
@@ -64,6 +64,7 @@ void
 bsd_test_show ( long xxx )
 {
 	tcb_show ();
+	tcp_statistics ();
 }
 
 /* For debugging */
@@ -72,14 +73,15 @@ tcb_show ( void )
 {
         struct inpcb *inp;
 
+        if ( inp->inp_next == &tcb )
+	    printf ( "INPCB: empty\n" );
+
         inp = &tcb;
         while ( inp->inp_next != &tcb ) {
             inp = inp->inp_next;
-            printf ( "INPCB: %08x -- local, foreign: %s %d .. %s %d\n", inp,
-                ip2str32(inp->inp_laddr.s_addr),
-                ntohs(inp->inp_lport),
-                ip2str32(inp->inp_faddr.s_addr),
-                ntohs(inp->inp_fport) );
+            printf ( "INPCB: %08x -- local, foreign: ", inp );
+	    printf ( "%s %d .. ", ip2str32(inp->inp_laddr.s_addr), ntohs(inp->inp_lport) );
+	    printf ( "%s %d\n", ip2str32(inp->inp_faddr.s_addr), ntohs(inp->inp_fport) );
         }
 }
 
@@ -346,7 +348,47 @@ bsd_test_blab ( long xxx )
 
 /* ============================ */
 
-static void bind_test ( int );
+// static void bind_test ( int );
+
+static void
+bind_test ( int port )
+{
+	struct socket *so;
+	struct socket *cso;
+	int fip;
+
+	so = tcp_bind ( port );
+
+	/* ------------- finally do an accept */
+	/* Accept is the most interesting perhaps.
+	 * the unix call blocks and returns a new
+	 * socket when a connection is made.
+	 * The arguments to accept give a place where
+	 * the address on the peer end of the connection
+	 * can be returned.  This is ignored if both
+	 * address and length are set to zero.
+	 */
+	bpf2 ( "--- Server bind OK\n" );
+	bpf2 ( "--- waiting for connections\n" );
+	// tcb_show ();
+
+	for ( ;; ) {
+	    char *msg = "Dead men tell no tales\r\n";
+	    cso = tcp_accept ( so );
+
+	    fip = tcp_getpeer_ip ( cso );
+	    // printf ( "kyu_accept got a connection: %08x\n", cso );
+	    bpf3 ( "kyu_accept got a connection from: %s\n", ip2str32_h(fip) );
+	    // tcb_show ();
+
+	    tcp_send ( cso, msg, strlen(msg) );
+
+	    (void) soclose ( cso );
+
+	    bpf3 ( "socket was closed\n" );
+	}
+}
+
 
 void
 server_thread ( long xxx )
@@ -362,7 +404,46 @@ bsd_test_server ( long xxx )
 
 /* ============================ */
 
-static void connect_test ( char *, int );
+struct socket *tcp_bind ( int );
+struct socket *tcp_accept ( struct socket * );
+struct socket *tcp_connect ( char *, int );
+
+// static void connect_test ( char *, int );
+
+#define TEST_BUF_SIZE	128
+
+static void
+connect_test ( char *host, int port )
+{
+	struct socket *so;
+	char buf[TEST_BUF_SIZE];
+	int i, n;
+
+	bpf1 ( "Start connect to %s (port %d)\n", host, port );
+	so = tcp_connect ( host, port );
+	// bpf1 ( "Connect returns: %08x\n", so );
+
+	for ( i=0; i<5; i++ ) {
+	    thr_delay ( 1000 );		// 1 second
+	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
+	    printf ( "%d bytes received\n", n );
+	    if ( n > 0 ) {
+		buf[n-2] = '\n';
+		buf[n-1] = '\0';
+		printf ( "%s", buf );
+		// dump_buf ( buf, n );
+	    }
+	}
+
+	thr_delay ( 1000 );		// 1 second
+
+	//(void) soclose ( so );
+	//bpf1 ( "Connect closed and finished\n" );
+	printf ( "Leaving connect socket open\n" );
+
+	bpf1 ( "TCP connect test finished\n" );
+}
+
 
 void
 client_thread ( long xxx )
@@ -400,92 +481,5 @@ bsd_test_connect ( long xxx )
 /* ================================================================================ */
 /* ================================================================================ */
 /* ================================================================================ */
-
-struct socket *tcp_bind ( int );
-struct socket *tcp_accept ( struct socket * );
-struct socket *tcp_connect ( char *, int );
-
-#ifdef notdef
-struct mbuf *mb_free ( struct mbuf * );
-
-/* Can these all be static ?? */
-void sofree ( struct socket * );
-void sbflush ( struct sockbuf * );
-void sbdrop ( struct sockbuf *, int );
-
-void socantrcvmore ( struct socket * );
-void socantsendmore ( struct socket * );
-#endif
-
-/* ----------------------------- */
-/* ----------------------------- */
-
-#define TEST_BUF_SIZE	128
-
-void
-connect_test ( char *host, int port )
-{
-	struct socket *so;
-	char buf[TEST_BUF_SIZE];
-	int i, n;
-
-	bpf1 ( "Start connect to %s (port %d)\n", host, port );
-	so = tcp_connect ( host, port );
-	// bpf1 ( "Connect returns: %08x\n", so );
-
-	for ( i=0; i<5; i++ ) {
-	    thr_delay ( 1000 );		// 1 second
-	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
-	    printf ( "%d bytes received\n", n );
-	    if ( n > 0 ) {
-		buf[n-2] = '\n';
-		buf[n-1] = '\0';
-		printf ( "%s", buf );
-		// dump_buf ( buf, n );
-	    }
-	}
-
-	(void) soclose ( so );
-	bpf1 ( "Connect closed and finished\n" );
-
-	bpf1 ( "TCP connect test finished\n" );
-}
-
-static void
-bind_test ( int port )
-{
-	struct socket *so;
-	struct socket *cso;
-	int fip;
-
-	so = tcp_bind ( port );
-
-	/* ------------- finally do an accept */
-	/* Accept is the most interesting perhaps.
-	 * the unix call blocks and returns a new
-	 * socket when a connection is made.
-	 * The arguments to accept give a place where
-	 * the address on the peer end of the connection
-	 * can be returned.  This is ignored if both
-	 * address and length are set to zero.
-	 */
-	bpf2 ( "--- Server bind OK\n" );
-	bpf2 ( "--- waiting for connections\n" );
-	// tcb_show ();
-
-	for ( ;; ) {
-	    char *msg = "Dead men tell no tales\r\n";
-	    cso = tcp_accept ( so );
-
-	    fip = tcp_getpeer_ip ( cso );
-	    // printf ( "kyu_accept got a connection: %08x\n", cso );
-	    bpf3 ( "kyu_accept got a connection from: %s\n", ip2str32_h(fip) );
-	    // tcb_show ();
-
-	    tcp_send ( cso, msg, strlen(msg) );
-	    (void) soclose ( cso );
-	    bpf3 ( "socket was closed\n" );
-	}
-}
 
 /* THE END */

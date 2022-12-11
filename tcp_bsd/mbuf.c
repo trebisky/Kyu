@@ -33,6 +33,45 @@ void * kyu_malloc ( unsigned long );
  * -- also impose limit on alloc to avoid runaway bugs
  */
 
+struct kstats {
+	char *name;
+	int alloc;
+	int free;
+	int max;
+};
+
+struct kstats ts[] = {
+    { "mbuf", 0, 0, 0 },
+    { "sock", 0, 0, 0 },
+    { "inpcb", 0, 0, 0 },
+    { "tcpcb", 0, 0, 0 }
+};
+
+#define S_MBUF	0
+#define S_SOCK	1
+#define S_INPCB	2
+#define S_TCPCB	3
+
+static void
+tcp_statistics_init ( void )
+{
+}
+
+void
+tcp_statistics ( void )
+{
+	int i;
+
+	for ( i=0; i<4; i++ ) {
+	    printf ( "%6s: ", ts[i].name );
+	    printf ( "alloc = %d,", ts[i].alloc );
+	    printf ( "free = %d,", ts[i].free );
+	    printf ( "max = %d\n", ts[i].max );
+	}
+}
+
+/* ------------------------------------ */
+
 struct my_list {
 	struct my_list *next;
 };
@@ -47,12 +86,16 @@ k_mbuf_alloc ( void )
 	if ( mbuf_list ) {
 	    rv = mbuf_list;
 	    mbuf_list = ((struct my_list *) rv) -> next;
+	    ts[S_MBUF].alloc++;
+	    ts[S_MBUF].free--;
 	    return rv;
 	}
 
 	rv = kyu_malloc ( MSIZE );	/* 128 */
 	bpf3 ( "kyu_mbuf_alloc: %d %08x\n", MSIZE, rv );
 	memset ( rv, 0xab, MSIZE );
+	ts[S_MBUF].alloc++;
+	ts[S_MBUF].max++;
 	return rv;
 }
 
@@ -61,6 +104,8 @@ k_mbuf_free ( void *m )
 {
 	((struct my_list *) m) -> next = (struct my_list *) mbuf_list;
 	mbuf_list = (void *) m;
+	ts[S_MBUF].free++;
+	ts[S_MBUF].alloc--;
 }
 
 /* -------------------------------------------------------------------------------------------- */
@@ -82,12 +127,16 @@ k_sock_alloc ( void )
 	if ( sock_list ) {
 	    rv = sock_list;
 	    sock_list = ((struct my_list *) rv) -> next;
+	    ts[S_SOCK].alloc++;
+	    ts[S_SOCK].free--;
 	    return rv;
 	}
 
 	rv = kyu_malloc ( n );
 	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
+	ts[S_SOCK].alloc++;
+	ts[S_SOCK].max++;
 	return rv;
 }
 
@@ -96,6 +145,8 @@ k_sock_free ( void *m )
 {
 	((struct my_list *) m) -> next = (struct my_list *) sock_list;
 	sock_list = (void *) m;
+	ts[S_SOCK].free++;
+	ts[S_SOCK].alloc--;
 }
 
 /* -- */
@@ -109,12 +160,16 @@ k_inpcb_alloc ( void )
 	if ( inpcb_list ) {
 	    rv = inpcb_list;
 	    inpcb_list = ((struct my_list *) rv) -> next;
+	    ts[S_INPCB].alloc++;
+	    ts[S_INPCB].free--;
 	    return rv;
 	}
 
 	rv = kyu_malloc ( n );
 	bpf3 ( "kyu_inpcb_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
+	ts[S_INPCB].alloc++;
+	ts[S_INPCB].max++;
 	return rv;
 }
 
@@ -123,6 +178,8 @@ k_inpcb_free ( void *m )
 {
 	((struct my_list *) m) -> next = (struct my_list *) inpcb_list;
 	inpcb_list = (void *) m;
+	ts[S_INPCB].free++;
+	ts[S_INPCB].alloc--;
 }
 
 /* -- */
@@ -136,12 +193,16 @@ k_tcpcb_alloc ( void )
 	if ( tcpcb_list ) {
 	    rv = tcpcb_list;
 	    tcpcb_list = ((struct my_list *) rv) -> next;
+	    ts[S_TCPCB].alloc++;
+	    ts[S_TCPCB].free--;
 	    return rv;
 	}
 
 	rv = kyu_malloc ( n );
 	bpf3 ( "kyu_tcpcb_alloc: %d %08x\n", n, rv );
 	// memset ( rv, 0, n );
+	ts[S_TCPCB].alloc++;
+	ts[S_TCPCB].max++;
 	return rv;
 }
 
@@ -150,6 +211,8 @@ k_tcpcb_free ( void *m )
 {
 	((struct my_list *) m) -> next = (struct my_list *) tcpcb_list;
 	tcpcb_list = (void *) m;
+	ts[S_TCPCB].free++;
+	ts[S_TCPCB].alloc--;
 }
 
 /* -------------------------------------------------------------------------------------------- */
@@ -280,6 +343,8 @@ void
 mb_init ( void )
 {
 	struct mbuf *m;
+
+	tcp_statistics_init ();
 
 	mb_cl_init ();
 

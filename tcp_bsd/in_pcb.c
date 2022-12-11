@@ -35,33 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-// #include <mbuf.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-// #include <sys/ioctl.h>
-#include <sys/errno.h>
-#include <sys/time.h>
-// #include <sys/proc.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/in_var.h>
-#include <netinet/ip_var.h>
-#endif
-
 extern struct	in_addr zeroin_addr;
 
 int
@@ -361,8 +334,10 @@ in_pcbdetach(inp)
 
 	so->so_pcb = 0;
 	sofree(so);
+
 	if (inp->inp_options)
-		(void)mb_free(inp->inp_options);
+	    (void) mb_free(inp->inp_options);
+
 	//if (inp->inp_route.ro_rt)
 	//	rtfree(inp->inp_route.ro_rt);
 	// ip_freemoptions(inp->inp_moptions);
@@ -403,6 +378,10 @@ in_setpeeraddr(inp, nam)
 	sin->sin_addr = inp->inp_faddr;
 }
 
+#ifdef notdef
+// Called from tcp_ctlinput()
+// This is all about dealing with notifications from ICMP
+// (which Kyu is currently entirely neglecting)
 /*
  * Pass some notification to all connections of a protocol
  * associated with address dst.  The local address and/or port numbers
@@ -432,6 +411,7 @@ in_pcbnotify(head, dst, fport_arg, laddr, lport_arg, cmd, notify)
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET)
 		return;
+
 	faddr = ((struct sockaddr_in *)dst)->sin_addr;
 	if (faddr.s_addr == INADDR_ANY)
 		return;
@@ -467,6 +447,7 @@ in_pcbnotify(head, dst, fport_arg, laddr, lport_arg, cmd, notify)
 		 	(*notify)(oinp, errno);
 	}
 }
+#endif
 
 #ifdef ROUTING_STUFF
 /*
@@ -580,3 +561,5 @@ in_pcblookup(head, faddr, fport_arg, laddr, lport_arg, flags)
 	}
 	return (match);
 }
+
+/* THE END */

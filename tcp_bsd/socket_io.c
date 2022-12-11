@@ -1141,6 +1141,7 @@ void
 sofree ( struct socket *so )
 {
 	printf ( "sofree called: %08x\n", so );
+	unroll_cur ();
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
                 return;
@@ -1432,9 +1433,11 @@ drop:
 discard:
 	// Near as I can tell, this marks the socket as not
 	// having a reference in file array (i.e. as an "fd")
-	// In Kyu this bit is always set.
-        // if (so->so_state & SS_NOFDREF)
-        //         panic("soclose: NOFDREF");
+
+	// Kyu will get this panic, so I must comment it out.
+        // if ( so->so_state & SS_NOFDREF )
+        //         panic ( "soclose: NOFDREF" );
+
         so->so_state |= SS_NOFDREF;
 
         sofree(so);
@@ -1521,7 +1524,7 @@ socreate ( struct socket *so, int dom, int type, int proto)
         // struct proc *p = curproc;               /* XXX */
         // register struct protosw *prp;
         // register struct socket *so;
-        register int error;
+        int error;
 
 	// prp = &tcp_proto;
         // if (proto)
@@ -1535,7 +1538,7 @@ socreate ( struct socket *so, int dom, int type, int proto)
 	//	return (EPROTOTYPE);
 
         // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_WAIT);
-        bzero((caddr_t)so, sizeof(*so));
+        bzero ( (caddr_t)so, sizeof(struct socket) );
 
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
 	if ( ! so->kyu_sem ) {
@@ -1556,6 +1559,13 @@ socreate ( struct socket *so, int dom, int type, int proto)
         //         (struct mbuf *)0, (struct mbuf *)proto, (struct mbuf *)0);
 
         error = proto_attach (so );
+
+	// A socket will be created here with so_state = 0,
+	//  (thanks to the bzero)
+	// i.e. with the SS_NOFDREF bit clear,
+	// which indicates there is an FD reference,
+	// i.e. the user side of things still thinks the
+	// socket is open.
 
         if (error) {
                 so->so_state |= SS_NOFDREF;

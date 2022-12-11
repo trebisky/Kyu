@@ -267,7 +267,7 @@ tcp_drop(tp, errno)
 	if (errno == ETIMEDOUT && tp->t_softerror)
 		errno = tp->t_softerror;
 	so->so_error = errno;
-	return (tcp_close(tp));
+	return tcp_close ( tp );
 }
 
 /*
@@ -284,7 +284,9 @@ tcp_close(tp)
 	struct inpcb *inp = tp->t_inpcb;
 	struct socket *so = inp->inp_socket;
 	register struct mbuf *m;
+
 #ifdef RTV_RTT
+	// Nope, this is not turned on for Kyu
 	register struct rtentry *rt;
 
 	/*
@@ -377,8 +379,26 @@ tcp_close(tp)
 		tcp_last_inpcb = &tcb;
 	in_pcbdetach(inp);
 	tcpstat.tcps_closed++;
-	return ((struct tcpcb *)0);
+
+	return (struct tcpcb *) 0;
 }
+
+/*
+ * When a source quench is received, close congestion window
+ * to one segment.  We will gradually open it again as we proceed.
+ * The errno argument is because this gets referenced by
+ *  a function pointer than also can call tcp_notify()
+ * This gets called from tcp_output()
+ */
+void
+tcp_quench ( struct inpcb *inp, int errno)
+{
+	struct tcpcb *tp = intotcpcb(inp);
+
+	if (tp)
+		tp->snd_cwnd = tp->t_maxseg;
+}
+
 
 /* This would get called in a BSD system to let
  * TCP know that the system was desperate and wanted
@@ -386,15 +406,14 @@ tcp_close(tp)
  */
 // void tcp_drain() { }
 
+#ifdef notdef
 /*
  * Notify a tcp user of an asynchronous error;
  * store error as soft error, but wake up user
  * (for now, won't do anything until can select for soft error).
  */
 void
-tcp_notify(inp, error)
-	struct inpcb *inp;
-	int error;
+tcp_notify ( struct inpcb *inp, int error )
 {
 	register struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
 	register struct socket *so = inp->inp_socket;
@@ -407,8 +426,7 @@ tcp_notify(inp, error)
 	 * can never complete.
 	 */
 	if (tp->t_state == TCPS_ESTABLISHED &&
-	     (error == EHOSTUNREACH || error == ENETUNREACH ||
-	      error == EHOSTDOWN)) {
+	     (error == EHOSTUNREACH || error == ENETUNREACH || error == EHOSTDOWN)) {
 		return;
 	} else if (tp->t_state < TCPS_ESTABLISHED && tp->t_rxtshift > 3 &&
 	    tp->t_softerror)
@@ -423,6 +441,7 @@ tcp_notify(inp, error)
 	sowwakeup(so);
 }
 
+// Handle a notification from ICMP
 void
 tcp_ctlinput(cmd, sa, ip)
 	int cmd;
@@ -432,6 +451,7 @@ tcp_ctlinput(cmd, sa, ip)
 	register struct tcphdr *th;
 	extern struct in_addr zeroin_addr;
 	extern u_char inetctlerrmap[];
+
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 
 	if (cmd == PRC_QUENCH)
@@ -439,6 +459,7 @@ tcp_ctlinput(cmd, sa, ip)
 	else if (!PRC_IS_REDIRECT(cmd) &&
 		 ((unsigned)cmd > PRC_NCMDS || inetctlerrmap[cmd] == 0))
 		return;
+
 	if (ip) {
 		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 		in_pcbnotify(&tcb, sa, th->th_dport, ip->ip_src, th->th_sport,
@@ -447,19 +468,6 @@ tcp_ctlinput(cmd, sa, ip)
 		in_pcbnotify(&tcb, sa, 0, zeroin_addr, 0, cmd, notify);
 }
 
-/*
- * When a source quench is received, close congestion window
- * to one segment.  We will gradually open it again as we proceed.
- */
-void
-tcp_quench(inp, errno)
-	struct inpcb *inp;
-	int errno;
-{
-	struct tcpcb *tp = intotcpcb(inp);
-
-	if (tp)
-		tp->snd_cwnd = tp->t_maxseg;
-}
+#endif
 
 // THE END
