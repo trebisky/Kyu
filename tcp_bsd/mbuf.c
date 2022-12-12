@@ -52,9 +52,67 @@ struct kstats ts[] = {
 #define S_INPCB	2
 #define S_TCPCB	3
 
+struct socket_list {
+	struct socket *so;
+	int active;
+};
+
+/* This is an ugly hackish temporary thing.
+ * I want to be able to display a list of all the socket structures.
+ * It is problematic to set up a linked list given that the whole
+ * structure gets cleared in socreat(), so I do this.
+ */
+#define MAX_SL	200
+
+static struct socket_list sl[MAX_SL];
+
+// static struct socket *so_head = NULL;
+
 static void
 tcp_statistics_init ( void )
 {
+	memset ( (char *) sl, 0, sizeof(struct socket_list) * MAX_SL );
+}
+
+#ifdef notdef
+#define	SS_NOFDREF		0x001	/* no file table ref any more */
+#define	SS_ISCONNECTED		0x002	/* socket connected to a peer */
+#define	SS_ISCONNECTING		0x004	/* in process of connecting to peer */
+#define	SS_ISDISCONNECTING	0x008	/* in process of disconnecting */
+#define	SS_CANTSENDMORE		0x010	/* can't send more data to peer */
+#define	SS_CANTRCVMORE		0x020	/* can't receive more data from peer */
+#define	SS_RCVATMARK		0x040	/* at mark on input */
+
+#define	SS_PRIV			0x080	/* privileged for broadcast, raw... */
+#define	SS_NBIO			0x100	/* non-blocking ops */
+#define	SS_ASYNC		0x200	/* async i/o notify */
+#define	SS_ISCONFIRMING		0x400	/* deciding to accept connection req */
+#endif
+
+static void
+socket_show ( void )
+{
+	struct socket *sp;
+	int i;
+
+	for ( i=0; i<MAX_SL; i++ ) {
+
+	    // if ( ! sl[i].active )
+	    //	  continue;
+	    if ( sl[i].so ) {
+		sp = sl[i].so;
+		printf ( "Socket: %08x %d pcb = %08x, %04x", sp, sl[i].active, sp->so_pcb, sp->so_state );
+		if ( sp->so_state & SS_NOFDREF )
+		    printf ( " NOFDREF" );
+		if ( sp->so_state & SS_ISCONNECTED )
+		    printf ( " CONNECTED" );
+		if ( sp->so_state & SS_CANTSENDMORE )
+		    printf ( " CANTSEND" );
+		if ( sp->so_state & SS_CANTRCVMORE )
+		    printf ( " CANTRCV" );
+		printf ( "\n" );
+	    }
+	}
 }
 
 void
@@ -68,6 +126,8 @@ tcp_statistics ( void )
 	    printf ( "free = %d,", ts[i].free );
 	    printf ( "max = %d\n", ts[i].max );
 	}
+
+	socket_show ();
 }
 
 /* ------------------------------------ */
@@ -118,35 +178,58 @@ static void *sock_list = NULL;
 static void *inpcb_list = NULL;
 static void *tcpcb_list = NULL;
 
+static void
+sock_active ( struct socket *so, int val )
+{
+	int i;
+
+	for ( i=0; i<MAX_SL; i++ )
+	    if ( sl[i].so == so )
+		sl[i].active = val;
+}
+
 void *
 k_sock_alloc ( void )
 {
 	void *rv;
 	int n = sizeof ( struct socket );
+	int index;
 
 	if ( sock_list ) {
 	    rv = sock_list;
 	    sock_list = ((struct my_list *) rv) -> next;
+	    printf ( "kyu_sock_alloc from free list: %d %08x\n", n, rv );
 	    ts[S_SOCK].alloc++;
 	    ts[S_SOCK].free--;
+	    sock_active ( rv, 1 );
 	    return rv;
 	}
 
 	rv = kyu_malloc ( n );
 	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
+
 	// memset ( rv, 0, n );
+
 	ts[S_SOCK].alloc++;
 	ts[S_SOCK].max++;
+
+	index = ts[S_SOCK].max - 1;
+	sl[index].so = rv;
+	sl[index].active = 1;
+
 	return rv;
 }
 
 void
 k_sock_free ( void *m )
 {
+	// ((struct socket *) m)->active = 0;
 	((struct my_list *) m) -> next = (struct my_list *) sock_list;
 	sock_list = (void *) m;
 	ts[S_SOCK].free++;
 	ts[S_SOCK].alloc--;
+	printf ( "k_sock_free %08x\n", m );
+	sock_active ( m, 0 );
 }
 
 /* -- */

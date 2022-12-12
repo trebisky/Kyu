@@ -56,13 +56,14 @@
  * private data and error information.
  */
 struct socket {
+	struct socket *next;	/* kyu - free list (not really needed) */
 	short	so_type;		/* generic type, see socket.h */
 	short	so_options;		/* from socket call, see socket.h */
 	short	so_linger;		/* time to linger while closing */
 	short	so_state;		/* internal state flags SS_*, below */
 	caddr_t	so_pcb;			/* protocol control block */
 	struct	protosw *so_proto;	/* protocol handle */
-	int so_proto_flags;		/* NEW 12-7-2022 */
+	int so_proto_flags;		/* NEW 12-7-2022 (kyu) */
 /*
  * Variables for connection queueing.
  * Socket where accepts occur is so_head in all subsidiary sockets.

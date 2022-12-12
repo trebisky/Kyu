@@ -24,6 +24,7 @@ void bsd_test_blab ( long );
 void bsd_test_echo ( long );
 void bsd_test_wangdoodle ( long );
 void bsd_test_connect ( long );
+void bsd_test_close ( long );
 void bsd_test_debug ( long );
 
 /* XXX - stolen from tcp_xinu, needs rework */
@@ -35,7 +36,8 @@ struct test tcp_test_list[] = {
         bsd_test_blab,          "Start blab server",                    0,
         bsd_test_echo,          "Start echo server",                    0,
         bsd_test_wangdoodle,    "Start wangdoodle server",              0,
-	bsd_test_connect,	"Connect test",				0,
+	bsd_test_connect,	"Connect (client) test",		0,
+	bsd_test_close,		"Close client socket",			0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
 	bsd_test_debug,		"Set debug 2",				2,
@@ -412,6 +414,8 @@ struct socket *tcp_connect ( char *, int );
 
 #define TEST_BUF_SIZE	128
 
+struct socket *client_socket;
+
 static void
 connect_test ( char *host, int port )
 {
@@ -422,6 +426,8 @@ connect_test ( char *host, int port )
 	bpf1 ( "Start connect to %s (port %d)\n", host, port );
 	so = tcp_connect ( host, port );
 	// bpf1 ( "Connect returns: %08x\n", so );
+
+	client_socket = so;
 
 	for ( i=0; i<5; i++ ) {
 	    thr_delay ( 1000 );		// 1 second
@@ -438,6 +444,7 @@ connect_test ( char *host, int port )
 	thr_delay ( 1000 );		// 1 second
 
 	//(void) soclose ( so );
+
 	//bpf1 ( "Connect closed and finished\n" );
 	printf ( "Leaving connect socket open\n" );
 
@@ -474,6 +481,12 @@ void
 bsd_test_connect ( long xxx )
 {
 	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
+}
+
+void
+bsd_test_close ( long xxx )
+{
+	(void) soclose ( client_socket );
 }
 
 /* ================================================================================ */

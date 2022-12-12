@@ -238,9 +238,10 @@ soreceive (
 	int moff, type;
 	int orig_resid = uio->uio_resid;
 
-	struct protosw *pr = so->so_proto;
+	// struct protosw *pr = so->so_proto;
 
 	mp = mp0;
+
 	if (paddr)
 		*paddr = 0;
 	if (controlp)
@@ -277,7 +278,7 @@ bad:
 			mb_freem(m);
 			// m_freem(m);
 		return (error);
-	}
+	} /* END of OOB */
 
 	if (mp)
 		*mp = (struct mbuf *)0;
@@ -347,7 +348,11 @@ restart:
 			goto release;
 		}
 		sbunlock(&so->so_rcv);
-		error = sbwait(&so->so_rcv);
+
+	printf ( " -- soreceive BLOCK 1\n" );
+		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+	printf ( " -- soreceive BLOCK 1 done\n" );
+
 		splx(s);
 		if (error)
 			return (error);
@@ -513,7 +518,9 @@ dontblock:
 		    !sosendallatonce(so) && !nextrecord) {
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
-			error = sbwait(&so->so_rcv);
+	printf ( " -- soreceive BLOCK 2\n" );
+			error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+	printf ( " -- soreceive BLOCK 2 done\n" );
 			if (error) {
 				sbunlock(&so->so_rcv);
 				splx(s);
@@ -727,7 +734,7 @@ restart:
 				snderr(EWOULDBLOCK);
 
 			sbunlock(&so->so_snd);
-			error = sbwait(&so->so_snd);	/* Blocks */
+			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 
 			splx(s);
 			if (error)
@@ -1141,7 +1148,7 @@ void
 sofree ( struct socket *so )
 {
 	printf ( "sofree called: %08x\n", so );
-	unroll_cur ();
+	// unroll_cur ();
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
                 return;

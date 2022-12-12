@@ -25,6 +25,7 @@ tcp_connect ( char *name, int port )
 
 	/* First we need a socket */
         so = (struct socket *) k_sock_alloc ();
+
         e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
         if ( e ) {
             bpf2 ( "socreate fails for connect\n" );
@@ -165,6 +166,7 @@ tcp_bind ( int port )
 
 	/* ------------- make a socket */
 	so = (struct socket *) k_sock_alloc ();
+
 	// error = socreate(uap->domain, &so, uap->type, uap->protocol);
 	e = socreate ( so, AF_INET, SOCK_STREAM, 0 );
 	if ( e ) {
