@@ -40,6 +40,69 @@
 
 extern struct thread *cur_thread;
 
+/* ----------------------------------------------
+ * Notes on sorwakeup, sowwakeup, sbwakeup and so forth
+ * 12-13-2-22
+ * These began as macros in socketvar.h,
+ * but I moved them here, renamed them slightly,
+ * and made them inline functions.
+ * Add the msg argument for debugging
+ */
+
+static inline void
+so_rwakeup ( struct socket *so, char *msg )
+{
+	printf ( "rwakeup: %s\n", msg );
+	sbwakeup(&(so)->so_rcv);
+}
+
+static inline void
+so_wwakeup ( struct socket *so, char *msg )
+{
+	printf ( "wwakeup: %s\n", msg );
+	sbwakeup(&(so)->so_snd);
+}
+
+/* The above are only visible in this file, so for tcp_input.c
+ * I provide these externally visible functions.
+ * I could move the above into a header file,
+ * but I am trying to keep things in this one file
+ * as much as possible.
+ */
+
+void
+so_rwakeup_ext ( struct socket *so, char *msg )
+{
+	so_rwakeup ( so, msg );
+}
+
+void
+so_wwakeup_ext ( struct socket *so, char *msg )
+{
+	so_wwakeup ( so, msg );
+}
+
+#ifdef notdef
+/* On Kyu we replaced sowakeup with sbwakeup.
+ *  and did away with the socket argument that only is
+ *  involved with select() and signals.
+ * We did away with upcall also
+ */
+#define sorwakeup(so)   sbwakeup(&(so)->so_rcv)
+
+#define sowwakeup(so)   sbwakeup(&(so)->so_snd)
+
+#ifdef original
+#define sorwakeup(so)   { sowakeup((so), &(so)->so_rcv); \
+                          if ((so)->so_upcall) \
+                            (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
+                        }
+
+#define sowwakeup(so)   sowakeup((so), &(so)->so_snd)
+#endif
+#endif
+
+
 /* All this used to be in uio.h, but was moved here for Kyu
  * since this is the only place we use it.
  * (and it is nice to see it right alongside where it is used)
@@ -185,8 +248,12 @@ tcp_recv ( struct socket *so, char *buf, int max )
                 uio, (struct mbuf **)0, (struct mbuf **)0, (int *)0));
 		*/
 
+	// printf ( "Calling soreceive\n" );
 	stat = soreceive ( so, (struct mbuf **)0, &k_uio,
 	    (struct mbuf **)0, (struct mbuf **)0, (int *)0 );
+
+	n = k_uio.uio_offset;
+	printf ( "Return from  soreceive with %d\n", n );
 
 	/* Typical output on two successive calls.
 	 * the first had 26 bytes delivered
@@ -198,8 +265,6 @@ tcp_recv ( struct socket *so, char *buf, int max )
 
 	// bpf1 ( "kyu_recv - iov = %d, %d %d, %d\n", stat, k_vec.iov_len, k_uio.uio_resid, k_uio.uio_offset );
 	// bpf1 ( "kyu_recv - base = %08x\n", k_vec.iov_base );
-
-	n = k_uio.uio_offset;
 
 	return n;
 }
@@ -295,6 +360,8 @@ bad:
 		//     (struct mbuf *)0, (struct mbuf *)0);
 
 restart:
+	// printf ( " -- soreceive RESTART\n" );
+
 	if (error = sb_lock(&so->so_rcv, SBLOCKWAIT(flags)))
 		return (error);
 
@@ -356,7 +423,7 @@ restart:
 
 	printf ( " -- soreceive BLOCK 1\n" );
 		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
-	printf ( " -- soreceive BLOCK 1 done\n" );
+	printf ( " -- soreceive BLOCK 1 done (error = %d)\n", error );
 
 		// splx(s);
 		net_unlock ();
@@ -1074,7 +1141,7 @@ sonewconn ( struct socket *head, int connstatus )
         }
 
         if (connstatus) {
-                sorwakeup(head);
+                so_rwakeup(head, "connstatus" );
 
                 // wakeup((caddr_t)&head->so_timeo);
 		sem_unblock ( so->kyu_sem );
@@ -1246,7 +1313,7 @@ soisconnected(so)
 
         if (head && soqremque(so, 0)) {
                 soqinsque(head, so, 1);
-                sorwakeup(head);
+                so_rwakeup(head, "connected" );
 
 		bpf3 ( "soisconnected - wakeup head %08x\n", head->kyu_sem );
                 // wakeup((caddr_t)&head->so_timeo);
@@ -1257,8 +1324,8 @@ soisconnected(so)
                 // wakeup((caddr_t)&so->so_timeo);
 		sem_unblock ( so->kyu_sem );
 
-                sorwakeup(so);
-                sowwakeup(so);
+                so_rwakeup(so, "connected 2" );
+                so_wwakeup(so, "connected 2" );
         }
 }
 
@@ -1273,8 +1340,8 @@ soisdisconnecting(so)
         // wakeup((caddr_t)&so->so_timeo);
 	sem_unblock ( so->kyu_sem );
 
-        sowwakeup(so);
-        sorwakeup(so);
+        so_wwakeup(so, "disconnecting" );
+        so_rwakeup(so, "disconnecting" );
 }
 
 void
@@ -1289,8 +1356,8 @@ soisdisconnected(so)
 	// OK, but who would be waiting for this?
 	sem_unblock ( so->kyu_sem );
 
-        sowwakeup(so);
-        sorwakeup(so);
+        so_wwakeup(so, "disconnected" );
+        so_rwakeup(so, "disconnected" );
 }
 
 /* Kyu hack -- 12/5/2022
@@ -1346,7 +1413,7 @@ socantsendmore ( struct socket *so )
 {
 
         so->so_state |= SS_CANTSENDMORE;
-        sowwakeup(so);
+        so_wwakeup(so, "cant send more" );
 }
 
 void
@@ -1354,7 +1421,7 @@ socantrcvmore ( struct socket *so )
 {
 
         so->so_state |= SS_CANTRCVMORE;
-        sorwakeup(so);
+        so_rwakeup(so, "cant rcv more" );
 }
 
 /* From kern/uipc_socket.c */

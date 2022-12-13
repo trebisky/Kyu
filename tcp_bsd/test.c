@@ -426,6 +426,7 @@ connect_test ( char *host, int port )
 	bpf1 ( "Start connect to %s (port %d)\n", host, port );
 	so = tcp_connect ( host, port );
 	// bpf1 ( "Connect returns: %08x\n", so );
+	// printf ( "TCP connect done\n" );
 
 	client_socket = so;
 
@@ -443,11 +444,17 @@ connect_test ( char *host, int port )
 	}
 #endif
 
-	// XXX
-	thr_delay ( 100 );
+	// XXX this works, but why?
+	// thr_delay ( 100 );
 
 	n = tcp_recv ( so, buf, TEST_BUF_SIZE );
 	printf ( "%d bytes received\n", n );
+	if ( n == 0 ) {
+	    printf ( "try again\n" );
+	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
+	    printf ( "%d bytes received\n", n );
+	}
+
 	if ( n > 0 ) {
 	    buf[n-2] = '\n';
 	    buf[n-1] = '\0';

@@ -38,8 +38,11 @@
 int	tcp_keepidle = TCPTV_KEEP_IDLE;
 int	tcp_keepintvl = TCPTV_KEEPINTVL;
 int	tcp_maxidle;
+
+// static int my_count = 0;
 /*
  * Fast timeout routine for processing delayed acks
+ * Called every 200 ms. (5 hz)
  */
 void
 tcp_fasttimo ( void )
@@ -49,6 +52,7 @@ tcp_fasttimo ( void )
 	// int s = splnet();
 
 	net_lock ();
+	// printf ( "FAST: %d\n", my_count++ );
 
 	inp = tcb.inp_next;
 	if (inp)
@@ -65,7 +69,8 @@ tcp_fasttimo ( void )
 }
 
 /*
- * Tcp protocol timeout routine called every 500 ms.
+ * Tcp protocol timeout routine.
+ * Called every 500 ms.  (2 hz)
  * Updates the timers in all active tcb's and
  * causes finite state machine actions if timers expire.
  */
@@ -75,9 +80,10 @@ tcp_slowtimo ( void )
 	struct inpcb *ip, *ipnxt;
 	struct tcpcb *tp;
 	// int s = splnet();
-	register long i;
+	long i;
 
 	net_lock ();
+	// printf ( "SLOW\n" );
 
 	tcp_maxidle = TCPTV_KEEPCNT * tcp_keepintvl;
 	/*

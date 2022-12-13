@@ -47,7 +47,6 @@ extern u_long sb_max;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
-
 /*
  * Insert segment ti into reassembly queue of tcp with
  * control block tp.  Return TH_FIN if reassembly now includes
@@ -57,6 +56,8 @@ extern u_long sb_max;
  * from the queue and repetition of various conversions.
  * Set DELACK for segments received in order, but ack immediately
  * when segments are out of order (so fast retransmit can work).
+ *
+ * A use once macro ...
  */
 #define	TCP_REASS(tp, ti, m, so, flags) { \
 	if ((ti)->ti_seq == (tp)->rcv_nxt && \
@@ -68,7 +69,7 @@ extern u_long sb_max;
 		tcpstat.tcps_rcvpack++;\
 		tcpstat.tcps_rcvbyte += (ti)->ti_len;\
 		sbappend(&(so)->so_rcv, (m)); \
-		sorwakeup(so); \
+		so_rwakeup_ext(so,"tcp_input reass"); \
 	} else { \
 		(flags) = tcp_reass((tp), (ti), (m)); \
 		tp->t_flags |= TF_ACKNOW; \
@@ -166,20 +167,25 @@ present:
 		return (0);
 	if (tp->t_state == TCPS_SYN_RECEIVED && ti->ti_len)
 		return (0);
+
 	do {
 		tp->rcv_nxt += ti->ti_len;
 		flags = ti->ti_flags & TH_FIN;
 		remque(ti);
 		m = REASS_MBUF(ti);
 		ti = (struct tcpiphdr *)ti->ti_next;
+
+		printf ( "TCP input - data in tcp_reass 1 %d\n", m->m_len );
 		if (so->so_state & SS_CANTRCVMORE)
 			mb_freem(m);
 		else
 			sbappend(&so->so_rcv, m);
 	} while (ti != (struct tcpiphdr *)tp && ti->ti_seq == tp->rcv_nxt);
-	sorwakeup(so);
+
+	so_rwakeup_ext(so, "tcp_reass");
 	return (flags);
 }
+/* end of tcp_reass () */
 
 /* 12 bytes, no padding monkey business */
 struct pseudo {
@@ -824,7 +830,8 @@ findpcb:
 					tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
 
 				if (so->so_snd.sb_flags & SB_NOTIFY)
-					sowwakeup(so);
+					so_wwakeup_ext(so,"tcp_input ack");
+
 				if (so->so_snd.sb_cc)
 					(void) tcp_output(tp);
 				return;
@@ -841,14 +848,19 @@ findpcb:
 			tp->rcv_nxt += ti->ti_len;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += ti->ti_len;
+
 			/*
 			 * Drop TCP, IP headers and TCP options then add data
 			 * to socket buffer.
+			 * (this code is in tcp_input() )
 			 */
 			m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 			m->m_len -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
+
+			printf ( "TCP input - data arrived %d\n", m->m_len );
 			sbappend(&so->so_rcv, m);
-			sorwakeup(so);
+			so_rwakeup_ext(so,"tcp_input, data");
+
 			tp->t_flags |= TF_DELACK;
 			return;
 		}
@@ -1402,8 +1414,10 @@ trimthenstep6:
 			tp->snd_wnd -= acked;
 			ourfinisacked = 0;
 		}
+
 		if (so->so_snd.sb_flags & SB_NOTIFY)
-			sowwakeup(so);
+			so_wwakeup_ext(so,"tcp_input data 1");
+
 		tp->snd_una = ti->ti_ack;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
@@ -1563,6 +1577,8 @@ dodata:							/* XXX */
 	 */
 	if ((ti->ti_len || (tiflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+		/* !!! this is where data arrives */
+		printf ( "TCP input - data in tcp_reass 2 %d\n", m->m_len );
 		TCP_REASS(tp, ti, m, so, tiflags);
 		/*
 		 * Note the amount of data that peer has sent into

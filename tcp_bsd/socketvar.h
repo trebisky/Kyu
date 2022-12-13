@@ -206,10 +206,11 @@ struct socket {
  *  and did away with the socket argument that only is
  *  involved with select() and signals.
  * We did away with upcall also
+ * Now moved to socket_io.c as inline functions
  */
-#define	sorwakeup(so)	sbwakeup(&(so)->so_rcv)
+// #define	sorwakeup(so)	sbwakeup(&(so)->so_rcv)
 
-#define	sowwakeup(so)	sbwakeup(&(so)->so_snd)
+// #define	sowwakeup(so)	sbwakeup(&(so)->so_snd)
 
 #ifdef notdef
 #define	sorwakeup(so)	{ sowakeup((so), &(so)->so_rcv); \

@@ -236,32 +236,32 @@ sbdroprecord ( struct sockbuf *sb )
 }
 
 #ifdef notdef
-/*
- * Wakeup processes waiting on a socket buffer.
- * Do asynchronous notification via SIGIO
- * if the socket has the SS_ASYNC flag set.
- */
-void
-sowakeup ( struct socket *so, struct sockbuf *sb )
-{
-        // struct proc *p;
-
-        // selwakeup(&sb->sb_sel);
-        sb->sb_flags &= ~SB_SEL;
-        if (sb->sb_flags & SB_WAIT) {
-                sb->sb_flags &= ~SB_WAIT;
-                // wakeup((caddr_t)&sb->sb_cc);
-        }
-
-#ifdef signalSTUFF
-        if (so->so_state & SS_ASYNC) {
-                if (so->so_pgid < 0)
-                        gsignal(-so->so_pgid, SIGIO);
-                else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
-                        psignal(p, SIGIO);
-        }
-#endif
-}
+-/*
+- * Wakeup processes waiting on a socket buffer.
+- * Do asynchronous notification via SIGIO
+- * if the socket has the SS_ASYNC flag set.
+- */
+-void
+-sowakeup ( struct socket *so, struct sockbuf *sb )
+-{
+-        // struct proc *p;
+-
+-        // selwakeup(&sb->sb_sel);
+-        sb->sb_flags &= ~SB_SEL;
+-        if (sb->sb_flags & SB_WAIT) {
+-                sb->sb_flags &= ~SB_WAIT;
+-                // wakeup((caddr_t)&sb->sb_cc);
+-        }
+-
+-#ifdef signalSTUFF
+-        if (so->so_state & SS_ASYNC) {
+-                if (so->so_pgid < 0)
+-                        gsignal(-so->so_pgid, SIGIO);
+-                else if (so->so_pgid > 0 && (p = pfind(so->so_pgid)) != 0)
+-                        psignal(p, SIGIO);
+-        }
+-#endif
+-}
 #endif
 
 /* This replaces the above for Kyu
@@ -273,12 +273,19 @@ sowakeup ( struct socket *so, struct sockbuf *sb )
 void
 sbwakeup ( struct sockbuf *sb )
 {
+	// printf ( "sbwakeup called\n" );
+	sb->sb_flags &= ~SB_WAIT;
+	sem_unblock ( sb->sb_sleep );
+
+#ifdef notdef
+	/* Why the test on SB_WAIT ? */
         // sb->sb_flags &= ~SB_SEL;
         if (sb->sb_flags & SB_WAIT) {
                 sb->sb_flags &= ~SB_WAIT;
                 // wakeup((caddr_t)&sb->sb_cc);
 		sem_unblock ( sb->sb_sleep );
         }
+#endif
 }
 
 /*
@@ -292,6 +299,7 @@ sbwait ( struct sockbuf *sb )
 
         // return (tsleep((caddr_t)&sb->sb_cc,
         //     (sb->sb_flags & SB_NOINTR) ? PSOCK : PSOCK | PCATCH, netio, sb->sb_timeo));
+	return 0;
 }
 
 #ifdef notdef
@@ -347,6 +355,10 @@ sb_unlock ( struct sockbuf *sb )
 	sem_unblock ( sb->sb_lock );
 }
 
+/* In lieu of sblock() above, not sb_lock() above !!
+ * I'm not sure what the original sb_lock() was about,
+ * but apparently it wasn't being used in the TCP code.
+ */
 int
 sb_lock ( struct sockbuf *sb, int wf )
 {
