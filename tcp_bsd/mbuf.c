@@ -225,7 +225,7 @@ k_sock_alloc ( void )
 	if ( sock_list ) {
 	    rv = sock_list;
 	    sock_list = ((struct my_list *) rv) -> next;
-	    printf ( "kyu_sock_alloc from free list: %d %08x\n", n, rv );
+	    // printf ( "kyu_sock_alloc from free list: %d %08x\n", n, rv );
 	    ts[S_SOCK].alloc++;
 	    ts[S_SOCK].free--;
 	    sock_active ( rv, 1 );
@@ -233,7 +233,7 @@ k_sock_alloc ( void )
 	}
 
 	rv = kyu_malloc ( n );
-	printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
+	// printf ( "kyu_sock_alloc: %d %08x\n", n, rv );
 
 	// memset ( rv, 0, n );
 
@@ -255,7 +255,7 @@ k_sock_free ( void *m )
 	sock_list = (void *) m;
 	ts[S_SOCK].free++;
 	ts[S_SOCK].alloc--;
-	printf ( "k_sock_free %08x\n", m );
+	// printf ( "k_sock_free %08x\n", m );
 	sock_active ( m, 0 );
 }
 

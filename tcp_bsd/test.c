@@ -442,6 +442,10 @@ connect_test ( char *host, int port )
 	    }
 	}
 #endif
+
+	// XXX
+	thr_delay ( 100 );
+
 	n = tcp_recv ( so, buf, TEST_BUF_SIZE );
 	printf ( "%d bytes received\n", n );
 	if ( n > 0 ) {

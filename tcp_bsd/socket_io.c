@@ -235,7 +235,8 @@ soreceive (
 	struct mbuf **mp0, struct mbuf **controlp, int *flagsp )
 {
 	struct mbuf *m, **mp;
-	int flags, len, error, s, offset;
+	int flags, len, error, offset;
+	// int s;
 	struct mbuf *nextrecord;
 	int moff, type;
 	int orig_resid = uio->uio_resid;
@@ -296,7 +297,9 @@ bad:
 restart:
 	if (error = sb_lock(&so->so_rcv, SBLOCKWAIT(flags)))
 		return (error);
-	s = splnet();
+
+	// s = splnet();
+	net_lock ();
 
 	m = so->so_rcv.sb_mb;
 	/*
@@ -355,7 +358,9 @@ restart:
 		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
 	printf ( " -- soreceive BLOCK 1 done\n" );
 
-		splx(s);
+		// splx(s);
+		net_unlock ();
+
 		if (error)
 			return (error);
 		goto restart;
@@ -455,10 +460,15 @@ dontblock:
 		 * block interrupts again.
 		 */
 		if (mp == 0) {
-			splx(s);
+
+			// splx(s);
+			net_unlock ();
+
 			// error = uiomove(mtod(m, caddr_t) + moff, (int)len, uio);
 			error = xiomove ( mtod(m, caddr_t) + moff, (int)len, uio, 1);
-			s = splnet();
+
+			// s = splnet();
+			net_lock ();
 		} else
 			uio->uio_resid -= len;
 		if (len == m->m_len - moff) {
@@ -525,7 +535,8 @@ dontblock:
 	printf ( " -- soreceive BLOCK 2 done\n" );
 			if (error) {
 				sb_unlock(&so->so_rcv);
-				splx(s);
+				// splx(s);
+				net_unlock ();
 				return (0);
 			}
 			if (m = so->so_rcv.sb_mb)
@@ -554,7 +565,8 @@ dontblock:
 	if (orig_resid == uio->uio_resid && orig_resid &&
 	    (flags & MSG_EOR) == 0 && (so->so_state & SS_CANTRCVMORE) == 0) {
 		sb_unlock(&so->so_rcv);
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		goto restart;
 	}
 		
@@ -562,8 +574,12 @@ dontblock:
 		*flagsp |= flags;
 
 release:
+
 	sb_unlock(&so->so_rcv);
-	splx(s);
+
+	// splx(s);
+	net_unlock ();
+
 	return (error);
 }
 
@@ -695,14 +711,13 @@ restart:
 	if (error = sb_lock(&so->so_snd, SBLOCKWAIT(flags)))
 		goto out;
 
-#ifdef notYET
-#endif /* notYET */
-
-#define	snderr(err)	{ error = err; splx(s); goto release; }
+// #define	snderr(err)	{ error = err; splx(s); goto release; }
+#define	snderr(err)	{ error = err; net_unlock (); goto release; }
 
 
 	do {	/* Big loop */
-		s = splnet();
+		// s = splnet();
+		net_lock ();
 
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
@@ -738,13 +753,16 @@ restart:
 			sb_unlock(&so->so_snd);
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 
-			splx(s);
+			// splx(s);
+			net_unlock ();
 			if (error)
 				goto out;
 			goto restart;
 		}
 
-		splx(s);
+		// splx(s);
+		net_unlock ();
+
 		mp = &top;
 		space -= clen;
 
@@ -1125,20 +1143,24 @@ sorflush ( struct socket *so )
 {
         struct sockbuf *sb = &so->so_rcv;
         // struct protosw *pr = so->so_proto;
-        int s;
+        // int s;
         struct sockbuf asb;
 
         sb->sb_flags |= SB_NOINTR;
 
         (void) sb_lock(sb, M_WAITOK);
 
-        s = splimp();
+        // s = splimp();
+	net_lock ();
+
         socantrcvmore(so);
         sb_unlock(sb);
 
         asb = *sb;
         bzero((caddr_t)sb, sizeof (*sb));
-        splx(s);
+
+        // splx(s);
+	net_unlock ();
 
         // if (so->so_proto_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
         //         (*pr->pr_domain->dom_dispose)(asb.sb_mb);
@@ -1149,8 +1171,8 @@ sorflush ( struct socket *so )
 void
 sofree ( struct socket *so )
 {
-	printf ( "sofree called: %08x\n", so );
-	printf ( " thread = %08x\n", cur_thread );
+	// printf ( "sofree called: %08x\n", so );
+	// printf ( " thread = %08x\n", cur_thread );
 	// unroll_cur ();
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
@@ -1165,11 +1187,11 @@ sofree ( struct socket *so )
         sbrelease(&so->so_snd);
         sorflush(so);
 
-	printf ( "sofree destroying Kyu sem: %08x\n", so->kyu_sem );
+	// printf ( "sofree destroying Kyu sem: %08x\n", so->kyu_sem );
 	sem_destroy ( so->kyu_sem );
 
         // FREE(so, M_SOCKET);
-	printf ( "k_sock_free called: %08x\n", so );
+	// printf ( "k_sock_free called: %08x\n", so );
 	k_sock_free ( so );
 }
 
@@ -1487,8 +1509,10 @@ discard:
 int
 sodisconnect ( struct socket *so )
 {
-        int s = splnet();
+        // int s = splnet();
         int error;
+
+	net_lock ();
 
         if ((so->so_state & SS_ISCONNECTED) == 0) {
                 error = ENOTCONN;
@@ -1508,7 +1532,9 @@ sodisconnect ( struct socket *so )
 	error = proto_disconnect ( so );
 
 bad:
-        splx(s);
+        // splx(s);
+	net_unlock ();
+
         return (error);
 }
 
@@ -1620,6 +1646,8 @@ sobind ( struct socket *so, struct mbuf *nam )
         // int s = splnet();
         int error;
 
+	net_lock ();
+
         // error = (*so->so_proto->pr_usrreq)(so, PRU_BIND,
         //         (struct mbuf *)0, nam, (struct mbuf *)0);
         // error = tcp_usrreq (so, PRU_BIND,
@@ -1628,14 +1656,19 @@ sobind ( struct socket *so, struct mbuf *nam )
 	error = proto_bind ( so, nam );
 
         // splx(s);
+	net_unlock ();
+
         return (error);
 }
 
 int
 solisten ( struct socket *so, int backlog )
 {
-        int s = splnet();
+        // int s;
 	int error;
+
+	// s = splnet();
+	net_lock ();
 
         // error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN,
         //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
@@ -1645,7 +1678,8 @@ solisten ( struct socket *so, int backlog )
 	error = proto_listen ( so );
 
         if (error) {
-                splx(s);
+                // splx(s);
+		net_unlock ();
                 return (error);
         }
 
@@ -1656,7 +1690,9 @@ solisten ( struct socket *so, int backlog )
                 backlog = 0;
         so->so_qlimit = min(backlog, SOMAXCONN);
 
-        splx(s);
+        // splx(s);
+	net_unlock ();
+
         return (0);
 }
 
@@ -1684,5 +1720,3 @@ ip_stripoptions ( struct mbuf *m )
 }
 
 /* THE END */
-
-// THE END

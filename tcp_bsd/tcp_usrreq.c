@@ -291,9 +291,9 @@ extern	char *tcpstates[];
 static int
 tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struct mbuf *control)
 {
-	register struct inpcb *inp;
-	register struct tcpcb *tp;
-	int s;
+	struct inpcb *inp;
+	struct tcpcb *tp;
+	//int s;
 	int error = 0;
 	int ostate;
 
@@ -314,7 +314,9 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 		return (EINVAL);
 	}
 
-	s = splnet();
+	// s = splnet();
+	net_lock ();
+
 	inp = sotoinpcb(so);
 	// bpf3 ( "tcp_usrreq 1: req, so, inp = %d, %08x, %08x\n", req, so, inp );
 
@@ -324,7 +326,8 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 	 * structure will point at a subsidary (struct tcpcb).
 	 */
 	if (inp == 0 && req != PRU_ATTACH) {
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		return (EINVAL);		/* XXX */
 	}
 
@@ -511,7 +514,8 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 #ifdef notdef
 	case PRU_SENSE:
 		((struct stat *) m)->st_blksize = so->so_snd.sb_hiwat;
-		(void) splx(s);
+		// (void) splx(s);
+		net_unlock ();
 		return (0);
 #endif
 
@@ -584,7 +588,9 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 	if (tp && (so->so_options & SO_DEBUG))
 		tcp_trace(TA_USER, ostate, tp, (struct tcpiphdr *)0, req);
 
-	splx(s);
+	// splx(s);
+	net_unlock ();
+
 	return (error);
 }
 
@@ -597,23 +603,28 @@ tcp_ctloutput(op, so, level, optname, mp)
 	int level, optname;
 	struct mbuf **mp;
 {
-	int error = 0, s;
+	int error = 0;
+	// int s;
 	struct inpcb *inp;
 	register struct tcpcb *tp;
 	register struct mbuf *m;
 	register int i;
 
-	s = splnet();
+	// s = splnet();
+	net_lock ();
+
 	inp = sotoinpcb(so);
 	if (inp == NULL) {
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		if (op == PRCO_SETOPT && *mp)
 			(void) mb_free(*mp);
 		return (ECONNRESET);
 	}
 	if (level != IPPROTO_TCP) {
 		error = ip_ctloutput(op, so, level, optname, mp);
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		return (error);
 	}
 	tp = intotcpcb(inp);
@@ -666,7 +677,10 @@ tcp_ctloutput(op, so, level, optname, mp)
 		}
 		break;
 	}
-	splx(s);
+
+	// splx(s);
+	net_unlock ();
+
 	return (error);
 }
 #endif

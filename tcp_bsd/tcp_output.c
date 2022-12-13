@@ -682,7 +682,7 @@ tcp_template(tp)
 	/* Hack -- 12-4-2022 */
 	if ( ! n->ti_src.s_addr ) {
 	    n->ti_src.s_addr = htonl ( get_our_ip () );
-	    bpf2 ( "TCP template sets src to %08x\n", n->ti_dst );
+	    // bpf2 ( "TCP template sets src to %08x\n", n->ti_dst );
 	}
 
 	n->ti_sport = inp->inp_lport;

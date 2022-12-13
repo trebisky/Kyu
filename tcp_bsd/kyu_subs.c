@@ -141,9 +141,9 @@ _remque ( struct llist *element)
 /* This won't do of course, but keeps things quiet for now.
 */
 
-int splnet ( void ) {}
-int splimp ( void ) {}
-int splx ( int arg ) {}
+// int splimp ( void ) {}
+// int splnet ( void ) {}
+// int splx ( int arg ) {}
 
 #ifdef notdef
 /* Doesn't work */

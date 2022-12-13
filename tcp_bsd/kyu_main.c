@@ -210,7 +210,7 @@ tcp_bsd_init ( void )
 static void tcp_thread ( long );
 static void tcp_timer_func ( long );
 
-static struct sem *net_lock_sem;
+static void locker_init ( void );
 
 static void
 bsd_init ( void )
@@ -220,7 +220,7 @@ bsd_init ( void )
 
 	tcp_globals_init ();
 
-	net_lock_sem = sem_mutex_new ( SEM_FIFO );
+	locker_init ();
 
 	// in mbuf.c
 	mb_init ();
@@ -240,8 +240,58 @@ bsd_init ( void )
 
 /* These replace splnet, splimp, splx */
 
-void net_lock ( void ) { sem_block(net_lock_sem); }
-void net_unlock ( void ) { sem_unblock(net_lock_sem); }
+extern struct thread *cur_thread;
+
+struct locker {
+	struct thread *thread;
+	struct sem *sem;
+	int count;
+};
+
+static struct sem *net_lock_sem;
+
+static struct locker master_lock;
+
+/* Logic here allows for nested splnet
+ * which is absolutely necessary
+ */
+void
+net_lock ( void )
+{
+	if ( master_lock.count && master_lock.thread == cur_thread ) {
+	    // printf ( "$$$ net_lock, deadlock avoided\n" );
+	    // unroll_cur ();
+	    // studying the above unroll traceback might be a way to
+	    // someday cleanup the code and avoid the nesting (maybe).
+	    ++master_lock.count;
+	    return;
+	}
+
+	sem_block ( master_lock.sem );
+	master_lock.thread = cur_thread;
+	master_lock.count = 1;
+}
+
+void
+net_unlock ( void )
+{
+	if ( master_lock.count < 1 ) {
+	    printf ( "$$$ net_unlock, count = %d ???\n", master_lock.count );
+	    return;
+	}
+	--master_lock.count;
+	if ( master_lock.count == 0 )
+	    sem_unblock ( master_lock.sem );
+}
+
+static void
+locker_init ( void )
+{
+	master_lock.count = 0;
+	master_lock.thread = NULL;
+	master_lock.sem = sem_mutex_new ( SEM_FIFO );
+	// net_lock_sem = sem_mutex_new ( SEM_FIFO );
+}
 
 static int fast_count = 0;
 static int slow_count = 0;

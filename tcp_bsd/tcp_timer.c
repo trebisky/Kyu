@@ -35,34 +35,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-// #include <sys/mbuf.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/errno.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#endif
-
 int	tcp_keepidle = TCPTV_KEEP_IDLE;
 int	tcp_keepintvl = TCPTV_KEEPINTVL;
 int	tcp_maxidle;
@@ -70,11 +42,13 @@ int	tcp_maxidle;
  * Fast timeout routine for processing delayed acks
  */
 void
-tcp_fasttimo()
+tcp_fasttimo ( void )
 {
-	register struct inpcb *inp;
-	register struct tcpcb *tp;
-	int s = splnet();
+	struct inpcb *inp;
+	struct tcpcb *tp;
+	// int s = splnet();
+
+	net_lock ();
 
 	inp = tcb.inp_next;
 	if (inp)
@@ -86,7 +60,8 @@ tcp_fasttimo()
 			tcpstat.tcps_delack++;
 			(void) tcp_output(tp);
 		}
-	splx(s);
+	// splx(s);
+	net_unlock ();
 }
 
 /*
@@ -95,12 +70,14 @@ tcp_fasttimo()
  * causes finite state machine actions if timers expire.
  */
 void
-tcp_slowtimo()
+tcp_slowtimo ( void )
 {
-	register struct inpcb *ip, *ipnxt;
-	register struct tcpcb *tp;
-	int s = splnet();
+	struct inpcb *ip, *ipnxt;
+	struct tcpcb *tp;
+	// int s = splnet();
 	register long i;
+
+	net_lock ();
 
 	tcp_maxidle = TCPTV_KEEPCNT * tcp_keepintvl;
 	/*
@@ -108,9 +85,11 @@ tcp_slowtimo()
 	 */
 	ip = tcb.inp_next;
 	if (ip == 0) {
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		return;
 	}
+
 	for (; ip != &tcb; ip = ipnxt) {
 		ipnxt = ip->inp_next;
 		tp = intotcpcb(ip);
@@ -140,17 +119,18 @@ tpgone:
 		tcp_iss = 0;				/* XXX */
 #endif
 	tcp_now++;					/* for timestamps */
-	splx(s);
+
+	// splx(s);
+	net_unlock ();
 }
 
 /*
  * Cancel all timers for TCP tp.
  */
 void
-tcp_canceltimers(tp)
-	struct tcpcb *tp;
+tcp_canceltimers ( struct tcpcb *tp )
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < TCPT_NTIMERS; i++)
 		tp->t_timer[i] = 0;
@@ -314,3 +294,5 @@ tcp_timers ( struct tcpcb *tp, int timer )
 	}
 	return (tp);
 }
+
+/* THE END */

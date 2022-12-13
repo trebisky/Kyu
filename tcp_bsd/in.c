@@ -34,30 +34,6 @@
  */
 
 #include <bsd.h>
-// #include <netinet/in_var.h>
-
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#ifdef KYU
-// #include <sys/sockio.h>
-#else
-#include <sys/ioctl.h>
-#endif
-#include <sys/errno.h>
-#include <sys/malloc.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in_systm.h>
-#include <netinet/in.h>
-#include <netinet/in_var.h>
-#include <netinet/if_ether.h>
-#endif
 
 /* KYU defines this.
  * XXX - Kyu may be able to do away with most of this file.
@@ -425,7 +401,10 @@ in_ifinit(ifp, ia, sin, scrub)
 {
 	register u_long i = ntohl(sin->sin_addr.s_addr);
 	struct sockaddr_in oldaddr;
-	int s = splimp(), flags = RTF_UP, error, ether_output();
+	// int s = splimp();
+	int flags = RTF_UP, error, ether_output();
+
+	net_lock ();	/* in lieu of splimp */
 
 	oldaddr = ia->ia_addr;
 	ia->ia_addr = *sin;
@@ -436,7 +415,8 @@ in_ifinit(ifp, ia, sin, scrub)
 	 */
 	if (ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
-		splx(s);
+		// splx(s);
+		net_unlock ();
 		ia->ia_addr = oldaddr;
 		return (error);
 	}
@@ -444,7 +424,9 @@ in_ifinit(ifp, ia, sin, scrub)
 		ia->ia_ifa.ifa_rtrequest = arp_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 	}
-	splx(s);
+	// splx(s);
+	net_unlock ();
+
 	if (scrub) {
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&oldaddr;
 		in_ifscrub(ifp, ia);
@@ -498,6 +480,7 @@ in_ifinit(ifp, ia, sin, scrub)
 		addr.s_addr = htonl(INADDR_ALLHOSTS_GROUP);
 		in_addmulti(&addr, ifp);
 	}
+
 	return (error);
 }
 
@@ -642,4 +625,4 @@ in_delmulti(inm)
 	splx(s);
 }
 #endif /* KYU */
-#endif
+#endif /* INET */
