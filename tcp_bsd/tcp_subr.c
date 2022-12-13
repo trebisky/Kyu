@@ -374,10 +374,12 @@ tcp_close(tp)
 
 	inp->inp_ppcb = 0;
 	soisdisconnected(so);
+
 	/* clobber input pcb cache if we're closing the cached connection */
 	if (inp == tcp_last_inpcb)
 		tcp_last_inpcb = &tcb;
 	in_pcbdetach(inp);
+
 	tcpstat.tcps_closed++;
 
 	return (struct tcpcb *) 0;

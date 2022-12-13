@@ -316,10 +316,8 @@ in_pcbconnect (inp, nam)
 }
 
 int
-in_pcbdisconnect(inp)
-	struct inpcb *inp;
+in_pcbdisconnect ( struct inpcb *inp )
 {
-
 	inp->inp_faddr.s_addr = INADDR_ANY;
 	inp->inp_fport = 0;
 	if (inp->inp_socket->so_state & SS_NOFDREF)
@@ -327,10 +325,12 @@ in_pcbdisconnect(inp)
 }
 
 int
-in_pcbdetach(inp)
-	struct inpcb *inp;
+in_pcbdetach ( struct inpcb *inp )
 {
 	struct socket *so = inp->inp_socket;
+
+	// printf ( "SOfree from in_pcbdetach\n" );
+	// unroll_cur ();
 
 	so->so_pcb = 0;
 	sofree(so);
@@ -341,17 +341,19 @@ in_pcbdetach(inp)
 	//if (inp->inp_route.ro_rt)
 	//	rtfree(inp->inp_route.ro_rt);
 	// ip_freemoptions(inp->inp_moptions);
+
 	remque(inp);
+
 	// FREE(inp, M_PCB);
 	k_inpcb_free ( inp );
 }
 
 int
 in_setsockaddr(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 	
 	nam->m_len = sizeof (*sin);
 	sin = mtod(nam, struct sockaddr_in *);
@@ -367,7 +369,7 @@ in_setpeeraddr(inp, nam)
 	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 	
 	nam->m_len = sizeof (*sin);
 	sin = mtod(nam, struct sockaddr_in *);

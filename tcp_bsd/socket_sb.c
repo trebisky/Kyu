@@ -342,13 +342,13 @@ sblock ( struct sockbuf *sb, int wf )
 
 /* Leave the details to Kyu semaphores */
 void
-sbunlock ( struct sockbuf *sb )
+sb_unlock ( struct sockbuf *sb )
 {
 	sem_unblock ( sb->sb_lock );
 }
 
 int
-sblock ( struct sockbuf *sb, int wf )
+sb_lock ( struct sockbuf *sb, int wf )
 {
 	sem_block ( sb->sb_lock );
 	return 0;

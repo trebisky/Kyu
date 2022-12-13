@@ -429,7 +429,8 @@ connect_test ( char *host, int port )
 
 	client_socket = so;
 
-	for ( i=0; i<5; i++ ) {
+#ifdef notdef
+	for ( i=0; i<2; i++ ) {
 	    thr_delay ( 1000 );		// 1 second
 	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
 	    printf ( "%d bytes received\n", n );
@@ -440,13 +441,21 @@ connect_test ( char *host, int port )
 		// dump_buf ( buf, n );
 	    }
 	}
+#endif
+	n = tcp_recv ( so, buf, TEST_BUF_SIZE );
+	printf ( "%d bytes received\n", n );
+	if ( n > 0 ) {
+	    buf[n-2] = '\n';
+	    buf[n-1] = '\0';
+	    printf ( "%s", buf );
+	}
 
-	thr_delay ( 1000 );		// 1 second
+	// thr_delay ( 1000 );		// 1 second
 
-	//(void) soclose ( so );
+	(void) soclose ( so );
 
-	//bpf1 ( "Connect closed and finished\n" );
-	printf ( "Leaving connect socket open\n" );
+	// printf ( "Connect closed and finished\n" );
+	// printf ( "Leaving connect socket open\n" );
 
 	bpf1 ( "TCP connect test finished\n" );
 }

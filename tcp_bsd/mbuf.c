@@ -89,19 +89,39 @@ tcp_statistics_init ( void )
 #define	SS_ISCONFIRMING		0x400	/* deciding to accept connection req */
 #endif
 
+/* Mark socket active or not */
 static void
-socket_show ( void )
+sock_active ( struct socket *so, int val )
 {
-	struct socket *sp;
 	int i;
 
-	for ( i=0; i<MAX_SL; i++ ) {
+	for ( i=0; i<MAX_SL; i++ )
+	    if ( sl[i].so == so )
+		sl[i].active = val;
+}
 
-	    // if ( ! sl[i].active )
-	    //	  continue;
-	    if ( sl[i].so ) {
-		sp = sl[i].so;
-		printf ( "Socket: %08x %d pcb = %08x, %04x", sp, sl[i].active, sp->so_pcb, sp->so_state );
+/* Is socket active ? */
+static int
+is_sock_active ( struct socket *so )
+{
+	int i;
+
+	for ( i=0; i<MAX_SL; i++ )
+	    if ( sl[i].so == so )
+		return sl[i].active;
+	return 0;
+}
+
+
+static void
+socket_show_one ( struct socket *sp, int active )
+{
+		printf ( "Socket: %08x", sp );
+		if ( active )
+		    printf ( " ACTIVE" );
+		else
+		    printf ( " -inactive-" );
+		printf ( " pcb = %08x, %04x", sp->so_pcb, sp->so_state );
 		if ( sp->so_state & SS_NOFDREF )
 		    printf ( " NOFDREF" );
 		if ( sp->so_state & SS_ISCONNECTED )
@@ -111,6 +131,23 @@ socket_show ( void )
 		if ( sp->so_state & SS_CANTRCVMORE )
 		    printf ( " CANTRCV" );
 		printf ( "\n" );
+}
+
+/* for external use */
+void
+socket_show ( struct socket *sp )
+{
+	socket_show_one ( sp, is_sock_active ( sp ) );
+}
+
+static void
+socket_show_all ( void )
+{
+	int i;
+
+	for ( i=0; i<MAX_SL; i++ ) {
+	    if ( sl[i].so ) {
+		socket_show_one ( sl[i].so, sl[i].active );
 	    }
 	}
 }
@@ -127,7 +164,7 @@ tcp_statistics ( void )
 	    printf ( "max = %d\n", ts[i].max );
 	}
 
-	socket_show ();
+	socket_show_all ();
 }
 
 /* ------------------------------------ */
@@ -177,16 +214,6 @@ k_mbuf_free ( void *m )
 static void *sock_list = NULL;
 static void *inpcb_list = NULL;
 static void *tcpcb_list = NULL;
-
-static void
-sock_active ( struct socket *so, int val )
-{
-	int i;
-
-	for ( i=0; i<MAX_SL; i++ )
-	    if ( sl[i].so == so )
-		sl[i].active = val;
-}
 
 void *
 k_sock_alloc ( void )

@@ -38,6 +38,8 @@
 #include <kyu.h>
 #include <thread.h>
 
+extern struct thread *cur_thread;
+
 /* All this used to be in uio.h, but was moved here for Kyu
  * since this is the only place we use it.
  * (and it is nice to see it right alongside where it is used)
@@ -292,7 +294,7 @@ bad:
 		//     (struct mbuf *)0, (struct mbuf *)0);
 
 restart:
-	if (error = sblock(&so->so_rcv, SBLOCKWAIT(flags)))
+	if (error = sb_lock(&so->so_rcv, SBLOCKWAIT(flags)))
 		return (error);
 	s = splnet();
 
@@ -347,7 +349,7 @@ restart:
 			error = EWOULDBLOCK;
 			goto release;
 		}
-		sbunlock(&so->so_rcv);
+		sb_unlock(&so->so_rcv);
 
 	printf ( " -- soreceive BLOCK 1\n" );
 		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
@@ -522,7 +524,7 @@ dontblock:
 			error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
 	printf ( " -- soreceive BLOCK 2 done\n" );
 			if (error) {
-				sbunlock(&so->so_rcv);
+				sb_unlock(&so->so_rcv);
 				splx(s);
 				return (0);
 			}
@@ -551,7 +553,7 @@ dontblock:
 	}
 	if (orig_resid == uio->uio_resid && orig_resid &&
 	    (flags & MSG_EOR) == 0 && (so->so_state & SS_CANTRCVMORE) == 0) {
-		sbunlock(&so->so_rcv);
+		sb_unlock(&so->so_rcv);
 		splx(s);
 		goto restart;
 	}
@@ -560,7 +562,7 @@ dontblock:
 		*flagsp |= flags;
 
 release:
-	sbunlock(&so->so_rcv);
+	sb_unlock(&so->so_rcv);
 	splx(s);
 	return (error);
 }
@@ -690,7 +692,7 @@ sosend(so, addr, uio, top, control, flags)
 		clen = control->m_len;
 
 restart:
-	if (error = sblock(&so->so_snd, SBLOCKWAIT(flags)))
+	if (error = sb_lock(&so->so_snd, SBLOCKWAIT(flags)))
 		goto out;
 
 #ifdef notYET
@@ -733,7 +735,7 @@ restart:
 			if (so->so_state & SS_NBIO)
 				snderr(EWOULDBLOCK);
 
-			sbunlock(&so->so_snd);
+			sb_unlock(&so->so_snd);
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 
 			splx(s);
@@ -877,7 +879,7 @@ nopages:
 	} while (resid);
 
 release:
-	sbunlock(&so->so_snd);
+	sb_unlock(&so->so_snd);
 out:
 	if (top)
 		mb_freem(top);
@@ -1128,11 +1130,11 @@ sorflush ( struct socket *so )
 
         sb->sb_flags |= SB_NOINTR;
 
-        (void) sblock(sb, M_WAITOK);
+        (void) sb_lock(sb, M_WAITOK);
 
         s = splimp();
         socantrcvmore(so);
-        sbunlock(sb);
+        sb_unlock(sb);
 
         asb = *sb;
         bzero((caddr_t)sb, sizeof (*sb));
@@ -1148,6 +1150,7 @@ void
 sofree ( struct socket *so )
 {
 	printf ( "sofree called: %08x\n", so );
+	printf ( " thread = %08x\n", cur_thread );
 	// unroll_cur ();
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
@@ -1162,6 +1165,7 @@ sofree ( struct socket *so )
         sbrelease(&so->so_snd);
         sorflush(so);
 
+	printf ( "sofree destroying Kyu sem: %08x\n", so->kyu_sem );
 	sem_destroy ( so->kyu_sem );
 
         // FREE(so, M_SOCKET);
@@ -1387,13 +1391,17 @@ char    netcls[] = "netcls";
 int
 soclose ( struct socket *so )
 {
-        int s = splnet();               /* conservative */
         int error = 0;
+        // int s;
 
-	bpf3 ( "soclose called with %08x\n", so );
+	// printf ( "soclose called with %08x\n", so );
 
 	if ( ! so )
 	    return 0;
+
+	/* conservative?  No -- essential! */
+	// s = splnet();
+	net_lock ();
 
         if (so->so_options & SO_ACCEPTCONN) {
                 while (so->so_q0)
@@ -1416,7 +1424,7 @@ soclose ( struct socket *so )
                             (so->so_state & SS_NBIO))
                                 goto drop;
                         while (so->so_state & SS_ISCONNECTED)
-			    bpf3 ( "block in close: %08x\n", so->kyu_sem );
+			    // printf ( "block in close: %08x\n", so->kyu_sem );
 			    sem_block ( so->kyu_sem );
                                 //if (error = tsleep((caddr_t)&so->so_timeo,
                                 //    PSOCK | PCATCH, netcls, so->so_linger))
@@ -1438,17 +1446,40 @@ drop:
         }
 
 discard:
-	// Near as I can tell, this marks the socket as not
+	// Near as I can tell, SS_NOFDREF marks the socket as not
 	// having a reference in file array (i.e. as an "fd")
+	// Meaning it is free to be nuked and deallocated
 
 	// Kyu will get this panic, so I must comment it out.
         // if ( so->so_state & SS_NOFDREF )
         //         panic ( "soclose: NOFDREF" );
 
+#ifdef notdef
+	/* This debug, andin particular the delay uncovered a race
+	 * when I called soclose() from my application.
+	 * sofree would get called twice and we would
+	 * destroy the same Kyu semaphore twice.
+	 * Adding the net_lock/unlock semaphore fixed this.
+	 */
+	printf ( "In soclose, start wait, so = %08x, fdref = %d\n",
+	    so, so->so_state & SS_NOFDREF );
+	socket_show ( so );
+	printf ( " thread = %08x\n", cur_thread );
+
+	// thr_delay ( 2000 );
+
+	printf ( "In soclose, end wait, so = %08x, fdref = %d\n",
+	    so, so->so_state & SS_NOFDREF );
+	socket_show ( so );
+	printf ( " thread = %08x\n", cur_thread );
+#endif
+
         so->so_state |= SS_NOFDREF;
 
+	// printf ( "SOfree called from soclose\n" );
         sofree(so);
-        splx(s);
+        // splx(s);
+	net_unlock ();
 
         return (error);
 }

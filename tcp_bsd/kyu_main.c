@@ -116,6 +116,7 @@ bpf3 ( const char *fmt, ... )
 /* ---------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------- */
 
+#ifdef notdef
 /* From net/radix.c
  * -- something to do with routing.
  * should never get called.
@@ -126,6 +127,7 @@ rn_inithead ( void **head, int off )
 {
 	panic ( "rn_inithead called" );
 }
+#endif
 
 /* Both of these from in_proto.c
  *  In the original there is an array "inetsw" of which the tcp_proto
@@ -208,6 +210,8 @@ tcp_bsd_init ( void )
 static void tcp_thread ( long );
 static void tcp_timer_func ( long );
 
+static struct sem *net_lock_sem;
+
 static void
 bsd_init ( void )
 {
@@ -215,6 +219,8 @@ bsd_init ( void )
 	bpf3 ( "BSD tcp init called\n" );
 
 	tcp_globals_init ();
+
+	net_lock_sem = sem_mutex_new ( SEM_FIFO );
 
 	// in mbuf.c
 	mb_init ();
@@ -231,6 +237,11 @@ bsd_init ( void )
 	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
 	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, 13, 0, 100 );
 }
+
+/* These replace splnet, splimp, splx */
+
+void net_lock ( void ) { sem_block(net_lock_sem); }
+void net_unlock ( void ) { sem_unblock(net_lock_sem); }
 
 static int fast_count = 0;
 static int slow_count = 0;
@@ -256,7 +267,7 @@ static struct sem *tcp_q_sem;
 /* We might be better off using a condition variable here.
  * If we get deadlocks we will need to change things.
  */
-static struct sem *tcp_lock_sem;
+static struct sem *tcp_queue_lock_sem;
 
 static void
 tcp_thread ( long xxx )
@@ -270,14 +281,14 @@ tcp_thread ( long xxx )
 	if ( ! tcp_q_sem )
 	    panic ("Cannot get tcp queue signal semaphore");
 
-	tcp_lock_sem = sem_mutex_new ( SEM_FIFO );
-	if ( ! tcp_lock_sem )
+	tcp_queue_lock_sem = sem_mutex_new ( SEM_FIFO );
+	if ( ! tcp_queue_lock_sem )
 	    panic ("Cannot get tcp queue lock semaphore");
 
 	for ( ;; ) {
 	    /* Do we have a packet to process ? */
 
-	    sem_block ( tcp_lock_sem );
+	    sem_block ( tcp_queue_lock_sem );
             nbp = NULL;
 	    // printf ( " --- LIST1: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
             if ( tcp_q_head ) {
@@ -293,7 +304,7 @@ tcp_thread ( long xxx )
 	    //else
 	    //	printf ( " --- LIST2: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
 
-	    sem_unblock ( tcp_lock_sem );
+	    sem_unblock ( tcp_queue_lock_sem );
 
             if ( nbp ) {
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
@@ -319,7 +330,7 @@ tcp_bsd_rcv ( struct netbuf *nbp )
         nbp->next = (struct netbuf *) 0;
 	// bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
-	sem_block ( tcp_lock_sem );
+	sem_block ( tcp_queue_lock_sem );
 	    // printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
         if ( tcp_q_tail ) {
             tcp_q_tail->next = nbp;
@@ -329,8 +340,9 @@ tcp_bsd_rcv ( struct netbuf *nbp )
             tcp_q_head = nbp;
         }
 	    // printf ( " --- LIST++2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
-	sem_unblock ( tcp_lock_sem );
+	sem_unblock ( tcp_queue_lock_sem );
 
+	/* Announce packet arrival */
         sem_unblock ( tcp_q_sem );
 }
 
@@ -392,7 +404,9 @@ tcp_bsd_process ( struct netbuf *nbp )
 	iip = mtod(m, struct ip *);
 	iip->ip_len -= sizeof(struct ip);
 
+	net_lock ();
 	tcp_input ( m, len );
+	net_unlock ();
 }
 
 /* Called when TCP wants to hand a packet to IP for transmission
