@@ -422,8 +422,10 @@ restart:
 		sb_unlock(&so->so_rcv);
 
 	printf ( " -- soreceive BLOCK 1\n" );
+	locker_show ();
 		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
 	printf ( " -- soreceive BLOCK 1 done (error = %d)\n", error );
+	locker_show ();
 
 		// splx(s);
 		net_unlock ();

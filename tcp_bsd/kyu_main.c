@@ -277,11 +277,20 @@ net_unlock ( void )
 {
 	if ( master_lock.count < 1 ) {
 	    printf ( "$$$ net_unlock, count = %d ???\n", master_lock.count );
+	    unroll_cur ();
 	    return;
 	}
 	--master_lock.count;
 	if ( master_lock.count == 0 )
 	    sem_unblock ( master_lock.sem );
+}
+
+void
+locker_show ( void )
+{
+	printf ( "locker count: %d\n", master_lock.count );
+	if ( master_lock.count > 0 )
+	    printf ( "locker thread: %08x\n", master_lock.thread );
 }
 
 static void

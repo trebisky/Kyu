@@ -66,6 +66,7 @@ void
 bsd_test_show ( long xxx )
 {
 	tcb_show ();
+	locker_show ();
 	tcp_statistics ();
 }
 
@@ -75,10 +76,10 @@ tcb_show ( void )
 {
         struct inpcb *inp;
 
+        inp = &tcb;
         if ( inp->inp_next == &tcb )
 	    printf ( "INPCB: empty\n" );
 
-        inp = &tcb;
         while ( inp->inp_next != &tcb ) {
             inp = inp->inp_next;
             printf ( "INPCB: %08x -- local, foreign: ", inp );
@@ -164,7 +165,7 @@ run_wangdoodle ( struct socket *so )
 	int s;
 	int idle = 0;
 
-	printf ( "start wangdoodle: so = %08x\n", so );
+	printf ( "start wangdoodle connection handler: so = %08x\n", so );
 
 	for ( ;; ) {
 	    if ( idle == 0 ) {
