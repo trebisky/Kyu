@@ -605,9 +605,13 @@ dontblock:
 		    !sosendallatonce(so) && !nextrecord) {
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
+
 	printf ( " -- soreceive BLOCK 2\n" );
+			net_unlock ();
 			error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+			net_lock ();
 	printf ( " -- soreceive BLOCK 2 done\n" );
+
 			if (error) {
 				sb_unlock(&so->so_rcv);
 				// splx(s);
@@ -826,10 +830,15 @@ restart:
 				snderr(EWOULDBLOCK);
 
 			sb_unlock(&so->so_snd);
+
+			/* Moved here to allow tcp_input() to run while we wait */
+			net_unlock ();
+
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 
 			// splx(s);
-			net_unlock ();
+			// net_unlock ();
+
 			if (error)
 				goto out;
 			goto restart;

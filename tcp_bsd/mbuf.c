@@ -30,7 +30,7 @@ void * kyu_malloc ( unsigned long );
  * "alloc" - how many in use.
  * "free" - how many on free list.
  * "max" - high water of in use.
- * -- also impose limit on alloc to avoid runaway bugs
+ * XXX -- also impose limit on alloc to avoid runaway bugs
  */
 
 struct kstats {
@@ -40,17 +40,23 @@ struct kstats {
 	int max;
 };
 
+/* XXX - max is usually alloc+free so it could be eliminated.
+ * The exception is mbufcl.
+ */
+
 struct kstats ts[] = {
     { "mbuf", 0, 0, 0 },
+    { "mbufcl", 0, 0, 0 },
     { "sock", 0, 0, 0 },
     { "inpcb", 0, 0, 0 },
     { "tcpcb", 0, 0, 0 }
 };
 
-#define S_MBUF	0
-#define S_SOCK	1
-#define S_INPCB	2
-#define S_TCPCB	3
+#define S_MBUF		0
+#define S_MBUFCL	1
+#define S_SOCK		2
+#define S_INPCB		3
+#define S_TCPCB		4
 
 struct socket_list {
 	struct socket *so;
@@ -159,9 +165,9 @@ tcp_statistics ( void )
 
 	for ( i=0; i<4; i++ ) {
 	    printf ( "%6s: ", ts[i].name );
-	    printf ( "alloc = %d,", ts[i].alloc );
-	    printf ( "free = %d,", ts[i].free );
-	    printf ( "max = %d\n", ts[i].max );
+	    printf ( "alloc = %2d, ", ts[i].alloc );
+	    printf ( "free = %3d, ", ts[i].free );
+	    printf ( "max = %2d\n", ts[i].max );
 	}
 
 	socket_show_all ();
@@ -381,6 +387,7 @@ mb_cl_init ( void )
 	    ((struct my_list *) cl) -> next = (struct my_list *) mbufcl_list;
 	    mbufcl_list = (void *) cl;
 	    cl += MCLBYTES;
+	    ts[S_MBUFCL].free++;
 	}
 }
 
@@ -395,6 +402,10 @@ mbufcl_alloc ( void )
 	rv = mbufcl_list;
 	mbufcl_list = ( (struct my_list *) rv) -> next;
 
+	ts[S_MBUFCL].alloc++;
+	ts[S_MBUFCL].max++;
+	ts[S_MBUFCL].free--;
+
 	mclrefcnt[mtocl(rv)] = 1;
 
 	return rv;
@@ -408,6 +419,8 @@ mbufcl_free ( void *cl )
 
 	((struct my_list *) cl) -> next = (struct my_list *) mbufcl_list;
 	mbufcl_list = (void *) cl;
+	ts[S_MBUFCL].free++;
+	ts[S_MBUFCL].alloc--;
 }
 
 /* bump a cluster reference count */
@@ -464,6 +477,7 @@ mb_init ( void )
 	 * I think these could all be zero.
 	 */
 	/* From netiso/tuba_subr.c */
+	/* XXX - what the heck is all this ??? */
 	/* 80 bytes ! */
 	#define TUBAHDRSIZE (3 /*LLC*/ + 9 /*CLNP Fixed*/ + 42 /*Addresses*/ \
 	     + 6 /*CLNP Segment*/ + 20 /*TCP*/)
@@ -487,12 +501,14 @@ mb_init ( void )
 	/* maximum chars per socket buffer, from socketvar.h */
 	// sb_max = SB_MAX;
 
+#ifdef notdef
 	/* More of a diagnostic than anything else */
 	m = mb_get ( MT_DATA );
 	mb_freem ( m );
 	m = mb_get ( MT_DATA );
 	mb_clget ( m );
 	mb_freem ( m );
+#endif
 }
 
 struct mbuf *

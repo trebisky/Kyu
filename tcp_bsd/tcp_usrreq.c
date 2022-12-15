@@ -129,11 +129,14 @@ proto_accept ( struct socket *so, struct mbuf *nam )
 {
 	struct inpcb *inp;
 
+	net_lock ();
 	inp = sotoinpcb(so);
 	if ( inp == 0 )
 	    return (EINVAL);
 
 	in_setpeeraddr(inp, nam);
+	net_unlock ();
+
 	return 0;
 }
 #endif
@@ -144,7 +147,6 @@ proto_disconnect ( struct socket *so )
 	return tcp_usrreq (so, PRU_DISCONNECT,
 	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
 }
-
 /*
  * Mark the connection as being incapable of further output.
  */
@@ -157,17 +159,22 @@ proto_shutdown ( struct socket *so )
 	// (void) tcp_usrreq (so, PRU_SHUTDOWN,
 	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
 
+	net_lock ();
+
 	socantsendmore ( so );
 
 	inp = sotoinpcb(so);
-	if ( inp == 0 )
-	    return;
 
-	tp = intotcpcb(inp);
+	if ( inp  ) {
 
-	tp = tcp_usrclosed ( tp );
-	if ( tp )
-	    (void) tcp_output ( tp );
+	    tp = intotcpcb(inp);
+
+	    tp = tcp_usrclosed ( tp );
+	    if ( tp )
+		(void) tcp_output ( tp );
+	}
+
+	net_unlock ();
 }
 
 /*
@@ -182,14 +189,24 @@ proto_rcvd ( struct socket *so )
 	// return tcp_usrreq (so, PRU_RCVD,
 	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
 
+	net_lock ();
+
 	inp = sotoinpcb(so);
-	if ( inp == 0 )
+	if ( inp == 0 ) {
+	    net_unlock ();
 	    return (EINVAL);
+	}
+
 	tp = intotcpcb(inp);
 
 	(void) tcp_output(tp);
+
+	net_unlock ();
+
 	return 0;
 }
+
+
 
 #ifdef notdef
 /*
@@ -201,17 +218,28 @@ proto_send ( struct socket *so, struct mbuf *m )
 {
 	struct tcpcb *tp;
 	struct inpcb *inp;
+	int rv;
 
 	// return tcp_usrreq (so, PRU_SEND,
 	//     m, (struct mbuf *)0, (struct mbuf *)0);
 
+	net_lock ();
+
 	inp = sotoinpcb(so);
-	if ( inp == 0 )
+	if ( inp == 0 ) {
+	    net_unlock ();
 	    return (EINVAL);
+	}
+
 	tp = intotcpcb(inp);
 
 	sbappend(&so->so_snd, m);
-	return tcp_output(tp);
+	rv = tcp_output(tp);
+
+	net_unlock ();
+
+	return rv;
+
 }
 
 /* Needs verification (and testing).
@@ -241,15 +269,24 @@ proto_abort ( struct socket *so )
 	struct tcpcb *tp;
 	struct inpcb *inp;
 
-	inp = sotoinpcb(so);
-	if ( inp == 0 )
-	    return;
-	tp = intotcpcb(inp);
-
 	// return tcp_usrreq (so, PRU_ABORT,
 	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
 
-	tp = tcp_drop(tp, ECONNABORTED);
+	net_lock ();
+
+	inp = sotoinpcb(so);
+	if ( inp == 0 ) {
+	    net_unlock ();
+	    return;
+	}
+
+	tp = intotcpcb(inp);
+
+	// tp was only returned to pass to tcp_trace
+	// tp = tcp_drop(tp, ECONNABORTED);
+	(void) tcp_drop ( tp, ECONNABORTED );
+
+	net_unlock ();
 }
 
 /*
@@ -263,12 +300,20 @@ proto_slowtimo ( struct socket *so, int index )
 	struct tcpcb *tp;
 	struct inpcb *inp;
 
+	net_lock ();
+
 	inp = sotoinpcb(so);
-	if ( inp == 0 )
+	if ( inp == 0 ) {
+	    net_unlock ();
 	    return;
+	}
+
 	tp = intotcpcb(inp);
 
-	tp = tcp_timers ( tp, index );
+	// tp = tcp_timers ( tp, index );
+	(void) tcp_timers ( tp, index );
+
+	net_unlock ();
 
 	/* for debug's sake */
 	// req |= (long)nam << 8;
