@@ -99,7 +99,10 @@
 #define	TCPTV_MIN	(  1*PR_SLOWHZ)		/* minimum allowable value */
 #define	TCPTV_REXMTMAX	( 64*PR_SLOWHZ)		/* max allowable REXMT value */
 
-#define	TCP_LINGERTIME	120			/* linger at most 2 minutes */
+/* XXX - Kyu shortens this drastically */
+/* 12-14-2022 */
+#define	TCP_LINGERTIME_ORIG	120		/* linger at most 2 minutes */
+#define	TCP_LINGERTIME	10			/* linger at most 10 seconds */
 
 #define	TCP_MAXRXTSHIFT	12			/* maximum retransmits */
 

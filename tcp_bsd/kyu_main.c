@@ -463,9 +463,19 @@ tcp_bsd_process ( struct netbuf *nbp )
 	iip = mtod(m, struct ip *);
 	iip->ip_len -= sizeof(struct ip);
 
-	net_lock ();
+	/* Given the way I implemented net_lock/unlock, I cannot just
+	 * call those here -- I must for sure get the lock, whereas
+	 * net_lock will breeze right past getting the lock if it has
+	 * already been acquired.
+	 */
+
+	// net_lock ();
+	sem_block ( master_lock.sem );
+
 	tcp_input ( m, len );
-	net_unlock ();
+
+	// net_unlock ();
+	sem_unblock ( master_lock.sem );
 }
 
 /* Called when TCP wants to hand a packet to IP for transmission

@@ -262,14 +262,22 @@ run_echo ( struct socket *so )
 
 	for ( ;; ) {
 	    n = tcp_recv ( so, msg, 128 );
-	    if ( n == 0 ) {
-		thr_delay ( 1 );
-		continue;
-	    }
+	    /* This happens when telnet closes
+	     * the connection.
+	     */
+	    if ( n == 0 )
+		break;
+	    // if ( n == 0 ) {
+	    // 	thr_delay ( 1 );
+	    // 	continue;
+	    //  }
 	    tcp_send ( so, msg, n );
 	    if ( msg[0] == 'q' )
 		break;
 	}
+
+	printf ( "done, closing\n" );
+	(void) soclose ( so );
 
 	strcpy ( msg, "All Done\n" );
 	tcp_send ( so, msg, strlen(msg) );
@@ -291,8 +299,6 @@ echo_thread ( long xxx )
 
 	    /* Really shoud run this in new thread */
 	    run_echo ( cso );
-
-	    (void) soclose ( cso );
 	}
 }
 

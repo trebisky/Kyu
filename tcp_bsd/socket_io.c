@@ -421,6 +421,12 @@ restart:
 		}
 		sb_unlock(&so->so_rcv);
 
+		/* I moved this here since if we hold the lock while calling
+		 * sbwait(), I don't see how tcp_input() could ever run and
+		 * handle packets.
+		 */
+		net_unlock ();
+
 	printf ( " -- soreceive BLOCK 1\n" );
 	locker_show ();
 		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
@@ -428,7 +434,7 @@ restart:
 	locker_show ();
 
 		// splx(s);
-		net_unlock ();
+		// net_unlock ();
 
 		if (error)
 			return (error);
