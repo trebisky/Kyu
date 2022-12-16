@@ -46,20 +46,22 @@ extern struct thread *cur_thread;
  * These began as macros in socketvar.h,
  * but I moved them here, renamed them slightly,
  * and made them inline functions.
- * Add the msg argument for debugging
+ * and added the msg argument for debugging
+ * the "_ext" versions have some overhead, but
+ *  who really cares?
  */
 
 static inline void
 so_rwakeup ( struct socket *so, char *msg )
 {
-	printf ( "rwakeup: %s\n", msg );
+	// printf ( "rwakeup: %s\n", msg );
 	sbwakeup(&(so)->so_rcv);
 }
 
 static inline void
 so_wwakeup ( struct socket *so, char *msg )
 {
-	printf ( "wwakeup: %s\n", msg );
+	// printf ( "wwakeup: %s\n", msg );
 	sbwakeup(&(so)->so_snd);
 }
 
@@ -253,7 +255,7 @@ tcp_recv ( struct socket *so, char *buf, int max )
 	    (struct mbuf **)0, (struct mbuf **)0, (int *)0 );
 
 	n = k_uio.uio_offset;
-	printf ( "Return from  soreceive with %d\n", n );
+	// printf ( "Return from  soreceive with %d\n", n );
 
 	/* Typical output on two successive calls.
 	 * the first had 26 bytes delivered
@@ -427,11 +429,11 @@ restart:
 		 */
 		net_unlock ();
 
-	printf ( " -- soreceive BLOCK 1\n" );
-	locker_show ();
-		error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
-	printf ( " -- soreceive BLOCK 1 done (error = %d)\n", error );
-	locker_show ();
+	// printf ( " -- soreceive BLOCK 1\n" );
+	// locker_show ();
+	 	error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+	// printf ( " -- soreceive BLOCK 1 done (error = %d)\n", error );
+	// locker_show ();
 
 		// splx(s);
 		// net_unlock ();

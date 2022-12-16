@@ -175,7 +175,8 @@ present:
 		m = REASS_MBUF(ti);
 		ti = (struct tcpiphdr *)ti->ti_next;
 
-		printf ( "TCP input - data in tcp_reass 1 %d\n", m->m_len );
+		// I don't see this one much
+		// printf ( "TCP input - data in tcp_reass 1 %d\n", m->m_len );
 		if (so->so_state & SS_CANTRCVMORE)
 			mb_freem(m);
 		else
@@ -857,7 +858,8 @@ findpcb:
 			m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 			m->m_len -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
 
-			printf ( "TCP input - data arrived %d\n", m->m_len );
+			/* rarely seen */
+			// printf ( "TCP input - data arrived %d\n", m->m_len );
 			sbappend(&so->so_rcv, m);
 			so_rwakeup_ext(so,"tcp_input, data");
 
@@ -1577,8 +1579,11 @@ dodata:							/* XXX */
 	 */
 	if ((ti->ti_len || (tiflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+
 		/* !!! this is where data arrives */
-		printf ( "TCP input - data in tcp_reass 2 %d\n", m->m_len );
+		/* All the action seems to be here */
+		// printf ( "TCP input - data in tcp_reass 2 %d\n", m->m_len );
+
 		TCP_REASS(tp, ti, m, so, tiflags);
 		/*
 		 * Note the amount of data that peer has sent into

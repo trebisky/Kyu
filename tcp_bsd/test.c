@@ -23,7 +23,9 @@ void bsd_test_server ( long );
 void bsd_test_blab ( long );
 void bsd_test_echo ( long );
 void bsd_test_wangdoodle ( long );
+void bsd_test_doney ( long );
 void bsd_test_connect ( long );
+void bsd_test_lots ( long );
 void bsd_test_close ( long );
 void bsd_test_debug ( long );
 
@@ -36,8 +38,10 @@ struct test tcp_test_list[] = {
         bsd_test_blab,          "Start blab server",                    0,
         bsd_test_echo,          "Start echo server",                    0,
         bsd_test_wangdoodle,    "Start wangdoodle server",              0,
+        bsd_test_doney,         "Start doney server",                   0,
 	bsd_test_connect,	"Connect (client) test",		0,
-	bsd_test_close,		"Close client socket",			0,
+	bsd_test_lots,		"Connect (client) with lots",		0,
+	// bsd_test_close,		"Close client socket",			0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
 	bsd_test_debug,		"Set debug 2",				2,
@@ -89,28 +93,7 @@ tcb_show ( void )
 }
 
 /* ============================ */
-
-#define PRINTF_BUF_SIZE 128
-
-void
-so_printf ( struct socket *so, const char *fmt, ... )
-{
-        char buf[PRINTF_BUF_SIZE];
-        va_list args;
-        int rv;
-
-        va_start ( args, fmt );
-        rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
-        va_end ( args );
-
-	// printf ( "soprintf --- %d %d\n", rv, strlen(buf) );
-	// tcp_send ( so, buf, strlen(buf) );
-	tcp_send ( so, buf, rv );
-}
-
 /* ============================ */
-
-#define WANGDOODLE_PORT	114
 
 static void
 so_puts ( struct socket *so, char *buf )
@@ -133,6 +116,125 @@ net_trim ( char *msg, int len )
 	msg[len] = '\0';
 }
 
+#define PRINTF_BUF_SIZE 128
+
+void
+so_printf ( struct socket *so, const char *fmt, ... )
+{
+        char buf[PRINTF_BUF_SIZE];
+        va_list args;
+        int rv;
+
+        va_start ( args, fmt );
+        rv = vsnprintf ( buf, PRINTF_BUF_SIZE, fmt, args );
+        va_end ( args );
+
+	// printf ( "soprintf --- %d %d\n", rv, strlen(buf) );
+	// tcp_send ( so, buf, strlen(buf) );
+	tcp_send ( so, buf, rv );
+}
+
+/* ============================ */
+/* ============================ */
+
+#define DONEY_PORT	115
+
+/* This listens, then when it gets a connection, reads and
+ * counts bytes.
+ *
+ * I use this on linux for testing:
+ *
+ *   cat xinu.bin | ncat levi 115
+ *
+ * I ran this at first with the XBUF_SIZE set to 2048.
+ * it worked, but I saw a mixed size of reads, with values
+ * as big as the entire 2048.
+ *
+ * So I got curious and increased XBUF_SIZE to 16385.
+ * Now I see most reads returning 8000 bytes.
+ * Two things explain this value.
+ *
+ * 1 - Wireshark shows me that each network packet
+ *   holds a 1000 byte payload (something linux decided
+ *   on that I am not going to worry about).
+ * 2 - Our BSD socketbuffers have a size of 8192.
+ *
+ * So the BSD code is loading 8 of the packet payloads
+ *  into the socketbuffer, then passing that to us.
+ *
+ * Look at socket_sb.c for this code:
+ *
+ *   static u_long  tcp_sendspace = 1024*8;
+ *   static u_long  tcp_recvspace = 1024*8;
+ */
+
+// #define XBUF_SIZE	8*2048
+#define XBUF_SIZE	8*1024
+
+char xmsg[XBUF_SIZE];
+
+static void
+run_doney ( struct socket *so )
+{
+	int n;
+	int total = 0;
+
+	printf ( "start doney connection handler: so = %08x\n", so );
+
+	for ( ;; ) {
+
+	    n = tcp_recv ( so, xmsg, XBUF_SIZE );
+
+	    /* Here we discover connection is closed.
+	     * Note that when the other end closes
+	     * the connection, it stays "connected",
+	     * but is marked as no longer receiving.
+	     */
+	    if ( n == 0 && ! is_socket_receiving ( so ) ) {
+		printf ( "Bail out, not receiving\n" );
+		break;
+	    }
+
+	    total += n;
+	    printf ( "Doney got: %d, %d\n", n, total );
+	}
+
+	(void) soclose ( so );
+
+	printf ( "total bytes seen = %d\n", total );
+	printf ( "doney connection finished\n" );
+}
+
+void
+doney_thread ( long xxx )
+{
+	struct socket *so;
+	struct socket *cso;
+	int fip;
+
+	so = tcp_bind ( DONEY_PORT );
+
+	for ( ;; ) {
+	    cso = tcp_accept ( so );
+	    fip = tcp_getpeer_ip ( cso );
+
+	    printf ( "doney server got a connection from: %s\n", ip2str32_h(fip) );
+
+	    (void) safe_thr_new ( "doney_thr", (tfptr) run_doney, (void *) cso, 15, 0 );
+	}
+}
+
+void
+bsd_test_doney ( long xxx )
+{
+	(void) safe_thr_new ( "doney", doney_thread, (void *) 0, 15, 0 );
+}
+
+
+/* ============================ */
+
+#define WANGDOODLE_PORT	114
+
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
 {
@@ -141,7 +243,7 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	if ( cmd[0] == 'q' )
 	    return 1;
 
-	printf ( "Got: %s\n", cmd );
+	// printf ( "Got: %s\n", cmd );
 
 	// printf ( "len = %d\n", strlen(cmd) );
 	// dump_buf ( cmd, strlen(cmd) );
@@ -154,9 +256,54 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	    so_printf ( so, "U %d\n", gb_unif_rand(100) );
 	else
 	    so_puts ( so, "ERR\n" );
+
 	return 0;
 }
 
+static void
+run_wangdoodle ( struct socket *so )
+{
+	char msg[128];
+	int n;
+
+	printf ( "start wangdoodle connection handler: so = %08x\n", so );
+
+	for ( ;; ) {
+
+	    n = tcp_recv ( so, msg, 128 );
+
+	    /* Here we discover connection is closed.
+	     * Note that when the other end closes
+	     * the connection, it stays "connected",
+	     * but is marked as no longer receiving.
+	     */
+	    // if ( ! is_socket_connected ( so ) )
+	    if ( n == 0 && ! is_socket_receiving ( so ) ) {
+		printf ( "Bail out, not receiving\n" );
+		break;
+	    }
+
+	    /* When using telnet, the string is not sent
+	     * until I hit return.  Then if I type
+	     * "dog", 5 bytes get sent, "\r\n" gets
+	     * appended (and no null byte).
+	     */
+	    // printf ( "%d bytes from tcp_recv\n", n );
+	    // dump_buf ( msg, n );
+
+	    net_trim ( msg, n );
+
+	    if ( one_wangdoodle ( so, msg ) ) {
+		printf ( "quit by user request\n" );
+		break;
+	    }
+	}
+
+	(void) soclose ( so );
+	printf ( "wangdoodle connection finished\n" );
+}
+
+#ifdef notdef
 static void
 run_wangdoodle ( struct socket *so )
 {
@@ -168,6 +315,10 @@ run_wangdoodle ( struct socket *so )
 	printf ( "start wangdoodle connection handler: so = %08x\n", so );
 
 	for ( ;; ) {
+	    /* All of this idle business is a hack until I figure
+	     * out a nice way to learn that a connection has
+	     * been closed from the other end.
+	     */
 	    if ( idle == 0 ) {
 		s = get_socket_state ( so );
 		// printf ( "Socket state: %08x\n", s );
@@ -178,20 +329,23 @@ run_wangdoodle ( struct socket *so )
 		printf ( "Timeout -- exit thread\n" );
 		break;
 	    }
+
+	    n = tcp_recv ( so, msg, 128 );
+
 	    /* Hack 12-5-2022 */
 	    /* Here we discover connection is closed.
-	     * the socket is no longer valid, so
-	     * calling so_close() is bad.
+	     * Note that when the other end closes
+	     * the connection, it stays "connected",
+	     * but is marked as no longer receiving.
 	     */
 	    // if ( ! is_socket_connected ( so ) )
-	    if ( ! is_socket_receiving ( so ) ) {
+	    if ( n == 0 && ! is_socket_receiving ( so ) ) {
 		printf ( "Bail out, not receiving\n" );
-		// causes Data abort
-		// (void) soclose ( so );
+		(void) soclose ( so );
 		break;
 	    }
 
-	    n = tcp_recv ( so, msg, 128 );
+	    /* more idle hackery */
 	    if ( n == 0 ) {
 		thr_delay ( 1 );
 		idle++;
@@ -223,6 +377,7 @@ run_wangdoodle ( struct socket *so )
 	// strcpy ( msg, "All Done\n" );
 	// tcp_send ( so, msg, strlen(msg) );
 }
+#endif
 
 void
 wangdoodle_thread ( long xxx )
@@ -510,11 +665,130 @@ bsd_test_connect ( long xxx )
 	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
 }
 
+/* ++++++++++++++++++++++++++++++++ */
+
+/* Something on the linux side ought to be listening.
+ *
+ * I use this:
+ *
+ *   ncat -v -v -l -p 2022 > levi.test < /dev/null
+ *
+ * I have to shut down my firewall to open port 2022.
+ *
+ * Then I get this when I try to write 4444 bytes
+ *  Ncat: Version 7.93 ( https://nmap.org/ncat )
+ *  Ncat: Listening on :::2022
+ *  Ncat: Listening on 0.0.0.0:2022
+ *  Ncat: Connection from 192.168.0.73.
+ *  Ncat: Connection from 192.168.0.73:1024.
+ *  NCAT DEBUG: EOF on stdin
+ * The file levi.test has 4444 bytes.
+ * This test worked.
+ *
+ * Sending 132555 bytes "just worked" and in a split second.
+ */
+
+void
+lots_thread ( long xxx )
+{
+	struct socket *so;
+	char *buf;
+	int i, n;
+
+	int port = 2022;
+	char *host = "192.168.0.5";
+	int total;
+
+	/* As good a place as any */
+	buf = (char *) tcp_input;
+
+	/* This many bytes */
+	total = 132555;
+
+	printf ( "Connect to %s (port %d)\n", host, port );
+	so = tcp_connect ( host, port );
+	printf ( "Connected\n" );
+
+	/* Currently this is useless.  A valid socket is arranged and
+	 * if not port is listening on the linux side, we currently
+	 * get an ICMP reply, "Destination unreachable,
+	 *  administratively prohibited".  Sounds like my firewall.
+	 * BSD seems to eventually time out.
+	 */
+	if ( ! so ) {
+	    printf ( "Connect failed\n" );
+	    return;
+	}
+
+	while ( total > 0 ) {
+	    if ( total < 2048 ) {
+		tcp_send ( so, buf, total );
+		break;
+	    } else {
+		tcp_send ( so, buf, 2048 );
+		total -= 2048;
+		buf += 2048;
+	    }
+	}
+
+	(void) soclose ( so );
+
+	printf ( "TCP connect test with lots finished\n" );
+}
+
+#ifdef notdef
+void
+lots_thread_1 ( long xxx )
+{
+	struct socket *so;
+	char *buf;
+	int i, n;
+
+	int port = 2022;
+	char *host = "192.168.0.5";
+	int total;
+
+	/* As good a place as any */
+	buf = (char *) tcp_input;
+
+	/* This many bytes */
+	total = 4444;
+
+	printf ( "Connect to %s (port %d)\n", host, port );
+	so = tcp_connect ( host, port );
+
+	/* Currently this is useless.  A valid socket is arranged and
+	 * if not port is listening on the linux side, we currently
+	 * get an ICMP reply, "Destination unreachable,
+	 *  administratively prohibited".  Sounds like my firewall.
+	 * BSD seems to eventually time out.
+	 */
+	if ( ! so ) {
+	    printf ( "Connect failed\n" );
+	    return;
+	}
+
+	tcp_send ( so, buf, total );
+
+	(void) soclose ( so );
+
+	printf ( "TCP connect test with lots finished\n" );
+}
+#endif
+
+void
+bsd_test_lots ( long xxx )
+{
+	(void) safe_thr_new ( "tcp-lots", lots_thread, (void *) 0, 15, 0 );
+}
+
+#ifdef notdef
 void
 bsd_test_close ( long xxx )
 {
 	(void) soclose ( client_socket );
 }
+#endif
 
 /* ================================================================================ */
 /* ================================================================================ */
