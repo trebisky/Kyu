@@ -241,8 +241,8 @@ extern u_long	tcp_now;		/* for RFC 1323 timestamps */
 
 int	 tcp_attach __P((struct socket *));
 void	 tcp_canceltimers __P((struct tcpcb *));
-struct tcpcb *
-	 tcp_close __P((struct tcpcb *));
+// struct tcpcb * tcp_close __P((struct tcpcb *));
+struct tcpcb * tcpcb_close __P((struct tcpcb *));
 //void	 tcp_ctlinput __P((int, struct sockaddr *, struct ip *));
 //int	 tcp_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 struct tcpcb *

@@ -79,7 +79,7 @@ extern	struct inpcb *tcp_last_inpcb;
  * Tcp initialization
  */
 void
-tcp_init()
+tcp_init ( void )
 {
 
 	tcp_iss = 1;		/* wrong */
@@ -92,7 +92,7 @@ tcp_init()
 		max_protohdr = sizeof(struct tcpiphdr);
 
 	if (max_linkhdr + sizeof(struct tcpiphdr) > MHLEN)
-		panic("tcp_init");
+		bsd_panic("tcp_init");
 }
 
 /*
@@ -267,7 +267,7 @@ tcp_drop(tp, errno)
 	if (errno == ETIMEDOUT && tp->t_softerror)
 		errno = tp->t_softerror;
 	so->so_error = errno;
-	return tcp_close ( tp );
+	return tcpcb_close ( tp );
 }
 
 /*
@@ -275,19 +275,22 @@ tcp_drop(tp, errno)
  *	discard all space held by the tcp
  *	discard internet protocol block
  *	wake up any sleepers
+ *
+ * Originally tcp_close()
+ * renamed tcpcb_close() for kyu so I could
+ * define my own tcp_close();
  */
 struct tcpcb *
-tcp_close(tp)
-	register struct tcpcb *tp;
+tcpcb_close ( struct tcpcb *tp )
 {
-	register struct tcpiphdr *t;
+	struct tcpiphdr *t;
 	struct inpcb *inp = tp->t_inpcb;
 	struct socket *so = inp->inp_socket;
-	register struct mbuf *m;
+	struct mbuf *m;
 
 #ifdef RTV_RTT
 	// Nope, this is not turned on for Kyu
-	register struct rtentry *rt;
+	struct rtentry *rt;
 
 	/*
 	 * If we sent enough data to get some meaningful characteristics,

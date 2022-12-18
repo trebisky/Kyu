@@ -423,7 +423,7 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 		if (tp->t_state > TCPS_LISTEN)
 			tp = tcp_disconnect(tp);
 		else
-			tp = tcp_close(tp);
+			tp = tcpcb_close(tp);
 		break;
 
 	/*
@@ -624,7 +624,7 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 #endif
 
 	default:
-		panic("tcp_usrreq");
+		bsd_panic("tcp_usrreq");
 	}
 	
 
@@ -797,7 +797,7 @@ tcp_disconnect(tp)
 	struct socket *so = tp->t_inpcb->inp_socket;
 
 	if (tp->t_state < TCPS_ESTABLISHED)
-		tp = tcp_close(tp);
+		tp = tcpcb_close(tp);
 	else if ((so->so_options & SO_LINGER) && so->so_linger == 0)
 		tp = tcp_drop(tp, 0);
 	else {
@@ -831,7 +831,7 @@ tcp_usrclosed(tp)
 	case TCPS_LISTEN:
 	case TCPS_SYN_SENT:
 		tp->t_state = TCPS_CLOSED;
-		tp = tcp_close(tp);
+		tp = tcpcb_close(tp);
 		break;
 
 	case TCPS_SYN_RECEIVED:

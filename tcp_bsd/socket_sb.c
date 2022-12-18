@@ -64,25 +64,25 @@ sb_init ( struct socket *so )
 	bpf3 ( "SB init called for %08x\n", so );
 
 	if ( soreserve ( so, tcp_sendspace, tcp_recvspace ) )
-	    panic ( "sb_init - cannot reserve space" );
+	    bsd_panic ( "sb_init - cannot reserve space" );
 
 	sb = &so->so_rcv;
 	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
         if ( ! sb->sb_sleep )
-            panic ("Cannot get sb sleep semaphore");
+            bsd_panic ("Cannot get sb sleep semaphore");
 
 	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
         if ( ! sb->sb_lock )
-            panic ("Cannot get sb lock semaphore");
+            bsd_panic ("Cannot get sb lock semaphore");
 
 	sb = &so->so_snd;
 	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
         if ( ! sb->sb_sleep )
-            panic ("Cannot get sb sleep semaphore");
+            bsd_panic ("Cannot get sb sleep semaphore");
 
 	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
         if ( ! sb->sb_lock )
-            panic ("Cannot get sb lock semaphore");
+            bsd_panic ("Cannot get sb lock semaphore");
 
 }
 
@@ -148,13 +148,13 @@ void
 sbflush ( struct sockbuf *sb )
 {
         if (sb->sb_flags & SB_LOCK)
-                panic("sbflush");
+                bsd_panic("sbflush");
 
         while (sb->sb_mbcnt)
                 sbdrop(sb, (int)sb->sb_cc);
 
         if (sb->sb_cc || sb->sb_mb)
-                panic("sbflush 2");
+                bsd_panic("sbflush 2");
 }
 
 /*
@@ -184,7 +184,7 @@ sbdrop ( struct sockbuf *sb, int len)
         while (len > 0) {
                 if (m == 0) {
                         if (next == 0)
-                                panic("sbdrop");
+                                bsd_panic("sbdrop");
                         m = next;
                         next = m->m_nextpkt;
                         continue;

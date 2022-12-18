@@ -166,7 +166,7 @@ tcp_timers ( struct tcpcb *tp, int timer )
 		    tp->t_idle <= tcp_maxidle)
 			tp->t_timer[TCPT_2MSL] = tcp_keepintvl;
 		else
-			tp = tcp_close(tp);
+			tp = tcpcb_close(tp);
 		break;
 
 	/*

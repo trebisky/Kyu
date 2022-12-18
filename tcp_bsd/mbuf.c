@@ -397,7 +397,7 @@ mbufcl_alloc ( void )
 	void *rv;
 
 	if ( ! mbufcl_list )
-	    panic ( "mb_cl_alloc: clusters exhausted"); \
+	    bsd_panic ( "mb_cl_alloc: clusters exhausted"); \
 
 	rv = mbufcl_list;
 	mbufcl_list = ( (struct my_list *) rv) -> next;
@@ -552,7 +552,7 @@ mb_get ( int type )
 
         m = (struct mbuf *) k_mbuf_alloc ();
 	if ( ! m )
-	    panic ( "mbuf mb_get exhausted");
+	    bsd_panic ( "mbuf mb_get exhausted");
 
 	m->m_type = type;
 	m->m_next = (struct mbuf *) NULL;
@@ -572,7 +572,7 @@ mb_gethdr ( int type )
 
         m = (struct mbuf *) k_mbuf_alloc ();
 	if ( ! m )
-	    panic ( "mbuf mb_gethdr exhausted");
+	    bsd_panic ( "mbuf mb_gethdr exhausted");
 
 	m->m_type = type;
 	m->m_next = (struct mbuf *) NULL;

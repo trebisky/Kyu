@@ -43,34 +43,6 @@
 
 #include <bsd.h>
 
-#ifdef notdef
-#include <kyu_compat.h>
-
-#include <sys/param.h>
-#include <sys/systm.h>
-// #include <sys/mbuf.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/errno.h>
-
-#include <net/route.h>
-#include <net/if.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_debug.h>
-#endif
-
 #ifdef TCPDEBUG
 int	tcpconsdebug = 0;
 #endif

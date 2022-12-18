@@ -197,7 +197,8 @@ in_control(so, cmd, data, ifp)
 			return (EPERM);
 
 		if (ifp == 0)
-			panic("in_control");
+			bsd_panic("in_control");
+
 		if (ia == (struct in_ifaddr *)0) {
 			oia = (struct in_ifaddr *)
 				malloc(sizeof *oia, M_IFADDR, M_WAITOK);

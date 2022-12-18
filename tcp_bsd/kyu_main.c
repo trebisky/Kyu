@@ -125,7 +125,7 @@ bpf3 ( const char *fmt, ... )
 static int
 rn_inithead ( void **head, int off )
 {
-	panic ( "rn_inithead called" );
+	bsd_panic ( "rn_inithead called" );
 }
 #endif
 
@@ -211,6 +211,17 @@ static void tcp_thread ( long );
 static void tcp_timer_func ( long );
 
 static void locker_init ( void );
+void locker_show ( void );
+
+/* Wrapper on Kyu panic - gives stack traceback */
+void
+bsd_panic ( char *msg )
+{
+	unroll_cur_short ();
+	locker_show ();
+	printf ( "BSD panic: %s\n", msg );
+	panic ( "BSD tcp" );
+}
 
 static void
 bsd_init ( void )
@@ -231,7 +242,7 @@ bsd_init ( void )
 	bpf3 ( "timer rate: %d\n", timer_rate_get() );
 	if ( timer_rate_get() != 1000 ) {
 	    printf ( "Unexpected timer rate: %d\n", timer_rate_get() );
-	    panic ( "TCP timer rate" );
+	    bsd_panic ( "TCP timer rate" );
 	}
 
 	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
@@ -239,6 +250,9 @@ bsd_init ( void )
 }
 
 /* These replace splnet, splimp, splx */
+
+// Set in kyu_compat.h
+// #define BIG_LOCKS
 
 extern struct thread *cur_thread;
 
@@ -252,6 +266,52 @@ static struct sem *net_lock_sem;
 
 static struct locker master_lock;
 
+#ifdef BIG_LOCKS
+/* The idea here it to do away with all of this internal fine grained locking
+ * and just put locks around the big pieces, namely:
+ * 
+ *  -- tcp_input()
+ *  -- timer calls
+ *  -- user calls
+ *  ---  send
+ *  ---  receive
+ *  ---  bind
+ *  ---  connect
+ *  ---  close
+ */
+void
+net_lock ( void )
+{
+}
+
+void
+net_unlock ( void )
+{
+}
+
+void
+big_lock ( void )
+{
+	sem_block ( master_lock.sem );
+}
+
+void
+big_unlock ( void )
+{
+	sem_unblock ( master_lock.sem );
+}
+
+#else
+
+void
+big_lock ( void )
+{
+}
+
+void
+big_unlock ( void )
+{
+}
 /* Logic here allows for nested splnet
  * which is absolutely necessary
  */
@@ -259,8 +319,8 @@ void
 net_lock ( void )
 {
 	if ( master_lock.count && master_lock.thread == cur_thread ) {
-	    // printf ( "$$$ net_lock, deadlock avoided\n" );
-	    // unroll_cur ();
+	    printf ( "$$$ net_lock, deadlock avoided\n" );
+	    unroll_cur_short ();
 	    // studying the above unroll traceback might be a way to
 	    // someday cleanup the code and avoid the nesting (maybe).
 	    ++master_lock.count;
@@ -277,20 +337,28 @@ net_unlock ( void )
 {
 	if ( master_lock.count < 1 ) {
 	    printf ( "$$$ net_unlock, count = %d ???\n", master_lock.count );
-	    unroll_cur ();
+	    unroll_cur_short ();
 	    return;
 	}
 	--master_lock.count;
 	if ( master_lock.count == 0 )
 	    sem_unblock ( master_lock.sem );
 }
+#endif
 
 void
 locker_show ( void )
 {
 	printf ( "locker count: %d\n", master_lock.count );
 	if ( master_lock.count > 0 )
-	    printf ( "locker thread: %08x\n", master_lock.thread );
+	    printf ( "locker thread: %s (%08x)\n",
+		master_lock.thread->name, master_lock.thread );
+}
+
+int
+get_lock_count ( void )
+{
+	return master_lock.count;
 }
 
 static void
@@ -305,6 +373,26 @@ locker_init ( void )
 static int fast_count = 0;
 static int slow_count = 0;
 
+#ifdef BIG_LOCKS
+static void
+tcp_timer_func ( long xxx )
+{
+	++fast_count;
+	if ( (fast_count % 2) == 0 ) {
+	    sem_block ( master_lock.sem );
+	    tcp_fasttimo();
+	    sem_unblock ( master_lock.sem );
+	}
+
+	++slow_count;
+	if ( (slow_count % 5) == 0 ) {
+	    sem_block ( master_lock.sem );
+	    tcp_slowtimo();
+	    sem_unblock ( master_lock.sem );
+	}
+}
+
+#else
 /* This runs every 100 ticks */
 static void
 tcp_timer_func ( long xxx )
@@ -317,6 +405,7 @@ tcp_timer_func ( long xxx )
 	if ( (slow_count % 5) == 0 )
 	    tcp_slowtimo();
 }
+#endif
 
 static struct netbuf *tcp_q_head;
 static struct netbuf *tcp_q_tail;
@@ -338,11 +427,11 @@ tcp_thread ( long xxx )
 
 	tcp_q_sem = sem_signal_new ( SEM_FIFO );
 	if ( ! tcp_q_sem )
-	    panic ("Cannot get tcp queue signal semaphore");
+	    bsd_panic ("Cannot get tcp queue signal semaphore");
 
 	tcp_queue_lock_sem = sem_mutex_new ( SEM_FIFO );
 	if ( ! tcp_queue_lock_sem )
-	    panic ("Cannot get tcp queue lock semaphore");
+	    bsd_panic ("Cannot get tcp queue lock semaphore");
 
 	for ( ;; ) {
 	    /* Do we have a packet to process ? */
@@ -469,13 +558,13 @@ tcp_bsd_process ( struct netbuf *nbp )
 	 * already been acquired.
 	 */
 
-	// net_lock ();
+#ifdef BIG_LOCKS
 	sem_block ( master_lock.sem );
-
 	tcp_input ( m, len );
-
-	// net_unlock ();
 	sem_unblock ( master_lock.sem );
+#else
+	tcp_input ( m, len );
+#endif
 }
 
 /* Called when TCP wants to hand a packet to IP for transmission
@@ -552,7 +641,7 @@ int
 ip_ctloutput ( int i, struct socket *s, int j, int k, struct mbuf **mm )
 {
 	// bpf1 ( "TCP(bsd): ctl output\n" );
-	panic ( "TCP(bsd): ctl output\n" );
+	bsd_panic ( "TCP(bsd): ctl output\n" );
 }
 
 /* THE END */

@@ -1142,7 +1142,7 @@ trimthenstep6:
 	 */
 	if ((so->so_state & SS_NOFDREF) &&
 	    tp->t_state > TCPS_CLOSE_WAIT && ti->ti_len) {
-		tp = tcp_close(tp);
+		tp = tcpcb_close(tp);
 		tcpstat.tcps_rcvafterclose++;
 		goto dropwithreset;
 	}
@@ -1166,7 +1166,7 @@ trimthenstep6:
 			    tp->t_state == TCPS_TIME_WAIT &&
 			    SEQ_GT(ti->ti_seq, tp->rcv_nxt)) {
 				iss = tp->rcv_nxt + TCP_ISSINCR;
-				tp = tcp_close(tp);
+				tp = tcpcb_close(tp);
 				goto findpcb;
 			}
 			/*
@@ -1223,13 +1223,13 @@ trimthenstep6:
 	close:
 		tp->t_state = TCPS_CLOSED;
 		tcpstat.tcps_drops++;
-		tp = tcp_close(tp);
+		tp = tcpcb_close(tp);
 		goto drop;
 
 	case TCPS_CLOSING:
 	case TCPS_LAST_ACK:
 	case TCPS_TIME_WAIT:
-		tp = tcp_close(tp);
+		tp = tcpcb_close(tp);
 		goto drop;
 	}
 
@@ -1471,7 +1471,7 @@ trimthenstep6:
 		 */
 		case TCPS_LAST_ACK:
 			if (ourfinisacked) {
-				tp = tcp_close(tp);
+				tp = tcpcb_close(tp);
 				goto drop;
 			}
 			break;
@@ -1811,7 +1811,7 @@ tcp_pulloutofband(so, ti, m)
 		if (m == 0)
 			break;
 	}
-	panic("tcp_pulloutofband");
+	bsd_panic("tcp_pulloutofband");
 }
 
 /*

@@ -342,4 +342,28 @@ unroll_cur ( void )
 	unroll_fp ( fp );
 }
 
+/* As above, but omit stack dump */
+void
+unroll_cur_short ( void )
+{
+	reg_t *fp;
+	unsigned int sp;
+	// char stbuf[16];
+	struct thread *cp;
+
+	get_SP ( sp );
+
+	// fp = (int *) get_fp ();
+	get_FP ( fp );
+
+	cp = thr_self ();
+	printf ( "Current thread is %s\n", cp->name );
+	printf ( " SP = %08x,  FP = %08x\n", sp, fp );
+
+	// sprintf ( stbuf, "%08x", sp );
+	// mem_dumper ( 'l', stbuf, "16" );
+
+	unroll_fp ( fp );
+}
+
 /* THE END */

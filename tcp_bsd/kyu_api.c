@@ -11,10 +11,11 @@
 
 struct socket * tcp_bind ( int );
 struct socket * tcp_accept ( struct socket * );
+static int kyu_soconnect ( struct socket *, struct mbuf * );
 
 /* Connect as a client */
-struct socket *
-tcp_connect ( char *name, int port )
+static struct socket *
+tcp_connect_int ( char *name, int port )
 {
 	unsigned long server_ip;
 	struct socket *so;
@@ -87,7 +88,18 @@ tcp_connect ( char *name, int port )
 	return so;
 }
 
-int
+struct socket *
+tcp_connect ( char *name, int port )
+{
+	struct socket *rv;
+
+	big_lock ();
+	rv = tcp_connect_int ( name, port );
+	big_unlock ();
+	return rv;
+}
+
+static int
 kyu_soconnect ( struct socket *so, struct mbuf *nam)
 {
         int s;
@@ -154,8 +166,8 @@ tcp_getpeer_port ( struct socket *so )
 }
 
 
-struct socket *
-tcp_bind ( int port )
+static struct socket *
+tcp_bind_int ( int port )
 {
 	int e;
 	struct mbuf *nam;
@@ -217,13 +229,21 @@ tcp_bind ( int port )
 	return so;
 }
 
+struct socket *
+tcp_bind ( int port )
+{
+	big_lock ();
+	tcp_bind_int ( port );
+	big_unlock ();
+}
+
 /* We do an abbreviated form of the accept call.
  * We don't need to translate fd to sock and vice versa
  * We also don't need to fuss around copying address
  * information from kernel to user space.
  */
-struct socket *
-tcp_accept ( struct socket *so )
+static struct socket *
+tcp_accept_int ( struct socket *so )
 {
 	struct socket *rso;
 
@@ -254,7 +274,7 @@ tcp_accept ( struct socket *so )
 	 */
         rso = so->so_q;
         if ( soqremque(rso, 1) == 0)
-                panic("accept");
+                bsd_panic("accept");
 
 	// if we wanted the peer name, this call
 	// would get it for us, albeit into an mbuf.
@@ -264,6 +284,18 @@ tcp_accept ( struct socket *so )
 	// in_setpeeraddr(inp, nam);
 
 	return rso;
+}
+
+struct socket *
+tcp_accept ( struct socket *so )
+{
+	struct socket *rv;
+
+	big_lock ();
+	rv = tcp_accept_int ( so );
+	big_unlock ();
+
+	return rv;
 }
 
 /* THE END */

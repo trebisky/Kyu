@@ -61,7 +61,7 @@ tcp_setpersist(tp)
 	register int t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
 
 	if (tp->t_timer[TCPT_REXMT])
-		panic("tcp_output REXMT");
+		bsd_panic("tcp_output REXMT");
 	/*
 	 * Start/restart persistance timer.
 	 */
@@ -86,7 +86,8 @@ tcp_output ( struct tcpcb *tp )
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
-	// int ckstat;	// XXX
+
+	printf ( "In tcp_output, lock = %d\n", get_lock_count () );
 
 	// bpf2 ( "-tcp_output\n" );
 	/*
@@ -335,7 +336,7 @@ send:
 
 #ifdef DIAGNOSTIC
  	if (max_linkhdr + hdrlen > MHLEN)
-		panic("tcphdr too big");
+		bsd_panic("tcphdr too big");
 #endif
 
 	/*
@@ -416,7 +417,7 @@ send:
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	ti = mtod(m, struct tcpiphdr *);
 	if (tp->t_template == 0)
-		panic("tcp_output");
+		bsd_panic("tcp_output");
 	bcopy((caddr_t)tp->t_template, (caddr_t)ti, sizeof (struct tcpiphdr));
 
 	/*
@@ -581,6 +582,7 @@ send:
 
 	// tcp_show_pkt ( m, "tcp_output" );
 
+	// int ckstat;
 	// ckstat = cksum_game ( m, hdrlen+len, "tcp_output" );
 	// ckstat = cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );
 	(void) cksum_verify_outgoing ( m, hdrlen+len, "tcp_output" );

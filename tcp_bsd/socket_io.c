@@ -251,8 +251,11 @@ tcp_recv ( struct socket *so, char *buf, int max )
 		*/
 
 	// printf ( "Calling soreceive\n" );
+
+	big_lock ();
 	stat = soreceive ( so, (struct mbuf **)0, &k_uio,
 	    (struct mbuf **)0, (struct mbuf **)0, (int *)0 );
+	big_unlock ();
 
 	n = k_uio.uio_offset;
 	// printf ( "Return from  soreceive with %d\n", n );
@@ -389,7 +392,7 @@ restart:
 	    m->m_nextpkt == 0 && (so->so_proto_flags & PR_ATOMIC) == 0) {
 #ifdef DIAGNOSTIC
 		if (m == 0 && so->so_rcv.sb_cc)
-			panic("receive 1");
+			bsd_panic("receive 1");
 #endif
 		if (so->so_error) {
 			if (m)
@@ -452,7 +455,7 @@ dontblock:
 	if (so->so_proto_flags & PR_ADDR) {
 #ifdef DIAGNOSTIC
 		if (m->m_type != MT_SONAME)
-			panic("receive 1a");
+			bsd_panic("receive 1a");
 #endif
 		orig_resid = 0;
 		if (flags & MSG_PEEK) {
@@ -520,7 +523,7 @@ dontblock:
 			break;
 #ifdef DIAGNOSTIC
 		else if (m->m_type != MT_DATA && m->m_type != MT_HEADER)
-			panic("receive 3");
+			bsd_panic("receive 3");
 #endif
 		so->so_state &= ~SS_RCVATMARK;
 		len = uio->uio_resid;
@@ -716,8 +719,12 @@ tcp_send ( struct socket *so, char *buf, int len )
         // k_uio.uio_resid = 0;
         k_uio.uio_resid = len;
 
+	big_lock ();
+
 	error = sosend (so, (struct mbuf *)0, &k_uio,
 	    (struct mbuf *)0, (struct mbuf *)0, 0);
+
+	big_unlock ();
 
 	// return (sosend((struct socket *)fp->f_data, (struct mbuf *)0,
         //         uio, (struct mbuf *)0, (struct mbuf *)0, 0));
@@ -799,6 +806,8 @@ restart:
 	do {	/* Big loop */
 		// s = splnet();
 		net_lock ();
+
+		printf ( "In sosend, big loop, lock = %d\n", get_lock_count () );
 
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
@@ -963,6 +972,8 @@ nopages:
 		    else
 			bpf3 ( "sosend: mb-len: %d\n", top->m_len );
 
+		    printf ( "In sosend, appending, lock = %d\n", get_lock_count () );
+
 		    sbappend(&so->so_snd, top);
 		    error = tcp_output(tp);
 
@@ -1125,7 +1136,7 @@ sonewconn ( struct socket *head, int connstatus )
 
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
 	if ( ! so->kyu_sem ) {
-	    panic ( "sonewcomm1 - semaphores all gone" );
+	    bsd_panic ( "sonewcomm1 - semaphores all gone" );
 	}
 
         so->so_type = head->so_type;
@@ -1266,7 +1277,7 @@ sofree ( struct socket *so )
 
         if (so->so_head) {
                 if (!soqremque(so, 0) && !soqremque(so, 1))
-                        panic("sofree dq");
+                        bsd_panic("sofree dq");
                 so->so_head = 0;
         }
 
@@ -1492,11 +1503,12 @@ char    netcls[] = "netcls";
  * Initiate disconnect if connected.
  * Free socket when disconnect complete.
  *
- * We get tempted for Kyu to call this tcp_close(), but that
- *  name is already taken, with different semantics.
+ * Once I renamed the original (BSD) tcp_close to tcpcb_close()
+ *  I was free to introduce my own tcp_close that is a locked
+ *  wrapper around this.
  */
  /* from kern/uipc_socket.c */
-int
+static int
 soclose ( struct socket *so )
 {
         int error = 0;
@@ -1560,7 +1572,7 @@ discard:
 
 	// Kyu will get this panic, so I must comment it out.
         // if ( so->so_state & SS_NOFDREF )
-        //         panic ( "soclose: NOFDREF" );
+        //         bsd_panic ( "soclose: NOFDREF" );
 
 #ifdef notdef
 	/* This debug, andin particular the delay uncovered a race
@@ -1584,12 +1596,20 @@ discard:
 
         so->so_state |= SS_NOFDREF;
 
-	// printf ( "SOfree called from soclose\n" );
+	// printf ( "Sofree called from soclose\n" );
         sofree(so);
         // splx(s);
 	net_unlock ();
 
         return (error);
+}
+
+void
+tcp_close ( struct socket *so )
+{
+	big_lock();
+	(void) soclose ( so );
+	big_unlock();
 }
 
 int
@@ -1692,7 +1712,7 @@ socreate ( struct socket *so, int dom, int type, int proto)
 
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
 	if ( ! so->kyu_sem ) {
-	    panic ( "socreate - semaphores all gone" );
+	    bsd_panic ( "socreate - semaphores all gone" );
 	}
 
         so->so_type = type;	/* SOCK_STREAM */

@@ -199,7 +199,7 @@ run_doney ( struct socket *so )
 	    printf ( "Doney got: %d, %d\n", n, total );
 	}
 
-	(void) soclose ( so );
+	tcp_close ( so );
 
 	printf ( "total bytes seen = %d\n", total );
 	printf ( "doney connection finished\n" );
@@ -235,6 +235,34 @@ bsd_test_doney ( long xxx )
 
 #define WANGDOODLE_PORT	114
 
+//#define CHUNK	2048
+#define CHUNK	5000
+
+static void
+big_wangdoodle ( struct socket *so )
+{
+	char *buf;
+	int total;
+
+	/* As good a place as any */
+	buf = (char *) tcp_input;
+
+	/* This many bytes */
+	total = 137555;
+	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
+
+	while ( total > 0 ) {
+	    if ( total < CHUNK ) {
+		tcp_send ( so, buf, total );
+		break;
+	    } else {
+		tcp_send ( so, buf, CHUNK );
+		total -= CHUNK;
+		buf += CHUNK;
+	    }
+	}
+}
+
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
 {
@@ -254,6 +282,10 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	    so_printf ( so, "R %d\n", gb_next_rand() );
 	else if ( strcmp ( cmd, "uni" ) == 0 )
 	    so_printf ( so, "U %d\n", gb_unif_rand(100) );
+	else if ( strcmp ( cmd, "big" ) == 0 ) {
+	    big_wangdoodle ( so );
+	    return 1 ;
+	}
 	else
 	    so_puts ( so, "ERR\n" );
 
@@ -299,7 +331,7 @@ run_wangdoodle ( struct socket *so )
 	    }
 	}
 
-	(void) soclose ( so );
+	tcp_close ( so );
 	printf ( "wangdoodle connection finished\n" );
 }
 
@@ -341,7 +373,7 @@ run_wangdoodle ( struct socket *so )
 	    // if ( ! is_socket_connected ( so ) )
 	    if ( n == 0 && ! is_socket_receiving ( so ) ) {
 		printf ( "Bail out, not receiving\n" );
-		(void) soclose ( so );
+		tcp_close ( so );
 		break;
 	    }
 
@@ -367,7 +399,7 @@ run_wangdoodle ( struct socket *so )
 	    if ( one_wangdoodle ( so, msg ) ) {
 		/* Here we close the connection */
 		printf ( "quit by user request\n" );
-		(void) soclose ( so );
+		tcp_close ( so );
 		break;
 	    }
 	}
@@ -387,6 +419,7 @@ wangdoodle_thread ( long xxx )
 	int fip;
 
 	so = tcp_bind ( WANGDOODLE_PORT );
+	printf ( "Wangdoodle server running on port %d\n", WANGDOODLE_PORT );
 
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
@@ -432,7 +465,7 @@ run_echo ( struct socket *so )
 	}
 
 	printf ( "done, closing\n" );
-	(void) soclose ( so );
+	tcp_close ( so );
 
 	strcpy ( msg, "All Done\n" );
 	tcp_send ( so, msg, strlen(msg) );
@@ -500,7 +533,7 @@ blab_thread ( long xxx )
 	    /* Really shoud run this in new thread */
 	    blabber ( cso );
 
-	    (void) soclose ( cso );
+	    tcp_close ( cso );
 	}
 }
 
@@ -547,7 +580,7 @@ bind_test ( int port )
 
 	    tcp_send ( cso, msg, strlen(msg) );
 
-	    (void) soclose ( cso );
+	    tcp_close ( cso );
 
 	    bpf3 ( "socket was closed\n" );
 	}
@@ -585,7 +618,7 @@ connect_test ( char *host, int port )
 	char buf[TEST_BUF_SIZE];
 	int i, n;
 
-	bpf1 ( "Start connect to %s (port %d)\n", host, port );
+	// bpf1 ( "Start connect to %s (port %d)\n", host, port );
 	so = tcp_connect ( host, port );
 	// bpf1 ( "Connect returns: %08x\n", so );
 	// printf ( "TCP connect done\n" );
@@ -610,27 +643,31 @@ connect_test ( char *host, int port )
 	// thr_delay ( 100 );
 
 	n = tcp_recv ( so, buf, TEST_BUF_SIZE );
-	printf ( "%d bytes received\n", n );
+	// printf ( "%d bytes received\n", n );
+#ifdef notdef
+	/* This was helpful before I fixed a bug */
 	if ( n == 0 ) {
 	    printf ( "try again\n" );
 	    n = tcp_recv ( so, buf, TEST_BUF_SIZE );
 	    printf ( "%d bytes received\n", n );
 	}
+#endif
 
 	if ( n > 0 ) {
 	    buf[n-2] = '\n';
 	    buf[n-1] = '\0';
+	    printf ( "\n" );
 	    printf ( "%s", buf );
 	}
 
 	// thr_delay ( 1000 );		// 1 second
 
-	(void) soclose ( so );
+	tcp_close ( so );
 
 	// printf ( "Connect closed and finished\n" );
 	// printf ( "Leaving connect socket open\n" );
 
-	bpf1 ( "TCP connect test finished\n" );
+	// bpf1 ( "TCP connect test finished\n" );
 }
 
 
@@ -641,22 +678,23 @@ client_thread ( long xxx )
 	// but it turns out to be "ONC RPC"
 	// which is part of Sun NFS and is running on
 	// my linux machine (for some ancient reason).
+
 	// int port = 111;
 	// int port = 2345;
 	int port = 13;		// Daytime
 
-	char *host = "192.168.0.5";
 	// char *host = "127.0.0.1";
+	char *host = "192.168.0.5";
 
-	bpf1 ( "***\n" );
-	bpf1 ( "Start connect test *******************\n" );
-	bpf1 ( "***\n" );
+	// bpf1 ( "***\n" );
+	// bpf1 ( "Start connect test *******************\n" );
+	// bpf1 ( "***\n" );
 
 	connect_test ( host, port );
 
-	bpf1 ( "***\n" );
-	bpf1 ( "Finished with connect test *******************\n" );
-	bpf1 ( "***\n" );
+	// bpf1 ( "***\n" );
+	// bpf1 ( "Finished with connect test *******************\n" );
+	// bpf1 ( "***\n" );
 }
 
 void
@@ -686,7 +724,29 @@ bsd_test_connect ( long xxx )
  * This test worked.
  *
  * Sending 132555 bytes "just worked" and in a split second.
+ * Wireshark showed all the TCP packets had
+ *  500 byte payloads.  Who knows why.
+ * It sure goes fast when there isn't any printf uart
+ *  traffic to slow everything down.
  */
+
+#define LOTS_SIZE	132555
+
+// This works just fine
+// #define LOTS_CHUNK	2048
+// These do also
+// #define LOTS_CHUNK	3000
+// #define LOTS_CHUNK	4000
+// #define LOTS_CHUNK	5000
+
+/* This yields "panic m_copym 3" */
+// #define LOTS_CHUNK	10000
+
+/* This yields "panic m_copym 3" */
+#define LOTS_CHUNK	8000
+
+/* This yields "panic m_copym 3" */
+// #define LOTS_CHUNK	6500
 
 void
 lots_thread ( long xxx )
@@ -703,7 +763,7 @@ lots_thread ( long xxx )
 	buf = (char *) tcp_input;
 
 	/* This many bytes */
-	total = 132555;
+	total = LOTS_SIZE;
 
 	printf ( "Connect to %s (port %d)\n", host, port );
 	so = tcp_connect ( host, port );
@@ -721,17 +781,17 @@ lots_thread ( long xxx )
 	}
 
 	while ( total > 0 ) {
-	    if ( total < 2048 ) {
+	    if ( total < LOTS_CHUNK ) {
 		tcp_send ( so, buf, total );
 		break;
 	    } else {
-		tcp_send ( so, buf, 2048 );
-		total -= 2048;
-		buf += 2048;
+		tcp_send ( so, buf, LOTS_CHUNK );
+		total -= LOTS_CHUNK;
+		buf += LOTS_CHUNK;
 	    }
 	}
 
-	(void) soclose ( so );
+	tcp_close ( so );
 
 	printf ( "TCP connect test with lots finished\n" );
 }
@@ -770,7 +830,7 @@ lots_thread_1 ( long xxx )
 
 	tcp_send ( so, buf, total );
 
-	(void) soclose ( so );
+	tcp_close ( so );
 
 	printf ( "TCP connect test with lots finished\n" );
 }
@@ -786,7 +846,7 @@ bsd_test_lots ( long xxx )
 void
 bsd_test_close ( long xxx )
 {
-	(void) soclose ( client_socket );
+	tcp_close ( client_socket );
 }
 #endif
 

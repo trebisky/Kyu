@@ -101,24 +101,29 @@ m_copym(m, off0, len, wait)
 	struct mbuf *top;
 	int copyhdr = 0;
 
+	printf ( "In m_copym, lock = %d\n", get_lock_count () );
+
 	if (off < 0 || len < 0)
-		panic("m_copym");
+	    bsd_panic("m_copym 1");
+
 	if (off == 0 && m->m_flags & M_PKTHDR)
 		copyhdr = 1;
+
 	while (off > 0) {
 		if (m == 0)
-			panic("m_copym");
+		    bsd_panic("m_copym 2");
 		if (off < m->m_len)
 			break;
 		off -= m->m_len;
 		m = m->m_next;
 	}
+
 	np = &top;
 	top = 0;
 	while (len > 0) {
 		if (m == 0) {
 			if (len != M_COPYALL)
-				panic("m_copym");
+				bsd_panic("m_copym 3");
 			break;
 		}
 		// MGET(n, wait, m->m_type);
@@ -150,8 +155,10 @@ m_copym(m, off0, len, wait)
 		m = m->m_next;
 		np = &n->m_next;
 	}
+
 	if (top == 0)
 		MCFail++;
+
 	return (top);
 
 nospace:
@@ -175,10 +182,10 @@ m_copydata(m, off, len, cp)
 	register unsigned count;
 
 	if (off < 0 || len < 0)
-		panic("m_copydata");
+		bsd_panic("m_copydata 1");
 	while (off > 0) {
 		if (m == 0)
-			panic("m_copydata");
+			bsd_panic("m_copydata 2");
 		if (off < m->m_len)
 			break;
 		off -= m->m_len;
@@ -186,7 +193,7 @@ m_copydata(m, off, len, cp)
 	}
 	while (len > 0) {
 		if (m == 0)
-			panic("m_copydata");
+			bsd_panic("m_copydata 3");
 		count = min(m->m_len - off, len);
 		bcopy(mtod(m, caddr_t) + off, cp, count);
 		len -= count;

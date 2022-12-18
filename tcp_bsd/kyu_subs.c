@@ -149,12 +149,12 @@ _remque ( struct llist *element)
 /* Doesn't work */
 void malloc ( void )
 {
-	panic ( "malloc called\n" );
+	bsd_panic ( "malloc called\n" );
 }
 
 void free ( void )
 {
-	panic ( "free called\n" );
+	bsd_panic ( "free called\n" );
 }
 #endif
 
@@ -169,7 +169,7 @@ void free ( void )
  */
 int tsleep ( void *ident, int priority, char *wmesg, int timo ) {}
 
-// void wakeup ( void ) { panic ( "wakeup" ); }
+// void wakeup ( void ) { bsd_panic ( "wakeup" ); }
 void wakeup ( void ) { }
 #endif
 
@@ -177,9 +177,6 @@ void wakeup ( void ) { }
 /* These would scan the ifnet list looking for an interface that met
  * some criteria.
  */
-// struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { panic ( "ifa_ifwithnet" ); }
-// struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithaddr" ); }
-// struct ifaddr * ifa_ifwithdstaddr ( struct sockaddr *addr ) { panic ( "ifa_ifwithstaddr" ); }
 
 struct ifaddr * ifa_ifwithnet ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }
 struct ifaddr * ifa_ifwithaddr ( struct sockaddr *addr ) { return (struct ifaddr *) 0; }

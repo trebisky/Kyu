@@ -17,4 +17,10 @@
 /* for ntohl() and such */
 #include <arch/cpu.h>
 
+/* Just do locking around big pieces of the TCP subsystem
+ * Introduced 12-18-2022 when I got frustrated with emulating
+ * the splx() family of calls with their nesting.
+ */
+#define BIG_LOCKS
+
 /* THE END */
