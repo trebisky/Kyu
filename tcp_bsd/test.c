@@ -236,7 +236,8 @@ bsd_test_doney ( long xxx )
 #define WANGDOODLE_PORT	114
 
 //#define CHUNK	2048
-#define CHUNK	5000
+// #define CHUNK	5000
+#define CHUNK	8000
 
 static void
 big_wangdoodle ( struct socket *so )
@@ -572,6 +573,10 @@ bind_test ( int port )
 	for ( ;; ) {
 	    char *msg = "Dead men tell no tales\r\n";
 	    cso = tcp_accept ( so );
+	    if ( ! cso ) {
+		printf ( "Accept fails\n" );
+		break;
+	    }
 
 	    fip = tcp_getpeer_ip ( cso );
 	    // printf ( "kyu_accept got a connection: %08x\n", cso );
@@ -584,6 +589,8 @@ bind_test ( int port )
 
 	    bpf3 ( "socket was closed\n" );
 	}
+
+	tcp_close ( so );
 }
 
 

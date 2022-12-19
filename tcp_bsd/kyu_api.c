@@ -13,6 +13,14 @@ struct socket * tcp_bind ( int );
 struct socket * tcp_accept ( struct socket * );
 static int kyu_soconnect ( struct socket *, struct mbuf * );
 
+void
+tcp_close ( struct socket *so )
+{
+	user_lock();
+	(void) soclose ( so );	/* in socket_io.c */
+	user_unlock();
+}
+
 /* Connect as a client */
 static struct socket *
 tcp_connect_int ( char *name, int port )
@@ -93,9 +101,9 @@ tcp_connect ( char *name, int port )
 {
 	struct socket *rv;
 
-	big_lock ();
+	user_lock ();
 	rv = tcp_connect_int ( name, port );
-	big_unlock ();
+	user_unlock ();
 	return rv;
 }
 
@@ -232,9 +240,12 @@ tcp_bind_int ( int port )
 struct socket *
 tcp_bind ( int port )
 {
-	big_lock ();
-	tcp_bind_int ( port );
-	big_unlock ();
+	struct socket *rv;
+
+	user_lock ();
+	rv = tcp_bind_int ( port );
+	user_unlock ();
+	return rv;
 }
 
 /* We do an abbreviated form of the accept call.
@@ -258,9 +269,15 @@ tcp_accept_int ( struct socket *so )
                         so->so_error = ECONNABORTED;
                         break;
                 }
+#ifdef BIG_LOCKS
+		user_waiting ();
                 // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
 		// bpf2 ( "block in accept: %08x\n", so->kyu_sem );
 		sem_block ( so->kyu_sem );
+		user_lock ();
+#else
+		sem_block ( so->kyu_sem );
+#endif
         }
 
         if (so->so_error) {
@@ -291,9 +308,9 @@ tcp_accept ( struct socket *so )
 {
 	struct socket *rv;
 
-	big_lock ();
+	user_lock ();
 	rv = tcp_accept_int ( so );
-	big_unlock ();
+	user_unlock ();
 
 	return rv;
 }

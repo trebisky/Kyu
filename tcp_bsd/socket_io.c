@@ -252,10 +252,10 @@ tcp_recv ( struct socket *so, char *buf, int max )
 
 	// printf ( "Calling soreceive\n" );
 
-	big_lock ();
+	user_lock ();
 	stat = soreceive ( so, (struct mbuf **)0, &k_uio,
 	    (struct mbuf **)0, (struct mbuf **)0, (int *)0 );
-	big_unlock ();
+	user_unlock ();
 
 	n = k_uio.uio_offset;
 	// printf ( "Return from  soreceive with %d\n", n );
@@ -426,6 +426,11 @@ restart:
 		}
 		sb_unlock(&so->so_rcv);
 
+#ifdef BIG_LOCKS
+		user_waiting ();
+	 	error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+		user_lock ();
+#else
 		/* I moved this here since if we hold the lock while calling
 		 * sbwait(), I don't see how tcp_input() could ever run and
 		 * handle packets.
@@ -440,6 +445,7 @@ restart:
 
 		// splx(s);
 		// net_unlock ();
+#endif
 
 		if (error)
 			return (error);
@@ -611,11 +617,17 @@ dontblock:
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
 
+#ifdef BIG_LOCKS
+			user_waiting ();
+			error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
+			user_lock ();
+#else
 	printf ( " -- soreceive BLOCK 2\n" );
 			net_unlock ();
 			error = sbwait(&so->so_rcv);	/* We block here (this is soreceive()) */
 			net_lock ();
 	printf ( " -- soreceive BLOCK 2 done\n" );
+#endif
 
 			if (error) {
 				sb_unlock(&so->so_rcv);
@@ -719,12 +731,12 @@ tcp_send ( struct socket *so, char *buf, int len )
         // k_uio.uio_resid = 0;
         k_uio.uio_resid = len;
 
-	big_lock ();
+	user_lock ();
 
 	error = sosend (so, (struct mbuf *)0, &k_uio,
 	    (struct mbuf *)0, (struct mbuf *)0, 0);
 
-	big_unlock ();
+	user_unlock ();
 
 	// return (sosend((struct socket *)fp->f_data, (struct mbuf *)0,
         //         uio, (struct mbuf *)0, (struct mbuf *)0, 0));
@@ -807,7 +819,7 @@ restart:
 		// s = splnet();
 		net_lock ();
 
-		printf ( "In sosend, big loop, lock = %d\n", get_lock_count () );
+		// printf ( "In sosend, big loop, lock = %d\n", get_lock_count () );
 
 		if (so->so_state & SS_CANTSENDMORE)
 			snderr(EPIPE);
@@ -842,14 +854,17 @@ restart:
 
 			sb_unlock(&so->so_snd);
 
+#ifdef BIG_LOCKS
+			user_waiting ();
+			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
+			user_lock ();
+#else
 			/* Moved here to allow tcp_input() to run while we wait */
 			net_unlock ();
-
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
-
 			// splx(s);
 			// net_unlock ();
-
+#endif
 			if (error)
 				goto out;
 			goto restart;
@@ -972,7 +987,7 @@ nopages:
 		    else
 			bpf3 ( "sosend: mb-len: %d\n", top->m_len );
 
-		    printf ( "In sosend, appending, lock = %d\n", get_lock_count () );
+		    // printf ( "In sosend, appending, lock = %d\n", get_lock_count () );
 
 		    sbappend(&so->so_snd, top);
 		    error = tcp_output(tp);
@@ -1508,7 +1523,7 @@ char    netcls[] = "netcls";
  *  wrapper around this.
  */
  /* from kern/uipc_socket.c */
-static int
+int
 soclose ( struct socket *so )
 {
         int error = 0;
@@ -1602,14 +1617,6 @@ discard:
 	net_unlock ();
 
         return (error);
-}
-
-void
-tcp_close ( struct socket *so )
-{
-	big_lock();
-	(void) soclose ( so );
-	big_unlock();
 }
 
 int

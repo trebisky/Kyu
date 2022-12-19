@@ -260,6 +260,10 @@ struct locker {
 	struct thread *thread;
 	struct sem *sem;
 	int count;
+	/* -- */
+	int user_busy;
+	int timer_busy;
+	int input_busy;
 };
 
 static struct sem *net_lock_sem;
@@ -276,6 +280,7 @@ static struct locker master_lock;
  *  ---  send
  *  ---  receive
  *  ---  bind
+ *  ---  accept
  *  ---  connect
  *  ---  close
  */
@@ -300,6 +305,29 @@ big_unlock ( void )
 {
 	sem_unblock ( master_lock.sem );
 }
+
+void
+user_lock ( void )
+{
+	master_lock.user_busy = 1;
+	sem_block ( master_lock.sem );
+}
+
+void
+user_unlock ( void )
+{
+	sem_unblock ( master_lock.sem );
+	master_lock.user_busy = 0;
+}
+
+/* Same as unlock, but mark different state */
+void
+user_waiting ( void )
+{
+	sem_unblock ( master_lock.sem );
+	master_lock.user_busy = 2;
+}
+
 
 #else
 
@@ -346,6 +374,18 @@ net_unlock ( void )
 }
 #endif
 
+char *
+locker_state ( int st )
+{
+	if ( st == 0 )
+	    return "idle";
+	if ( st == 1 )
+	    return "busy";
+	if ( st == 2 )
+	    return "wait (idle)";
+	return "unknown??";
+}
+
 void
 locker_show ( void )
 {
@@ -353,6 +393,9 @@ locker_show ( void )
 	if ( master_lock.count > 0 )
 	    printf ( "locker thread: %s (%08x)\n",
 		master_lock.thread->name, master_lock.thread );
+	printf ( "Input thread: %s\n", locker_state ( master_lock.input_busy ) );
+	printf ( "Timer thread: %s\n", locker_state ( master_lock.timer_busy ) );
+	printf ( "User lock: %s\n", locker_state ( master_lock.user_busy ) );
 }
 
 int

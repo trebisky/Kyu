@@ -101,7 +101,7 @@ m_copym(m, off0, len, wait)
 	struct mbuf *top;
 	int copyhdr = 0;
 
-	printf ( "In m_copym, lock = %d\n", get_lock_count () );
+	// printf ( "In m_copym, lock = %d\n", get_lock_count () );
 
 	if (off < 0 || len < 0)
 	    bsd_panic("m_copym 1");

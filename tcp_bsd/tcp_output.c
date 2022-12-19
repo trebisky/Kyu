@@ -87,7 +87,7 @@ tcp_output ( struct tcpcb *tp )
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
 
-	printf ( "In tcp_output, lock = %d\n", get_lock_count () );
+	// printf ( "In tcp_output, lock = %d\n", get_lock_count () );
 
 	// bpf2 ( "-tcp_output\n" );
 	/*
