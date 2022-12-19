@@ -181,10 +181,13 @@ sbdrop ( struct sockbuf *sb, int len)
         struct mbuf *next;
 
         next = (m = sb->sb_mb) ? m->m_nextpkt : 0;
+
         while (len > 0) {
                 if (m == 0) {
-                        if (next == 0)
-                                bsd_panic("sbdrop");
+                        if (next == 0) {
+			    printf ( "sb, m, len = %08x, %08x, %d\n", sb, m, len );
+			    bsd_panic("sbdrop");
+			}
                         m = next;
                         next = m->m_nextpkt;
                         continue;

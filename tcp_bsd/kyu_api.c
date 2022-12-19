@@ -16,6 +16,9 @@ static int kyu_soconnect ( struct socket *, struct mbuf * );
 void
 tcp_close ( struct socket *so )
 {
+	if ( ! so )
+	    return;
+
 	user_lock();
 	(void) soclose ( so );	/* in socket_io.c */
 	user_unlock();
@@ -86,8 +89,15 @@ tcp_connect_int ( char *name, int port )
 
 	// bpf2 ( "block in connect: %08x\n", so->kyu_sem );
 
+#ifdef BIG_LOCKS
+	user_waiting ();
         while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
 	    sem_block ( so->kyu_sem );
+	user_lock ();
+#else
+        while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0)
+	    sem_block ( so->kyu_sem );
+#endif
 
         // splx(s);
         // so->so_state &= ~SS_ISCONNECTING;
@@ -307,6 +317,9 @@ struct socket *
 tcp_accept ( struct socket *so )
 {
 	struct socket *rv;
+
+	if ( ! so )
+	    return NULL;
 
 	user_lock ();
 	rv = tcp_accept_int ( so );

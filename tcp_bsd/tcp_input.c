@@ -599,9 +599,11 @@ tcp_input ( struct mbuf *m, int iphlen)
 	// if (ti->ti_sum = tcp_cksum(m, len)) {
 	ti->ti_sum = tcp_cksum(m, len);
 	// bpf2 ( "TCP_INPUT, cksum: %x\n", ti->ti_sum );
+
 	if ( ti->ti_sum ) {
 		tcpstat.tcps_rcvbadsum++;
 		printf ( " *** *** *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
+		printf ( "m, tlen, len = %08x, %d, %d\n", m, tlen, len );
 		// dump_buf ( (char *) ti, len );
 		goto drop;
 	}

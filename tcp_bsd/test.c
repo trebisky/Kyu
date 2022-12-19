@@ -74,19 +74,42 @@ bsd_test_show ( long xxx )
 	tcp_statistics ();
 }
 
+static char *
+tcb_state ( int val )
+{
+	static char buf[24];
+
+	switch ( val ) {
+	    case 0:
+		return "Closed";
+	    case 1:
+		return "Listen";
+	    case 4:
+		return "Establ";
+	    default:
+		(void) sprintf ( buf, "%d", val );
+		return buf;
+	}
+}
+
 /* For debugging */
 void
 tcb_show ( void )
 {
         struct inpcb *inp;
+	struct tcpcb *tp;
+	char *tstate;
 
         inp = &tcb;
+
         if ( inp->inp_next == &tcb )
 	    printf ( "INPCB: empty\n" );
 
         while ( inp->inp_next != &tcb ) {
             inp = inp->inp_next;
-            printf ( "INPCB: %08x -- local, foreign: ", inp );
+	    tp = (struct tcpcb *) inp->inp_ppcb;
+	    tstate = tcb_state ( tp->t_state );
+            printf ( "INPCB: %08x %10s -- local, foreign: ", inp, tstate );
 	    printf ( "%s %d .. ", ip2str32(inp->inp_laddr.s_addr), ntohs(inp->inp_lport) );
 	    printf ( "%s %d\n", ip2str32(inp->inp_faddr.s_addr), ntohs(inp->inp_fport) );
         }
@@ -213,6 +236,10 @@ doney_thread ( long xxx )
 	int fip;
 
 	so = tcp_bind ( DONEY_PORT );
+	if ( ! so ) {
+	    printf ( "bind fails\n" );
+	    return;
+	}
 
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
@@ -235,9 +262,77 @@ bsd_test_doney ( long xxx )
 
 #define WANGDOODLE_PORT	114
 
-//#define CHUNK	2048
+/* A different idea.  Now I want to send recognizable data in each
+ * 2000 byte packet.
+ */
+
+#define CHUNK	2000
+#define CREP	(2000/5/4)
+
+static void
+load_buf ( char *buf, char *proto, int num )
+{
+	char pbuf[10];
+	int i;
+	char *p;
+
+	p = proto + 2;
+
+	sprintf ( p, "%03d", num++ );
+	for ( i=0; i<CREP; i++ ) {
+	    strncpy ( buf, proto, 5 );
+	    buf += 5;
+	}
+	sprintf ( p, "%03d", num++ );
+	for ( i=0; i<CREP; i++ ) {
+	    strncpy ( buf, proto, 5 );
+	    buf += 5;
+	}
+	sprintf ( p, "%03d", num++ );
+	for ( i=0; i<CREP; i++ ) {
+	    strncpy ( buf, proto, 5 );
+	    buf += 5;
+	}
+	sprintf ( p, "%03d", num );
+	for ( i=0; i<CREP; i++ ) {
+	    strncpy ( buf, proto, 5 );
+	    buf += 5;
+	}
+}
+
+#define NUM_CHUNK	100
+
+static void
+big_wangdoodle ( struct socket *so )
+{
+	char buf[CHUNK+1];
+	int total;
+	int i;
+	int ix;
+
+	total = NUM_CHUNK * CHUNK;
+	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
+
+	load_buf ( buf, "ST000", 1 );
+	tcp_send ( so, buf, CHUNK );
+
+	ix = 1;
+	for ( i=0; i<(NUM_CHUNK-2); i++ ) {
+	    load_buf ( buf, "PK000", ix );
+	    tcp_send ( so, buf, CHUNK );
+	    ix += 4;
+	}
+
+	load_buf ( buf, "EN000", 1 );
+	tcp_send ( so, buf, CHUNK );
+}
+
+#ifdef notdef
+
 // #define CHUNK	5000
-#define CHUNK	8000
+// #define CHUNK	8000
+// #define CHUNK	2048
+#define CHUNK	2000
 
 static void
 big_wangdoodle ( struct socket *so )
@@ -249,7 +344,8 @@ big_wangdoodle ( struct socket *so )
 	buf = (char *) tcp_input;
 
 	/* This many bytes */
-	total = 137555;
+	// total = 137555;
+	total = 132555;
 	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
 
 	while ( total > 0 ) {
@@ -263,6 +359,7 @@ big_wangdoodle ( struct socket *so )
 	    }
 	}
 }
+#endif
 
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
@@ -420,6 +517,10 @@ wangdoodle_thread ( long xxx )
 	int fip;
 
 	so = tcp_bind ( WANGDOODLE_PORT );
+	if ( ! so ) {
+	    printf ( "bind fails\n" );
+	    return;
+	}
 	printf ( "Wangdoodle server running on port %d\n", WANGDOODLE_PORT );
 
 	for ( ;; ) {
@@ -480,6 +581,10 @@ echo_thread ( long xxx )
 	int fip;
 
 	so = tcp_bind ( ECHO_PORT );
+	if ( ! so ) {
+	    printf ( "bind fails\n" );
+	    return;
+	}
 
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
@@ -525,6 +630,10 @@ blab_thread ( long xxx )
 	int fip;
 
 	so = tcp_bind ( BLAB_PORT );
+	if ( ! so ) {
+	    printf ( "bind fails\n" );
+	    return;
+	}
 
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
@@ -556,6 +665,10 @@ bind_test ( int port )
 	int fip;
 
 	so = tcp_bind ( port );
+	if ( ! so ) {
+	    printf ( "bind fails\n" );
+	    return;
+	}
 
 	/* ------------- finally do an accept */
 	/* Accept is the most interesting perhaps.

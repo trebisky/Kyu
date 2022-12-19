@@ -230,6 +230,9 @@ tcp_recv ( struct socket *so, char *buf, int max )
 	int stat;
 	int n;
 
+	if ( ! so )
+	    return 0;
+
 	// bpf1 ( "kyu_recv - max = %d bytes\n", max );
 
 	k_vec.iov_base = buf;
@@ -714,6 +717,9 @@ tcp_send ( struct socket *so, char *buf, int len )
 	struct uio k_uio;
 	struct iovec k_vec;
 	int error;
+
+	if ( ! so )
+	    return;
 
 	// bpf1 ( "kyu_send - sending %d bytes: %s\n", len, buf );
 
@@ -1558,12 +1564,21 @@ soclose ( struct socket *so )
                         if ((so->so_state & SS_ISDISCONNECTING) &&
                             (so->so_state & SS_NBIO))
                                 goto drop;
+
+#ifdef BIG_LOCKS
+                        while (so->so_state & SS_ISCONNECTED) {
+			    user_waiting ();
+			    sem_block ( so->kyu_sem );
+			    user_lock ();
+			}
+#else
                         while (so->so_state & SS_ISCONNECTED)
 			    // printf ( "block in close: %08x\n", so->kyu_sem );
 			    sem_block ( so->kyu_sem );
                                 //if (error = tsleep((caddr_t)&so->so_timeo,
                                 //    PSOCK | PCATCH, netcls, so->so_linger))
                                 //        break;
+#endif
                 }
         }
 

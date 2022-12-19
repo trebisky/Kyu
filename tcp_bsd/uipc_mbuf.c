@@ -91,15 +91,16 @@ m_prepend(m, len, how)
 int MCFail;
 
 struct mbuf *
-m_copym(m, off0, len, wait)
-	register struct mbuf *m;
-	int off0, wait;
-	register int len;
+m_copym ( struct mbuf *m, int off0, int len, int wait )
 {
-	register struct mbuf *n, **np;
-	register int off = off0;
+	struct mbuf *n, **np;
+	int off = off0;
 	struct mbuf *top;
 	int copyhdr = 0;
+
+	/* For debug */
+	struct mbuf *m_orig = m;
+	int len_orig = len;
 
 	// printf ( "In m_copym, lock = %d\n", get_lock_count () );
 
@@ -110,8 +111,10 @@ m_copym(m, off0, len, wait)
 		copyhdr = 1;
 
 	while (off > 0) {
-		if (m == 0)
+		if (m == 0) {
+		    printf ( "m, len = %08x, %d\n", m_orig, len_orig );
 		    bsd_panic("m_copym 2");
+		}
 		if (off < m->m_len)
 			break;
 		off -= m->m_len;
@@ -120,10 +123,13 @@ m_copym(m, off0, len, wait)
 
 	np = &top;
 	top = 0;
+
 	while (len > 0) {
 		if (m == 0) {
-			if (len != M_COPYALL)
-				bsd_panic("m_copym 3");
+			if (len != M_COPYALL) {
+			    printf ( "m, len = %08x, %d\n", m_orig, len_orig );
+			    bsd_panic("m_copym 3");
+			}
 			break;
 		}
 		// MGET(n, wait, m->m_type);
