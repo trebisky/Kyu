@@ -98,8 +98,29 @@ proto_attach ( struct socket *so )
 int
 proto_detach ( struct socket *so )
 {
-	return tcp_usrreq (so, PRU_DETACH,
-	    (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	struct inpcb *inp;
+	struct tcpcb *tp;
+
+	// return tcp_usrreq (so, PRU_DETACH,
+	//     (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
+	/*
+	 * PRU_DETACH detaches the TCP protocol from the socket.
+	 * If the protocol state is non-embryonic, then can't
+	 * do this directly: have to initiate a PRU_DISCONNECT,
+	 * which may finish later; embryonic TCB's can just
+	 * be discarded here.
+	 */
+	net_lock ();
+
+	inp = sotoinpcb(so);
+	tp = intotcpcb(inp);
+
+	if (tp->t_state > TCPS_LISTEN)
+	    tp = tcp_disconnect(tp);
+	else
+	    tp = tcpcb_close(tp);
+
+	net_unlock ();
 }
 
 int

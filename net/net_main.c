@@ -235,10 +235,10 @@ net_init ( void )
 #endif
 
     /* XXX review and revise priorities someday */
-    (void) safe_thr_new ( "net", net_thread, (void *) 0, 10, 0 );
+    (void) safe_thr_new ( "net", net_thread, (void *) 0, 12, 0 );
 
     /* We do indeed do the new slow way */
-    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 11, 0, system_clock_rate );
+    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, 13, 0, system_clock_rate );
 
     /* Here is where we initialize hardware.
      * no network traffic until after this is done
@@ -250,7 +250,7 @@ net_init ( void )
      */
 
     net_state = NET_INIT;
-    (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 14, 0 );
+    (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, 16, 0 );
 
 /* With the BBB, this usually takes about 3 seconds, with the
  * time for autonegotiation (about 2.1 seconds) dominating.

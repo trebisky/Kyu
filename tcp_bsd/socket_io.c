@@ -1628,6 +1628,7 @@ discard:
 
 	// printf ( "Sofree called from soclose\n" );
         sofree(so);
+
         // splx(s);
 	net_unlock ();
 

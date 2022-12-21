@@ -268,6 +268,10 @@ bsd_test_doney ( long xxx )
 
 #define CHUNK	2000
 #define CREP	(2000/5/4)
+#define NUM_CHUNK	100
+
+/* Don't put this on the stack */
+char wang_buf[CHUNK+1];
 
 static void
 load_buf ( char *buf, char *proto, int num )
@@ -300,31 +304,28 @@ load_buf ( char *buf, char *proto, int num )
 	}
 }
 
-#define NUM_CHUNK	100
-
 static void
 big_wangdoodle ( struct socket *so )
 {
-	char buf[CHUNK+1];
 	int total;
 	int i;
 	int ix;
 
 	total = NUM_CHUNK * CHUNK;
-	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
+	// printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
 
-	load_buf ( buf, "ST000", 1 );
-	tcp_send ( so, buf, CHUNK );
+	load_buf ( wang_buf, "ST000", 1 );
+	tcp_send ( so, wang_buf, CHUNK );
 
 	ix = 1;
 	for ( i=0; i<(NUM_CHUNK-2); i++ ) {
-	    load_buf ( buf, "PK000", ix );
-	    tcp_send ( so, buf, CHUNK );
+	    load_buf ( wang_buf, "PK000", ix );
+	    tcp_send ( so, wang_buf, CHUNK );
 	    ix += 4;
 	}
 
-	load_buf ( buf, "EN000", 1 );
-	tcp_send ( so, buf, CHUNK );
+	load_buf ( wang_buf, "EN000", 1 );
+	tcp_send ( so, wang_buf, CHUNK );
 }
 
 #ifdef notdef
@@ -361,10 +362,11 @@ big_wangdoodle ( struct socket *so )
 }
 #endif
 
+/* Called for each line sent by user */
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
 {
-	char resp[64];
+	// char resp[64];
 
 	if ( cmd[0] == 'q' )
 	    return 1;
@@ -390,13 +392,14 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	return 0;
 }
 
+/* Called to handle each connection */
 static void
 run_wangdoodle ( struct socket *so )
 {
 	char msg[128];
 	int n;
 
-	printf ( "start wangdoodle connection handler: so = %08x\n", so );
+	// printf ( "start wangdoodle connection handler: so = %08x\n", so );
 
 	for ( ;; ) {
 
@@ -424,13 +427,13 @@ run_wangdoodle ( struct socket *so )
 	    net_trim ( msg, n );
 
 	    if ( one_wangdoodle ( so, msg ) ) {
-		printf ( "quit by user request\n" );
+		// printf ( "quit by user request\n" );
 		break;
 	    }
 	}
 
 	tcp_close ( so );
-	printf ( "wangdoodle connection finished\n" );
+	// printf ( "wangdoodle connection finished\n" );
 }
 
 #ifdef notdef
@@ -509,6 +512,14 @@ run_wangdoodle ( struct socket *so )
 }
 #endif
 
+/* place these lower than the shell (which is at 50) to get some
+ * decent response from the shell while this is running a big test.
+ * Ha!  This does not work.  The shell is running at 40, but it spins
+ * in a uart polling loop.
+ */
+#define WANG_PRI	30
+#define WANG_PRI2	31
+
 void
 wangdoodle_thread ( long xxx )
 {
@@ -516,28 +527,72 @@ wangdoodle_thread ( long xxx )
 	struct socket *cso;
 	int fip;
 
+	printf ( "Wangdoodle server starting\n" );
+
 	so = tcp_bind ( WANGDOODLE_PORT );
 	if ( ! so ) {
 	    printf ( "bind fails\n" );
 	    return;
 	}
-	printf ( "Wangdoodle server running on port %d\n", WANGDOODLE_PORT );
+
+	printf ( "Wangdoodle server running on port %d, priority %d\n", WANGDOODLE_PORT, WANG_PRI );
 
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
 	    fip = tcp_getpeer_ip ( cso );
 
-	    printf ( "wangdoodle server got a connection from: %s\n", ip2str32_h(fip) );
+	    // printf ( "wangdoodle server got a connection from: %s\n", ip2str32_h(fip) );
 	    // printf ( "wangdoodle socket: %08x\n", cso );
 
-	    (void) safe_thr_new ( "wang_thr", (tfptr) run_wangdoodle, (void *) cso, 15, 0 );
+	    (void) safe_thr_new ( "wang_thr", (tfptr) run_wangdoodle, (void *) cso, WANG_PRI2, 0 );
 	}
+}
+
+static int dog_count = 0;
+
+static void
+dog_func ( long xxx )
+{
+	++dog_count;
+	printf ( "Alive and kicking (thread) %d\n", dog_count );
+}
+
+static int fast_dog_count = 0;
+static int dog_count2 = 0;
+
+static void
+dog2_func ( void )
+{
+	++fast_dog_count;
+	if ( (fast_dog_count % 60000) == 0 ) {
+	    dog_count2++;
+	    printf ( "Alive and kicking (hook) %d\n", dog_count2 );
+	}
+}
+
+/* This starts a thread to give periodic announcements.
+ * Kyu makes it run at priority 10, same as the net thread,
+ * but this seems to work OK.
+ */
+static void
+want_monitor1 ( void )
+{
+	(void) thr_new_repeat ( "dog", dog_func, (void *) 0, 5, 0, 60000 );
+}
+
+static void
+want_monitor2 ( void )
+{
+	timer_hookup ( dog2_func );
 }
 
 void
 bsd_test_wangdoodle ( long xxx )
 {
-	(void) safe_thr_new ( "wangdoodle", wangdoodle_thread, (void *) 0, 15, 0 );
+	want_monitor1 ();
+	want_monitor2 ();
+
+	(void) safe_thr_new ( "wangdoodle", wangdoodle_thread, (void *) 0, WANG_PRI, 0 );
 }
 
 /* ============================ */
@@ -657,12 +712,15 @@ bsd_test_blab ( long xxx )
 
 // static void bind_test ( int );
 
-static void
-bind_test ( int port )
+#define PIRATE_PORT	111
+
+void
+pirate_thread ( long arg )
 {
 	struct socket *so;
 	struct socket *cso;
 	int fip;
+	int port = arg;
 
 	so = tcp_bind ( port );
 	if ( ! so ) {
@@ -706,17 +764,13 @@ bind_test ( int port )
 	tcp_close ( so );
 }
 
-
-void
-server_thread ( long xxx )
-{
-	bind_test ( 111 );
-}
-
 void
 bsd_test_server ( long xxx )
 {
-	(void) safe_thr_new ( "tcp-server", server_thread, (void *) 0, 15, 0 );
+	char buf[64];
+
+	sprintf ( buf, "tcp-%d", PIRATE_PORT );
+	(void) safe_thr_new ( buf, pirate_thread, (void *) PIRATE_PORT, 15, 0 );
 }
 
 /* ============================ */

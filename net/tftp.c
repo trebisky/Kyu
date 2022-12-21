@@ -158,7 +158,7 @@ tftp_fetch ( char *file, char *buf, int limit )
 	tftp_count = 0;
 
 	tftp_state = TFS_START;
-	(void) safe_thr_new ( "tftp_wdog", tftp_wdog, (void *) 0, 13, 0 );
+	(void) safe_thr_new ( "tftp_wdog", tftp_wdog, (void *) 0, 16, 0 );
 
 	tftp_start ( file );
 

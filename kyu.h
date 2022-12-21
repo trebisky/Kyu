@@ -28,7 +28,12 @@
  */
 #define DEBUG_THREADS	0
 
-#define STACK_SIZE	4096	/* bytes */
+/* A 4K stack has been the norm since the early days
+ * of Kyu.  In December of 2022 I tried some experiments
+ * with a larger stack when I was getting hangs related to TCP
+ */
+// #define STACK_SIZE	4096	/* bytes */
+#define STACK_SIZE	16384	/* bytes */
 
 /* There will be trouble if we change this,
  * in particular, TCP timeouts expect the timer

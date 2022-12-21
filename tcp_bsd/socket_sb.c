@@ -365,6 +365,16 @@ sb_unlock ( struct sockbuf *sb )
 int
 sb_lock ( struct sockbuf *sb, int wf )
 {
+	/* Extra checks because I have seen trouble
+	 * during soclose() on several occasions
+	 * that yielded data aborts.
+	 * XXX - need a way to do "is_valid_ram_addr ( x )"
+	 */
+	if ( sb->sb_lock == 0 || (int) sb->sb_lock == 0xffffffff ) {
+	    printf ( "sb, sb_lock = %08x, %08x\n", sb, sb->sb_lock );
+	    bsd_panic ( "sb_lock" );
+	}
+
 	sem_block ( sb->sb_lock );
 	return 0;
 }

@@ -32,6 +32,10 @@
 #include <arch/types.h>
 #include "h3_ints.h"
 
+#include "kyu.h"
+#include "kyulib.h"
+#include "thread.h"
+
 #define NUM_UART	4
 
 #define UART0_BASE	0x01C28000
@@ -49,6 +53,13 @@ struct h3_uart {
 	vu32 mcr;	/* 10 - modem control */
 	vu32 lsr;	/* 14 - line status */
 	vu32 msr;	/* 18 - modem status */
+	vu32 scr;	/* 1c - scratch register */
+	int _pad0[23];
+	vu32 stat;	/* 7c - uart status */
+	vu32 flvl;	/* 80 - fifo level */
+	vu32 rfl;	/* 84 - RFL */
+	int _pad1[7];
+	vu32 halt;	/* A4 - Tx halt */
 };
 
 static struct h3_uart * uart_base[] = {
@@ -70,7 +81,6 @@ static struct h3_uart * uart_base[] = {
 #define BAUD_19200    78 /* 24 * 1000 * 1000 / 16 / 19200 = 78 */
 #define BAUD_9600    156 /* 24 * 1000 * 1000 / 16 / 9600 = 156 */
 
-
 /* bits in the lsr */
 #define RX_READY	0x01
 #define TX_READY	0x40
@@ -81,7 +91,7 @@ static struct h3_uart * uart_base[] = {
 #define IE_TXE		0x02	/* Tx register empty */
 #define IE_LS		0x04	/* Line status */
 #define IE_MS		0x08	/* Modem status */
-#define IE_THRE		0x80	/* Modem status */
+#define IE_THRE		0x80	/* THRE */
 
 #define LCR_DATA_5	0x00	/* 5 data bits */
 #define LCR_DATA_6	0x01	/* 6 data bits */
@@ -97,11 +107,83 @@ static struct h3_uart * uart_base[] = {
 
 #define LCR_DLAB	0x80	/* divisor latch access bit */
 
+#define IIR_MODEM	0x0	/* modem status, clear by reading modem status */
+#define IIR_NONE	0x1	/* why isn't "none" zero ? */
+#define IIR_TXE		0x2	/* THR empty, clear by reading IIR or write to THR */
+#define IIR_RDA		0x4	/* rcvd data available, clear by reading it. */
+#define IIR_LINE	0x6	/* line status, clear by reading line status. */
+#define IIR_BUSY	0x7	/* busy detect, clear by reading modem status. */
+
+
 /* 8 bits, no parity, 1 stop bit */
 #define LCR_SETUP	LCR_DATA_8
 
+void uart_putc ( int, int );
 void uart_gpio_init ( int );
+
 // void uart_clock_init ( int );
+
+/* 12-20-2022 */
+/* Hackish for now, just for console */
+#define CONSOLE_UART	0
+static struct cqueue *in_queue;
+static struct sem *in_sem;
+static int use_ints = 0;
+
+/* This is tricky.  We want the console as early as
+ * possible for output, but we cannot set the uart up for
+ * interrupts until a lot of other Kyu initialization is done.
+ * So we need to start up without using interrupts,
+ * then switch later.
+ */
+
+/* You find out what the interrupt is all about by reading
+ * the IIR register.  
+ * The first time I set up this handler, the IIR_BUSY was
+ * set (even with ier=0) and I had to learn to clear it by
+ * reading the status register.  It is set because
+ * "the master tried to write to the LCR while the Uart is busy"
+ * and this is some kind of 16550 non compatibility thing.
+ * It makes little or no sense to me, but there you have it.
+ */
+static void
+uart_handler ( int devnum )
+{
+        struct h3_uart *up = uart_base[devnum];
+	int x;
+	int iir;
+	int stat;
+
+	iir = up->iir & 0xf;
+
+	// printf ( "Uart IIR = %x\n", iir );
+
+	// Verify my structure
+	// printf ( "Uart status loc = %x\n", &up->stat );
+	// printf ( "Uart halt loc = %x\n", &up->halt );
+
+	if ( iir == IIR_BUSY ) {
+	    stat = up->stat;
+	    printf ( "Uart status = %x\n", stat );
+	    return;
+	}
+
+	/* I see the LSR at 0x21 whenever I get this.
+	 * I do get one character per interrupt when
+	 * watching the console (no big surprise).
+	 * The 0x20 is the TXEmpty bit
+	 */
+	if ( iir == IIR_RDA ) {
+	    // printf ( "Uart LSR = %x\n", up->lsr );
+	    while ( up->lsr & 0x1 ) {
+		x = up->data;
+		// printf ( "Uart data = %x\n", x );
+		// putchar ( x & 0x7f );
+		cq_add ( in_queue, x );
+	    }
+	    sem_unblock ( in_sem );
+	}
+}
 
 /* XXX - Ignores baud rate argument */
 void
@@ -119,14 +201,32 @@ uart_init ( int uart, int baud )
 	up->divisor_lsb = BAUD_115200;
 
 	up->lcr = LCR_SETUP;
+}
 
-	// No sense if we aren't using interrupts.
+/* XXX  12-20-2022 */
+void
+console_use_ints ( void )
+{
+	struct h3_uart *up = uart_base[CONSOLE_UART];
+
+	in_queue = cq_init ( 128 );
+        if ( ! in_queue )
+            panic ( "Cannot get in-queue for uart" );
+
+	in_sem = sem_signal_new ( SEM_FIFO );
+
+        irq_hookup ( IRQ_UART0, uart_handler, CONSOLE_UART );
+
+	// up->ier = 0;
 	// up->ier = IE_RDA | IE_TXE;
+	up->ier = IE_RDA;
+
+	use_ints = 1;
 }
 
 // Polling loops like this could use a timeout maybe.
 void
-uart_putc ( int uart, char c )
+uart_putc ( int uart, int c )
 {
 	struct h3_uart *up = uart_base[uart];
 
@@ -149,11 +249,30 @@ uart_puts ( int uart, char *s )
 }
 
 // Polling loops like this could use a timeout maybe.
+// Or maybe not if we expect the console to sit here.
 int
 uart_getc ( int uart )
 {
 	struct h3_uart *up = uart_base[uart];
+	int c;
 
+	if ( use_ints ) {
+	    for ( ;; ) {
+		// lock
+		if ( cq_count ( in_queue ) ) {
+		    c = cq_remove ( in_queue );
+		    // unlock
+		    return c;
+		}
+		// unlock
+		sem_block ( in_sem );
+	    }
+	}
+
+	/* This is the tried and true method used by the Kyu console
+	 * since time immemorial.  Kyu would spend pretty much all of
+	 * its time polling here (rather than in the idle task)
+	 */
 	while ( ! (up->lsr & RX_READY) )
 	    ;
 	return up->data;
@@ -191,6 +310,7 @@ serial_getc ( void )
 static struct serial_softc {
         struct h3_uart *base;
         int irq;
+	struct sem *in_sem;
 } serial_soft[NUM_UART];
 
 static void
@@ -203,15 +323,19 @@ serial_handler ( int devnum )
 	/* poll data ready */
 	while ( base->lsr & 0x1 ) {
 	    x = base->data;
-	    putchar ( x & 0x7f );
+	    // putchar ( x & 0x7f );
+	    cq_add ( in_queue, x );
 	}
+
+	sem_unblock ( in_sem );
 
 	/* Disable any more interrupts.
 	 * OK for some testing,
 	 * but needs to be more fancy in the future
 	 */
 	// base->ier &= ~(IE_TXE | IE_THRE);
-	base->ier &= IE_RDA;
+	// // base->ier &= IE_RDA;
+
 	// printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
 }
 
@@ -221,6 +345,7 @@ serial_handler ( int devnum )
  * We can also nicely listen via interrupts to a port (works great)
  */
 
+// Enable serial interrupts
 static void
 serial_listen ( int devnum )
 {

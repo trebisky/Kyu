@@ -245,8 +245,8 @@ bsd_init ( void )
 	    bsd_panic ( "TCP timer rate" );
 	}
 
-	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 12, 0 );
-	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, 13, 0, 100 );
+	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 14, 0 );
+	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, 15, 0, 100 );
 }
 
 /* These replace splnet, splimp, splx */
@@ -423,14 +423,18 @@ tcp_timer_func ( long xxx )
 	++fast_count;
 	if ( (fast_count % 2) == 0 ) {
 	    sem_block ( master_lock.sem );
+	    master_lock.timer_busy = 1;
 	    tcp_fasttimo();
+	    master_lock.timer_busy = 0;
 	    sem_unblock ( master_lock.sem );
 	}
 
 	++slow_count;
 	if ( (slow_count % 5) == 0 ) {
 	    sem_block ( master_lock.sem );
+	    master_lock.timer_busy = 1;
 	    tcp_slowtimo();
+	    master_lock.timer_busy = 0;
 	    sem_unblock ( master_lock.sem );
 	}
 }
@@ -603,7 +607,9 @@ tcp_bsd_process ( struct netbuf *nbp )
 
 #ifdef BIG_LOCKS
 	sem_block ( master_lock.sem );
+	master_lock.input_busy = 1;
 	tcp_input ( m, len );
+	master_lock.input_busy = 0;
 	sem_unblock ( master_lock.sem );
 #else
 	tcp_input ( m, len );

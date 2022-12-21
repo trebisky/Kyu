@@ -403,8 +403,13 @@ mbufcl_alloc ( void )
 	mbufcl_list = ( (struct my_list *) rv) -> next;
 
 	ts[S_MBUFCL].alloc++;
-	ts[S_MBUFCL].max++;
+	// ts[S_MBUFCL].max++;
 	ts[S_MBUFCL].free--;
+
+	if ( ts[S_MBUFCL].alloc > ts[S_MBUFCL].max )
+	    ts[S_MBUFCL].max = ts[S_MBUFCL].alloc;
+
+	// printf ( "alloc mbuf cluster, %d %08x\n", ts[S_MBUFCL].max, rv );
 
 	mclrefcnt[mtocl(rv)] = 1;
 

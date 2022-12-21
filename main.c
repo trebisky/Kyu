@@ -516,8 +516,12 @@ sys_init ( long xxx )
 
 /* These things must be after net_init() because
  * they will try to do tftp to get the symbol table.
+ * The "console_use_ints()" call will only work
+ * for the orange pi at present, it is a hack
+ * introduced in 12-2022 for TCP debugging.
  */
 #ifdef WANT_SHELL
+	console_use_ints ();	/* XXX */
 	shell_init ();
 #endif
 
