@@ -236,10 +236,12 @@ main_help ( void )
 #define MAXB	64
 #define MAXW	4
 
-/* This normally gets run as the test thread.
+/* This normally gets run as the user thread
+ *  during development and testing.
+ * This is the default Kyu console.
  */
 void
-test_main ( long xx )
+shell_main ( long xx )
 {
 	char buf[MAXB];
 	char *wp[MAXW];

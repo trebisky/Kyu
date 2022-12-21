@@ -11,6 +11,13 @@
  * Tom Trebisky  12-22-2016
  * Tom Trebisky  1/19/2017
  * Tom Trebisky  5/28/2018
+ * Tom Trebisky  12/21/2022
+ *
+ * This is now shared by the H3 and the H5 code.
+ * This was heavily modified 12-21-2022 to allow it to be
+ *  interrupt driven.  The console needs to be polled
+ *  initially, then switch to using interrupts later.
+ *  This has been tested only on the H3 thus far.
  *
  * serial.c
  * super simple "driver" for the H3 uart.
@@ -114,28 +121,83 @@ static struct h3_uart * uart_base[] = {
 #define IIR_LINE	0x6	/* line status, clear by reading line status. */
 #define IIR_BUSY	0x7	/* busy detect, clear by reading modem status. */
 
-
 /* 8 bits, no parity, 1 stop bit */
 #define LCR_SETUP	LCR_DATA_8
 
+static struct serial_softc {
+        struct h3_uart *base;
+        int irq;
+	struct sem *in_sem;
+	struct cqueue *in_queue;
+	int use_ints;
+} serial_soft[NUM_UART];
+
+void uart_init ( int, int );
 void uart_putc ( int, int );
+void uart_puts ( int , char * );
 void uart_gpio_init ( int );
+
+static void serial_listen ( int devnum );
+static void serial_setup ( int devnum, int irq, int baud );
+static void aux_uart_init ( int devnum, int baud );
 
 // void uart_clock_init ( int );
 
 /* 12-20-2022 */
 /* Hackish for now, just for console */
 #define CONSOLE_UART	0
-static struct cqueue *in_queue;
-static struct sem *in_sem;
-static int use_ints = 0;
+// static struct cqueue *in_queue;
+// static struct sem *in_sem;
+// static int use_ints = 0;
 
-/* This is tricky.  We want the console as early as
+/* A tricky issue arises with the console and interrupts.
+ * We want the console as early as
  * possible for output, but we cannot set the uart up for
- * interrupts until a lot of other Kyu initialization is done.
+ * interrupts until later when a lot of other Kyu initialization
+ * has been done.
  * So we need to start up without using interrupts,
  * then switch later.
  */
+
+/* These are the "standard" entry points used for the Kyu console */
+
+/* Called from board.c */
+void
+serial_init ( int baud )
+{
+	// uart_init ( 0, baud );
+	uart_init ( 0, BAUD_115200 );
+}
+
+void
+serial_putc ( char c )
+{
+	uart_putc ( 0, c );
+}
+
+void
+serial_puts ( char *s )
+{
+	uart_puts ( 0, s );
+}
+
+int
+serial_getc ( void )
+{
+	return uart_getc ( 0 );
+}
+
+/* Called from board.c */
+void
+serial_aux_init ( void )
+{
+        // serial_setup ( 0, IRQ_UART0, BAUD_115200 );
+        serial_setup ( 1, IRQ_UART1, BAUD_9600 );
+        serial_setup ( 2, IRQ_UART2, BAUD_9600 );
+        serial_setup ( 3, IRQ_UART3, BAUD_9600 );
+
+	serial_listen ( 1 );
+}
 
 /* You find out what the interrupt is all about by reading
  * the IIR register.  
@@ -149,7 +211,8 @@ static int use_ints = 0;
 static void
 uart_handler ( int devnum )
 {
-        struct h3_uart *up = uart_base[devnum];
+        struct serial_softc *sc = &serial_soft[devnum];
+        struct h3_uart *up = sc->base;
 	int x;
 	int iir;
 	int stat;
@@ -179,17 +242,27 @@ uart_handler ( int devnum )
 		x = up->data;
 		// printf ( "Uart data = %x\n", x );
 		// putchar ( x & 0x7f );
-		cq_add ( in_queue, x );
+		cq_add ( sc->in_queue, x );
 	    }
-	    sem_unblock ( in_sem );
+	    sem_unblock ( sc->in_sem );
 	}
 }
 
-/* XXX - Ignores baud rate argument */
 void
 uart_init ( int uart, int baud )
 {
-	struct h3_uart *up = uart_base[uart];
+        struct serial_softc *sc = &serial_soft[uart];
+        // struct h3_uart *up = sc->base;
+	struct h3_uart *up;
+
+	sc->base = uart_base[uart];
+	up = sc->base;
+
+	sc->use_ints = 0;
+
+	sc->in_queue = cq_init ( 128 );
+        if ( ! sc->in_queue )
+            panic ( "Cannot get in-queue for uart" );
 
 	uart_gpio_init ( uart );
 	// uart_clock_init ( uart );
@@ -198,7 +271,7 @@ uart_init ( int uart, int baud )
 	up->lcr = LCR_DLAB;
 
 	up->divisor_msb = 0;
-	up->divisor_lsb = BAUD_115200;
+	up->divisor_lsb = baud;
 
 	up->lcr = LCR_SETUP;
 }
@@ -207,13 +280,11 @@ uart_init ( int uart, int baud )
 void
 console_use_ints ( void )
 {
-	struct h3_uart *up = uart_base[CONSOLE_UART];
+        struct serial_softc *sc = &serial_soft[CONSOLE_UART];
+        struct h3_uart *up = sc->base;
 
-	in_queue = cq_init ( 128 );
-        if ( ! in_queue )
-            panic ( "Cannot get in-queue for uart" );
-
-	in_sem = sem_signal_new ( SEM_FIFO );
+	sc->in_sem = sem_signal_new ( SEM_FIFO );
+	// should check
 
         irq_hookup ( IRQ_UART0, uart_handler, CONSOLE_UART );
 
@@ -221,14 +292,61 @@ console_use_ints ( void )
 	// up->ier = IE_RDA | IE_TXE;
 	up->ier = IE_RDA;
 
-	use_ints = 1;
+	sc->use_ints = 1;
 }
+
+static void
+serial_setup ( int devnum, int irq, int baud )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+
+	printf ( "UART irq %d for device %d hookup\n", irq, devnum );
+        irq_hookup ( irq, uart_handler, devnum );
+
+	sc->base = uart_base[devnum];
+	sc->irq = irq;
+
+	aux_uart_init ( devnum, baud );
+	uart_gpio_init ( devnum );
+}
+
+// Enable serial interrupts
+static void
+serial_listen ( int devnum )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+        struct h3_uart *base = sc->base;
+
+	base->ier = IE_RDA;
+}
+
+static void
+aux_uart_init ( int devnum, int baud )
+{
+        struct serial_softc *sc = &serial_soft[devnum];
+	struct h3_uart *up = uart_base[devnum];
+
+	up->ier = 0;
+	up->lcr = LCR_DLAB;
+
+	up->divisor_msb = 0;
+	up->divisor_lsb = baud;
+
+	up->lcr = LCR_SETUP;
+
+	// up->ier = IE_RDA | IE_TXE;
+	up->ier = IE_TXE;
+}
+
+/* ================================================================================ */
+/* ================================================================================ */
 
 // Polling loops like this could use a timeout maybe.
 void
 uart_putc ( int uart, int c )
 {
-	struct h3_uart *up = uart_base[uart];
+        struct serial_softc *sc = &serial_soft[uart];
+        struct h3_uart *up = sc->base;
 
 	while ( !(up->lsr & TX_READY) )
 	    ;
@@ -253,19 +371,20 @@ uart_puts ( int uart, char *s )
 int
 uart_getc ( int uart )
 {
-	struct h3_uart *up = uart_base[uart];
+        struct serial_softc *sc = &serial_soft[uart];
+        struct h3_uart *up = sc->base;
 	int c;
 
-	if ( use_ints ) {
+	if ( sc->use_ints ) {
 	    for ( ;; ) {
 		// lock
-		if ( cq_count ( in_queue ) ) {
-		    c = cq_remove ( in_queue );
+		if ( cq_count ( sc->in_queue ) ) {
+		    c = cq_remove ( sc->in_queue );
 		    // unlock
 		    return c;
 		}
 		// unlock
-		sem_block ( in_sem );
+		sem_block ( sc->in_sem );
 	    }
 	}
 
@@ -277,157 +396,5 @@ uart_getc ( int uart )
 	    ;
 	return up->data;
 }
-
-/* These are the "standard" entry points used for the Kyu console */
-
-/* Called from board.c */
-void
-serial_init ( int baud )
-{
-	uart_init ( 0, baud );
-}
-
-void
-serial_putc ( char c )
-{
-	uart_putc ( 0, c );
-}
-
-void
-serial_puts ( char *s )
-{
-	uart_puts ( 0, s );
-}
-
-int
-serial_getc ( void )
-{
-	return uart_getc ( 0 );
-}
-
-/* Code below added for interrupt experiment, 7-29-2020 */
-
-static struct serial_softc {
-        struct h3_uart *base;
-        int irq;
-	struct sem *in_sem;
-} serial_soft[NUM_UART];
-
-static void
-serial_handler ( int devnum )
-{
-        struct serial_softc *sc = &serial_soft[devnum];
-        struct h3_uart *base = sc->base;
-	int x;
-
-	/* poll data ready */
-	while ( base->lsr & 0x1 ) {
-	    x = base->data;
-	    // putchar ( x & 0x7f );
-	    cq_add ( in_queue, x );
-	}
-
-	sem_unblock ( in_sem );
-
-	/* Disable any more interrupts.
-	 * OK for some testing,
-	 * but needs to be more fancy in the future
-	 */
-	// base->ier &= ~(IE_TXE | IE_THRE);
-	// // base->ier &= IE_RDA;
-
-	// printf ( " ** Uart interrupt, lsr = %08x\n", base->lsr );
-}
-
-/* This series of routines are for
- * some quick testing to see if we can get UART interrupts,
- * we can simply enable TXE and we do get interrupts.
- * We can also nicely listen via interrupts to a port (works great)
- */
-
-// Enable serial interrupts
-static void
-serial_listen ( int devnum )
-{
-        struct serial_softc *sc = &serial_soft[devnum];
-        struct h3_uart *base = sc->base;
-
-	base->ier = IE_RDA;
-}
-
-static void
-aux_uart_init ( int devnum, int baud )
-{
-	struct h3_uart *up = uart_base[devnum];
-
-	up->ier = 0;
-	up->lcr = LCR_DLAB;
-
-	up->divisor_msb = 0;
-	up->divisor_lsb = baud;
-
-	up->lcr = LCR_SETUP;
-
-	// up->ier = IE_RDA | IE_TXE;
-	up->ier = IE_TXE;
-}
-
-
-static void
-serial_setup ( int devnum, int irq, int baud )
-{
-        struct serial_softc *sc = &serial_soft[devnum];
-
-	printf ( "UART irq %d for device %d hookup\n", irq, devnum );
-        irq_hookup ( irq, serial_handler, devnum );
-
-	sc->base = uart_base[devnum];
-	sc->irq = irq;
-
-	aux_uart_init ( devnum, baud );
-	uart_gpio_init ( devnum );
-}
-
-/* Called from board.c */
-void
-serial_aux_init ( void )
-{
-        // serial_setup ( 0, IRQ_UART0, BAUD_115200 );
-        serial_setup ( 1, IRQ_UART1, BAUD_9600 );
-        serial_setup ( 2, IRQ_UART2, BAUD_9600 );
-        serial_setup ( 3, IRQ_UART3, BAUD_9600 );
-
-	serial_listen ( 1 );
-}
-
-#ifdef notdef
- ## 
- ## /* OLD */
- ## #define UART_BASE	((struct h3_uart *) UART0_BASE)
- ## 
- ## int
- ## serial_rx_status ( void )
- ## {
- ## 	struct h3_uart *up = UART_BASE;
- ## 
- ## 	return up->lsr & RX_READY;
- ## }
- ## 
- ## int
- ## serial_read ( void )
- ## {
- ## 	struct h3_uart *up = UART_BASE;
- ## 
- ## 	return up->data;
- ## }
- ## 
- ## void
- ## serial_check ( int num )
- ## {
- ## 	struct h3_uart *up = UART_BASE;
- ## 
- ## 	printf ( " Uart: lsr/ier/iir %02x %02x %02x  %d\n", up->lsr, up->ier, up->iir, num );
- ## }
-#endif
 
 /* THE END */

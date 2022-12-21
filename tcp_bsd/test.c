@@ -26,7 +26,7 @@ void bsd_test_wangdoodle ( long );
 void bsd_test_doney ( long );
 void bsd_test_connect ( long );
 void bsd_test_lots ( long );
-void bsd_test_close ( long );
+void bsd_test_pig ( long );
 void bsd_test_debug ( long );
 
 /* XXX - stolen from tcp_xinu, needs rework */
@@ -41,7 +41,7 @@ struct test tcp_test_list[] = {
         bsd_test_doney,         "Start doney server",                   0,
 	bsd_test_connect,	"Connect (client) test",		0,
 	bsd_test_lots,		"Connect (client) with lots",		0,
-	// bsd_test_close,		"Close client socket",			0,
+	bsd_test_pig,		"CPU pig",				0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
 	bsd_test_debug,		"Set debug 2",				2,
@@ -548,6 +548,12 @@ wangdoodle_thread ( long xxx )
 	}
 }
 
+#ifdef notdef
+/* I used these when I had a mysterious hang and wanted to know if it was just the TCP
+ * subsystem, or Kyu overall (it was TCP).  After this I made changes to Kyu so that I
+ * can run the Kyu shell at priority 11 and thus have it to investigate when the next hang
+ * takes place.
+ */
 static int dog_count = 0;
 
 static void
@@ -585,12 +591,13 @@ want_monitor2 ( void )
 {
 	timer_hookup ( dog2_func );
 }
+#endif
 
 void
 bsd_test_wangdoodle ( long xxx )
 {
-	want_monitor1 ();
-	want_monitor2 ();
+	// want_monitor1 ();
+	// want_monitor2 ();
 
 	(void) safe_thr_new ( "wangdoodle", wangdoodle_thread, (void *) 0, WANG_PRI, 0 );
 }
@@ -1016,13 +1023,34 @@ bsd_test_lots ( long xxx )
 	(void) safe_thr_new ( "tcp-lots", lots_thread, (void *) 0, 15, 0 );
 }
 
-#ifdef notdef
-void
-bsd_test_close ( long xxx )
+static int pig_data[1024];
+
+static void
+pig1 ( void )
 {
-	tcp_close ( client_socket );
+	int i;
+
+	for ( i=0; i<1024; i++ )
+	    pig_data[i] = 99;
 }
-#endif
+
+static void
+pig2 ( void )
+{
+	int i;
+
+	for ( i=0; i<1024; i++ )
+	    pig_data[i] = 22;
+}
+
+void
+bsd_test_pig ( long xxx )
+{
+	for ( ;; ) {
+	    pig1 ();
+	    pig2 ();
+	}
+}
 
 /* ================================================================================ */
 /* ================================================================================ */

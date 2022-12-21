@@ -15,9 +15,11 @@
 #include "kyulib.h"
 #include "thread.h"
 
-#define PRI_SHELL	40
+// #define PRI_SHELL	40
+// this only works if we have a console uart via interrupts
+#define PRI_SHELL	11
 
-void test_main ( long );
+void shell_main ( long );
 
 #ifdef notdef
 volatile double q;
@@ -56,7 +58,7 @@ user_init ( long xx )
 #endif
 
 	/* Run the test "shell" as the user thread */
-	(void) safe_thr_new ( "shell", test_main, (void *)0, PRI_SHELL, 0 );
+	(void) safe_thr_new ( "shell", shell_main, (void *)0, PRI_SHELL, 0 );
 
 	/*
 	thr_show();

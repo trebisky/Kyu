@@ -356,6 +356,27 @@ thr_sched ( void )
 	/* NOTREACHED */
 }
 
+#define ARM_FP	11
+#define ARM_PC  15
+
+unsigned int
+thr_get_pc ( struct thread *tp )
+{
+	if ( tp->mode == JMP ) {
+	    return tp->jregs.regs[ARM_PC];
+	}
+
+	if ( tp->mode == INT ) {
+	    return tp->iregs.regs[ARM_PC];
+	}
+
+	if ( tp->mode == CONT ) {
+	    return tp->cregs.regs[1];;
+	}
+
+	return 0xdeadbeef;
+}
+
 /* Show lots of stuff for one particular thread
  * Note that there is a lot of stuff (like displaying all registers)
  * in arm/show_regs.c that would be worth looking at.
@@ -386,19 +407,18 @@ thr_one_all ( struct thread *tp, char *msg )
 	/* XXX - ARMv7 specific, register 11 is fp */
 	/* works fine on armv7 8-14-2016 */
 
-#define ARM_FP	11
-#define ARM_PC  15
-
 	if ( tp->mode == JMP ) {
 	    show_regs ( tp->jregs.regs );
-	    pc = cur_thread->jregs.regs[ARM_PC];
+	    // pc = cur_thread->jregs.regs[ARM_PC];
+	    pc = tp->jregs.regs[ARM_PC];
 	    printf ( "PC = %08x ( %s )\n", pc, mk_symaddr(pc) );
 	    unroll_fp ( tp->jregs.regs[ARM_FP] );
 	}
 
 	if ( tp->mode == INT ) {
 	    show_regs ( tp->iregs.regs );
-	    pc = cur_thread->iregs.regs[ARM_PC];
+	    // pc = cur_thread->iregs.regs[ARM_PC];
+	    pc = tp->iregs.regs[ARM_PC];
 	    printf ( "PC = %08x ( %s )\n", pc, mk_symaddr(pc) );
 	    unroll_fp ( tp->iregs.regs[ARM_FP] );
 	}
@@ -414,6 +434,7 @@ thr_one_all ( struct thread *tp, char *msg )
 	printf ( "\n" );
 }
 
+/* Shows -all- threads that match a given name */
 void
 thr_show_name ( char *name )
 {
@@ -497,6 +518,8 @@ thr_one ( struct thread *tp )
 	else
 	    printf ( "%d ", tp->mode );
 
+	printf ( "%08x ", thr_get_pc ( tp ) );
+
 #ifdef ARCH_X86
 	printf ( "%8x %4d\n", tp->regs.esp, tp->pri );
 #else
@@ -511,7 +534,8 @@ thr_show ( void )
 {
 	struct thread *tp;
 
-	printf ( "  Thread:       name (  &tp   )    state      sp     pri\n");
+	// printf ( "  Thread:       name (  &tp   )    state      sp     pri\n");
+	printf ( "  Thread:       name (  &tp   )    state      pc       sp     pri\n");
 	/*
 	thr_one ( thread0 );
 	*/
@@ -685,7 +709,8 @@ thr_alloc ( void )
 }
 
 /* Common code for thr_exit() and thr_join()
- * XXX ( does this need a lock?)
+ * This does need to be locked, but that is
+ *  done by the callers.
  */
 static void
 cleanup_thread ( struct thread *xp )
@@ -918,6 +943,8 @@ thr_exit ( void )
 	    /* NOTREACHED */
 	}
 
+	INT_lock;	// 12-21-2022
+
 	cur_thread->state = DEAD;
 
 	/* We don't need to clean up any delay timers
@@ -949,13 +976,17 @@ thr_exit ( void )
 	 * or they are already waiting for us (so unblock them!)
 	 */
 	if ( cur_thread->join ) {
+	    INT_unlock;		// 12-21-2022
 	    thr_unblock ( cur_thread->join );
+	    INT_lock;		// 12-21-2022
 	    cleanup_thread ( cur_thread );
 	} else if ( cur_thread->flags & TF_JOIN ) {
 	    cur_thread->state = ZOMBIE;
 	} else {
 	    cleanup_thread ( cur_thread );
 	}
+
+	INT_unlock;	// 12-21-2022
 
 	/* 
 	 * Now things get a bit tricky.
@@ -981,13 +1012,17 @@ thr_join ( struct thread *tp )
 	if ( tp->state == DEAD )
 	    return;
 
+	INT_lock;	// 12-21-2022
 	if ( tp->state == ZOMBIE ) {
 	    tp->state = DEAD;
 	    cleanup_thread ( tp );
+	    INT_unlock;	// 12-21-2022
 	    return;
 	}
 
 	tp->join = cur_thread;
+	INT_unlock;	// 12-21-2022
+
 	thr_block ( JOIN );
 }
 
