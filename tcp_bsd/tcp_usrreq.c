@@ -482,16 +482,19 @@ tcp_usrreq ( struct socket *so, int req, struct mbuf *m, struct mbuf *nam, struc
 			if (error)
 				break;
 		}
+
 		// bpf2 ( "Tconnect 1\n" );
 		error = in_pcbconnect(inp, nam);
 		if (error)
 			break;
+
 		// bpf2 ( "Tconnect 2\n" );
 		tp->t_template = tcp_template(tp);
 		if (tp->t_template == 0) {
 			in_pcbdisconnect(inp);
 			error = ENOBUFS;
 			break;
+
 		}
 		// bpf2 ( "Tconnect 3\n" );
 
@@ -760,8 +763,7 @@ tcp_ctloutput(op, so, level, optname, mp)
  * bufer space, and entering LISTEN state if to accept connections.
  */
 int
-tcp_attach(so)
-	struct socket *so;
+tcp_attach ( struct socket *so )
 {
 	register struct tcpcb *tp;
 	struct inpcb *inp;
@@ -770,6 +772,7 @@ tcp_attach(so)
 	// bpf3 ( "tcp_attach 0\n" );
 
 	sb_init ( so );
+	// printf ( "tcp_attach == sb_init done, so = %08x\n", so );
 
 #ifdef notdef
 	if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
@@ -789,13 +792,17 @@ tcp_attach(so)
 
 	inp = sotoinpcb(so);
 	tp = tcp_newtcpcb(inp);
+
 	if (tp == 0) {
 		// bpf3 ( "tcp_attach 2e\n" );
-		int nofd = so->so_state & SS_NOFDREF;	/* XXX */
+
+		// I got rid of this.  Will I regret it?  12-2022
+		// int nofd = so->so_state & SS_NOFDREF;	/* XXX */
 
 		so->so_state &= ~SS_NOFDREF;	/* don't free the socket yet */
 		in_pcbdetach(inp);
-		so->so_state |= nofd;
+		// so->so_state |= nofd;
+		so->so_state |= SS_NOFDREF;
 		return (ENOBUFS);
 	}
 	// bpf3 ( "tcp_attach 3\n" );

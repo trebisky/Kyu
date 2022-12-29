@@ -1194,6 +1194,12 @@ thr_unblock ( struct thread *tp )
 	if ( ! tp )
 	    panic ( "Yikes!  null tp in thr_unblock" );
 
+	// adding this leads to endless panics that say
+	// PANIC: do_irq, resume
+	// (something returns that never should)
+	//
+	// INT_lock;	// added 12-22-2022
+
 	/* This would mean we ran over our tail in
 	 * some time delay loop or something of the
 	 * sort.  If the thread is ready we don't
@@ -1201,8 +1207,10 @@ thr_unblock ( struct thread *tp )
 	 * not panic.  Note that this often gets
 	 * called from interrupt code.
 	 */
-	if ( tp->state == READY )
+	if ( tp->state == READY ) {
+	    // INT_unlock;	// added 12-22-2-22
 	    return;
+	}
 
 	/* Added 8-12-2016 so we can be tidy when unblocking
 	 * a thread waiting for a timer.   To be honest, this
@@ -1269,6 +1277,8 @@ thr_unblock ( struct thread *tp )
 	    if ( tp->pri < cur_thread->pri )
 		change_thread ( tp, 0 );
 	}
+
+	// INT_unlock;	// Added 12-22-2022
 
 #ifdef OLDWAY
 	if ( tp->pri < cur_thread->pri ) {

@@ -127,7 +127,9 @@ socket_show_one ( struct socket *sp, int active )
 		    printf ( " ACTIVE" );
 		else
 		    printf ( " -inactive-" );
-		printf ( " pcb = %08x, %04x", sp->so_pcb, sp->so_state );
+
+		printf ( " pcb = %08x, state = %04x", sp->so_pcb, sp->so_state );
+
 		if ( sp->so_state & SS_NOFDREF )
 		    printf ( " NOFDREF" );
 		if ( sp->so_state & SS_ISCONNECTED )
@@ -263,6 +265,9 @@ k_sock_free ( void *m )
 	ts[S_SOCK].alloc--;
 	// printf ( "k_sock_free %08x\n", m );
 	sock_active ( m, 0 );
+
+	// ((struct socket *) m)->so_state &= ~SS_ACTIVE;
+        bzero (m, sizeof(struct socket) );
 }
 
 /* -- */

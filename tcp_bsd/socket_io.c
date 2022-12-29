@@ -1143,7 +1143,8 @@ sonewconn ( struct socket *head, int connstatus )
         int soqueue = connstatus ? 1 : 0;
 	int error;
 
-	bpf3 ( "sonewconn - %08x %d\n", head, connstatus );
+	// bpf3 ( "sonewconn - %08x %d\n", head, connstatus );
+	// printf ( "sonewconn- 0\n" );
 
         if (head->so_qlen + head->so_q0len > 3 * head->so_qlimit / 2)
                 return ((struct socket *)0);
@@ -1168,11 +1169,15 @@ sonewconn ( struct socket *head, int connstatus )
         so->so_timeo = head->so_timeo;
         so->so_pgid = head->so_pgid;
 
+	so->so_state |= SS_ACTIVE;	/* Kyu */
+
 	// This call is/was weird, it passes sb_hiwat, yet soreserve sets it.
 	// Kyu: I just did away with this weirdness.
         // (void) soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat);
 	// XXX in fact, this gets called in the ATTACH, so why do this here?
         // sb_init ( so );
+
+	// printf ( "sonewconn- 1\n" );
 
         soqinsque(head, so, soqueue);
 
@@ -1181,6 +1186,8 @@ sonewconn ( struct socket *head, int connstatus )
         // error = tcp_usrreq (so, PRU_ATTACH,
         //         (struct mbuf *)0, (struct mbuf *)0, (struct mbuf *)0);
         error = proto_attach (so );
+
+	// printf ( "sonewconn- 2\n" );
 
 	if ( error ) {
                 (void) soqremque(so, soqueue);
@@ -1264,6 +1271,10 @@ sorflush ( struct socket *so )
         // int s;
         struct sockbuf asb;
 
+	// printf ( " in sorflush (%08x, %08x, %08x): ", so, sb, sb->sb_lock );
+	// socket_show ( so );
+	// unroll_cur_short ();
+
         sb->sb_flags |= SB_NOINTR;
 
         (void) sb_lock(sb, M_WAITOK);
@@ -1292,6 +1303,12 @@ sofree ( struct socket *so )
 	// printf ( "sofree called: %08x\n", so );
 	// printf ( " thread = %08x\n", cur_thread );
 	// unroll_cur ();
+
+	if ( ! (so->so_state & SS_ACTIVE) ) {
+	    printf ( "sofree called in inactive socket: %08x\n", so );
+	    socket_show ( so );
+	    bsd_panic ( "sofree - inactive" );
+	}
 
         if (so->so_pcb || (so->so_state & SS_NOFDREF) == 0)
                 return;
@@ -1733,6 +1750,8 @@ socreate ( struct socket *so, int dom, int type, int proto)
         // MALLOC(so, struct socket *, sizeof(*so), M_SOCKET, M_WAIT);
         bzero ( (caddr_t)so, sizeof(struct socket) );
 
+	so->so_state |= SS_ACTIVE;	/* Kyu */
+
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
 	if ( ! so->kyu_sem ) {
 	    bsd_panic ( "socreate - semaphores all gone" );
@@ -1847,5 +1866,279 @@ ip_stripoptions ( struct mbuf *m )
                 m->m_pkthdr.len -= olen;
         ip->ip_hl = sizeof(struct ip) >> 2;
 }
+
+/* OK, let's rework accept.
+ * It was one of the first things I coded up and I should have just
+ * verbatim adoped the BSD code like I am doing right here.
+ * 12-28-2022
+ * from: kern/uipc_socket.c (soaccept())
+ * from: kern/uipc_syscalls.c (accept1())
+ */
+
+/* This is a wrapper around a wrapper, the main business being
+ * to get the peer name.  But!! Do not overlook what it
+ * does with SS_NOFDREF.
+ */
+static int
+soaccept ( struct socket *so, struct mbuf *nam )
+{
+        // int s = splnet();
+        int error;
+
+        if ((so->so_state & SS_NOFDREF) == 0)
+	    panic("soaccept: !NOFDREF");
+        so->so_state &= ~SS_NOFDREF;
+
+	// proto_accept ( so, nam );
+        // error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT,
+        //    (struct mbuf *)0, nam, (struct mbuf *)0);
+
+        // splx(s);
+        return (error);
+}
+
+// accept_kyu (p, uap, retval)
+struct socket *
+accept_kyu ( struct socket *so )
+        // struct proc *p;
+        // struct accept_args *uap;
+        // int *retval;
+{
+        // struct file *fp;
+        // struct mbuf *nam;
+        // int namelen;
+	int error;
+	// int s;
+        // struct socket *so;
+        struct socket *rso;
+
+        // if (uap->name && (error = copyin((caddr_t)uap->anamelen,
+        //     (caddr_t)&namelen, sizeof (namelen))))
+        //         return (error);
+
+        // if (error = getsock(p->p_fd, uap->s, &fp))
+        //         return (error);
+
+        // s = splnet();
+
+        // so = (struct socket *)fp->f_data;
+
+        if ((so->so_options & SO_ACCEPTCONN) == 0) {
+                // splx(s);
+                // return (EINVAL);
+		return NULL;
+        }
+
+        if ((so->so_state & SS_NBIO) && so->so_qlen == 0) {
+                // splx(s);
+                // return (EWOULDBLOCK);
+		return NULL;
+        }
+
+        while ( so->so_qlen == 0 && so->so_error == 0 ) {
+                if (so->so_state & SS_CANTRCVMORE) {
+                        so->so_error = ECONNABORTED;
+                        break;
+                }
+#ifdef BIG_LOCKS
+		user_waiting ();
+                // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
+                //         splx(s);
+                //         return (error);
+		// }
+		// bpf2 ( "block in accept: %08x\n", so->kyu_sem );
+		sem_block ( so->kyu_sem );
+		user_lock ();
+#else
+		sem_block ( so->kyu_sem );
+#endif
+        }
+
+        if (so->so_error) {
+                error = so->so_error;
+                so->so_error = 0;
+                // splx(s);
+                // return (error);
+		return NULL;
+        }
+
+        // if (error = falloc(p, &fp, retval)) {
+        //         splx(s);
+        //         return (error);
+        // }
+
+	/* Pull a socket off the queue */
+        rso = so->so_q;
+
+        if (soqremque(rso, 1) == 0)
+                panic("accept");
+        // so = rso;
+
+        // fp->f_type = DTYPE_SOCKET;
+        // fp->f_flag = FREAD|FWRITE;
+        // fp->f_ops = &socketops;
+        // fp->f_data = (caddr_t)so;
+
+	/* For Kyu, we skip the business of the peer name here.
+	 */
+        (void) soaccept ( rso, NULL );
+
+#ifdef get_the_peer
+        nam = m_get(M_WAIT, MT_SONAME);
+        (void) soaccept(so, nam);
+        if (uap->name) {
+                if (namelen > nam->m_len)
+                        namelen = nam->m_len;
+                /* SHOULD COPY OUT A CHAIN HERE */
+                if ((error = copyout(mtod(nam, caddr_t), (caddr_t)uap->name,
+                    (u_int)namelen)) == 0)
+                        error = copyout((caddr_t)&namelen,
+                            (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
+        }
+        m_freem(nam);
+#endif
+        // splx(s);
+        // return (error);
+	return rso;
+}
+
+
+#ifdef notdef
+/* This is more or less the original BSD code */
+int
+accept1(p, uap, retval)
+        struct proc *p;
+        struct accept_args *uap;
+        int *retval;
+{
+        struct file *fp;
+        struct mbuf *nam;
+        int namelen, error, s;
+        struct socket *so;
+
+        if (uap->name && (error = copyin((caddr_t)uap->anamelen,
+            (caddr_t)&namelen, sizeof (namelen))))
+                return (error);
+        if (error = getsock(p->p_fd, uap->s, &fp))
+                return (error);
+
+        // s = splnet();
+        so = (struct socket *)fp->f_data;
+        if ((so->so_options & SO_ACCEPTCONN) == 0) {
+                splx(s);
+                return (EINVAL);
+        }
+        if ((so->so_state & SS_NBIO) && so->so_qlen == 0) {
+                splx(s);
+                return (EWOULDBLOCK);
+        }
+        while (so->so_qlen == 0 && so->so_error == 0) {
+                if (so->so_state & SS_CANTRCVMORE) {
+                        so->so_error = ECONNABORTED;
+                        break;
+                }
+                if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH,
+                    netcon, 0)) {
+                        splx(s);
+                        return (error);
+                }
+        }
+        if (so->so_error) {
+                error = so->so_error;
+                so->so_error = 0;
+                splx(s);
+                return (error);
+        }
+        if (error = falloc(p, &fp, retval)) {
+                splx(s);
+                return (error);
+        }
+        { struct socket *aso = so->so_q;
+          if (soqremque(aso, 1) == 0)
+                panic("accept");
+          so = aso;
+        }
+        fp->f_type = DTYPE_SOCKET;
+        fp->f_flag = FREAD|FWRITE;
+        fp->f_ops = &socketops;
+        fp->f_data = (caddr_t)so;
+
+	/* For Kyu, we skip the business of the peer name here.
+	 */
+        (void) soaccept ( so, NULL );
+
+#ifdef get_the_peer
+        nam = m_get(M_WAIT, MT_SONAME);
+        (void) soaccept(so, nam);
+        if (uap->name) {
+                if (namelen > nam->m_len)
+                        namelen = nam->m_len;
+                /* SHOULD COPY OUT A CHAIN HERE */
+                if ((error = copyout(mtod(nam, caddr_t), (caddr_t)uap->name,
+                    (u_int)namelen)) == 0)
+                        error = copyout((caddr_t)&namelen,
+                            (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
+        }
+        m_freem(nam);
+#endif
+        // splx(s);
+        return (error);
+}
+
+/* We do an abbreviated form of the accept call.
+ * We don't need to translate fd to sock and vice versa
+ * We also don't need to fuss around copying address
+ * information from kernel to user space.
+ */
+static struct socket *
+tcp_accept_int ( struct socket *so )
+{
+	struct socket *rso;
+
+        if ((so->so_options & SO_ACCEPTCONN) == 0) {
+		printf ( "socket not ready to accept\n" );
+                // return (EINVAL);
+                return NULL;
+        }
+
+        while (so->so_qlen == 0 && so->so_error == 0) {
+                if (so->so_state & SS_CANTRCVMORE) {
+                        so->so_error = ECONNABORTED;
+                        break;
+                }
+#ifdef BIG_LOCKS
+		user_waiting ();
+                // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
+		// bpf2 ( "block in accept: %08x\n", so->kyu_sem );
+		sem_block ( so->kyu_sem );
+		user_lock ();
+#else
+		sem_block ( so->kyu_sem );
+#endif
+        }
+
+        if (so->so_error) {
+                // error = so->so_error;
+                so->so_error = 0;
+                // return (error);
+                return NULL;
+        }
+
+	/* Pull the socket we are accepting off the queue.
+	 */
+        rso = so->so_q;
+        if ( soqremque(rso, 1) == 0)
+                bsd_panic("accept");
+
+	// if we wanted the peer name, this call
+	// would get it for us, albeit into an mbuf.
+
+	// this is what PRU_ACCEPT would do ...
+	// inp = sotoinpcb(rso);
+	// in_setpeeraddr(inp, nam);
+
+	return rso;
+}
+#endif
 
 /* THE END */

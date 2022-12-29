@@ -359,6 +359,7 @@ tcpcb_close ( struct tcpcb *tp )
 		}
 	}
 #endif /* RTV_RTT */
+
 	/* free the reassembly queue, if any */
 	t = tp->seg_next;
 	while (t != (struct tcpiphdr *)tp) {
@@ -368,10 +369,12 @@ tcpcb_close ( struct tcpcb *tp )
 		// m_freem(m);
 		mb_freem(m);
 	}
+
 #ifndef KYU
 	if (tp->t_template)
 		(void) mb_free(dtom(tp->t_template));
 #endif
+
 	// free(tp, M_PCB);
 	k_tcpcb_free ( tp );
 
@@ -381,6 +384,7 @@ tcpcb_close ( struct tcpcb *tp )
 	/* clobber input pcb cache if we're closing the cached connection */
 	if (inp == tcp_last_inpcb)
 		tcp_last_inpcb = &tcb;
+
 	in_pcbdetach(inp);
 
 	tcpstat.tcps_closed++;

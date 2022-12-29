@@ -13,11 +13,15 @@ struct socket * tcp_bind ( int );
 struct socket * tcp_accept ( struct socket * );
 static int kyu_soconnect ( struct socket *, struct mbuf * );
 
+struct socket * accept_kyu ( struct socket * );
+
 void
 tcp_close ( struct socket *so )
 {
 	if ( ! so )
 	    return;
+
+	// printf ( "tcp_close: %08x\n", so );
 
 	user_lock();
 	(void) soclose ( so );	/* in socket_io.c */
@@ -258,61 +262,6 @@ tcp_bind ( int port )
 	return rv;
 }
 
-/* We do an abbreviated form of the accept call.
- * We don't need to translate fd to sock and vice versa
- * We also don't need to fuss around copying address
- * information from kernel to user space.
- */
-static struct socket *
-tcp_accept_int ( struct socket *so )
-{
-	struct socket *rso;
-
-        if ((so->so_options & SO_ACCEPTCONN) == 0) {
-		printf ( "socket not ready to accept\n" );
-                // return (EINVAL);
-                return NULL;
-        }
-
-        while (so->so_qlen == 0 && so->so_error == 0) {
-                if (so->so_state & SS_CANTRCVMORE) {
-                        so->so_error = ECONNABORTED;
-                        break;
-                }
-#ifdef BIG_LOCKS
-		user_waiting ();
-                // if (error = tsleep((caddr_t)&so->so_timeo, PSOCK | PCATCH, netcon, 0)) {
-		// bpf2 ( "block in accept: %08x\n", so->kyu_sem );
-		sem_block ( so->kyu_sem );
-		user_lock ();
-#else
-		sem_block ( so->kyu_sem );
-#endif
-        }
-
-        if (so->so_error) {
-                // error = so->so_error;
-                so->so_error = 0;
-                // return (error);
-                return NULL;
-        }
-
-	/* Pull the socket we are accepting off the queue.
-	 */
-        rso = so->so_q;
-        if ( soqremque(rso, 1) == 0)
-                bsd_panic("accept");
-
-	// if we wanted the peer name, this call
-	// would get it for us, albeit into an mbuf.
-
-	// this is what PRU_ACCEPT would do ...
-	// inp = sotoinpcb(rso);
-	// in_setpeeraddr(inp, nam);
-
-	return rso;
-}
-
 struct socket *
 tcp_accept ( struct socket *so )
 {
@@ -322,7 +271,7 @@ tcp_accept ( struct socket *so )
 	    return NULL;
 
 	user_lock ();
-	rv = tcp_accept_int ( so );
+	rv = accept_kyu ( so );
 	user_unlock ();
 
 	return rv;
