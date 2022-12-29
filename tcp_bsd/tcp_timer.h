@@ -83,7 +83,15 @@
 /*
  * Time constants.
  */
-#define	TCPTV_MSL	( 30*PR_SLOWHZ)		/* max seg lifetime (hah!) */
+
+/* For Kyu we shorten this quite a lot.
+ * The value is doubled and loaded into the timer,
+ * giving a 60 second TIME_WAIT.
+ * We go for 8 seconds total.  12-28-2022
+ */
+// #define	TCPTV_MSL	( 30*PR_SLOWHZ)		/* max seg lifetime (hah!) */
+#define	TCPTV_MSL	( 4*PR_SLOWHZ)		/* Kyu max seg lifetime */
+
 #define	TCPTV_SRTTBASE	0			/* base roundtrip time;
 						   if 0, no idea yet */
 #define	TCPTV_SRTTDFLT	(  3*PR_SLOWHZ)		/* assumed RTT if no info */
@@ -91,6 +99,9 @@
 #define	TCPTV_PERSMIN	(  5*PR_SLOWHZ)		/* retransmit persistance */
 #define	TCPTV_PERSMAX	( 60*PR_SLOWHZ)		/* maximum persist interval */
 
+/* These timeouts are really long, but I am not messing
+ *  with them for Kyu for now.  Look at code in tcp_timer.c
+ */
 #define	TCPTV_KEEP_INIT	( 75*PR_SLOWHZ)		/* initial connect keep alive */
 #define	TCPTV_KEEP_IDLE	(120*60*PR_SLOWHZ)	/* dflt time before probing */
 #define	TCPTV_KEEPINTVL	( 75*PR_SLOWHZ)		/* default probe interval */

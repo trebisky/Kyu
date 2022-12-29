@@ -82,10 +82,11 @@ tcp_slowtimo ( void )
 	// int s = splnet();
 	long i;
 
-	net_lock ();
 	// printf ( "SLOW\n" );
 
 	tcp_maxidle = TCPTV_KEEPCNT * tcp_keepintvl;
+
+	net_lock ();
 	/*
 	 * Search through tcb's and update active timers.
 	 */

@@ -132,7 +132,7 @@ struct socket {
 #define	SS_ASYNC		0x200	/* async i/o notify */
 #define	SS_ISCONFIRMING		0x400	/* deciding to accept connection req */
 
-#define SS_ACTIVE		0x8000	/* Kyu adds for sanity check */
+#define SS_ACTIVE		0x4000	/* Kyu adds for sanity check */
 
 
 /*

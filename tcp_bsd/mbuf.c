@@ -128,7 +128,7 @@ socket_show_one ( struct socket *sp, int active )
 		else
 		    printf ( " -inactive-" );
 
-		printf ( " pcb = %08x, state = %04x", sp->so_pcb, sp->so_state );
+		printf ( " pcb = %08x, state = %04x", sp->so_pcb, sp->so_state & 0xffff );
 
 		if ( sp->so_state & SS_NOFDREF )
 		    printf ( " NOFDREF" );
