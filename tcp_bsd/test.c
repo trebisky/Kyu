@@ -13,6 +13,9 @@
 
 #include <stdarg.h>
 
+/* Here for debugging */
+extern struct thread *cur_thread;
+
 void tcb_show ( void );
 
 struct socket * tcp_bind ( int );
@@ -27,6 +30,7 @@ void bsd_test_doney ( long );
 void bsd_test_connect ( long );
 void bsd_test_lots ( long );
 void bsd_test_pig ( long );
+void bsd_test_info ( long );
 void bsd_test_debug ( long );
 
 /* XXX - stolen from tcp_xinu, needs rework */
@@ -41,13 +45,14 @@ struct test tcp_test_list[] = {
         bsd_test_doney,         "Start doney server",                   0,
 	bsd_test_connect,	"Connect (client) test",		0,
 	bsd_test_lots,		"Connect (client) with lots",		0,
-	bsd_test_pig,		"CPU pig",				0,
+	bsd_test_info,		"Show WANG info",			0,
 	bsd_test_debug,		"Set debug 0",				0,
 	bsd_test_debug,		"Set debug 1",				1,
+#ifdef notdef
+	bsd_test_pig,		"CPU pig",				0,
 	bsd_test_debug,		"Set debug 2",				2,
 	bsd_test_debug,		"Set debug 3",				3,
 	bsd_test_debug,		"Set debug 4",				4,
-#ifdef notdef
         xtest_client_echo,      "Echo client [n]",                      0,
         xtest_client_echo2,     "Echo client (single connection) [n]",  0,
         xtest_client_daytime,   "Daytime client [n]",                   0,
@@ -74,18 +79,40 @@ bsd_test_show ( long xxx )
 	tcp_statistics ();
 }
 
+#ifdef notdef
+/* From tcp_fsm.h */
+#define	TCPS_CLOSED		0	/* closed */
+#define	TCPS_LISTEN		1	/* listening for connection */
+#define	TCPS_SYN_SENT		2	/* active, have sent syn */
+#define	TCPS_SYN_RECEIVED	3	/* have send and received syn */
+/* states < TCPS_ESTABLISHED are those where connections not established */
+#define	TCPS_ESTABLISHED	4	/* established */
+#define	TCPS_CLOSE_WAIT		5	/* rcvd fin, waiting for close */
+/* states > TCPS_CLOSE_WAIT are those where user has closed */
+#define	TCPS_FIN_WAIT_1		6	/* have closed, sent fin */
+#define	TCPS_CLOSING		7	/* closed xchd FIN; await FIN ACK */
+#define	TCPS_LAST_ACK		8	/* had fin and close; await FIN ACK */
+/* states > TCPS_CLOSE_WAIT && < TCPS_FIN_WAIT_2 await ACK of FIN */
+#define	TCPS_FIN_WAIT_2		9	/* have closed, fin is acked */
+#define	TCPS_TIME_WAIT		10	/* in 2*msl quiet wait after close */
+#endif
+
 static char *
 tcb_state ( int val )
 {
 	static char buf[24];
 
 	switch ( val ) {
-	    case 0:
+	    case TCPS_CLOSED:
 		return "Closed";
-	    case 1:
+	    case TCPS_LISTEN:
 		return "Listen";
-	    case 4:
-		return "Establ";
+	    case TCPS_ESTABLISHED:
+		return "Establshed";
+	    case TCPS_CLOSE_WAIT:
+		return "Close-Wait";
+	    case TCPS_TIME_WAIT:
+		return "Time-Wait";
 	    default:
 		(void) sprintf ( buf, "%d", val );
 		return buf;
@@ -109,7 +136,7 @@ tcb_show ( void )
             inp = inp->inp_next;
 	    tp = (struct tcpcb *) inp->inp_ppcb;
 	    tstate = tcb_state ( tp->t_state );
-            printf ( "INPCB: %08x %10s -- local, foreign: ", inp, tstate );
+            printf ( "INPCB: %08x %15s -- local, foreign: ", inp, tstate );
 	    printf ( "%s %d .. ", ip2str32(inp->inp_laddr.s_addr), ntohs(inp->inp_lport) );
 	    printf ( "%s %d\n", ip2str32(inp->inp_faddr.s_addr), ntohs(inp->inp_fport) );
         }
@@ -262,6 +289,33 @@ bsd_test_doney ( long xxx )
 
 #define WANGDOODLE_PORT	114
 
+static int wang_state = 0;
+static int wang_count = 0;
+static int wang_dog_count = 0;
+static struct thread *wang_thread;
+static int wang_unblock_count = 0;
+static int wang_on = 0;
+static int wang_blocked = 7;
+
+static int wang_first = 1;
+
+static void
+wang_show ( void )
+{
+	printf ( "Wang state, count = %d, %d\n", wang_state, wang_count );
+	printf ( "Wang dog count = %d\n", wang_dog_count );
+	printf ( "Wang unblock count = %d\n", wang_unblock_count );
+	printf ( "Wang blocked = %d\n", wang_blocked );
+
+	/* open the floodgates */
+	if ( wang_first ) {
+	    wang_on = 1;
+	    wang_first = 0;
+	} else {
+	    wang_on = 0;
+	}
+}
+
 /* A different idea.  Now I want to send recognizable data in each
  * 2000 byte packet.
  */
@@ -314,17 +368,25 @@ big_wangdoodle ( struct socket *so )
 	total = NUM_CHUNK * CHUNK;
 	// printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
 
+	wang_state = 11;
+	wang_count = 0;
 	load_buf ( wang_buf, "ST000", 1 );
+	wang_unblock_count = 0;
 	tcp_send ( so, wang_buf, CHUNK );
 
 	ix = 1;
 	for ( i=0; i<(NUM_CHUNK-2); i++ ) {
+	    wang_state = 12;
+	    wang_count++;
 	    load_buf ( wang_buf, "PK000", ix );
+	    wang_unblock_count = 0;
 	    tcp_send ( so, wang_buf, CHUNK );
 	    ix += 4;
 	}
 
+	wang_state = 13;
 	load_buf ( wang_buf, "EN000", 1 );
+	wang_unblock_count = 0;
 	tcp_send ( so, wang_buf, CHUNK );
 }
 
@@ -362,11 +424,30 @@ big_wangdoodle ( struct socket *so )
 }
 #endif
 
+/* Called from thr_unblock() */
+void
+wang_hook ( struct thread *old, struct thread *new )
+{
+	// if ( cur_thread != old )
+	//     return;
+	// wang_unblock_count++;
+	if ( wang_on )
+	    printf ( "Switch %s --> %s\n", old->name, new->name );
+}
+
+void
+wang_hook2 ( int is_blocked )
+{
+	wang_blocked = is_blocked;
+}
+
 /* Called for each line sent by user */
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
 {
 	// char resp[64];
+
+	wang_thread = cur_thread;
 
 	if ( cmd[0] == 'q' )
 	    return 1;
@@ -383,7 +464,9 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	else if ( strcmp ( cmd, "uni" ) == 0 )
 	    so_printf ( so, "U %d\n", gb_unif_rand(100) );
 	else if ( strcmp ( cmd, "big" ) == 0 ) {
+	    wang_state = 10;
 	    big_wangdoodle ( so );
+	    wang_state = 99;
 	    return 1 ;
 	}
 	else
@@ -400,6 +483,7 @@ run_wangdoodle ( struct socket *so )
 	int n;
 
 	// printf ( "start wangdoodle connection handler: so = %08x\n", so );
+	wang_state = 1;
 
 	for ( ;; ) {
 
@@ -432,7 +516,9 @@ run_wangdoodle ( struct socket *so )
 	    }
 	}
 
+	wang_state = 81;
 	tcp_close ( so );
+	wang_state = 89;
 	// printf ( "wangdoodle connection finished\n" );
 }
 
@@ -518,7 +604,23 @@ run_wangdoodle ( struct socket *so )
  * in a uart polling loop.
  */
 #define WANG_PRI	30
-#define WANG_PRI2	31
+#define WANG_DOG_PRI	32
+#define WANG_PRI2	35
+
+/* A different sort of watchdog 12-29-2022.
+ * This runs at a priority just above the connection thread
+ * to see if our thread is simply getting starved.
+ */
+void
+wang_dog_thread ( long xxx )
+{
+	wang_dog_count = 0;
+
+	for ( ;; ) {
+	    wang_dog_count++;
+	    thr_delay ( 500 );
+	}
+}
 
 void
 wangdoodle_thread ( long xxx )
@@ -526,6 +628,7 @@ wangdoodle_thread ( long xxx )
 	struct socket *so;
 	struct socket *cso;
 	int fip;
+	int ccount = 0;
 
 	printf ( "Wangdoodle server starting\n" );
 
@@ -540,6 +643,9 @@ wangdoodle_thread ( long xxx )
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
 	    fip = tcp_getpeer_ip ( cso );
+
+	    ++ccount;
+	    printf ( "Wangdoodle connection %d\n", ccount );
 
 	    // printf ( "wangdoodle server got a connection from: %s\n", ip2str32_h(fip) );
 	    // printf ( "wangdoodle socket: %08x\n", cso );
@@ -598,6 +704,8 @@ bsd_test_wangdoodle ( long xxx )
 {
 	// want_monitor1 ();
 	// want_monitor2 ();
+
+	// (void) safe_thr_new ( "wangdog", wang_dog_thread, (void *) 0, WANG_DOG_PRI, 0 );
 
 	(void) safe_thr_new ( "wangdoodle", wangdoodle_thread, (void *) 0, WANG_PRI, 0 );
 }
@@ -1023,6 +1131,7 @@ bsd_test_lots ( long xxx )
 	(void) safe_thr_new ( "tcp-lots", lots_thread, (void *) 0, 15, 0 );
 }
 
+#ifdef notdef
 static int pig_data[1024];
 
 static void
@@ -1050,6 +1159,14 @@ bsd_test_pig ( long xxx )
 	    pig1 ();
 	    pig2 ();
 	}
+}
+#endif
+
+/* display info about a possibly hung wangdoodle connection */
+void
+bsd_test_info ( long xxx )
+{
+	wang_show ();
 }
 
 /* ================================================================================ */

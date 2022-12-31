@@ -67,6 +67,14 @@ static enum console_mode first_console = INITIAL_CONSOLE;
 struct thread static_thread;
 struct thread *cur_thread = & static_thread;
 
+/* Introduced 12-29-2022 as an aid to debugging.
+ * the thread display always shows us the shell as
+ * the current thread, but it would be more interesting
+ * to see the thread that was running just prior to
+ * the shell preempting it.
+ */
+struct thread *prior_thread;
+
 static long in_interrupt;
 static struct thread *in_newtp;
 
@@ -253,6 +261,8 @@ thr_init ( void )
 	threads_running = 0;
 	in_newtp = (struct thread *) 0;
 	in_interrupt = 0;
+
+	prior_thread = cur_thread;
 
 	sem_init ();
 
@@ -499,7 +509,8 @@ thr_one ( struct thread *tp )
 	    return;
 	}
 
-	if ( tp == cur_thread )
+	// if ( tp == cur_thread )
+	if ( tp == prior_thread )
 	    printf ( "* " );
 	else
 	    printf ( "  " );
@@ -543,11 +554,15 @@ thr_show ( void )
 	for ( tp=thread_ready; tp; tp = tp->next )
 	    thr_one ( tp );
 
-	printf ( "  Thread  Cur : (%08x)", cur_thread);
+#ifdef notdef
+/* this yields no additional information and wastes a line on output */
+	// printf ( "  Thread  Cur : (%08x)", cur_thread);
+	printf ( "  Thread (prior) : (%08x)", prior_thread);
 	if ( in_interrupt )
 	    printf ( " (INT)\n" );
 	else
 	    printf ( "\n" );
+#endif
 }
 
 void
@@ -1656,6 +1671,8 @@ change_thread ( struct thread *new_tp, int options )
 	 * structure.
 	 */
 	INT_lock;
+	wang_hook ( cur_thread, new_tp );
+	prior_thread = cur_thread;	/* new 12-29-2022 */
 	cur_thread = new_tp;
 
 	/* We need to stay locked between deciding how to resume

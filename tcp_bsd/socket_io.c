@@ -861,9 +861,13 @@ restart:
 			sb_unlock(&so->so_snd);
 
 #ifdef BIG_LOCKS
+			printf ( "Send blocked\n" );
+			wang_hook2 ( 1 );
 			user_waiting ();
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 			user_lock ();
+			wang_hook2 ( 0 );
+			printf ( "Send unblocked\n" );
 #else
 			/* Moved here to allow tcp_input() to run while we wait */
 			net_unlock ();
