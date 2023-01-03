@@ -44,7 +44,8 @@ enum thread_state {
 	ZOMBIE,		/* 6 - waiting to be joined */
 	FAULT,		/* 7 - did something bad */
 	REPEAT,		/* 8 - blocked on repeat event */
-	DEAD		/* 9 - on free list */
+	KILLED,		/* 9 - killed by shell command */
+	DEAD		/* 10 - on free list (we hope) */
 };
 
 struct thread *thr_new ( char *, tfptr, void *, int, int );

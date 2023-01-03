@@ -26,6 +26,10 @@
 #ifndef __KYU_NET_H__
 #define __KYU_NET_H__
 
+#define	PRI_NET		20
+#define	PRI_SLOW	21
+#define	PRI_HW_INIT	22
+
 #define DEBUG_TCP
 
 #define ETH_ARP		0x0806

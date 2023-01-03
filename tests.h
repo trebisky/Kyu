@@ -20,7 +20,7 @@ struct test {
 };
 
 #define PRI_DEBUG	5
-#define PRI_TEST	10
-#define PRI_WRAP	20
+#define PRI_TEST	13	/* standard Kyu tests */
+#define PRI_WRAP	14	/* tests from menus */
 
 /* THE END */

@@ -301,6 +301,7 @@ shell_main ( long xx )
 
 	    /* kyu thread test submenu
 	     *  (regression tests)
+	     * 'k' is for Kyu
 	     */
 	    if ( **wp == 'k' )
 		submenu ( kyu_test_list, wp, nw );
@@ -356,6 +357,10 @@ shell_main ( long xx )
 	     */
 	    if ( **wp == 'u' && nw == 2 ) {
 	    	thr_show_name ( wp[1] );
+	    }
+
+	    if ( **wp == 'v' && nw == 2 ) {
+	    	thr_kill_name ( wp[1] );
 	    }
 
 	}

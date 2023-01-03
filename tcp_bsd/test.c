@@ -13,6 +13,21 @@
 
 #include <stdarg.h>
 
+#define PRI_TCP_TEST	30
+
+/* place these lower than the shell (which used to be at 50) to get some
+ * decent response from the shell while this is running a big test.
+ * Ha!  This does not work.  The shell is running at 40, but it spins
+ * in a uart polling loop.
+ * To make this debug work, we redid the uart driver to allow interrupt
+ * driven console input (otherwise the shell would hog the cpu polling
+ * the uart), and now run the shell at priority 11.
+ */
+#define WANG_PRI	31
+#define WANG_DOG_PRI	32
+#define WANG_PRI2	35
+
+
 /* Here for debugging */
 extern struct thread *cur_thread;
 
@@ -107,6 +122,10 @@ tcb_state ( int val )
 		return "Closed";
 	    case TCPS_LISTEN:
 		return "Listen";
+	    case TCPS_SYN_SENT:
+		return "SYN sent";
+	    case TCPS_SYN_RECEIVED:
+		return "SYN received";
 	    case TCPS_ESTABLISHED:
 		return "Establshed";
 	    case TCPS_CLOSE_WAIT:
@@ -274,14 +293,14 @@ doney_thread ( long xxx )
 
 	    printf ( "doney server got a connection from: %s\n", ip2str32_h(fip) );
 
-	    (void) safe_thr_new ( "doney_thr", (tfptr) run_doney, (void *) cso, 15, 0 );
+	    (void) safe_thr_new ( "doney_thr", (tfptr) run_doney, (void *) cso, PRI_TCP_TEST, 0 );
 	}
 }
 
 void
 bsd_test_doney ( long xxx )
 {
-	(void) safe_thr_new ( "doney", doney_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "doney", doney_thread, (void *) 0, PRI_TCP_TEST, 0 );
 }
 
 
@@ -289,16 +308,18 @@ bsd_test_doney ( long xxx )
 
 #define WANGDOODLE_PORT	114
 
+int wang_debug = 0;
+
 static int wang_state = 0;
 static int wang_count = 0;
 static int wang_dog_count = 0;
 static struct thread *wang_thread;
 static int wang_unblock_count = 0;
-static int wang_on = 0;
 static int wang_blocked = 7;
 
 static int wang_first = 1;
 
+/* Currently "t 9" does this */
 static void
 wang_show ( void )
 {
@@ -307,13 +328,21 @@ wang_show ( void )
 	printf ( "Wang unblock count = %d\n", wang_unblock_count );
 	printf ( "Wang blocked = %d\n", wang_blocked );
 
+	/* Toggle */
+	if ( wang_debug )
+	    wang_debug = 0;
+	else
+	    wang_debug = 1;
+
+#ifdef notdef
 	/* open the floodgates */
 	if ( wang_first ) {
-	    wang_on = 1;
+	    wang_debug = 1;
 	    wang_first = 0;
 	} else {
-	    wang_on = 0;
+	    wang_debug = 0;
 	}
+#endif
 }
 
 /* A different idea.  Now I want to send recognizable data in each
@@ -426,17 +455,25 @@ big_wangdoodle ( struct socket *so )
 
 /* Called from thr_unblock() */
 void
-wang_hook ( struct thread *old, struct thread *new )
+wang_hook1 ( struct thread *old, struct thread *new )
 {
 	// if ( cur_thread != old )
 	//     return;
 	// wang_unblock_count++;
-	if ( wang_on )
+	if ( wang_debug )
 	    printf ( "Switch %s --> %s\n", old->name, new->name );
 }
 
 void
-wang_hook2 ( int is_blocked )
+wang_hook2 ( struct thread *cur )
+{
+	if ( wang_debug ) {
+	    printf ( " running %s %d\n", cur->name, cur->mode );
+	}
+}
+
+void
+wang_hook3 ( int is_blocked )
 {
 	wang_blocked = is_blocked;
 }
@@ -598,15 +635,6 @@ run_wangdoodle ( struct socket *so )
 }
 #endif
 
-/* place these lower than the shell (which is at 50) to get some
- * decent response from the shell while this is running a big test.
- * Ha!  This does not work.  The shell is running at 40, but it spins
- * in a uart polling loop.
- */
-#define WANG_PRI	30
-#define WANG_DOG_PRI	32
-#define WANG_PRI2	35
-
 /* A different sort of watchdog 12-29-2022.
  * This runs at a priority just above the connection thread
  * to see if our thread is simply getting starved.
@@ -683,13 +711,13 @@ dog2_func ( void )
 }
 
 /* This starts a thread to give periodic announcements.
- * Kyu makes it run at priority 10, same as the net thread,
- * but this seems to work OK.
+ * I originally asked for priority 5, but Kyu bumps that to 10
+ * I now select 12, which is just below the shell.
  */
 static void
 want_monitor1 ( void )
 {
-	(void) thr_new_repeat ( "dog", dog_func, (void *) 0, 5, 0, 60000 );
+	(void) thr_new_repeat ( "dog", dog_func, (void *) 0, 12, 0, 60000 );
 }
 
 static void
@@ -769,7 +797,7 @@ echo_thread ( long xxx )
 void
 bsd_test_echo ( long xxx )
 {
-	(void) safe_thr_new ( "echo-server", echo_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "echo-server", echo_thread, (void *) 0, PRI_TCP_TEST, 0 );
 }
 
 /* ============================ */
@@ -820,7 +848,7 @@ blab_thread ( long xxx )
 void
 bsd_test_blab ( long xxx )
 {
-	(void) safe_thr_new ( "blab-server", blab_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "blab-server", blab_thread, (void *) 0, PRI_TCP_TEST, 0 );
 }
 
 /* ============================ */
@@ -885,7 +913,7 @@ bsd_test_server ( long xxx )
 	char buf[64];
 
 	sprintf ( buf, "tcp-%d", PIRATE_PORT );
-	(void) safe_thr_new ( buf, pirate_thread, (void *) PIRATE_PORT, 15, 0 );
+	(void) safe_thr_new ( buf, pirate_thread, (void *) PIRATE_PORT, PRI_TCP_TEST, 0 );
 }
 
 /* ============================ */
@@ -989,7 +1017,7 @@ client_thread ( long xxx )
 void
 bsd_test_connect ( long xxx )
 {
-	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "tcp-client", client_thread, (void *) 0, PRI_TCP_TEST, 0 );
 }
 
 /* ++++++++++++++++++++++++++++++++ */
@@ -1128,7 +1156,7 @@ lots_thread_1 ( long xxx )
 void
 bsd_test_lots ( long xxx )
 {
-	(void) safe_thr_new ( "tcp-lots", lots_thread, (void *) 0, 15, 0 );
+	(void) safe_thr_new ( "tcp-lots", lots_thread, (void *) 0, PRI_TCP_TEST, 0 );
 }
 
 #ifdef notdef

@@ -444,6 +444,26 @@ thr_one_all ( struct thread *tp, char *msg )
 	printf ( "\n" );
 }
 
+/* This is the 'v' command from test.c
+ * The first one with the given name will be killed.
+ * For careful use when debugging, no way to undo it.
+ */
+void
+thr_kill_name ( char *name )
+{
+	struct thread *tp;
+	int ok = 0;
+
+        for ( tp=thread_ready; tp; tp = tp->next ) {
+	    if ( strcmp ( tp->name, name ) == 0 ) {
+		tp->state = KILLED;
+		ok = 1;
+	    }
+	}
+	if ( ! ok )
+	    printf ( "Oops, no such thread\n" );
+}
+
 /* Shows -all- threads that match a given name */
 void
 thr_show_name ( char *name )
@@ -1671,9 +1691,10 @@ change_thread ( struct thread *new_tp, int options )
 	 * structure.
 	 */
 	INT_lock;
-	wang_hook ( cur_thread, new_tp );
+	wang_hook1 ( cur_thread, new_tp );
 	prior_thread = cur_thread;	/* new 12-29-2022 */
 	cur_thread = new_tp;
+	wang_hook2 ( cur_thread );
 
 	/* We need to stay locked between deciding how to resume
 	 * and actually doing so.  5-14-2015

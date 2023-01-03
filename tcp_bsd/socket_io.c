@@ -54,14 +54,21 @@ extern struct thread *cur_thread;
 static inline void
 so_rwakeup ( struct socket *so, char *msg )
 {
-	// printf ( "rwakeup: %s\n", msg );
+	// printf ( "R wakeup: %s\n", msg );
 	sbwakeup(&(so)->so_rcv);
 }
 
+/* Every time a connection closes we get 3 messages:
+ * W wakeup: disconnecting
+ * W wakeup: disconnecting
+ * W wakeup: disconnected
+ * The strncmp test avoids these.
+ */
 static inline void
 so_wwakeup ( struct socket *so, char *msg )
 {
-	// printf ( "wwakeup: %s\n", msg );
+	if ( strncmp ( msg, "disco", 5 ) != 0 )
+	    printf ( "W wakeup: %s\n", msg );
 	sbwakeup(&(so)->so_snd);
 }
 
@@ -862,11 +869,11 @@ restart:
 
 #ifdef BIG_LOCKS
 			printf ( "Send blocked\n" );
-			wang_hook2 ( 1 );
+			// wang_hook3 ( 1 );
 			user_waiting ();
 			error = sbwait(&so->so_snd);	/* We block here (this is sosend())  */
 			user_lock ();
-			wang_hook2 ( 0 );
+			// wang_hook3 ( 0 );
 			printf ( "Send unblocked\n" );
 #else
 			/* Moved here to allow tcp_input() to run while we wait */

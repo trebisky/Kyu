@@ -223,6 +223,9 @@ bsd_panic ( char *msg )
 	panic ( "BSD tcp" );
 }
 
+#define	PRI_TCP_MAIN	24
+#define	PRI_TCP_TIMER	25
+
 static void
 bsd_init ( void )
 {
@@ -245,8 +248,8 @@ bsd_init ( void )
 	    bsd_panic ( "TCP timer rate" );
 	}
 
-	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, 14, 0 );
-	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, 15, 0, 100 );
+	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, PRI_TCP_MAIN, 0 );
+	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, PRI_TCP_TIMER, 0, 100 );
 }
 
 /* These replace splnet, splimp, splx */
@@ -464,10 +467,13 @@ static struct sem *tcp_q_sem;
  */
 static struct sem *tcp_queue_lock_sem;
 
+extern int wang_debug;
+
 static void
 tcp_thread ( long xxx )
 {
 	struct netbuf *nbp;
+	int npk;
 
 	tcp_q_head = (struct netbuf *) 0;
 	tcp_q_tail = (struct netbuf *) 0;
@@ -504,13 +510,17 @@ tcp_thread ( long xxx )
             if ( nbp ) {
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
+		npk++;
                 continue;
             }
 
             /* Wait for another packet.
              */
 	    // bpf2 ( "TCP thread waiting\n" );
+	    if ( wang_debug )
+		printf ( "tcp-bsd - processed %d packets on this wakeup\n", npk );
             sem_block_cpu ( tcp_q_sem );
+	    npk = 0;
 	}
 
 }
