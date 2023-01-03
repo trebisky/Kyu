@@ -504,6 +504,12 @@ net_handle ( struct netbuf *nbp )
 	netbuf_free ( nbp );
 }
 
+int
+net_get_inq_count ( void )
+{
+	return inq_count;
+}
+
 void
 net_show ( void )
 {

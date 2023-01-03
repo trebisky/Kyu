@@ -92,6 +92,9 @@ bsd_test_show ( long xxx )
 	tcb_show ();
 	locker_show ();
 	tcp_statistics ();
+	printf ( "Kyu input queue size: %d\n", net_get_inq_count() );
+	printf ( "TCP input queue size: %d\n", tcp_get_inq_count() );
+	printf ( "Clock: %d\n", get_timer_count_s () );
 }
 
 #ifdef notdef
@@ -512,6 +515,8 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	return 0;
 }
 
+static int wang_ccount = 0;
+
 /* Called to handle each connection */
 static void
 run_wangdoodle ( struct socket *so )
@@ -521,6 +526,10 @@ run_wangdoodle ( struct socket *so )
 
 	// printf ( "start wangdoodle connection handler: so = %08x\n", so );
 	wang_state = 1;
+
+	++wang_ccount;
+	printf ( "Wangdoodle connection %d ..", wang_ccount );
+
 
 	for ( ;; ) {
 
@@ -556,6 +565,8 @@ run_wangdoodle ( struct socket *so )
 	wang_state = 81;
 	tcp_close ( so );
 	wang_state = 89;
+	printf ( " finished (%d)\n", wang_ccount );
+
 	// printf ( "wangdoodle connection finished\n" );
 }
 
@@ -656,7 +667,6 @@ wangdoodle_thread ( long xxx )
 	struct socket *so;
 	struct socket *cso;
 	int fip;
-	int ccount = 0;
 
 	printf ( "Wangdoodle server starting\n" );
 
@@ -671,9 +681,6 @@ wangdoodle_thread ( long xxx )
 	for ( ;; ) {
 	    cso = tcp_accept ( so );
 	    fip = tcp_getpeer_ip ( cso );
-
-	    ++ccount;
-	    printf ( "Wangdoodle connection %d\n", ccount );
 
 	    // printf ( "wangdoodle server got a connection from: %s\n", ip2str32_h(fip) );
 	    // printf ( "wangdoodle socket: %08x\n", cso );

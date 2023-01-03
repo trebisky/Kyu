@@ -469,6 +469,14 @@ static struct sem *tcp_queue_lock_sem;
 
 extern int wang_debug;
 
+static int tcp_inq_count = 0;
+
+int
+tcp_get_inq_count ( void )
+{
+	return tcp_inq_count;
+}
+
 static void
 tcp_thread ( long xxx )
 {
@@ -508,6 +516,7 @@ tcp_thread ( long xxx )
 	    sem_unblock ( tcp_queue_lock_sem );
 
             if ( nbp ) {
+		tcp_inq_count--;
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
 		npk++;
@@ -544,6 +553,7 @@ tcp_bsd_rcv ( struct netbuf *nbp )
             tcp_q_tail = nbp;
             tcp_q_head = nbp;
         }
+	tcp_inq_count++;
 	    // printf ( " --- LIST++2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
 	sem_unblock ( tcp_queue_lock_sem );
 

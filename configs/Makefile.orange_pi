@@ -80,7 +80,7 @@ term:
 
 .PHONY:	tags
 tags:
-	ctags -R
+	ctags --exclude=OLD -R
 
 machine.o:	bogus
 	cd arm ; make

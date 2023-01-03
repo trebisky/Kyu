@@ -293,6 +293,7 @@ sbwakeup ( struct sockbuf *sb )
 
 /*
  * Wait for data to arrive at/drain from a socket buffer.
+ *   the wakeup is the routine just above.
  */
 int
 sbwait ( struct sockbuf *sb )
