@@ -482,7 +482,7 @@ static void
 tcp_thread ( long xxx )
 {
 	struct netbuf *nbp;
-	int npk;
+	// int npk;
 
 	tcp_q_head = (struct netbuf *) 0;
 	tcp_q_tail = (struct netbuf *) 0;
@@ -527,20 +527,20 @@ tcp_thread ( long xxx )
 		tcp_inq_count--;
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
-		npk++;
+		// npk++;
                 continue;
             }
 
             /* Wait for another packet.
              */
 	    // bpf2 ( "TCP thread waiting\n" );
-	    if ( wang_debug )
-		printf ( "tcp-input - processed %d packets on this wakeup\n", npk );
+	    // if ( wang_debug )
+	    // 	printf ( "tcp-input - processed %d packets on this wakeup\n", npk );
 
             // sem_block_cpu ( tcp_q_sem );
 	    cv_wait ( tcp_queue_cv );
 
-	    npk = 0;
+	    // npk = 0;
 	}
 
 }
@@ -657,7 +657,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         struct ip_hdr *ipp;
 	struct mbuf *mp;
         int len;
-        int size = 0;
+        int size;
 	char *buf;
 
 #ifdef notdef
@@ -679,12 +679,22 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 
 	// printf ( "IP output 1\n" );
 	buf = (char *) nbp->iptr;
+	size = 0;
+
 	for (mp = A; mp; mp = mp->m_next) {
                 len = mp->m_len;
                 if (len == 0)
                         continue;
+		
+		if ( ! valid_ram_address ( buf ) ) {
+		    printf ( "ip_output, buf = %08x\n", buf );
+		    netbuf_show ();
+		    panic ( "ip_output = bad netbuf addr\n" );
+		}
+
                 // bcopy ( mtod(mp, char *), buf, len );
                 memcpy ( buf, mtod(mp, char *), len );
+
                 buf += len;
                 size += len;
         }

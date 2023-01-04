@@ -43,11 +43,13 @@ static void slow_net ( long );
 // static void fast_net ( void );
 
 static void net_thread ( long );
+static void output_thread ( long );
 static void netbuf_init ( void );
 void netbuf_show ( void );
 void net_show ( void );
 static void net_handle ( struct netbuf * );
 void net_addr_get ( char * );
+void net_show_packet ( char *, struct netbuf * );
 
 static void init_ephem_port ( void );
 
@@ -64,16 +66,19 @@ static int net_state;
 
 struct host_info host_info;
 
-/* queue of IP packets
+/* queue of incoming packets
  */
+static struct sem *inq_sem;
 static struct netbuf *inq_head;
 static struct netbuf *inq_tail;
 static int inq_count;
 
-static struct sem *inq_sem;
-/*
+/* queue of outgoint packets
+ */
 static struct sem *outq_sem;
-*/
+static struct netbuf *outq_head;
+static struct netbuf *outq_tail;
+static int outq_count;
 
 static int system_clock_rate;
 
@@ -217,30 +222,27 @@ net_init ( void )
     inq_tail = (struct netbuf *) 0;
     inq_count = 0;
 
-    /*
-    inq_sem = cpu_new ();
-    */
+    outq_head = (struct netbuf *) 0;
+    outq_tail = (struct netbuf *) 0;
+    outq_count = 0;
+
     inq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! inq_sem )
 	panic ("Cannot get net input semaphore");
     sem_set_name ( inq_sem, "net-inq" );
 
-
-#ifdef notyet
-    /*
-    outq_sem = cpu_new ();
-    */
     outq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! outq_sem )
 	panic ("Cannot get net output semaphore");
     sem_set_name ( outq_sem, "net-outq" );
-#endif
+
 
     /* XXX review and revise priorities someday */
-    (void) safe_thr_new ( "net", net_thread, (void *) 0, PRI_NET, 0 );
+    (void) safe_thr_new ( "net-in", net_thread, (void *) 0, PRI_NET_IN, 0 );
+    (void) safe_thr_new ( "net-out", output_thread, (void *) 0, PRI_NET_OUT, 0 );
 
-    /* We do indeed do the new slow way */
-    (void) thr_new_repeat ( "net_slow", slow_net, (void *) 0, PRI_SLOW, 0, system_clock_rate );
+    /* this handles ARP and DNS */
+    (void) thr_new_repeat ( "net-slow", slow_net, (void *) 0, PRI_SLOW, 0, system_clock_rate );
 
     /* Here is where we initialize hardware.
      * no network traffic until after this is done
@@ -345,7 +347,7 @@ net_rcv_noint ( struct netbuf *nbp )
 	}
 	inq_count++;
 	INT_unlock;
-	printf ( "Packet (loopback) added to IP queue: %d\n", inq_count );
+	// printf ( "Packet (loopback) added to IP queue: %d\n", inq_count );
 
 	/*
 	cpu_signal ( inq_sem );
@@ -418,33 +420,86 @@ net_thread ( long xxx )
 	/* NOTREACHED */
 }
 
-#ifdef oldway
-/* Thread to process queue of arriving packets */
+/* Thread to process queue of outgoing packets */
 static void
-net_thread ( long arg )
+output_thread ( long xxx )
 {
     	struct netbuf *nbp;
 
-    	INT_lock;
-
 	for ( ;; ) {
-	    while ( inq_head ) {
-		nbp = inq_head;
-		inq_head = nbp->next;
-		if ( ! inq_head )
-		    inq_tail = (struct netbuf *) 0;
-		INT_unlock;
 
-		net_handle ( nbp );
+	    INT_lock;
 
-		INT_lock;
+	    /* Do we have a packet to process ? */
+	    nbp = NULL;
+	    if ( outq_head ) {
+		nbp = outq_head;
+		outq_head = nbp->next;
+		if ( ! outq_head )
+		    outq_tail = (struct netbuf *) 0;
+		outq_count--;	
 	    }
 
-	    cpu_wait ( inq_sem );
+	    if ( nbp ) {
+		INT_unlock;
+		// net_handle ( nbp );
+		board_net_send ( nbp );
+		netbuf_free ( nbp );
+		continue;
+	    }
+
+	    /* Special to block while keeping interrupts
+	     * enabled to avoid race.
+	     * The worry is that if we enable interrupts
+	     * and then use the usual sem_block(), a
+	     * packet may arrive and we have deadlock.
+	     */
+	    sem_block_cpu ( outq_sem );
+
+	    /* note that it is harmless to unlock twice
+	     * if already unlocked.
+	     * But all we are going to do is lock anyway
+	     * so this is pointless.
+	     */
+	    // INT_unlock;
 	}
 	/* NOTREACHED */
 }
-#endif
+
+/* This gets called by everybody and anybody when they
+ *   have a packet that needs to be sent.
+ */
+void
+net_send ( struct netbuf *nbp )
+{
+
+	nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
+
+	if ( net_debug_f > 0 ) {
+	    net_show_packet ( "net_send", nbp );
+	    if ( net_debug_f == 1 )
+		net_debug_f = 0;
+	}
+
+	/*
+	printf ("Sending packet\n" );
+	*/
+	nbp->next = (struct netbuf *) 0;
+
+        if ( outq_tail ) {
+            outq_tail->next = nbp;
+            outq_tail = nbp;
+        } else {
+            outq_tail = nbp;
+            outq_head = nbp;
+        }
+        outq_count++;
+
+        cpu_signal ( outq_sem );
+
+	// board_net_send ( nbp );
+	// netbuf_free ( nbp );
+}
 
 /* We see plenty of oddball packets, even on a home network
  * with a single Windows 7 machine on it.
@@ -512,6 +567,12 @@ net_get_inq_count ( void )
 	return inq_count;
 }
 
+int
+net_get_outq_count ( void )
+{
+	return outq_count;
+}
+
 void
 net_show ( void )
 {
@@ -556,30 +617,6 @@ net_show_packet ( char *msg, struct netbuf *nbp )
 	dump_buf ( nbp->eptr, nbp->elen );
 }
 
-void
-net_send ( struct netbuf *nbp )
-{
-
-    nbp->elen = nbp->ilen + sizeof(struct eth_hdr);
-
-    if ( net_debug_f > 0 ) {
-	net_show_packet ( "net_send", nbp );
-	if ( net_debug_f == 1 )
-	    net_debug_f = 0;
-    }
-
-    /*
-    printf ("Sending packet\n" );
-    */
-    board_net_send ( nbp );
-
-    /* XXX - Someday we may have a transmit queue
-     * so we must remain free to dispose the netbuf.
-     */
-    netbuf_free ( nbp );
-}
-
-
 /* We get bugs when we call this too soon before network
  * is initialized.
  * So I added the panic.  11-22-2015
@@ -613,14 +650,14 @@ net_addr_get ( char *buf )
 static char netbuf_buf[NUM_NETBUF * sizeof(struct netbuf)];
 #endif
 
-static struct netbuf *free;
+static struct netbuf *nb_free;
+static int nb_avail;
 
 static void
 netbuf_init ( void )
 {
 	struct netbuf *ap;
 	struct netbuf *end;
-	int count = 0;
 
 	/*
 	printf ( "In netbuf_init ()\n" );
@@ -636,27 +673,29 @@ netbuf_init ( void )
 #endif
 	end = &ap[NUM_NETBUF];
 
-	free = (struct netbuf *) 0;
+	nb_free = (struct netbuf *) 0;
 
+	nb_avail = 0;
 	for ( ap; ap < end; ap++ ) {
-	    ap->next = free;
-	    free = ap;
-	    ++count;
+	    ap->next = nb_free;
+	    nb_free = ap;
+	    ++nb_avail;
 	}
 
-	printf ("%d netbuf initialized\n", count );
+	printf ("%d netbuf initialized of %d\n", nb_avail, NUM_NETBUF );
 	netbuf_show ();
 }
 
 int
 netbuf_count ( void )
 {
-	int count = 0;
 	struct netbuf *ap;
+	int count = 0;
 
-	for ( ap = free; ap; ap = ap->next ) {
+	for ( ap = nb_free; ap; ap = ap->next ) {
 	    count++;
-	    if ( count > (NUM_NETBUF+10) )	/* XXX */
+	    // avoid runaway if list is corrupt
+	    if ( count > (NUM_NETBUF+10) )
 		break;
 	}
 	return count;
@@ -665,11 +704,10 @@ netbuf_count ( void )
 void
 netbuf_show ( void )
 {
-	int count = 0;
-
-	printf ( "Netbuf head shows: %08x\n", free );
-	count = netbuf_count ();
-	printf ( "%d netbuf free of %d\n", count, NUM_NETBUF );
+	printf ( "Netbuf head: %08x\n", nb_free );
+	printf ( "%3d netbuf available\n", nb_avail );
+	printf ( "%3d netbuf on free list\n", netbuf_count () );
+	printf ( "%3d netbuf configured\n", NUM_NETBUF );
 }
 
 /* get a netbuf, with lock */
@@ -697,13 +735,26 @@ netbuf_alloc_i ( void )
 	struct netbuf *rv;
 	struct netbuf **nbpt;
 
-	if ( ! free ) {
+	if ( ! nb_free ) {
 	    panic ( "We just flat ran out of netbufs !!" );
 	    // return (struct netbuf *) 0;
 	}
 
-	rv = free;
-	free = free->next;
+	rv = nb_free;
+	nb_free = nb_free->next;
+	nb_avail--;
+
+	if ( ! valid_ram_address ( nb_free ) ) {
+	    printf ( "netbuf_alloc rv, free = %08x, %08x\n", rv, nb_free );
+	    netbuf_show ();
+	    panic ( "netbuf_alloc_i -- bad next address\n" );
+	}
+
+	if ( ! valid_ram_address ( rv ) ) {
+	    printf ( "netbuf_alloc rv, free = %08x, *08x\n", rv, nb_free );
+	    netbuf_show ();
+	    panic ( "netbuf_alloc_i -- bad address\n" );
+	}
 
 	rv->refcount = 1;
 	rv->bptr = rv->data;
@@ -715,7 +766,7 @@ netbuf_alloc_i ( void )
 	*nbpt = rv;
 
 // XXX debug
-	memset ( rv->data, 0xAB, NETBUF_MAX );
+//	memset ( rv->data, 0xAB, NETBUF_MAX );
 
 #ifdef ARM_ALIGNMENT_HACK
 	if ( ((u32) rv->iptr) & 0x3 )
@@ -745,8 +796,9 @@ netbuf_free ( struct netbuf *old )
 
 	// printf ( " (%d --> %d free)\n", count, count+1 );
     	INT_lock;
-	old->next = free;
-	free = old;
+	old->next = nb_free;
+	nb_free = old;
+	++nb_avail;
     	INT_unlock;
 }
 

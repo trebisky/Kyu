@@ -26,9 +26,10 @@
 #ifndef __KYU_NET_H__
 #define __KYU_NET_H__
 
-#define	PRI_NET		20
-#define	PRI_SLOW	21
-#define	PRI_HW_INIT	22
+#define	PRI_NET_IN	20
+#define	PRI_NET_OUT	21
+#define	PRI_SLOW	22
+#define	PRI_HW_INIT	23
 
 #define DEBUG_TCP
 

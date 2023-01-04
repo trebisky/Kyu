@@ -183,6 +183,13 @@ ip_send ( struct netbuf *nbp, u32 dest_ip )
 {
 	struct ip_hdr *ipp;
 
+	if ( ! valid_ram_address ( nbp ) ) {
+	    printf ( "ip_send, nbp = %08x\n", nbp );
+	    netbuf_show ();
+	    panic ( "ip_send = bad netbuf addr\n" );
+	}
+
+
 	// changed for Xinu TCP
 	// ipp = (struct ip_hdr *) nbp->iptr;
 	ipp = (struct ip_hdr *) ((char *) nbp->eptr + sizeof ( struct eth_hdr ));

@@ -1006,7 +1006,6 @@ thr_exit ( void )
 	 */
 	cancel_repeat ( cur_thread );
 
-
 #ifdef notdef
 	/* release stack memory.
 	 * This used to be OK for plain old exits,
@@ -1021,7 +1020,6 @@ thr_exit ( void )
 	 */
 	thr_free ( cur_thread->stack, cur_thread->stack_size );
 #endif
-	cur_thread->state = KILLED;
 
 	/* If we expect to be joined,
 	 * either we got here first (in which case, go zombie);
@@ -1041,6 +1039,7 @@ thr_exit ( void )
 
 	/* Often an interrupt runs away with things right here,
 	 * which seems to be OK.
+	 * (Just as good as calling resched() at this point.)
 	 */
 
 	/* 

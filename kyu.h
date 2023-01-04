@@ -33,7 +33,8 @@
  * with a larger stack when I was getting hangs related to TCP
  */
 // #define STACK_SIZE	4096	/* bytes */
-#define STACK_SIZE	16384	/* bytes */
+#define STACK_SIZE	8192	/* bytes */
+// #define STACK_SIZE	16384	/* bytes */
 
 /* There will be trouble if we change this,
  * in particular, TCP timeouts expect the timer
