@@ -223,6 +223,7 @@ net_init ( void )
     inq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! inq_sem )
 	panic ("Cannot get net input semaphore");
+    sem_set_name ( inq_sem, "net-inq" );
 
 
 #ifdef notyet
@@ -232,6 +233,7 @@ net_init ( void )
     outq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! outq_sem )
 	panic ("Cannot get net output semaphore");
+    sem_set_name ( outq_sem, "net-outq" );
 #endif
 
     /* XXX review and revise priorities someday */

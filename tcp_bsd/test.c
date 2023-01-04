@@ -354,11 +354,13 @@ wang_show ( void )
 
 #define CHUNK	2000
 #define CREP	(2000/5/4)
-#define NUM_CHUNK	100
 
 /* Don't put this on the stack */
 char wang_buf[CHUNK+1];
 
+/* Generate a 2000 byte buffer with 4 pieces,
+ * each 500 bytes and full of identical stuff
+ */
 static void
 load_buf ( char *buf, char *proto, int num )
 {
@@ -391,14 +393,19 @@ load_buf ( char *buf, char *proto, int num )
 }
 
 static void
-big_wangdoodle ( struct socket *so )
+big_wangdoodle ( struct socket *so, int nchunks )
 {
-	int total;
+	// int total;
 	int i;
 	int ix;
+	int nc;
 
-	total = NUM_CHUNK * CHUNK;
+	// #define NUM_CHUNK	100
+	// total = NUM_CHUNK * CHUNK;
 	// printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
+
+	nc = nchunks - 2;
+	if ( nc < 0 ) nc = 0;
 
 	wang_state = 11;
 	wang_count = 0;
@@ -407,7 +414,7 @@ big_wangdoodle ( struct socket *so )
 	tcp_send ( so, wang_buf, CHUNK );
 
 	ix = 1;
-	for ( i=0; i<(NUM_CHUNK-2); i++ ) {
+	for ( i=0; i<nc; i++ ) {
 	    wang_state = 12;
 	    wang_count++;
 	    load_buf ( wang_buf, "PK000", ix );
@@ -422,6 +429,17 @@ big_wangdoodle ( struct socket *so )
 	tcp_send ( so, wang_buf, CHUNK );
 }
 
+/* Wrapper on the above, adds some rules, namely --
+ * No less that 2 chunks and a multiple of chunk size
+ */
+static void
+lots ( struct socket *so, int chunks )
+{
+	// chunks = (total + CHUNK - 1) / CHUNK;
+	if ( chunks < 2 ) chunks = 2;
+	big_wangdoodle ( so, chunks );
+}
+
 #ifdef notdef
 
 // #define CHUNK	5000
@@ -429,31 +447,31 @@ big_wangdoodle ( struct socket *so )
 // #define CHUNK	2048
 #define CHUNK	2000
 
-static void
-big_wangdoodle ( struct socket *so )
-{
-	char *buf;
-	int total;
-
-	/* As good a place as any */
-	buf = (char *) tcp_input;
-
-	/* This many bytes */
-	// total = 137555;
-	total = 132555;
-	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
-
-	while ( total > 0 ) {
-	    if ( total < CHUNK ) {
-		tcp_send ( so, buf, total );
-		break;
-	    } else {
-		tcp_send ( so, buf, CHUNK );
-		total -= CHUNK;
-		buf += CHUNK;
-	    }
-	}
-}
+-static void
+-big_wangdoodle ( struct socket *so )
+-{
+-	char *buf;
+-	int total;
+-
+-	/* As good a place as any */
+-	buf = (char *) tcp_input;
+-
+-	/* This many bytes */
+-	// total = 137555;
+-	total = 132555;
+-	printf ( "Big wandoodle: %d bytes in chunks of %d\n", total, CHUNK );
+-
+-	while ( total > 0 ) {
+-	    if ( total < CHUNK ) {
+-		tcp_send ( so, buf, total );
+-		break;
+-	    } else {
+-		tcp_send ( so, buf, CHUNK );
+-		total -= CHUNK;
+-		buf += CHUNK;
+-	    }
+-	}
+-}
 #endif
 
 /* Called from thr_unblock() */
@@ -481,16 +499,26 @@ wang_hook3 ( int is_blocked )
 	wang_blocked = is_blocked;
 }
 
+#define MAXW	4
+
 /* Called for each line sent by user */
 static int
 one_wangdoodle ( struct socket *so, char *cmd )
 {
+	char *wp[MAXW];
+	int nw;
+	int ntest;
 	// char resp[64];
 
 	wang_thread = cur_thread;
 
+	if ( cmd[0] == '\0' )
+	    return 0;
+
 	if ( cmd[0] == 'q' )
 	    return 1;
+
+	nw = split ( cmd, wp, MAXW );
 
 	// printf ( "Got: %s\n", cmd );
 
@@ -505,9 +533,15 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	    so_printf ( so, "U %d\n", gb_unif_rand(100) );
 	else if ( strcmp ( cmd, "big" ) == 0 ) {
 	    wang_state = 10;
-	    big_wangdoodle ( so );
+	    // big_wangdoodle ( so );
+	    lots ( so, 100 );
 	    wang_state = 99;
 	    return 1 ;
+	} else if ( strcmp ( wp[0], "lots" ) == 0 && nw == 1 ) {
+	    lots ( so, 2 );
+	} else if ( strcmp ( wp[0], "lots" ) == 0 && nw == 2 ) {
+	    ntest = atoi ( wp[1] );
+	    lots ( so, (ntest+CHUNK-1)/CHUNK );
 	}
 	else
 	    so_puts ( so, "ERR\n" );

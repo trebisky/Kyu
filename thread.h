@@ -194,6 +194,7 @@ struct thread {
 	int flags;
 	struct thread *join;	/* who wants to join us */
 	struct thread *yield;	/* who yielded to us */
+	struct sem *cur_sem;	/* if we are blocked on a sem, this is the one */
 };
 
 /* Here are fault codes (kind of like errno)
@@ -205,6 +206,7 @@ struct thread {
 
 /* ---------------------------------------------------------
  */
+#define MAX_SEM_NAME	9
 
 struct sem {
 	struct sem *next;		/* links together avail and on timer */
@@ -212,6 +214,7 @@ struct sem {
 	int state;			/* SET or CLEAR */
 	int flags;
 	int delay;			/* for sem with timeout */
+	char name[MAX_SEM_NAME];	/* for debugging 1-3-2022 */
 };
 
 struct cv {

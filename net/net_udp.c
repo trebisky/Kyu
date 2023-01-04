@@ -52,6 +52,7 @@ void
 udp_init ( void )
 {
 	udp_sem = sem_mutex_new ( SEM_FIFO );
+	sem_set_name ( udp_sem, "udp-lock" );
 }
 
 void

@@ -68,19 +68,23 @@ sb_init ( struct socket *so )
 
 	sb = &so->so_rcv;
 	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
+	sem_set_name ( sb->sb_sleep, "sb-rcv" );
         if ( ! sb->sb_sleep )
             bsd_panic ("Cannot get sb sleep semaphore");
 
 	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
+	sem_set_name ( sb->sb_lock, "sb-rcvlk" );
         if ( ! sb->sb_lock )
             bsd_panic ("Cannot get sb lock semaphore");
 
 	sb = &so->so_snd;
 	sb->sb_sleep = sem_signal_new ( SEM_FIFO );
+	sem_set_name ( sb->sb_sleep, "sb-snd" );
         if ( ! sb->sb_sleep )
             bsd_panic ("Cannot get sb sleep semaphore");
 
 	sb->sb_lock = sem_mutex_new ( SEM_FIFO );
+	sem_set_name ( sb->sb_lock, "sb-sndlk" );
         if ( ! sb->sb_lock )
             bsd_panic ("Cannot get sb lock semaphore");
 

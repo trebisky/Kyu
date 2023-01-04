@@ -150,6 +150,7 @@ static void thr_show_state ( struct thread * );
 #define RSF_YIELD	0x01	/* try not to run me */
 #define RSF_CONT	0x02
 #define RSF_INTER	0x04
+#define RSF_MAYBE	0x08	/* OK to not switch */
 
 /* not having this an enum allows me to keep these
  * definitions local to this file.
@@ -515,6 +516,9 @@ thr_show_state ( struct thread *tp )
 	    case DEAD:
 		printf ( "   DEAD " );
 		break;
+	    case KILLED:
+		printf ( " KILLED " );
+		break;
 	    default:
 		printf ( "    ?%d? ", tp->state );
 		break;
@@ -549,6 +553,11 @@ thr_one ( struct thread *tp )
 	else
 	    printf ( "%d ", tp->mode );
 
+	if ( tp->state == SWAIT )
+	    printf ( "%8s ", tp->cur_sem->name );
+	else
+	    printf ( "         " );
+
 	printf ( "%08x ", thr_get_pc ( tp ) );
 
 #ifdef ARCH_X86
@@ -566,7 +575,8 @@ thr_show ( void )
 	struct thread *tp;
 
 	// printf ( "  Thread:       name (  &tp   )    state      sp     pri\n");
-	printf ( "  Thread:       name (  &tp   )    state      pc       sp     pri\n");
+	// printf ( "  Thread:       name (  &tp   )    state      pc       sp     pri\n");
+	printf ( "  Thread:       name (  &tp   )    state     sem       pc       sp     pri\n");
 	/*
 	thr_one ( thread0 );
 	*/
@@ -948,7 +958,9 @@ void
 thr_repeat_stop ( struct thread *tp )
 {
 	tp->flags &= ~TF_REPEAT;
+	INT_lock;
 	cancel_repeat ( tp );
+	INT_unlock;
 	if ( tp->state == REPEAT )
 	    thr_unblock ( tp );
 }
@@ -966,6 +978,10 @@ void
 thr_exit ( void )
 {
 	struct thread *tp;
+
+	// if ( strncmp ( cur_thread->name, "tcp-", 4 ) != 0 &&
+	// 	strncmp ( cur_thread->name, "net_", 4 ) != 0 )
+	// 	    printf ( "exit of %s\n", cur_thread->name );
 
 	if ( thread_debug ) {
 	    printf ( "exit of %s\n", cur_thread->name );
@@ -1005,15 +1021,15 @@ thr_exit ( void )
 	 */
 	thr_free ( cur_thread->stack, cur_thread->stack_size );
 #endif
+	cur_thread->state = KILLED;
 
 	/* If we expect to be joined,
 	 * either we got here first (in which case, go zombie);
 	 * or they are already waiting for us (so unblock them!)
 	 */
 	if ( cur_thread->join ) {
-	    INT_unlock;		// 12-21-2022
+	    /* This is rare */
 	    thr_unblock ( cur_thread->join );
-	    INT_lock;		// 12-21-2022
 	    cleanup_thread ( cur_thread );
 	} else if ( cur_thread->flags & TF_JOIN ) {
 	    cur_thread->state = ZOMBIE;
@@ -1022,6 +1038,10 @@ thr_exit ( void )
 	}
 
 	INT_unlock;	// 12-21-2022
+
+	/* Often an interrupt runs away with things right here,
+	 * which seems to be OK.
+	 */
 
 	/* 
 	 * Now things get a bit tricky.
@@ -1233,7 +1253,7 @@ thr_unblock ( struct thread *tp )
 	// PANIC: do_irq, resume
 	// (something returns that never should)
 	//
-	// INT_lock;	// added 12-22-2022
+	INT_lock;	// added 12-22-2022
 
 	/* This would mean we ran over our tail in
 	 * some time delay loop or something of the
@@ -1243,7 +1263,7 @@ thr_unblock ( struct thread *tp )
 	 * called from interrupt code.
 	 */
 	if ( tp->state == READY ) {
-	    // INT_unlock;	// added 12-22-2-22
+	    INT_unlock;	// added 12-22-2-22
 	    return;
 	}
 
@@ -1760,6 +1780,21 @@ change_thread ( struct thread *new_tp, int options )
  *
  */
 
+#ifdef notdef
+/* policy options for resched ()
+ */
+#define RSF_YIELD	0x01	/* try not to run me */
+#define RSF_CONT	0x02
+#define RSF_INTER	0x04
+#define RSF_MAYBE	0x08	/* OK to not switch 1-2023 */
+#endif
+
+/* Note that RSF_YIELD no longer works.
+ * (and thr_yield() is now a noop).
+ * Perhaps the new RSF_MAYBE would make yield work.
+ */
+
+
 static void
 resched ( int options )
 {
@@ -1845,8 +1880,13 @@ resched ( int options )
 	 * yield that should have been taken
 	 * care of.
 	 */
-	if ( best_tp == cur_thread )
+	if ( best_tp == cur_thread ) {
+	    if ( options & RSF_MAYBE ) {
+		INT_unlock;
+		return;
+	    }
 	    panic ( "resched, current" );
+	}
 
 	if ( best_tp ) {
 	    if ( options & RSF_YIELD)
@@ -1953,6 +1993,22 @@ sem_init ( void )
 	}
 }
 
+void
+sem_set_name ( struct sem *sem, char *name )
+{
+	int len;
+
+	len = strlen ( name );
+	if ( len < 1 )
+	    return;
+
+	if ( len > MAX_SEM_NAME - 1 )
+	    len = MAX_SEM_NAME - 1;
+
+       strncpy ( sem->name, name, len );
+       sem->name[len]= '\0';
+}
+
 /* initialize a new semaphore.
  * state = 1	set, (full).
  * state = 0	clear, (empty).
@@ -1971,6 +2027,7 @@ static struct sem *
 sem_new ( int state, int flags )
 {
 	struct sem *sp;
+	char name[10];
 
 	if ( ! sem_avail ) {
 	    /* XXX - bad bugs come when we
@@ -1987,6 +2044,9 @@ sem_new ( int state, int flags )
 
 	sp->state = state;
 	sp->flags = flags;
+
+	sprintf ( name, "sem-%04x", ((int)sp) & 0xffff );
+	sem_set_name ( sp, name );
 
 	sp->list = (struct thread *) 0;
 	return sp;
@@ -2031,6 +2091,36 @@ sem_unblock ( struct sem *sem )
 	    tp = sem->list;
 	    sem->list = tp->wnext;
 	    thr_unblock ( tp );
+	    return;
+	}
+	sem->state = SEM_CLEAR;
+}
+
+/* This is a special version of the above that is
+ * used internally by the condition variable code.
+ * We want to do everything but initiate the
+ * actual thread switch.
+ * This is always called with interrupts locked.
+ */
+static void
+sem_unblock_cv ( struct sem *sem )
+{
+	struct thread *tp;
+
+	if ( sem->state == SEM_CLEAR )
+	    return;
+
+	if ( sem->flags & SEM_TIMEOUT )
+	    sem_cancel_wait ( sem );
+
+	/* SEM_SET */
+	if ( sem->list ) {
+	    tp = sem->list;
+	    sem->list = tp->wnext;
+
+	    // thr_unblock ( tp );
+	    tp->state = READY;
+
 	    return;
 	}
 	sem->state = SEM_CLEAR;
@@ -2105,6 +2195,9 @@ sem_block_cpu ( struct sem *sem )
 	    INT_unlock;
 	    return;
 	}
+
+	/* 1-3-2022 for debugging */
+	cur_thread->cur_sem = sem;
 
 	/* SEM_SET */
 	sem_add ( sem );
@@ -2236,6 +2329,12 @@ cv_new ( struct sem *mutex )
 }
 
 void
+cv_set_name ( struct cv *cp, char *name )
+{
+	sem_set_name ( cp->signal, name );
+}
+
+void
 cv_destroy ( struct cv *cp )
 {
 	sem_destroy ( cp->signal );
@@ -2249,6 +2348,29 @@ cv_signal ( struct cv *cp )
 	sem_unblock ( cp->signal );
 }
 
+/* We enter this holding mutex (to avoid a race)
+ * The idea here is to make signaling and releasing
+ * the lock an atomic operation.
+ * 1-3-2023
+ */
+void
+cv_wait ( struct cv *cp )
+{
+	INT_lock;
+	sem_unblock_cv ( cp->mutex );
+	sem_block_cpu ( cp->signal );
+	INT_unlock;
+
+	// resched ( RSF_MAYBE );
+}
+
+#ifdef notdef
+/* This is the code prior to 1-3-2023
+ * I am not really sure what I was thinking.
+ * This was only ever used by the test cases.
+ * all this looks entirely bogus and is not what
+ * we want for the producer/consumer use case.
+ */
 void
 cv_wait ( struct cv *cp )
 {
@@ -2261,6 +2383,7 @@ cv_wait ( struct cv *cp )
 	 */
 	sem_block ( cp->mutex );
 }
+#endif
 
 /* Just some "sugar" to make the cpu_xxx() calls all nice
  * and analogous to the cv_xxx() calls.
@@ -2456,6 +2579,7 @@ setup_repeat ( struct thread *tp, int delay )
 	 repeat_head = tp;
 }
 
+/* Must call with interrupts locked */
 static void
 cancel_repeat ( struct thread *tp )
 {
@@ -2466,11 +2590,8 @@ cancel_repeat ( struct thread *tp )
 	if ( ! repeat_head )
 	    return;
 
-	INT_lock;
-
 	if ( repeat_head == tp ) {
 	    repeat_head = tp->rep_next;
-	    INT_unlock;
 	    return;
 	}
 
@@ -2483,8 +2604,6 @@ cancel_repeat ( struct thread *tp )
 		pp = cp;
 	    cp = pp->rep_next;
 	}
-
-	INT_unlock;
 }
 
 static void

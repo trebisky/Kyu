@@ -248,7 +248,7 @@ bsd_init ( void )
 	    bsd_panic ( "TCP timer rate" );
 	}
 
-	(void) safe_thr_new ( "tcp-bsd", tcp_thread, (void *) 0, PRI_TCP_MAIN, 0 );
+	(void) safe_thr_new ( "tcp-input", tcp_thread, (void *) 0, PRI_TCP_MAIN, 0 );
 	(void) thr_new_repeat ( "tcp-timer", tcp_timer_func, (void *) 0, PRI_TCP_TIMER, 0, 100 );
 }
 
@@ -413,7 +413,7 @@ locker_init ( void )
 	master_lock.count = 0;
 	master_lock.thread = NULL;
 	master_lock.sem = sem_mutex_new ( SEM_FIFO );
-	// net_lock_sem = sem_mutex_new ( SEM_FIFO );
+	sem_set_name ( master_lock.sem, "tcp-main" );
 }
 
 static int fast_count = 0;
@@ -460,7 +460,8 @@ tcp_timer_func ( long xxx )
 static struct netbuf *tcp_q_head;
 static struct netbuf *tcp_q_tail;
 
-static struct sem *tcp_q_sem;
+// static struct sem *tcp_q_sem;
+static struct cv *tcp_queue_cv;
 
 /* We might be better off using a condition variable here.
  * If we get deadlocks we will need to change things.
@@ -486,13 +487,21 @@ tcp_thread ( long xxx )
 	tcp_q_head = (struct netbuf *) 0;
 	tcp_q_tail = (struct netbuf *) 0;
 
-	tcp_q_sem = sem_signal_new ( SEM_FIFO );
-	if ( ! tcp_q_sem )
-	    bsd_panic ("Cannot get tcp queue signal semaphore");
-
 	tcp_queue_lock_sem = sem_mutex_new ( SEM_FIFO );
 	if ( ! tcp_queue_lock_sem )
 	    bsd_panic ("Cannot get tcp queue lock semaphore");
+	sem_set_name ( tcp_queue_lock_sem, "tcp-q-lk" );
+
+	tcp_queue_cv = cv_new ( tcp_queue_lock_sem );
+	cv_set_name ( tcp_queue_cv, "tcp-inq" );
+
+#ifdef notdef
+	tcp_q_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! tcp_q_sem )
+	    bsd_panic ("Cannot get tcp queue signal semaphore");
+	sem_set_name ( tcp_q_sem, "tcp-inq" );
+
+#endif
 
 	for ( ;; ) {
 	    /* Do we have a packet to process ? */
@@ -513,9 +522,8 @@ tcp_thread ( long xxx )
 	    //else
 	    //	printf ( " --- LIST2: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
 
-	    sem_unblock ( tcp_queue_lock_sem );
-
             if ( nbp ) {
+		sem_unblock ( tcp_queue_lock_sem );
 		tcp_inq_count--;
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
@@ -527,8 +535,11 @@ tcp_thread ( long xxx )
              */
 	    // bpf2 ( "TCP thread waiting\n" );
 	    if ( wang_debug )
-		printf ( "tcp-bsd - processed %d packets on this wakeup\n", npk );
-            sem_block_cpu ( tcp_q_sem );
+		printf ( "tcp-input - processed %d packets on this wakeup\n", npk );
+
+            // sem_block_cpu ( tcp_q_sem );
+	    cv_wait ( tcp_queue_cv );
+
 	    npk = 0;
 	}
 
@@ -558,7 +569,8 @@ tcp_bsd_rcv ( struct netbuf *nbp )
 	sem_unblock ( tcp_queue_lock_sem );
 
 	/* Announce packet arrival */
-        sem_unblock ( tcp_q_sem );
+        // sem_unblock ( tcp_q_sem );
+	cv_signal ( tcp_queue_cv );
 }
 
 #ifdef notdef

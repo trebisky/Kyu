@@ -1168,6 +1168,7 @@ sonewconn ( struct socket *head, int connstatus )
         bzero((caddr_t)so, sizeof(*so));
 
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	sem_set_name ( so->kyu_sem, "socket" );
 	if ( ! so->kyu_sem ) {
 	    bsd_panic ( "sonewcomm1 - semaphores all gone" );
 	}
@@ -1764,6 +1765,7 @@ socreate ( struct socket *so, int dom, int type, int proto)
 	so->so_state |= SS_ACTIVE;	/* Kyu */
 
 	so->kyu_sem = sem_signal_new ( SEM_FIFO );
+	sem_set_name ( so->kyu_sem, "socket" );
 	if ( ! so->kyu_sem ) {
 	    bsd_panic ( "socreate - semaphores all gone" );
 	}
