@@ -686,6 +686,7 @@ netbuf_init ( void )
 	netbuf_show ();
 }
 
+/* for debug/statistics */
 int
 netbuf_count ( void )
 {

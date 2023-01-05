@@ -290,6 +290,8 @@ console_puts ( char *buf )
 /* XXX - for now, panic routines are here.
  */
 
+static int panic_count = 0;
+
 
 /* This is a real panic, as distinguished
  * from calls to dpanic(), which are just
@@ -301,6 +303,14 @@ kyu_panic ( char *msg, int spin )
 {
 	// keep messages tidy.
 	INT_lock;
+
+	// 1-5-2022 avoid runaway panic loop
+	++panic_count;
+	if ( panic_count > 2 ) {
+	    printf ( "-- panic limit reached, spinning\n" );
+	    for ( ;; )
+		;
+	}
 
 	if ( msg )
 	    printf ( "PANIC: %s\n", msg );

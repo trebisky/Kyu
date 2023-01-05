@@ -213,14 +213,28 @@ static void tcp_timer_func ( long );
 static void locker_init ( void );
 void locker_show ( void );
 
+/* Used by "t 1" command */
+void
+bsd_debug_info ( void )
+{
+	tcb_show ();
+	locker_show ();
+	tcp_statistics ();
+	printf ( "Kyu input queue size: %d\n", net_get_inq_count() );
+	printf ( "TCP input queue size: %d\n", tcp_get_inq_count() );
+	printf ( "Kyu output queue size: %d\n", net_get_outq_count() );
+	netbuf_show ();
+	printf ( "Clock: %d\n", get_timer_count_s () );
+}
+
 /* Wrapper on Kyu panic - gives stack traceback */
 void
 bsd_panic ( char *msg )
 {
-	unroll_cur_short ();
-	locker_show ();
 	printf ( "BSD panic: %s\n", msg );
-	panic ( "BSD tcp" );
+	unroll_cur_short ();
+	bsd_debug_info ();
+	panic ( "BSD tcp ----- end" );
 }
 
 #define	PRI_TCP_MAIN	24
@@ -604,6 +618,10 @@ tcp_bsd_process ( struct netbuf *nbp )
 	// printf ( "TCP: bsd_process %d, %d bytes\n", nbp->ilen, nbp->iptr->len );
 	// dump_buf ( (char *) nbp->iptr, nbp->ilen );
 
+#ifdef BIG_LOCKS
+	sem_block ( master_lock.sem );
+	master_lock.input_busy = 1;
+
 	len = nbp->ilen;
 	m = mb_devget ( (char *) nbp->iptr, len, 0, NULL, 0 );
 	if ( ! m ) {
@@ -637,13 +655,11 @@ tcp_bsd_process ( struct netbuf *nbp )
 	 * already been acquired.
 	 */
 
-#ifdef BIG_LOCKS
-	sem_block ( master_lock.sem );
-	master_lock.input_busy = 1;
 	tcp_input ( m, len );
 	master_lock.input_busy = 0;
 	sem_unblock ( master_lock.sem );
 #else
+	// XXX will never work
 	tcp_input ( m, len );
 #endif
 }

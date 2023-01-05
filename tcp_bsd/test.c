@@ -89,14 +89,7 @@ bsd_test_debug ( long val )
 void
 bsd_test_show ( long xxx )
 {
-	tcb_show ();
-	locker_show ();
-	tcp_statistics ();
-	printf ( "Kyu input queue size: %d\n", net_get_inq_count() );
-	printf ( "TCP input queue size: %d\n", tcp_get_inq_count() );
-	printf ( "Kyu output queue size: %d\n", net_get_outq_count() );
-	netbuf_show ();
-	printf ( "Clock: %d\n", get_timer_count_s () );
+	bsd_debug_info ();
 }
 
 #ifdef notdef

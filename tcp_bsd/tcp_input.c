@@ -605,6 +605,10 @@ tcp_input ( struct mbuf *m, int iphlen)
 		printf ( " *** *** *** tcp_input 2, bad cksum = %x\n", ti->ti_sum );
 		printf ( "m, tlen, len = %08x, %d, %d\n", m, tlen, len );
 		// dump_buf ( (char *) ti, len );
+		// XXX - for now we will panic rather than drop
+		// 1-5-2022
+		mbuf_show ( m, "bad cksum" );
+		bsd_panic ( "tcp input bad checksum" );
 		goto drop;
 	}
 

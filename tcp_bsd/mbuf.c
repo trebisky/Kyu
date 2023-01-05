@@ -450,20 +450,39 @@ mbuf_show ( struct mbuf *mp, char *msg )
 {
 	int off;
 
-	if ( ! bpf_debug ( 3 ) )
-	    return;
+	// if ( ! bpf_debug ( 3 ) )
+	//     return;
 
 	printf ( "mbuf_show (%s): %08x\n", msg, mp );
-	printf ( " size(hdr): %d\n", sizeof(struct m_hdr) );
-	printf ( " size(int): %d\n", sizeof(int) );
-	printf ( " size(*): %d\n", sizeof(caddr_t) );
+	// printf ( " size(hdr): %d\n", sizeof(struct m_hdr) );
+	// printf ( " size(int): %d\n", sizeof(int) );
+	// printf ( " size(*): %d\n", sizeof(caddr_t) );
+
 	printf ( " next:    %08x\n", mp->m_next );
 	printf ( " nextpkt: %08x\n", mp->m_nextpkt );
 	printf ( " len: %d\n", mp->m_len );
 	  off = mp->m_data - mp->m_dat;
 	printf ( " data: %08x (%d)\n", mp->m_data, off );
-	printf ( " type: %d\n", mp->m_type );
-	printf ( " flags: %08x\n", mp->m_flags );
+
+	printf ( " type: %d", mp->m_type );
+	if ( mp->m_type == MT_FREE )
+	    printf ( " (MT_FREE)" );
+	if ( mp->m_type == MT_DATA )
+	    printf ( " (MT_DATA)" );
+	if ( mp->m_type == MT_HEADER )
+	    printf ( " (MT_HEADER)" );
+	printf ( "\n" );
+
+	printf ( " flags: %08x", mp->m_flags );
+	if ( mp->m_flags & M_EXT )
+	    printf ( " EXT" );
+	if ( mp->m_flags & M_PKTHDR )
+	    printf ( " PKTHDR" );
+	if ( mp->m_flags & M_EOR )
+	    printf ( " EOR" );
+	printf ( "\n" );
+
+	dump_buf ( mp, 128 );
 }
 
 /* I am moving routines from uipc_mbuf.c to this file.

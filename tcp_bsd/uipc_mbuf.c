@@ -112,7 +112,8 @@ m_copym ( struct mbuf *m, int off0, int len, int wait )
 
 	while (off > 0) {
 		if (m == 0) {
-		    printf ( "m, len = %08x, %d\n", m_orig, len_orig );
+		    printf ( "m, len, off0 = %08x, %d, %d\n", m_orig, len_orig, off0 );
+		    mbuf_show ( m_orig, "m_copym 2" );
 		    bsd_panic("m_copym 2");
 		}
 		if (off < m->m_len)
