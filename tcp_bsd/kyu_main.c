@@ -480,7 +480,7 @@ static struct cv *tcp_queue_cv;
 /* We might be better off using a condition variable here.
  * If we get deadlocks we will need to change things.
  */
-static struct sem *tcp_queue_lock_sem;
+// static struct sem *tcp_queue_lock_sem;
 
 extern int wang_debug;
 
@@ -501,13 +501,15 @@ tcp_thread ( long xxx )
 	tcp_q_head = (struct netbuf *) 0;
 	tcp_q_tail = (struct netbuf *) 0;
 
-	tcp_queue_lock_sem = sem_mutex_new ( SEM_FIFO );
-	if ( ! tcp_queue_lock_sem )
-	    bsd_panic ("Cannot get tcp queue lock semaphore");
-	sem_set_name ( tcp_queue_lock_sem, "tcp-q-lk" );
+	// tcp_queue_lock_sem = sem_mutex_new ( SEM_FIFO );
+	// if ( ! tcp_queue_lock_sem )
+	//     bsd_panic ("Cannot get tcp queue lock semaphore");
+	// sem_set_name ( tcp_queue_lock_sem, "tcp-q-lk" );
 
-	tcp_queue_cv = cv_new ( tcp_queue_lock_sem );
-	cv_set_name ( tcp_queue_cv, "tcp-inq" );
+	// tcp_queue_cv = cv_new ( tcp_queue_lock_sem );
+	tcp_queue_cv = cv_new ();
+	cv_set_sname ( tcp_queue_cv, "tcp-inq" );
+	cv_set_mname ( tcp_queue_cv, "tcp-q-lk" );
 
 #ifdef notdef
 	tcp_q_sem = sem_signal_new ( SEM_FIFO );
@@ -520,7 +522,9 @@ tcp_thread ( long xxx )
 	for ( ;; ) {
 	    /* Do we have a packet to process ? */
 
-	    sem_block ( tcp_queue_lock_sem );
+	    // sem_block ( tcp_queue_lock_sem );
+	    cv_lock ( tcp_queue_cv );
+
             nbp = NULL;
 	    // printf ( " --- LIST1: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
             if ( tcp_q_head ) {
@@ -537,8 +541,9 @@ tcp_thread ( long xxx )
 	    //	printf ( " --- LIST2: H, T = %08x %08x\n", tcp_q_head, tcp_q_tail );
 
             if ( nbp ) {
-		sem_unblock ( tcp_queue_lock_sem );
 		tcp_inq_count--;
+		// sem_unblock ( tcp_queue_lock_sem );
+		cv_unlock ( tcp_queue_cv );
 		// bpf2 ( "bsd_pull %08x, %d\n", nbp, nbp->ilen );
                 tcp_bsd_process ( nbp );
 		// npk++;
@@ -569,7 +574,9 @@ tcp_bsd_rcv ( struct netbuf *nbp )
         nbp->next = (struct netbuf *) 0;
 	// bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
-	sem_block ( tcp_queue_lock_sem );
+	// sem_block ( tcp_queue_lock_sem );
+	cv_lock ( tcp_queue_cv );
+
 	    // printf ( " --- LIST++1: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
         if ( tcp_q_tail ) {
             tcp_q_tail->next = nbp;
@@ -580,7 +587,9 @@ tcp_bsd_rcv ( struct netbuf *nbp )
         }
 	tcp_inq_count++;
 	    // printf ( " --- LIST++2: H, T = %08x %08x %08x\n", tcp_q_head, tcp_q_tail, nbp->next );
-	sem_unblock ( tcp_queue_lock_sem );
+
+	// sem_unblock ( tcp_queue_lock_sem );
+	cv_unlock ( tcp_queue_cv );
 
 	/* Announce packet arrival */
         // sem_unblock ( tcp_q_sem );

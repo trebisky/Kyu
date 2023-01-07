@@ -2282,6 +2282,14 @@ sem_block_m ( struct sem *sem, struct sem *mutex )
 }
 
 /* Condition variables ...
+ *
+ * These have evolved into something that probably
+ * should not longer be called a condition variable,
+ * but a tool for building producer/consumer setups
+ * without race conditions.
+ *
+ * Before I tweaked this in 1-2023 the following
+ *  comments applied (and are still of some interest).
  * I bind together the mutex and the cv when the
  * cv is created.  This may seem contrary to the
  * advice that a mutex may have several predicates,
@@ -2296,17 +2304,24 @@ sem_block_m ( struct sem *sem, struct sem *mutex )
  * have its own condition variable.
  */
 
+// cv_new ( struct sem *mutex )
 struct cv *
-cv_new ( struct sem *mutex )
+cv_new ( void )
 {
 	struct cv *cp;
-	struct sem *sp;
+	struct sem *sp_sig;
+	struct sem *sp_mut;
 
 	/* allocate a signaling semaphore
 	 * (empty so the first wait will block).
 	 */
-	sp = sem_new ( SEM_SET, SEM_FIFO );
-	if ( ! sp ) {
+	sp_sig = sem_signal_new ( SEM_FIFO );
+	if ( ! sp_sig ) {
+	    return (struct cv *) 0;
+	}
+
+	sp_mut = sem_mutex_new ( SEM_FIFO );
+	if ( ! sp_mut ) {
 	    return (struct cv *) 0;
 	}
 
@@ -2321,22 +2336,30 @@ cv_new ( struct sem *mutex )
 	cp = cv_avail;
 	cv_avail = cp->next;
 
-	cp->signal = sp;
-	cp->mutex = mutex;
+	cp->signal = sp_sig;
+	cp->mutex = sp_mut;
+	// cp->mutex = mutex;
 
 	return cp;
 }
 
 void
-cv_set_name ( struct cv *cp, char *name )
+cv_set_sname ( struct cv *cp, char *name )
 {
 	sem_set_name ( cp->signal, name );
+}
+
+void
+cv_set_mname ( struct cv *cp, char *name )
+{
+	sem_set_name ( cp->mutex, name );
 }
 
 void
 cv_destroy ( struct cv *cp )
 {
 	sem_destroy ( cp->signal );
+	sem_destroy ( cp->mutex );
 	cp->next = cv_avail;
 	cv_avail = cp;
 }
@@ -2345,6 +2368,18 @@ void
 cv_signal ( struct cv *cp )
 {
 	sem_unblock ( cp->signal );
+}
+
+void
+cv_lock ( struct cv *cp )
+{
+	sem_block ( cp->mutex );
+}
+
+void
+cv_unlock ( struct cv *cp )
+{
+	sem_unblock ( cp->mutex );
 }
 
 /* We enter this holding mutex (to avoid a race)

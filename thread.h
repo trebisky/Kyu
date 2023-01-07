@@ -82,7 +82,8 @@ struct sem *sem_signal_new ( int );
 void sem_block ( struct sem * );
 void sem_unblock ( struct sem * );
 
-struct cv *cv_new ( struct sem * );
+// struct cv *cv_new ( struct sem * );
+struct cv *cv_new ( void );
 void cv_wait ( struct cv * );
 void cv_signal ( struct cv * );
 

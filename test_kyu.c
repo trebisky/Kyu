@@ -1153,22 +1153,26 @@ test_hard ( long count )
 
 /* -------------------------------------------- */
 /* Check out condition variables.
+ * This is an entirely lame and useless test,
+ * but it does try to do -something- with a cv.
  */
 
 static volatile int predicate;
 static struct cv *cv1;
-static struct sem *cv1_mutex;
+// static struct sem *cv1_mutex;
 
 static void
 cv1_func ( long x )
 {
 	int m;
 
-	sem_block ( cv1_mutex );
+	// sem_block ( cv1_mutex );
+	cv_lock ( cv1 );
 	while ( ! predicate ) {
-	    printf ( "Wait " );
+	    printf ( "Wait\n" );
 	    cv_wait ( cv1 );
-	    printf ("Out ");
+	    printf ("done waiting\n ");
+#ifdef notdef
 	    /* This should fail, we should already have
 	     * the lock, if this works, we acquire it
 	     * below, which is wrong.
@@ -1176,8 +1180,11 @@ cv1_func ( long x )
 	    m = sem_block_try ( cv1_mutex );
 	    if ( m )
 	    	printf ( "Oops " );
+#endif
 	}
-	sem_unblock ( cv1_mutex );
+	// sem_unblock ( cv1_mutex );
+	cv_unlock ( cv1 );
+
 	printf ( "Bye! " );
 }
 
@@ -1189,9 +1196,10 @@ test_cv1 ( long count )
 	printf ( "CV test: " );
 
 	predicate = 0;
-	cv1_mutex = sem_mutex_new ( SEM_PRIO );
+	// cv1_mutex = sem_mutex_new ( SEM_PRIO );
 
-	cv1 = cv_new ( cv1_mutex );
+	// cv1 = cv_new ( cv1_mutex );
+	cv1 = cv_new ();
 	if ( ! cv1 )
 	    printf ( "No dice!\n" );
 
@@ -1203,7 +1211,7 @@ test_cv1 ( long count )
 
 	thr_join ( tp );
 	cv_destroy ( cv1 );
-	sem_destroy ( cv1_mutex );
+	// sem_destroy ( cv1_mutex );
 
 	printf ( " OK\n" );
 }
