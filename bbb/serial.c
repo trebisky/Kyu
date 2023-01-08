@@ -346,4 +346,31 @@ void serial_int ( int xxx )
 #endif
 }
 
+void
+console_use_ints ( void )
+{
+}
+
+#ifdef notdef
+/* XXX  12-20-2022 -- from the orange pi */
+void
+console_use_ints ( void )
+{
+        struct serial_softc *sc = &serial_soft[CONSOLE_UART];
+        struct h3_uart *up = sc->base;
+
+        sc->in_sem = sem_signal_new ( SEM_FIFO );
+        // should check
+
+        irq_hookup ( IRQ_UART0, uart_handler, CONSOLE_UART );
+
+        // up->ier = 0;
+        // up->ier = IE_RDA | IE_TXE;
+        up->ier = IE_RDA;
+
+        sc->use_ints = 1;
+}
+#endif
+
+
 /* THE END */

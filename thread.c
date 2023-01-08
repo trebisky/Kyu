@@ -1710,10 +1710,10 @@ change_thread ( struct thread *new_tp, int options )
 	 * structure.
 	 */
 	INT_lock;
-	wang_hook1 ( cur_thread, new_tp );
+	// wang_hook1 ( cur_thread, new_tp );
 	prior_thread = cur_thread;	/* new 12-29-2022 */
 	cur_thread = new_tp;
-	wang_hook2 ( cur_thread );
+	// wang_hook2 ( cur_thread );
 
 	/* We need to stay locked between deciding how to resume
 	 * and actually doing so.  5-14-2015

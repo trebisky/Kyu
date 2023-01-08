@@ -171,7 +171,7 @@ board_init ( void )
 	i2c_init ();
 
 	adc_init ();
-	// printf ( "board_init done\n" );
+	printf ( "BBB board_init done\n" );
 }
 
 /* Called by timer_init () */

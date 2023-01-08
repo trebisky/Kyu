@@ -540,6 +540,16 @@ i2c_hw_recv ( void *ii, int addr, char *buf, int count )
 	return 0;
 }
 
+/* XXX some chips provide an error register.
+ * perhaps some status register on the BBB would give
+ * us what we want?
+ */
+int
+i2c_hw_error ( void *ii )
+{
+	return 0;
+}
+
 void
 i2c_i2c0_setup ( void )
 {

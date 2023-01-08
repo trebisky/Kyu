@@ -17,7 +17,8 @@
 
 // #define PRI_SHELL	40
 // this only works if we have a console uart via interrupts
-#define PRI_SHELL	11
+// #define PRI_SHELL	11
+#define PRI_SHELL	60
 
 void shell_main ( long );
 

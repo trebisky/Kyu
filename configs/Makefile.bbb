@@ -37,9 +37,12 @@ OBJS =  machine.o \
     dlmalloc.o \
     random.o \
     net.o \
-    tcp_xinu.o \
     kyulib.o \
     lib.o
+
+#OBJS += tcp_kyu.o
+OBJS += tcp_bsd.o
+#OBJS += tcp_xinu.o
 
 all: install dump sym tags
 
@@ -64,6 +67,9 @@ machine.o:	bogus
 	cd net ; make
 	cd lib ; make
 	cd tcp_xinu ; make
+	cd tcp_bsd ; make
+	cd tcp_kyu ; make
+
 #	cd linux ; make
 
 bogus:
