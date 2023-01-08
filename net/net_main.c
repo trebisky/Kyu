@@ -486,6 +486,7 @@ net_send ( struct netbuf *nbp )
 	*/
 	nbp->next = (struct netbuf *) 0;
 
+	INT_lock;
         if ( outq_tail ) {
             outq_tail->next = nbp;
             outq_tail = nbp;
@@ -494,6 +495,7 @@ net_send ( struct netbuf *nbp )
             outq_head = nbp;
         }
         outq_count++;
+	INT_unlock;
 
         cpu_signal ( outq_sem );
 
