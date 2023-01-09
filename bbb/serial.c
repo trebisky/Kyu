@@ -54,8 +54,7 @@
 #define UART_LCR_EPS    0x10            /* Even Parity Select */
 #define UART_LCR_STKP   0x20            /* Stick Parity */
 #define UART_LCR_SBRK   0x40            /* Set Break */
-#define UART_LCR_BKSE   0x80            /* Bank select enable */
-#define UART_LCR_DLAB   0x80            /* Divisor latch access bit */
+#define UART_LCR_DLE    0x80            /* Divisor latch enable */
 
 /*
  * These are the definitions for the Line Status Register
@@ -136,10 +135,12 @@ struct uart {
 /* Clear & enable FIFOs */
 #define UART_FCRVAL (UART_FCR_FIFO_EN | UART_FCR_RXSR | UART_FCR_TXSR)
 
+/* The Uart gets a 48 Mhz clock */
 #define UART_CLOCK	48000000
 
-/* Testing this enables putc to work from the very start.
- * We do rely upon U-Boot initialization, but that does work.
+/* Testing this flat enables putc to work from the very start.
+ * We rely upon U-Boot initialization for that,
+ *  which does work.
  */
 static int early = 1;
 
@@ -201,7 +202,7 @@ set_baud ( struct uart *up, int baud )
 	bdiv = 16 * baud;
 	div = (UART_CLOCK + bdiv/2) / bdiv;
 
-	up->lcr = UART_LCR_BKSE | UART_LCRVAL;
+	up->lcr = UART_LCR_DLE | UART_LCRVAL;
 	up->dll = div & 0xff;
 	up->dlm = (div >> 8) & 0xff;
 	up->lcr = UART_LCRVAL;
@@ -213,13 +214,19 @@ serial_setup ( int devnum, int baud )
 	struct serial_softc *sc = &serial_soft[devnum];
 	struct uart *up = sc->base;
 
+	/* Wait for transmitter to empty
+	 */
 	while ( ! (up->lsr & UART_LSR_TEMT) )
 		;
 
 	up->ier = 0;
 
-	/* Extra -- needed for Omap 335x devices */
-	up->mdr1 = 0x7;		/* mode select reset TL16C750*/
+	/* This disables the uart, but the following
+	 * odd comments come from U-Boot ---
+	 *   Extra -- needed for Omap 335x devices.
+	 *   mode select reset TL16C750
+	 */
+	up->mdr1 = 0x7;
 
 	up->mcr = UART_MCRVAL;
 	up->fcr = UART_FCRVAL;
@@ -229,8 +236,9 @@ serial_setup ( int devnum, int baud )
 
 	set_baud ( up, baud );
 
-	/* Special for Omap3 335x devices */
-	/* /16 is proper to hit 115200 with 48MHz */
+	/* Uart 16x mode.
+	 * This lets us get 115200 with our 48 Mhz clock.
+	 */
 	up->mdr1 = 0;
 }
 
@@ -241,7 +249,7 @@ serial_putc ( int c )
 	struct serial_softc *sc = &serial_soft[CONSOLE_UART];
 	struct uart *up;
 
-	/* Be able to generate output without init being called */
+	/* Be able to generate output before serial_init is called */
 	if ( early )
 	    up = CONSOLE_UART_BASE;
 	else
