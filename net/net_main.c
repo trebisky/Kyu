@@ -242,7 +242,8 @@ net_init ( void )
     (void) safe_thr_new ( "net-out", output_thread, (void *) 0, PRI_NET_OUT, 0 );
 
     /* this handles ARP and DNS */
-    (void) thr_new_repeat ( "net-slow", slow_net, (void *) 0, PRI_SLOW, 0, system_clock_rate );
+    // (void) thr_new_repeat ( "net-slow", slow_net, (void *) 0, PRI_SLOW, 0, system_clock_rate );
+    (void) thr_new_repeat ( "net-timer", slow_net, (void *) 0, PRI_SLOW, 0, system_clock_rate );
 
     /* Here is where we initialize hardware.
      * no network traffic until after this is done

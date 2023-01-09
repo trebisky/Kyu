@@ -16,15 +16,12 @@
  *  include/ns16550.h
  */
 
-#define UART0_BASE      0x44E09000
+#include <arch/types.h>
+#include "omap_ints.h"
 
-#define UART1_BASE      0x48022000
-#define UART2_BASE      0x48024000
-#define UART3_BASE      0x481a6000
-#define UART4_BASE      0x481a8000
-#define UART5_BASE      0x481aa000
-
-#define UART_BASE	UART0_BASE
+#include <kyu.h>
+#include <kyulib.h>
+#include <thread.h>
 
 /* registers are 4 bytes apart, but only a byte wide.
  * they are read at the address specified
@@ -114,7 +111,7 @@
         unsigned char postpad_##x[3];
 
 struct NS16550 {
-        UART_REG(rbr);          /* 0 */
+        UART_REG(rhr);          /* 0 */
         UART_REG(ier);          /* 1 */
         UART_REG(fcr);          /* 2 */
         UART_REG(lcr);          /* 3 */
@@ -135,10 +132,52 @@ struct NS16550 {
         UART_REG(ssr);          /* 11*/
 };
 
-#define thr rbr
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+
+/* These are actually 8 bit registers,
+ *  followed by 3 bytes of "air".
+ * but because we are little endian
+ *  accessing them as 32 bit items like this works.
+ */
+struct uart {
+	volatile unsigned int	rhr;	/* 00 - data - thr/tbr */
+	volatile unsigned int	ier;	/* 04 - interrupt enable */
+	volatile unsigned int	fcr;	/* 08 - fifo control */
+	volatile unsigned int	lcr;	/* 0C - line control */
+	volatile unsigned int	mcr;	/* 10 - modem control */
+	volatile unsigned int	lsr;	/* 14 - line status */
+	volatile unsigned int	msr;	/* 18 - modem status */
+	volatile unsigned int	spr;	/* 1c - scratch */
+
+	volatile unsigned int	mdr1;	/* 20 - mode 1 */
+	volatile unsigned int	mdr2;	/* 24 - mode 2 */
+	volatile unsigned int	tfll;	/* 28 - transmit frame length low */
+	volatile unsigned int	tflh;	/* 2c - transmit frame length high */
+	volatile unsigned int	rfll;	/* 30 - receive frame length low */
+	volatile unsigned int	rflh;	/* 34 - receive frame length high */
+	volatile unsigned int	bof;	/* 38 - autobaud status */
+	volatile unsigned int	uasr;	/* 3c - aux status */
+	volatile unsigned int	scr;	/* 40 - suppl control */
+	volatile unsigned int	ssr;	/* 44 - suppl status */
+	volatile unsigned int	bofl;	/* 48 - bof length */
+	/* More registers, see page 4030-4031 */
+};
+
+#define thr rhr
 #define iir fcr
-#define dll rbr
+#define dll rhr
 #define dlm ier
+
+#define IER_CTS		0x80
+#define IER_RTS		0x40
+#define IER_XOFF	0x20
+#define IER_SLEEP	0x10
+#define IER_MODEM	0x08
+#define IER_LINE	0x04
+#define IER_THR		0x02
+#define IER_RHR		0x01
 
 #define UART_LCR_8N1    0x03
 #define UART_LCRVAL UART_LCR_8N1                /* 8 data, 1 stop, no parity */
@@ -147,6 +186,40 @@ struct NS16550 {
 
 /* Clear & enable FIFOs */
 #define UART_FCRVAL (UART_FCR_FIFO_EN | UART_FCR_RXSR | UART_FCR_TXSR)
+
+#define UART_CLOCK	48000000
+
+/* Testing this enables putc to work from the very start.
+ * We do rely upon U-Boot initialization, but that does work.
+ */
+static int early = 1;
+
+/* Yes Martha, the chip really has 6 serial ports */
+#define NUM_UART        6
+
+static struct serial_softc {
+        struct uart *base;
+        int irq;
+        struct sem *in_sem;
+        struct cqueue *in_queue;
+        int use_ints;
+} serial_soft[NUM_UART];
+
+#define UART0_BASE      ((struct uart *) 0x44E09000)
+
+#define UART1_BASE      ((struct uart *) 0x48022000)
+#define UART2_BASE      ((struct uart *) 0x48024000)
+#define UART3_BASE      ((struct uart *) 0x481a6000)
+#define UART4_BASE      ((struct uart *) 0x481a8000)
+#define UART5_BASE      ((struct uart *) 0x481aa000)
+
+#define CONSOLE_UART	0
+#define CONSOLE_UART_BASE	UART0_BASE
+
+// XXX
+#define UART_BASE	UART0_BASE
+
+static void serial_setup ( int );
 
 /* From linux/kernel.h
  * Divide positive or negative dividend by positive divisor and round
@@ -163,10 +236,6 @@ struct NS16550 {
                 (((__x) - ((__d) / 2)) / (__d));        \
 }                                                       \
 )
-
-#define UART_CLOCK	48000000
-
-static void serial_init_int ( int );
 
 static int
 calc_divisor ( int clock, int baudrate)
@@ -191,17 +260,33 @@ setbrg ( int baud_divisor)
 void
 serial_init ( int baud )
 {
-    int divisor = calc_divisor ( UART_CLOCK, baud );
+	struct serial_softc *sc = &serial_soft[CONSOLE_UART];
 
-    setup_uart0_mux ();
+	setup_uart0_mux ();
 
-    serial_init_int ( divisor );
+	serial_setup ( baud );
+
+	sc->use_ints = 0;
+	sc->base = (struct uart *) UART0_BASE;
+	sc->irq = IRQ_UART0;
+
+	sc->in_queue = cq_init ( 128 );
+        if ( ! sc->in_queue )
+            panic ( "Cannot get in-queue for uart" );
+
+	sc->base->ier = 0;
+
+	early = 0;
+	printf ( "Serial port initialized\n" );
 }
 
 static void
-serial_init_int ( int baud_divisor )
+serial_setup ( int baud )
 {
 	struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
+	int baud_divisor;
+
+	baud_divisor = calc_divisor ( UART_CLOCK, baud );
 
 #ifdef notdef
 	/*
@@ -237,31 +322,58 @@ serial_init_int ( int baud_divisor )
 	putb(0, &com_port->mdr1);
 }
 
+/* Good old polled output */
 void
 serial_putc ( int c )
 {
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
+	struct serial_softc *sc = &serial_soft[CONSOLE_UART];
+	struct uart *up;
 
-    while ( (getb(&com_port->lsr) & UART_LSR_THRE) == 0)
-	;
+	/* Be able to generate output without init being called */
+	if ( early )
+	    up = CONSOLE_UART_BASE;
+	else
+	    up = sc->base;
 
-    putb(c, &com_port->thr);
+	while ( ! (up->lsr & UART_LSR_THRE) )
+	    ;
 
-    if ( c == '\n' )
-	serial_putc ( '\r' );
+	up->thr = c;
+
+	if ( c == '\n' )
+	    serial_putc ( '\r' );
 }
 
+/* Good old polled input.
+ * -- never gets called until we are fully initialized.
+ */
 int
 serial_getc ( void )
 {
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
+	struct serial_softc *sc = &serial_soft[CONSOLE_UART];
+	struct uart *up = sc->base;
+	int c;
 
-    while ( (getb(&com_port->lsr) & UART_LSR_DR) == 0)
-	;
-    return getb(&com_port->rbr);
+	if ( sc->use_ints ) {
+            for ( ;; ) {
+                // lock
+                if ( cq_count ( sc->in_queue ) ) {
+                    c = cq_remove ( sc->in_queue );
+                    // unlock
+                    return c;
+                }
+                // unlock
+                sem_block ( sc->in_sem );
+            }
+        }
 
+	/* Simple polled read */
+	while ( ! (up->lsr & UART_LSR_DR) )
+	    ;
+	return up->rhr;
 }
 
+#ifdef notdef
 int 
 serial_tstc ( void )
 {
@@ -269,6 +381,7 @@ serial_tstc ( void )
 
     return getb(&com_port->lsr) & UART_LSR_DR != 0;
 }
+#endif
 
 
 void
@@ -278,8 +391,11 @@ serial_puts ( char *s )
 	serial_putc ( *s++ );
 }
 
-/* Interrupt stuff below here, above is polling driver */
+/* ==================================================  */
+/* ==================================================  */
+/* Interrupt stuff below here, above is the polling driver */
 
+#ifdef notdef
 char msg[] = "Hello World\r\n";
 
 #define IE_TX	2
@@ -329,7 +445,7 @@ void serial_int ( int xxx )
 
     putb(*next++, &com_port->thr);
 
-#ifdef notdef
+#ifdef not_even
     /* Try to output as many chars as possible per interrupt.
      * When I tested this, nothing happened till I typed
      * a character ??!!  Then it worked fine.
@@ -345,32 +461,52 @@ void serial_int ( int xxx )
     }
 #endif
 }
+#endif
 
-void
-console_use_ints ( void )
+/* We are using printf to debug ourself.
+ * It works given that output is polled.
+ */
+static void
+uart_handler ( int devnum )
 {
+	struct serial_softc *sc = &serial_soft[devnum];
+	struct uart *up = sc->base;
+	int x;
+
+	// printf ( "Console serial interrupt %d\n", devnum );
+	while ( up->lsr & UART_LSR_DR ) {
+	    x = up->rhr;
+	    cq_add ( sc->in_queue, x );
+	}
+	/* Would this work right if the above loop
+	 * harvested more than 1 character?
+	 */
+	sem_unblock ( sc->in_sem );
 }
 
-#ifdef notdef
-/* XXX  12-20-2022 -- from the orange pi */
+/* This is new as of 1-2023
+ * The idea is that the console serial port transitions to use
+ * interrupts (for input only) after most of Kyu initialization
+ * is done.  Truth be known, serial input could just as well be
+ * the game from the start, since we never do any input, but we
+ * need a variety of things to be initialized before we can
+ * switch to using interrupts.
+ */
 void
 console_use_ints ( void )
 {
-        struct serial_softc *sc = &serial_soft[CONSOLE_UART];
-        struct h3_uart *up = sc->base;
+	struct serial_softc *sc = &serial_soft[CONSOLE_UART];
+	struct uart *up = sc->base;
 
+	// Must do this here, doing it in "init" is too early
         sc->in_sem = sem_signal_new ( SEM_FIFO );
         // should check
 
         irq_hookup ( IRQ_UART0, uart_handler, CONSOLE_UART );
 
-        // up->ier = 0;
-        // up->ier = IE_RDA | IE_TXE;
-        up->ier = IE_RDA;
+	up->ier = IER_RHR;
 
         sc->use_ints = 1;
 }
-#endif
-
 
 /* THE END */

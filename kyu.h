@@ -17,6 +17,12 @@
 #include "protos.h"
 #include "board/board.h"
 
+// This is referenced in user.c when it launches the shell.
+// #define PRI_SHELL	60
+// this only works if we have a console uart
+// that does input via interrupts
+#define PRI_SHELL	11
+
 #define MAX_THREADS	32
 // #define MAX_SEM		64
 #define MAX_SEM		512

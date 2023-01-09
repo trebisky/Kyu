@@ -520,6 +520,9 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	// printf ( "len = %d\n", strlen(cmd) );
 	// dump_buf ( cmd, strlen(cmd) );
 
+// #define NUM_BIG	100	/* 100 * 2K = 200K */
+#define NUM_BIG	500	/* 500 * 2K = 1M */
+
 	if ( strcmp ( cmd, "stat" ) == 0 )
 	    so_puts ( so, "OK\n" );
 	else if ( strcmp ( cmd, "rand" ) == 0 )
@@ -529,7 +532,7 @@ one_wangdoodle ( struct socket *so, char *cmd )
 	else if ( strcmp ( cmd, "big" ) == 0 ) {
 	    wang_state = 10;
 	    // big_wangdoodle ( so );
-	    lots ( so, 100 );
+	    lots ( so, NUM_BIG );
 	    wang_state = 99;
 	    return 1 ;
 	} else if ( strcmp ( wp[0], "lots" ) == 0 && nw == 1 ) {
