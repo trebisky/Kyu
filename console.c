@@ -36,6 +36,7 @@ void puts ( char * );
 /* -------------------------------------------- */
 
 /* Set up for minimal IO without interrupts */
+/* XXX totally bogus */
 void
 console_initialize ( void )
 {

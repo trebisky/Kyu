@@ -6,14 +6,16 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  */
+
 /* serial.c
  * simple polled serial port driver
  * see section 19 of the am3359 TRM
  * register description pg 3992 ...
- * 
- * U-boot ns16550 driver is at:
- *  drivers/serial/ns16550.c
- *  include/ns16550.h
+ *
+ * Reworked 1-8-2023 to use interrupts, as well as to tidy
+ *  up register declarations.
+ * The original version was heavily influenced by
+ *   the U-boot ns16550 driver.
  */
 
 #include <arch/types.h>
@@ -22,18 +24,6 @@
 #include <kyu.h>
 #include <kyulib.h>
 #include <thread.h>
-
-/* registers are 4 bytes apart, but only a byte wide.
- * they are read at the address specified
- */
-
-#define getb(a)          (*(volatile unsigned char *)(a))
-#define getw(a)          (*(volatile unsigned short *)(a))
-#define getl(a)          (*(volatile unsigned int *)(a))
-
-#define putb(v,a)        (*(volatile unsigned char *)(a) = (v))
-#define putw(v,a)        (*(volatile unsigned short *)(a) = (v))
-#define putl(v,a)        (*(volatile unsigned int *)(a) = (v))
 
 /*
  * These are the definitions for the Modem Control Register
@@ -79,15 +69,6 @@
 #define UART_LSR_TEMT   0x40            /* Xmitter empty */
 #define UART_LSR_ERR    0x80            /* Error */
 
-#define UART_MSR_DCD    0x80            /* Data Carrier Detect */
-#define UART_MSR_RI     0x40            /* Ring Indicator */
-#define UART_MSR_DSR    0x20            /* Data Set Ready */
-#define UART_MSR_CTS    0x10            /* Clear to Send */
-#define UART_MSR_DDCD   0x08            /* Delta DCD */
-#define UART_MSR_TERI   0x04            /* Trailing edge ring indicator */
-#define UART_MSR_DDSR   0x02            /* Delta DSR */
-#define UART_MSR_DCTS   0x01            /* Delta CTS */
-
 /*
  * These are the definitions for the FIFO Control Register
  */
@@ -103,38 +84,6 @@
 
 #define UART_FCR_RXSR           0x02 /* Receiver soft reset */
 #define UART_FCR_TXSR           0x04 /* Transmitter soft reset */
-
-/* From include/ns16550.h */
-
-#define UART_REG(x)                                                     \
-        unsigned char x;                                                \
-        unsigned char postpad_##x[3];
-
-struct NS16550 {
-        UART_REG(rhr);          /* 0 */
-        UART_REG(ier);          /* 1 */
-        UART_REG(fcr);          /* 2 */
-        UART_REG(lcr);          /* 3 */
-        UART_REG(mcr);          /* 4 */
-        UART_REG(lsr);          /* 5 */
-        UART_REG(msr);          /* 6 */
-        UART_REG(spr);          /* 7 */
-
-        UART_REG(mdr1);         /* 8 */
-        UART_REG(reg9);         /* 9 */
-        UART_REG(regA);         /* A */
-        UART_REG(regB);         /* B */
-        UART_REG(regC);         /* C */
-        UART_REG(regD);         /* D */
-        UART_REG(regE);         /* E */
-        UART_REG(uasr);         /* F */
-        UART_REG(scr);          /* 10*/
-        UART_REG(ssr);          /* 11*/
-};
-
-/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
-/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
-/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 
 /* These are actually 8 bit registers,
  *  followed by 3 bytes of "air".
@@ -194,7 +143,9 @@ struct uart {
  */
 static int early = 1;
 
-/* Yes Martha, the chip really has 6 serial ports */
+/* Yes Martha, the chip really has 6 serial ports.
+ * This driver only supports the console at this time.
+ */
 #define NUM_UART        6
 
 static struct serial_softc {
@@ -216,47 +167,9 @@ static struct serial_softc {
 #define CONSOLE_UART	0
 #define CONSOLE_UART_BASE	UART0_BASE
 
-// XXX
-#define UART_BASE	UART0_BASE
+static void serial_setup ( int, int );
 
-static void serial_setup ( int );
-
-/* From linux/kernel.h
- * Divide positive or negative dividend by positive divisor and round
- * to closest integer. Result is undefined for negative divisors and
- * for negative dividends if the divisor variable type is unsigned.
- */
-#define DIV_ROUND_CLOSEST(x, divisor)(                  \
-{                                                       \
-        typeof(x) __x = x;                              \
-        typeof(divisor) __d = divisor;                  \
-        (((typeof(x))-1) > 0 ||                         \
-         ((typeof(divisor))-1) > 0 || (__x) > 0) ?      \
-                (((__x) + ((__d) / 2)) / (__d)) :       \
-                (((__x) - ((__d) / 2)) / (__d));        \
-}                                                       \
-)
-
-static int
-calc_divisor ( int clock, int baudrate)
-{
-        const unsigned int mode_x_div = 16;
-
-        return DIV_ROUND_CLOSEST(clock, mode_x_div * baudrate);
-}
-
-/* set the baud rate generator */
-static void
-setbrg ( int baud_divisor)
-{
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-
-    putb ( UART_LCR_BKSE | UART_LCRVAL, &com_port->lcr );
-    putb ( baud_divisor & 0xff, &com_port->dll );
-    putb ( (baud_divisor >> 8) & 0xff, &com_port->dlm );
-    putb ( UART_LCRVAL, &com_port->lcr );
-}
-
+/* You can bet on it that we will be asked for 115200 for the console */
 void
 serial_init ( int baud )
 {
@@ -264,62 +177,61 @@ serial_init ( int baud )
 
 	setup_uart0_mux ();
 
-	serial_setup ( baud );
-
 	sc->use_ints = 0;
 	sc->base = (struct uart *) UART0_BASE;
 	sc->irq = IRQ_UART0;
+
+	serial_setup ( CONSOLE_UART, baud );
 
 	sc->in_queue = cq_init ( 128 );
         if ( ! sc->in_queue )
             panic ( "Cannot get in-queue for uart" );
 
-	sc->base->ier = 0;
-
 	early = 0;
 	printf ( "Serial port initialized\n" );
 }
 
+/* set the baud rate generator */
+/* for 115200 this sets 26 */
 static void
-serial_setup ( int baud )
+set_baud ( struct uart *up, int baud )
 {
-	struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-	int baud_divisor;
+	int bdiv, div;
 
-	baud_divisor = calc_divisor ( UART_CLOCK, baud );
+	bdiv = 16 * baud;
+	div = (UART_CLOCK + bdiv/2) / bdiv;
 
-#ifdef notdef
-	/*
-	 * On some OMAP3/OMAP4 devices when UART3 is configured for boot mode
-	 * before SPL starts only THRE bit is set. We have to empty the
-	 * transmitter before initialization starts.
-	 */
-	if ( (getb(&com_port->lsr) & (UART_LSR_TEMT | UART_LSR_THRE)) == UART_LSR_THRE) {
-	    if (baud_divisor != -1)
-		setbrg ( baud_divisor );
-	    putb(0, &com_port->mdr1);
-	}
-#endif
+	up->lcr = UART_LCR_BKSE | UART_LCRVAL;
+	up->dll = div & 0xff;
+	up->dlm = (div >> 8) & 0xff;
+	up->lcr = UART_LCRVAL;
+}
 
-	while ( !(getb(&com_port->lsr) & UART_LSR_TEMT))
+static void
+serial_setup ( int devnum, int baud )
+{
+	struct serial_softc *sc = &serial_soft[devnum];
+	struct uart *up = sc->base;
+
+	while ( ! (up->lsr & UART_LSR_TEMT) )
 		;
 
-	putb ( 0, &com_port->ier );
+	up->ier = 0;
 
 	/* Extra -- needed for Omap 335x devices */
-	putb(0x7, &com_port->mdr1);	/* mode select reset TL16C750*/
+	up->mdr1 = 0x7;		/* mode select reset TL16C750*/
 
-	setbrg ( 0 );
+	up->mcr = UART_MCRVAL;
+	up->fcr = UART_FCRVAL;
 
-	putb (UART_MCRVAL, &com_port->mcr);
-	putb (UART_FCRVAL, &com_port->fcr);
+	if ( baud < 0 || baud > 1000000 )
+	    panic ( "Crazy baud rate" );
 
-	if (baud_divisor != -1)
-	    setbrg ( baud_divisor );
+	set_baud ( up, baud );
 
 	/* Special for Omap3 335x devices */
 	/* /16 is proper to hit 115200 with 48MHz */
-	putb(0, &com_port->mdr1);
+	up->mdr1 = 0;
 }
 
 /* Good old polled output */
@@ -373,95 +285,12 @@ serial_getc ( void )
 	return up->rhr;
 }
 
-#ifdef notdef
-int 
-serial_tstc ( void )
-{
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-
-    return getb(&com_port->lsr) & UART_LSR_DR != 0;
-}
-#endif
-
-
 void
 serial_puts ( char *s )
 {
     while ( *s )
 	serial_putc ( *s++ );
 }
-
-/* ==================================================  */
-/* ==================================================  */
-/* Interrupt stuff below here, above is the polling driver */
-
-#ifdef notdef
-char msg[] = "Hello World\r\n";
-
-#define IE_TX	2
-#define IE_RX	1
-
-char *next;
-
-/* Enable TH interrupts */
-void serial_int_setup ()
-{
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-
-    next = (char *) 0;
-}
-
-/* Simple test, queue up the above for output */
-void serial_int_test ( void )
-{
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-
-    next = msg;
-    putb(IE_TX, &com_port->ier);
-}
-
-/* Do whatever it takes to Ack an interrupt */
-void serial_irqack ( void )
-{
-}
-
-/* Process whatever should be processed */
-void serial_int ( int xxx )
-{
-    struct NS16550 *com_port = (struct NS16550 *) UART_BASE;
-    int c;
-
-    serial_irqack ();
-
-    if ( ! next ) {
-	putb(0, &com_port->ier);
-	return;
-    }
-    if ( ! *next ) {
-	putb(0, &com_port->ier);
-	next = (char *) 0;
-	return;
-    }
-
-    putb(*next++, &com_port->thr);
-
-#ifdef not_even
-    /* Try to output as many chars as possible per interrupt.
-     * When I tested this, nothing happened till I typed
-     * a character ??!!  Then it worked fine.
-     */
-    for ( ;; ) {
-	if ( (getb(&com_port->lsr) & UART_LSR_DR) == 0)
-	    break;
-	putb(*next++, &com_port->thr);
-	if ( ! *next ) {
-	    next = (char *) 0;
-	    break;
-	}
-    }
-#endif
-}
-#endif
 
 /* We are using printf to debug ourself.
  * It works given that output is polled.
