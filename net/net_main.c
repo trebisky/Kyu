@@ -100,9 +100,9 @@ void
 net_hw_init ( long bogus )
 {
     num_eth = board_net_init ();
-    puts ( "TJT after board_net_init" );
+    // puts ( "TJT after board_net_init" );
     board_net_activate ();
-    puts ( "TJT after board_net_activate" );
+    // puts ( "TJT after board_net_activate" );
 
     if ( num_eth > 0 )
 	net_state = NET_RUN;
@@ -262,15 +262,15 @@ net_init ( void )
  */
 #define NET_STARTUP_WAIT	12
 
-    puts ( "TJT -in net wait" );
+    // puts ( "TJT -in net wait" );
     count = 0;
     // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
     while ( net_state == NET_INIT && count++ < NET_STARTUP_WAIT ) {
 	// printf ( "Net wait %d\n", count );
 	thr_delay ( system_clock_rate/2 );
-	puts ( "TJT -tick" );
+	// puts ( "TJT -tick" );
     }
-    puts ( "TJT -after net wait" );
+    // puts ( "TJT -after net wait" );
 
     if ( num_eth == 0 ) {
 	net_state = NET_IDLE;
