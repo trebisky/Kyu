@@ -509,9 +509,9 @@ sys_init ( long xxx )
 #endif
 
 #ifdef WANT_NET
-	puts ( "TJT - start net_init" );
+	//puts ( "TJT - start net_init" );
 	net_init ();
-	puts ( "TJT - finished net_init" );
+	//puts ( "TJT - finished net_init" );
 #endif
 
 /* These things must be after net_init() because
@@ -519,6 +519,7 @@ sys_init ( long xxx )
  * The "console_use_ints()" call will only work
  * for the orange pi at present, it is a hack
  * introduced in 12-2022 for TCP debugging.
+ * (Actually, as of 1-2023 it also works for the BBB.)
  */
 #ifdef WANT_SHELL
 	console_use_ints ();	/* XXX */

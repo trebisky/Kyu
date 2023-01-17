@@ -574,6 +574,10 @@ tcp_bsd_rcv ( struct netbuf *nbp )
         nbp->next = (struct netbuf *) 0;
 	// bpf2 ( "bsd_rcv %08x, %d\n", nbp, nbp->ilen );
 
+	// XXX
+	// for debugging orange Pi
+	// emac_show_times ();
+
 	// sem_block ( tcp_queue_lock_sem );
 	cv_lock ( tcp_queue_cv );
 

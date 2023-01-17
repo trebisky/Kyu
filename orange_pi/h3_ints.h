@@ -12,6 +12,8 @@
  */
 
 /* List of interrupt numbers for the Allwinner H3
+ *
+ * See section 4.12 on page 206 of the TRM
  */
 
 /* The H3 defines 157 interrupts (0-156)

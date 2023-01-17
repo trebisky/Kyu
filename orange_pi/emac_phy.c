@@ -70,12 +70,14 @@
 #define BMCR_CT_ENABLE          0x0080		/* enable collision test */
 
 /* Bits in the basic mode status register. */
-#define BMSR_ANEGCAPABLE        0x0008
-#define BMSR_ANEGCOMPLETE       0x0020
-#define BMSR_10HALF             0x0800
-#define BMSR_10FULL             0x1000
-#define BMSR_100HALF            0x2000
+
 #define BMSR_100FULL            0x4000
+#define BMSR_100HALF            0x2000
+#define BMSR_10FULL             0x1000
+#define BMSR_10HALF             0x0800
+#define BMSR_ANEGCOMPLETE       0x0020
+#define BMSR_ANEGCAPABLE        0x0008
+#define BMSR_LINK_UP            0x0004
 
 /* Bits in the link partner ability register. */
 #define LPA_10HALF              0x0020
@@ -89,6 +91,7 @@
  * I get identical results from both address 0 and 1
  * U-boot sets it to 1, so I will also.
  * Code that does a phy_reset seems to set this to 0 though.
+ * Also a study of NetBSD code shows it sets the syscon address to 1.
  *
  * This gives us the ethernet PHY built into the H3 chip.
  * For Orange Pi variants that support 1G, we would need to
@@ -122,13 +125,14 @@
 
 void phy_init ( void );
 void phy_update ( void );
+void phy_show ( void );
+void phy_show_state ( void );
 
 static void emac_syscon_setup ( void );
 static int phy_id ( void );
-static void phy_show ( void );
 static void phy_reset ( void );
-static void phy_autonegotiate ( void );
-static void phy_link_status ( void );
+static void phy_autonegotiate ( int );
+static void phy_set_link_status ( int );
 static void phy_link_setup ( void );
 
 static int phy_read ( int );
@@ -143,6 +147,7 @@ static int phy_debug = 0;
  */
 static int phy_speed = 100;
 static int phy_duplex = DUPLEX_FULL;
+static int phy_up = 0;
 
 int
 phy_get_speed ( void )
@@ -156,8 +161,14 @@ phy_get_duplex ( void )
 	return phy_duplex;
 }
 
-void
-phy_init ( void )
+int
+phy_get_link ( void )
+{
+	return phy_up;
+}
+
+static void
+phy_init_int ( int speed_10 )
 {
 	int id;
 
@@ -180,16 +191,41 @@ phy_init ( void )
 	phy_show ();
 
 	printf ( "Start autonegotiation\n" );
-	phy_autonegotiate ();
+	phy_autonegotiate ( speed_10 );
 
 	phy_show ();
 
-	phy_update ();
+	// phy_update ();
+	phy_set_link_status ( 1 );
+	phy_show_state ();
 
+	/* set our control reg to reflect
+	 * what happened during autonegotiation
+	 */
 	phy_link_setup ();
+
+	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
 }
 
-static void
+/* Initialize the best we can get */
+void
+phy_init ( void )
+{
+	phy_init_int ( 0 );
+}
+
+/* Initialize at 10 mbit.
+ * XXX - does not work, autonegotiation simply fails.
+ * We end up with the link down.
+ */
+void
+phy_init_10 ( void )
+{
+	phy_init_int ( 1 );
+}
+
+void
 phy_show ( void )
 {
 	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
@@ -204,7 +240,7 @@ phy_link_setup ( void )
 	int reg;
 
         reg = phy_read ( PHY_BMCR );
-	reg &= (BMCR_100|BMCR_FULL);
+	reg &= ~(BMCR_100|BMCR_FULL);
 
 	if ( phy_speed ==100 )
 	    reg |= BMCR_100;
@@ -214,50 +250,90 @@ phy_link_setup ( void )
 }
 
 void
-phy_update ( void )
+phy_show_state ( void )
 {
-	phy_link_status ();
+	if ( phy_up )
+	    printf ( "PHY link detected UP at " );
+	else
+	    printf ( "PHY link detected DOWN at " );
 
-	printf ( "Link detected at " );
 	if ( phy_speed ==100 )
 	    printf ( "100" );
 	else
 	    printf ( "10" );
+
 	if ( phy_duplex == DUPLEX_FULL )
 	    printf ( " Full duplex\n" );
 	else
 	    printf ( " Half duplex\n" );
-
 }
 
+void
+phy_update ( void )
+{
+	phy_set_link_status ( 0 );
+	phy_show_state ();
+}
+
+/* A side note.  If this is called using the state returned by
+ * U-Boot it will (correctly) determine 100/full from the
+ * values in the registers, BUT the link is actually 10/full.
+ */
 static void
-phy_link_status ( void )
+phy_set_link_status ( int autoneg )
 {
         int match;
 
         phy_speed = 10;
         phy_duplex = DUPLEX_HALF;
+	phy_up = 0;
 
-        match = phy_read ( PHY_ADVERT ) &
-		phy_read ( PHY_PEER );
+	// printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+	// printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+
+	if ( autoneg )
+	    match = phy_read ( PHY_ADVERT ) & phy_read ( PHY_PEER );
+	else
+	    match = phy_read ( PHY_ADVERT );
 
         if ( match & (LPA_100FULL | LPA_100HALF) )
             phy_speed = 100;
 
         if ( match & (LPA_100FULL | LPA_10FULL) )
             phy_duplex = DUPLEX_FULL;
-}
 
+	if ( phy_read( PHY_BMSR ) & BMSR_LINK_UP )
+	    phy_up = 1;
+}
 
 #define ANEG_TIMEOUT	5000	/* 5 seconds */
 
 static void
-phy_autonegotiate ( void )
+phy_autonegotiate ( int speed_10 )
 {
         int reg;
         int tmo = ANEG_TIMEOUT;
 
         reg = phy_read ( PHY_BMCR );
+	// reg = 0;	// bad
+	printf ( "autonegotiation starting, BMCR = %04x\n", reg );
+	/* I see 0x3000 at this point, which is what we get after
+	 * the PHY reset. However, if I clear these bits,
+	 * the autonegotiation doesn't go right and I get all
+	 * zeros in the PEER register when it is done.
+	 * 0x2000 is the 100 Mbit speed selection
+	 * 0x1000 is ANEG enable
+	 */
+
+	/* limit speed to 10 Mbit */
+	if ( speed_10 ) {
+	    printf ( "PHY - limit autoneg speed to 10\n" );
+	    reg = phy_read ( PHY_ADVERT );
+	    printf ( "ADV   = %04x\n", reg );
+	    reg &= ~( LPA_100HALF | LPA_100FULL);
+	    printf ( "ADV   = %04x\n", reg );
+	    phy_write ( PHY_ADVERT, reg );
+	}
 
 	reg |= BMCR_ANEG_ENA;
         phy_write ( PHY_BMCR, reg );
@@ -266,7 +342,7 @@ phy_autonegotiate ( void )
 	reg |= BMCR_ANEG;
         phy_write ( PHY_BMCR, reg );
 
-	printf ( "autonegotion started: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+	printf ( "autonegotiation started: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
 
         while ( tmo-- && ! (phy_read(PHY_BMSR) & BMSR_ANEGCOMPLETE ) )
 	    thr_delay ( 2 );
@@ -279,8 +355,12 @@ phy_autonegotiate ( void )
 	    // I see 2.9 seconds, 3.0 seconds 
 	}
 
-	reg &= ~BMCR_ANEG_ENA;
-        phy_write ( PHY_BMCR, reg );
+	// If we do this (disable ANEG) we run for a little while,
+	// but then the link goes down.
+	// leave this up and we are fine.
+	// 11-13-2023
+	// reg &= ~BMCR_ANEG_ENA;
+        // phy_write ( PHY_BMCR, reg );
 }
 
 /* For some reason I thought this would take a long time,
@@ -415,8 +495,9 @@ phy_id ( void )
 
 #define EMAC_SYSCON	((unsigned int *) 0x01c00030)
 
-/* Syscon is peculiar in that it only has this one register for
- * controlling EMAC stuff, along with a chip version register.
+/* Syscon is peculiar in that it is essentially dedicated to the EMAC
+ * It has this one register for controlling EMAC stuff,
+ *   along with a chip version register.
  * This single 32 bit register controlls EMAC phy mux and such.
  */
 /* These are only some of the bit definitions, but more than we need */
@@ -455,6 +536,9 @@ emac_syscon_setup ( void )
 	// printf ( "Emac Syscon = %08x\n", *sc );
 
 	*sc = SYSCON_EPHY_INTERNAL | SYSCON_CLK24 | (SYSCON_PHY_ADDR<<20);
+
+	// I try using the 25 Mhz clock and autonegotion simply fails.
+	// *sc = SYSCON_EPHY_INTERNAL | (SYSCON_PHY_ADDR<<20);
 
 	// printf ( "Emac Syscon = %08x\n", *sc );
 }
@@ -519,206 +603,207 @@ see if it has a clever trick to make all of this work ... someday.
 
  */
 
-#ifdef PHY_JUNK
-/* This has the odd problem,
- * We use this for experiments, but the version below
- * that does two reads gives correct behavior
- */
-static int
-phy_read1 ( int reg )
-{
-	struct emac *ep = EMAC_BASE;
-
-	phy_spin();
-	ep->mii_cmd = MII_DIV | (PHY_DEV << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
-	phy_spin();
-
-	return ep->mii_data;
-}
-
-/* Call early in Kyu and see what is up */
-void
-emac_probe ( void )
-{
-	// struct emac *ep = EMAC_BASE;
-
-	printf ( "READ1 Values from U-Boot:\n" );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
-	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
-
-	/*
-	printf ( "EARLY Values from U-Boot:\n" );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
-	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
-	*/
-}
-#endif
-
-#define DUPLEX_HALF             0x00
-#define DUPLEX_FULL             0x01
-
-int link_good;
-int link_duplex;
-int link_speed;
-
-static void
-phy_set_link ( void )
-{
-	struct emac *ep = EMAC_BASE;
-	unsigned int val;
-
-	// printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	// printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
-
-	/* XXX - usually this would be set if autonegotiation
-	 * worked or not.
-	 */
-	link_good = 1;
-
-        link_speed = 10;
-        link_duplex = DUPLEX_HALF;
-
-        val = phy_read ( PHY_ADVERT ) & phy_read ( PHY_PEER );
-
-        if ( val & (LPA_100FULL | LPA_100HALF) )
-            link_speed = 100;
-
-        if ( val & (LPA_100FULL | LPA_10FULL) )
-            link_duplex = DUPLEX_FULL;
-
-	if ( ! link_good ) {
-            printf("link down (emac)\n");
-	    return;
-	}
-
-	printf ( "link up (emac), speed %d, %s duplex\n",
-                link_speed, (link_duplex == DUPLEX_FULL) ? "full" : "half" );
-
-	val = 0;
-
-	if ( link_duplex == DUPLEX_FULL )
-	    val |= CTL_FULL_DUPLEX;
-
-	if ( link_speed == 1000 )
-	    val |= CTL_SPEED_1000;
-	else if ( link_speed == 10 )
-	    val |= CTL_SPEED_10;
-	else /* 100 */
-	    val |= CTL_SPEED_100;
-
-	ep->ctl0 = val;
-}
-
-#ifdef PHY_JUNK
-
-static void
-phy_show ( void )
-{
-        printf ( "PHY status BMCR: %04x, BMSR: %04x\n",
-	phy_read ( PHY_BMCR ), phy_read ( PHY_BMSR ) );
-}
-
-static void
-phy_uboot ( void )
-{
-	printf ( "Values from U-Boot:\n" );
-	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
-}
-
-#define AN_TIMEOUT	5000
-
-/* perform autonegotiation.
- * This takes from 2 to 3 seconds,
- *  typically 2040 milliseconds.
- */
-static void
-phy_aneg ( void )
-{
-        int reg;
-        int tmo = AN_TIMEOUT;
-
-	printf ( "Autonegotiation ...\n" );
-	phy_uboot ();
-
-	phy_write ( PHY_ADVERT, 0 );
-	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	phy_write ( PHY_ADVERT, 0 );
-	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	phy_write ( PHY_ADVERT, LPA_ADVERT );
-	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	phy_write ( PHY_ADVERT, LPA_ADVERT );
-	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-
-	/* start autonegotiation, this bit self clears */
-	printf ( "Starting Autonegotiation:\n" );
-	printf ( "BMSR   = %04x\n", phy_read ( PHY_BMSR ) );
-        reg = phy_read ( PHY_BMCR );
-        phy_write ( PHY_BMCR, reg | BMCR_ANEG );
-        phy_write ( PHY_BMCR, reg | BMCR_ANEG );
-	printf ( "BMSR   = %04x\n", phy_read ( PHY_BMSR ) );
-
-        while ( tmo ) {
-            if ( phy_read ( PHY_BMSR ) & BMSR_ANEGCOMPLETE )
-                break;
-            thr_delay ( 1 );
-	    tmo--;
-        }
-
-	if ( ! tmo ) {
-	    printf ( " *** *** Autonegotiation timeout\n" );
-	    phy_show ();
-	    link_good = 0;
-	    phy_set_link ();	/* XXX */
-	    return;
-	}
-
-	printf ( "Autonegotiation finished\n" );
-	printf ( "Aneg done in %d milliseconds\n", AN_TIMEOUT - tmo );
-	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
-	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
-
-	phy_show ();
-	link_good = 1;
-	phy_set_link ();
-}
-#endif
-
-static void
-phy_init_OLD ( void )
-{
-	struct emac *ep = EMAC_BASE;
-
-	// printf ( "Starting Phy Init\n" );
-
-#ifdef notyet
-	ep->mii_cmd = 0x10;	/* perform reset */
-	/* delay ?? */
-	ep->mii_cmd = MII_DIV;  /* Set clock divisor */
-#endif
-
-	/* We won't reset it and leave well enough alone for now.
-	 * We won't even try to start autonegotiation.
-	 */
-	// phy_reset ();
-	// phy_id ();
-	// phy_aneg ();
-
-	phy_set_link ();
-
-	// printf ( "Finished with Phy Init\n" );
-}
-
+#ifdef ANCIENT_PHY
+--- #ifdef PHY_JUNK
+--- /* This has the odd problem,
+---  * We use this for experiments, but the version below
+---  * that does two reads gives correct behavior
+---  */
+--- static int
+--- phy_read1 ( int reg )
+--- {
+--- 	struct emac *ep = EMAC_BASE;
+--- 
+--- 	phy_spin();
+--- 	ep->mii_cmd = MII_DIV | (PHY_DEV << MII_DEV_SHIFT) | (reg << MII_REG_SHIFT) | MII_BUSY;
+--- 	phy_spin();
+--- 
+--- 	return ep->mii_data;
+--- }
+--- 
+--- /* Call early in Kyu and see what is up */
+--- void
+--- emac_probe ( void )
+--- {
+--- 	// struct emac *ep = EMAC_BASE;
+--- 
+--- 	printf ( "READ1 Values from U-Boot:\n" );
+--- 	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+--- 	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+--- 	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+--- 	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+--- 	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+--- 	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+--- 	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+--- 	printf ( "ID1  = %04x\n", phy_read1 ( PHY_ID1 ) );
+--- 	printf ( "ID2  = %04x\n", phy_read1 ( PHY_ID2 ) );
+--- 
+--- 	/*
+--- 	printf ( "EARLY Values from U-Boot:\n" );
+--- 	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+--- 	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+--- 	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+--- 	*/
+--- }
+--- #endif
+--- 
+--- #define DUPLEX_HALF             0x00
+--- #define DUPLEX_FULL             0x01
+--- 
+--- int link_good;
+--- int link_duplex;
+--- int link_speed;
+--- 
+--- static void
+--- phy_set_link ( void )
+--- {
+--- 	struct emac *ep = EMAC_BASE;
+--- 	unsigned int val;
+--- 
+--- 	// printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	// printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+--- 
+--- 	/* XXX - usually this would be set if autonegotiation
+--- 	 * worked or not.
+--- 	 */
+--- 	link_good = 1;
+--- 
+---         link_speed = 10;
+---         link_duplex = DUPLEX_HALF;
+--- 
+---         val = phy_read ( PHY_ADVERT ) & phy_read ( PHY_PEER );
+--- 
+---         if ( val & (LPA_100FULL | LPA_100HALF) )
+---             link_speed = 100;
+--- 
+---         if ( val & (LPA_100FULL | LPA_10FULL) )
+---             link_duplex = DUPLEX_FULL;
+--- 
+--- 	if ( ! link_good ) {
+---             printf("link down (emac)\n");
+--- 	    return;
+--- 	}
+--- 
+--- 	printf ( "link up (emac), speed %d, %s duplex\n",
+---                 link_speed, (link_duplex == DUPLEX_FULL) ? "full" : "half" );
+--- 
+--- 	val = 0;
+--- 
+--- 	if ( link_duplex == DUPLEX_FULL )
+--- 	    val |= CTL_FULL_DUPLEX;
+--- 
+--- 	if ( link_speed == 1000 )
+--- 	    val |= CTL_SPEED_1000;
+--- 	else if ( link_speed == 10 )
+--- 	    val |= CTL_SPEED_10;
+--- 	else /* 100 */
+--- 	    val |= CTL_SPEED_100;
+--- 
+--- 	ep->ctl0 = val;
+--- }
+--- 
+--- #ifdef PHY_JUNK
+--- 
+--- static void
+--- phy_show ( void )
+--- {
+---         printf ( "PHY status BMCR: %04x, BMSR: %04x\n",
+--- 	phy_read ( PHY_BMCR ), phy_read ( PHY_BMSR ) );
+--- }
+--- 
+--- static void
+--- phy_uboot ( void )
+--- {
+--- 	printf ( "Values from U-Boot:\n" );
+--- 	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+--- 	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+--- 	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+--- }
+--- 
+--- #define AN_TIMEOUT	5000
+--- 
+--- /* perform autonegotiation.
+---  * This takes from 2 to 3 seconds,
+---  *  typically 2040 milliseconds.
+---  */
+--- static void
+--- phy_aneg ( void )
+--- {
+---         int reg;
+---         int tmo = AN_TIMEOUT;
+--- 
+--- 	printf ( "Autonegotiation ...\n" );
+--- 	phy_uboot ();
+--- 
+--- 	phy_write ( PHY_ADVERT, 0 );
+--- 	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	phy_write ( PHY_ADVERT, 0 );
+--- 	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	phy_write ( PHY_ADVERT, LPA_ADVERT );
+--- 	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	phy_write ( PHY_ADVERT, LPA_ADVERT );
+--- 	printf ( "I set: ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 
+--- 	/* start autonegotiation, this bit self clears */
+--- 	printf ( "Starting Autonegotiation:\n" );
+--- 	printf ( "BMSR   = %04x\n", phy_read ( PHY_BMSR ) );
+---         reg = phy_read ( PHY_BMCR );
+---         phy_write ( PHY_BMCR, reg | BMCR_ANEG );
+---         phy_write ( PHY_BMCR, reg | BMCR_ANEG );
+--- 	printf ( "BMSR   = %04x\n", phy_read ( PHY_BMSR ) );
+--- 
+---         while ( tmo ) {
+---             if ( phy_read ( PHY_BMSR ) & BMSR_ANEGCOMPLETE )
+---                 break;
+---             thr_delay ( 1 );
+--- 	    tmo--;
+---         }
+--- 
+--- 	if ( ! tmo ) {
+--- 	    printf ( " *** *** Autonegotiation timeout\n" );
+--- 	    phy_show ();
+--- 	    link_good = 0;
+--- 	    phy_set_link ();	/* XXX */
+--- 	    return;
+--- 	}
+--- 
+--- 	printf ( "Autonegotiation finished\n" );
+--- 	printf ( "Aneg done in %d milliseconds\n", AN_TIMEOUT - tmo );
+--- 	printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+--- 	printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+--- 
+--- 	phy_show ();
+--- 	link_good = 1;
+--- 	phy_set_link ();
+--- }
+--- #endif
+--- 
+--- static void
+--- phy_init_OLD ( void )
+--- {
+--- 	struct emac *ep = EMAC_BASE;
+--- 
+--- 	// printf ( "Starting Phy Init\n" );
+--- 
+--- #ifdef notyet
+--- 	ep->mii_cmd = 0x10;	/* perform reset */
+--- 	/* delay ?? */
+--- 	ep->mii_cmd = MII_DIV;  /* Set clock divisor */
+--- #endif
+--- 
+--- 	/* We won't reset it and leave well enough alone for now.
+--- 	 * We won't even try to start autonegotiation.
+--- 	 */
+--- 	// phy_reset ();
+--- 	// phy_id ();
+--- 	// phy_aneg ();
+--- 
+--- 	phy_set_link ();
+--- 
+--- 	// printf ( "Finished with Phy Init\n" );
+--- }
+#endif /* ANCIENT_PHY */
 
 /* THE END */

@@ -48,6 +48,7 @@ static void test_udp_echo ( long );
 #endif
 
 static void test_netdebug ( long );
+static void test_fast ( long );
 
 #ifdef notdef
 void
@@ -88,6 +89,7 @@ struct test net_test_list[] = {
 	// test_tcp,	"Test TCP",		0,
 #endif
 	test_netdebug,	"Debug interface",	0,
+	test_fast,	"Test network speed",	0,
 	0,		0,			0
 };
 
@@ -432,6 +434,51 @@ void pkt_arrive ( void ) {}
 void pkt_send ( void ) {}
 void pkt_dispatch ( void ) {}
 #endif	/* WANT_NET */
+
+/* Test 100 mbit network speed
+ * 1-13-2023 during orangepi emac debugging
+ */
+static void
+test_fast ( long xxx )
+{
+	unsigned int t1, t2;
+	struct netbuf *nbp;
+	int i;
+
+#ifdef notdef
+	/* This comes out exactly right */
+	printf ( "Start 5 sec delay\n" );
+	thr_delay ( 5000 );
+	printf ( "end 5 sec delay\n" );
+#endif
+
+	set_CCNT ( 0 );
+	t1 = r_CCNT ();
+	thr_delay ( 100 );
+	t2 = r_CCNT ();
+
+	/* This yields 100,145,548 counts in 1/10 second
+	 * which is just right for a CPU at 1 Ghz
+	 */
+	printf ( "CCNT 0 = %d\n", t1 );
+	printf ( "CCNT timer, 0.1 seconds = %d\n", t2-t1 );
+
+	nbp = netbuf_alloc ();
+
+	nbp->ilen = 1000;
+
+	set_CCNT ( 0 );
+	t1 = r_CCNT ();
+
+	for ( i=0; i<10; i++ )
+	    emac_send_wait ( nbp );
+	    // board_net_send ( nbp );
+
+	t2 = r_CCNT ();
+	printf ( "1M data = %d\n", t2-t1 );
+
+	netbuf_free ( nbp );
+}
 
 /* Hook for board specific network statistics
  */

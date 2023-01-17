@@ -225,9 +225,13 @@ uart_handler ( int devnum )
 	// printf ( "Uart status loc = %x\n", &up->stat );
 	// printf ( "Uart halt loc = %x\n", &up->halt );
 
+	/* We get one of these with status 6 every time
+	 * we start up.  It is something about telling us it is
+	 * not a 16550 uart and that we should be proud.
+	 */
 	if ( iir == IIR_BUSY ) {
 	    stat = up->stat;
-	    printf ( "Uart status = %x\n", stat );
+	    // printf ( "Uart status = %x\n", stat );
 	    return;
 	}
 

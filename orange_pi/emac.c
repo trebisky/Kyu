@@ -67,6 +67,7 @@ static void rx_start ( void );
 
 #ifdef notdef
 /* From the sunxi linux driver - bits in the status word of a DMA descriptor */
+/* There looks like a lot of undocumented bits here */
 typedef union {
         struct {
                 /* TDES0 */
@@ -174,13 +175,18 @@ struct emac_desc {
 /* ------------------------------------------------------------ */
 
 /* The linux driver allocates 256 descriptors for each
-#define NUM_RX	256
-#define NUM_TX	256
+ * When I try this I get a data abort
  */
+// #define NUM_RX	256
+// #define NUM_TX	256
 
 /* For debug this is handy and fits on one screen */
-#define NUM_RX	16
-#define NUM_TX	16
+// #define NUM_RX	16
+// #define NUM_TX	16
+// #define NUM_RX	16
+// #define NUM_TX	4
+#define NUM_RX	64
+#define NUM_TX	64
 
 /* There are notes in the U-Boot driver that setting the value 2048
  * causes weird behavior and something less like 2044 should be used
@@ -214,9 +220,30 @@ static struct emac_desc *cur_rx_dma;
 static struct emac_desc *cur_tx_dma;
 static struct emac_desc *clean_tx_dma;
 
+static int emac_wait_flag = 0;
+static struct sem *emac_sem;
+
+/* gross, but let's see about this.
+ */
+// static volatile int emac_busy = 0;
+
+static struct emac_times {
+	int send;
+	int send_tx;
+	int rx;
+	int rx_tcp;
+} et;
+
+void emac_debug ( void );
+
+// rx_list_show ( rx_list, NUM_RX );
+// rx_list_show ( struct emac_desc *desc, int num )
 static void
-rx_list_show ( struct emac_desc *desc, int num )
+rx_list_show ( void )
 {
+	struct emac_desc *desc = rx_list;
+	int num = NUM_RX;
+
 	struct emac_desc *edp;
 	int len;
 	int i;
@@ -228,15 +255,20 @@ rx_list_show ( struct emac_desc *desc, int num )
 	    edp = &desc[i];
 	    len = (edp->status >> 16) & 0x3fff;
 	    if ( edp == cur_rx_dma )
-		printf ( "* Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+		printf ( "* Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
 	    else
-		printf ( "  Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+		printf ( "  Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
 	}
 }
 
+// tx_list_show ( tx_list, NUM_TX );
+// tx_list_show ( struct emac_desc *desc, int num )
 static void
-tx_list_show ( struct emac_desc *desc, int num )
+tx_list_show ( void )
 {
+	struct emac_desc *desc = tx_list;
+	int num = NUM_TX;
+
 	struct emac_desc *edp;
 	int len;
 	int i;
@@ -247,13 +279,13 @@ tx_list_show ( struct emac_desc *desc, int num )
 	for ( i=0; i<num; i++ ) {
 	    edp = &desc[i];
 	    if ( edp == cur_tx_dma && cur_tx_dma == clean_tx_dma )
-		printf ( "* Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+		printf ( "* Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else if ( edp == clean_tx_dma )
-		printf ( "> Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+		printf ( "> Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else if ( edp == cur_tx_dma )
-		printf ( "* Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+		printf ( "* Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else
-		printf ( "  Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+		printf ( "  Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	}
 }
 
@@ -525,36 +557,24 @@ static char last_buf[2048];
 static int prior_len;
 static char prior_buf[2048];
 
-/* Some notes on the cur and clean pointers ...
- * cur always points to the next available slot
- * clean always points after the last known clean slot.
- * when cur == clean the list is empty, and that
- *  is how we initialize things.
- * when cur->next == clean the list is full.
- *  (not really, there is still one slot, but we
- *   cannot use it without making the list look empty).
- *
- * XXX - someday when we do transmits straight out of netbufs
- *   this would be the place to release those netbufs.
- *
- * For some reason XXX at this time:
- *  When I send a UDP packet, 1.08 milliseconds elapses
- *  from the time the packet is queued and when we see the
- *  interrupt here to indicate it is finished.
- */
-static void
-tx_cleaner ( void )
-{
-	if ( cur_tx_dma == clean_tx_dma )
-	    return;
+#ifdef notdef
+static struct emac_times {
+	int send;
+	int send_tx;
+	int rx;
+	int rx_tcp;
+} et;
+#endif
 
-	while ( clean_tx_dma != cur_tx_dma ) {
-	    if ( clean_tx_dma->status & DS_ACTIVE)
-		break;
-	    // printf ( "Tx clean: %08x %08x\n", clean_tx_dma->status, clean_tx_dma->size );
-	    clean_tx_dma = clean_tx_dma->next;
-	    pkt_finish ();
-	}
+
+void
+emac_show_times ( void )
+{
+	et.rx_tcp = r_CCNT ();
+	printf ( "ET send  = %d\n", et.send );
+	printf ( "ET txint = %d (%d)\n", et.send_tx, et.send_tx - et.send );
+	printf ( "ET rxint = %d (%d)\n", et.rx, et.rx - et.send_tx );
+	printf ( "ET rxtcp = %d (%d)\n", et.rx_tcp, et.rx_tcp - et.rx );
 }
 
 static void
@@ -563,6 +583,9 @@ rx_handler ( int stat )
 	struct netbuf *nbp;
 	int len;
 	int tag = ' ';
+
+	// printf ( "Rx interrupt, packet incoming (emac)\n" );
+	et.rx = r_CCNT ();
 
 	// invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -573,6 +596,7 @@ rx_handler ( int stat )
 	    rx_count++;
 	    len = (cur_rx_dma->status >> 16) & 0x3fff;
 	    last_desc_stat = cur_rx_dma->status;
+
 	    if ( last_desc_stat & ~0x3fff0000 != 0x00000320 )
 		printf ( "Unusual desc status: %08x\n", cur_rx_dma->status );
 
@@ -582,7 +606,7 @@ rx_handler ( int stat )
 	    if ( ! nbp )
 		return;     /* drop packet */
 
-	    pkt_arrive ();
+	    // pkt_arrive ();
 
 	    nbp->elen = len - 4;
 	    memcpy ( (char *) nbp->eptr, cur_rx_dma->buf, len - 4 );
@@ -655,14 +679,55 @@ rx_handler ( int stat )
 }
 #endif
 
-/* Since we do nothing here, it is best to simply not enable any sort
- * of TX interrupts.
+/* Some notes on the cur and clean pointers ...
+ * cur always points to the next available slot
+ * clean always points after the last known clean slot.
+ * when cur == clean the list is empty, and that
+ *  is how we initialize things.
+ * when cur->next == clean the list is full.
+ *  (not really, there is still one slot, but we
+ *   cannot use it without making the list look empty).
+ *
+ * XXX - someday when we do transmits straight out of netbufs
+ *   this would be the place to release those netbufs.
+ *
+ * For some reason XXX at this time:
+ *  When I send a UDP packet, 1.08 milliseconds elapses
+ *  from the time the packet is queued and when we see the
+ *  interrupt here to indicate it is finished.
  */
+static void
+tx_cleaner ( void )
+{
+	if ( cur_tx_dma == clean_tx_dma )
+	    return;
+
+	// tx_list_show ();
+
+	while ( clean_tx_dma != cur_tx_dma ) {
+	    if ( clean_tx_dma->status & DS_ACTIVE)
+		break;
+	    // printf ( "Tx clean: %08x %08x\n", clean_tx_dma->status, clean_tx_dma->size );
+	    clean_tx_dma = clean_tx_dma->next;
+	    // pkt_finish ();
+	}
+
+	// emac_busy = 0;
+}
+
 static void
 tx_handler ( int stat )
 {
-	// printf ( "emac tx interrupt %08x\n", stat );
+	// printf ( "Emac tx interrupt %08x\n", stat );
+	// phy_show ();
+	// emac_debug ();
+	et.send_tx = r_CCNT ();
 	tx_cleaner ();
+
+	if ( emac_wait_flag ) {
+	    sem_unblock ( emac_sem );
+	    emac_wait_flag = 0;
+	}
 }
 
 static int int_count = 0;
@@ -749,6 +814,12 @@ emac_handler ( int junk )
 /* Real Emac stuff */
 /* ------------------------------------------------------------ */
 
+/* What is SID ?  Who is SID ?
+ * Some mystery from the H3 manual that had me interested
+ * at one poiht, perhaps when I was on a misguided search
+ * looking for a MAC address.
+ */
+
 #define SID_BASE	((unsigned int *) 0x01c14200)
 
 /* This yields:
@@ -804,7 +875,8 @@ set_mac ( char *mac_id )
 	    (mac_id[2] << 16) + (mac_id[3] << 24);
 }
 
-
+// seems to take 2 milliseconds
+// actually takes 10 ticks
 #define SOFT_RESET_TIMEOUT	500
 
 static void
@@ -816,11 +888,12 @@ emac_reset ( void )
 	ep->ctl1 |= CTL1_SOFT_RESET;
 
         while ( tmo-- && ep->ctl1 & CTL1_SOFT_RESET )
-            thr_delay ( 1 );
+	    ;
+            //thr_delay ( 1 );
 
-        printf ( "Emac Reset cleared in %d milliseconds\n", (SOFT_RESET_TIMEOUT-tmo) );
+        // printf ( "Emac Reset cleared in %d milliseconds\n", (SOFT_RESET_TIMEOUT-tmo) );
+        printf ( "Emac Reset cleared in %d ticks\n", (SOFT_RESET_TIMEOUT-tmo) );
 }
-
 
 /* ------------------------------------------------------------ */
 /* ------------------------------------------------------------ */
@@ -978,23 +1051,22 @@ emac_init_new ( void )
 	printf ( "Emac init\n" );
 	printf ( " *************************** Hello from the Emac driver\n" );
 
-	phy_init ();	// 1-10-2023
+	emac_sem = sem_signal_new ( SEM_FIFO );
 
-	/* Must reset after configuring PHY */
+	// phy_init ();	// 1-10-2023
+
+#define INHERIT_UBOOT
+#ifndef INHERIT_UBOOT
+	// This used to just leave the emac useless, but is working now
+	// 1-16-2023
 	// printf ( "Reset the emac\n" );
-	// emac_reset ();
+	emac_reset ();
+#endif
 
 	// show_sid ();
 
-	phy_update ();
-
-	printf ( "emac CTL0 (orig) = %08x\n", ep->ctl0 );
-	reg = 0;
-	if ( phy_get_speed () )
-	    reg |= CTL_SPEED_100;
-	if ( phy_get_duplex () )
-	    reg |= CTL_FULL_DUPLEX;
-	ep->ctl0 = reg;
+	// This does no harm
+	// phy_update ();
 
 	// NEW from old raw init.
 	ep->ctl1 = CTL1_BURST_8;
@@ -1023,6 +1095,11 @@ emac_init_new ( void )
 	 * MAC addr 0: 00 00 8c 26 9b 7f 20 02
 	 * our MAC address on the wire is: 02:20:7f:9b:26:8c with U-Boot
 	 * When running linux however:     c2:c2:9b:ae:f9:5e
+	 *
+	 * XXX - using this so called "linux" MAC address works but is
+	 * totally bogus.  The end result of using this wired in address
+	 * will be that every Orange Pi on my network will have the same
+	 * MAC address.
 	 */
 
 #ifdef USE_UBOOT_MAC
@@ -1031,6 +1108,7 @@ emac_init_new ( void )
 	// get_mac ( emac_mac );
 	fetch_linux_mac ( emac_mac );
 	set_mac ( emac_mac );
+	printf ( "*** Using BOGUS linux MAC address ***\n" );
 #endif
 
 	printf ( "MAC addr in use: %08x %08x\n", ep->mac_addr[0].hi, ep->mac_addr[0].lo );
@@ -1054,7 +1132,28 @@ emac_init_new ( void )
 
 	init_rings ();
 
-	/* the "activate" entry point really kicks things off */
+	/* the "emac_activate" entry point really kicks things off */
+
+#ifndef INHERIT_UBOOT
+	phy_init ();	// 1-10-2023
+	// phy_init_10 ();	// FAILS 1-12-2023
+#endif
+
+	// never hurts
+	phy_update ();
+
+	// This seems to be 0 after reset
+	printf ( "emac CTL0 (orig) = %08x\n", ep->ctl0 );
+
+#ifndef INHERIT_UBOOT
+	reg = 0;
+	if ( phy_get_speed () )
+	    reg |= CTL_SPEED_100;
+	if ( phy_get_duplex () )
+	    reg |= CTL_FULL_DUPLEX;
+	ep->ctl0 = reg;
+	printf ( "emac CTL0 (new) = %08x\n", ep->ctl0 );
+#endif
 
 	return 1;
 }
@@ -1077,7 +1176,7 @@ emac_enable ( void )
 }
 
 static void
-tx_poll ( void )
+tx_dma_start ( void )
 {
 	struct emac *ep = EMAC_BASE;
 
@@ -1284,10 +1383,36 @@ emac_show_last ( int show_bufs )
 	    dump_buf ( last_buf, last_len );
 }
 
-void
-emac_send ( struct netbuf *nbp )
+static int first_drop = 1;
+
+static void
+emac_send_int ( struct netbuf *nbp, int wait )
 {
         int len;
+
+	// printf ( "Emac sending packet\n" );
+
+	if ( ! phy_get_link() ) {
+	    if ( first_drop ) {
+		first_drop = 0;
+		printf ( "PHY link down --------------- **\n" );
+		printf ( "Dropping packet, will not send\n" );
+		phy_show ();
+		// emac_debug ();
+		phy_update ();
+	    }
+	    return;
+	}
+
+#ifdef notdef
+	if ( emac_busy ) {
+	    printf ( "Emac, waiting to send\n" );
+	    while ( emac_busy )
+		thr_delay(1);
+	    printf ( "Emac, done waiting .. sending ----\n" );
+	} else
+	    printf ( "Emac, clear -- sending packet -----\n" );
+#endif
 
         ++tx_count;
 
@@ -1296,7 +1421,8 @@ emac_send ( struct netbuf *nbp )
 
         len = nbp->ilen + sizeof(struct eth_hdr);
 
-	pkt_send ();
+	/* statistics */
+	// pkt_send ();
 
 	INT_lock;
 	// tx_cleaner ();
@@ -1339,12 +1465,34 @@ emac_send ( struct netbuf *nbp )
 	cur_tx_dma = cur_tx_dma->next;
 
 	// tx_cleaner ();
+	// emac_busy = 1;
+
 	INT_unlock;
 
-	tx_poll ();
+	// tx_list_show ();
+
+	et.send = r_CCNT ();
+	tx_dma_start ();
+
+	if ( wait ) {
+	    emac_wait_flag = 1;
+	    sem_block ( emac_sem );
+	}
 }
 
-/* Displayed as "n x" command output.
+void
+emac_send ( struct netbuf *nbp )
+{
+	emac_send_int ( nbp, 0 );
+}
+
+void
+emac_send_wait ( struct netbuf *nbp )
+{
+	emac_send_int ( nbp, 1 );
+}
+
+/* Displayed as "n 11" command output.
  *  more details than the above.
  */
 void
@@ -1352,21 +1500,37 @@ emac_debug ( void )
 {
 	struct emac *ep = EMAC_BASE;
 
+	/* Get current link status */
+	phy_update ();
+
 	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
 	printf ( "Emac rx_count / tx_count: %d / %d\n", rx_count, tx_count );
 
 	printf ( " Tx list\n" );
-	tx_list_show ( tx_list, NUM_TX );
+	// tx_list_show ( tx_list, NUM_TX );
+	tx_list_show ();
 
 	printf ( " Rx list\n" );
-	rx_list_show ( rx_list, NUM_RX );
+	// rx_list_show ( rx_list, NUM_RX );
+	rx_list_show ();
 
 	printf ( "emac RX CTL0 = %08x\n", ep->rx_ctl0 );
 	printf ( "emac RX CTL1 = %08x\n", ep->rx_ctl1 );
 	printf ( "emac TX CTL0 = %08x\n", ep->tx_ctl0 );
 	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
 
+	printf ( "emac Tx DMA status: %08x\n", ep-> tx_dma_stat );
+	printf ( "emac Tx DMA cur desc: %08x\n", ep-> tx_dma_cur_desc );
+	printf ( "emac Tx DMA cur buf: %08x\n", ep-> tx_dma_cur_buf );
+
+	printf ( "emac Rx DMA status: %08x\n", ep-> rx_dma_stat );
+	printf ( "emac Rx DMA cur desc: %08x\n", ep-> rx_dma_cur_desc );
+	printf ( "emac Rx DMA cur buf: %08x\n", ep-> rx_dma_cur_buf );
+
 	emac_show_last ( 1 );
+
+	/* Again, since it gets lost in the above */
+	phy_update ();
 }
 
 /* THE END */
