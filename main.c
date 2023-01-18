@@ -195,6 +195,8 @@ kyu_startup ( void )
 	unsigned long malloc_base;
 	reg_t val;
 
+	printf ( "We made it to kyu_startup!\n" );
+
 #ifdef notdef
 	// ensure core stack pointer valid
 	// this works !!

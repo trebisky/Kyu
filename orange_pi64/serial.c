@@ -52,6 +52,8 @@
 
 #define UART_R_BASE	0x01F02800	/* special */
 
+#define CONSOLE_UART_BASE	UART0_BASE
+
 struct h3_uart {
 	vu32 data;	/* 00 - Rx/Tx data */
 	vu32 ier;	/* 04 - interrupt enables */
@@ -141,6 +143,8 @@ static void serial_listen ( int devnum );
 static void serial_setup ( int devnum, int irq, int baud );
 static void aux_uart_init ( int devnum, int baud );
 
+static int early = 1;
+
 // void uart_clock_init ( int );
 
 /* 12-20-2022 */
@@ -167,6 +171,7 @@ serial_init ( int baud )
 {
 	// uart_init ( 0, baud );
 	uart_init ( 0, BAUD_115200 );
+	early = 0;
 }
 
 void
@@ -350,7 +355,14 @@ void
 uart_putc ( int uart, int c )
 {
         struct serial_softc *sc = &serial_soft[uart];
-        struct h3_uart *up = sc->base;
+        struct h3_uart *up;
+
+	/* Be able to generate output before serial_init is called */
+        if ( early )
+            up = CONSOLE_UART_BASE;
+        else
+            up = sc->base;
+
 
 	while ( !(up->lsr & TX_READY) )
 	    ;

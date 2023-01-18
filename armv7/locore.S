@@ -130,11 +130,12 @@ secondary_start:
 primary_start:
 
 #ifdef BOARD_BBB
-
 	b primary_start_bbb
-
 #endif
 
+#ifdef BOARD_ORANGE_PI
+	b primary_start_bbb
+#endif
 
 	// switch to SVR mode and disable interrupts
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
@@ -350,6 +351,7 @@ setup_stacks_kyu:
  *  the BBB runs slow (this startup is fine).
  *  Both spin timed delays and timer timed delays run slow with
  *  the multicore startup.
+ * This does NOT work for the orange pi (even for single core use).
  */
 primary_start_bbb:
 	mrs	r0, cpsr		/* disable interrupts */

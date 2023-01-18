@@ -21,7 +21,7 @@
  *  (it is simply another Allwinner H3 board)
  * There are some minor differences (such as the status LED).
  */
-#define BOARD_NANOPI_NEO
+// #define BOARD_NANOPI_NEO
 
 /* The following is currently not used */
 #define BOARD_ORANGE_PI_PC
