@@ -17,6 +17,7 @@
 
 #define BOARD_BBB
 #define ARCH_ARM
+#define ARCH_ARM32
 
 /* The am3359 defines 128 interrupts.
  *

@@ -27,6 +27,7 @@
 #define BOARD_ORANGE_PI_PC
 
 #define ARCH_ARM
+#define ARCH_ARM32
 
 #define NUM_INTS	157
 

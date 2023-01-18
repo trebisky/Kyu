@@ -18,6 +18,7 @@
 #define BOARD_FIRE3
 
 #define ARCH_ARM
+#define ARCH_ARM64
 #define ARCH_ARMV8
 
 #define NUM_INTS	(32 + 72)

@@ -26,6 +26,7 @@
 // #define BOARD_NANOPI_NEO
 
 #define ARCH_ARM
+#define ARCH_ARM64
 #define ARCH_ARMV8
 
 #define NUM_INTS	157
