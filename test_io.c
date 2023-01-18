@@ -490,10 +490,16 @@ test_cache ( long arg )
 /* =================================== */
 /* =================================== */
 
+/* This test was written to check the latency of cpu_signal()
+ * I see 1 on the BBB and 8 on the OrangePi.
+ *  (why should there be a difference?)
+ *  1-17-2023
+ */
+
 static struct sem *zz_sem;
 static int zz_msg = 0;
 
-void
+static void
 ear_thread ( long xxx )
 {
 	int t0;
@@ -510,7 +516,7 @@ ear_thread ( long xxx )
 }
 
 static void
-test_sigs ( void )
+zz_thread ( long xxx )
 {
 	int i;
 
@@ -549,7 +555,7 @@ test_cpu_clock ( long arg )
 	t0 /= rate;
 	printf ( "CCNT (normalized) for 1 sec = %d\n", t0 );
 
-	test_sigs ();
+	(void) safe_thr_new ( "zz", zz_thread, 0 , 31, 0 );
 }
 
 /* XXX - for now I am lazy and just setting

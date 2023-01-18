@@ -691,6 +691,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         int len;
         int size;
 	char *buf;
+	// int zz;
 
 	// XXX - hook for timing test
 	et_stcp ();
@@ -712,10 +713,15 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         if ( ! nbp )
             return 1;
 
+	// XXX - delay below here
 	// printf ( "IP output 1\n" );
 	buf = (char *) nbp->iptr;
 	size = 0;
 
+	/* During some experiments we find that this loop makes 2 passes.
+	 * First it copies 52 bytes (headers) then 500 bytes (payload).
+	 */
+	// zz = 0;
 	for (mp = A; mp; mp = mp->m_next) {
                 len = mp->m_len;
                 if (len == 0)
@@ -727,8 +733,12 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 		    panic ( "ip_output = bad netbuf addr\n" );
 		}
 
+	et_A();
                 // bcopy ( mtod(mp, char *), buf, len );
                 memcpy ( buf, mtod(mp, char *), len );
+		// zz++;
+		// printf ( "memcpy(%d) %d bytes\n", zz, len );
+	et_B();
 
                 buf += len;
                 size += len;
@@ -753,6 +763,7 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 
 	ipp = nbp->iptr;
 
+	// XXX - delay above here
 	// bpf2 ( "-IP output (ip_send) to %08x %d\n", ipp->dst, size );
 	// Hand it to the Kyu IP layer
         ip_send ( nbp, ipp->dst );

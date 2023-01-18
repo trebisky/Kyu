@@ -19,12 +19,19 @@
  */
 
 #include "kyu.h"
+#include "thread.h"
+
 #include <arch/cpu.h>
+
+extern struct thread *cur_thread;
 
 #define ET_MAX	10
 
 struct times {
+	char *name;
 	int send_tcp;
+	int a;
+	int b;
 	int send;
 	int tx;
 	int rx;
@@ -66,40 +73,60 @@ etimer_arm ( int skip )
 	et_skip = skip;
 }
 
+#define ET_FLAG		999999
+
+static void
+etimer_print ( int val )
+{
+	if ( val == ET_FLAG )
+	    printf ( "        -", val );
+	else
+	    printf ( " %8d", val );
+}
+
+static void
+etimer_print_s ( char *name )
+{
+	printf ( " %10s", name );
+}
+
 void
 etimer_show_times ( void )
 {
 	int i;
 	struct times *ep;
 
-	printf ( "     stcp     send       tx       rx     rtcp\n" );
+	printf ( "     thread     stcp        A        B     send       tx       rx     rtcp\n" );
 
 	for ( i=0; i<ET_MAX; i++ ) {
 	    ep = &et[i];
-	    printf ( " %8d", ep->send_tcp );
-	    printf ( " %8d", ep->send );
-	    printf ( " %8d", ep->tx );
-	    printf ( " %8d", ep->rx );
-	    printf ( " %8d", ep->rx_tcp );
+	    etimer_print_s ( ep->name );
+	    etimer_print ( ep->send_tcp );
+	    etimer_print ( ep->a );
+	    etimer_print ( ep->b );
+	    etimer_print ( ep->send );
+	    etimer_print ( ep->tx );
+	    etimer_print ( ep->rx );
+	    etimer_print ( ep->rx_tcp );
 	    printf ( "\n" );
 	}
 }
 
-void
-etimer_show_times_OLD ( void )
+static void
+etimer_clear ( void )
 {
 	int i;
 	struct times *ep;
 
 	for ( i=0; i<ET_MAX; i++ ) {
 	    ep = &et[i];
-	    printf ( "  stcp  send          tx          rx          rtcp\n" );
-	    printf ( " %d", ep->send_tcp );
-	    printf ( " %d (%d)", ep->send, ep->send - ep->send_tcp );
-	    printf ( " %d (%d)", ep->tx, ep->tx - ep->send );
-	    printf ( " %d (%d)", ep->rx, ep->rx - ep->tx );
-	    printf ( " %d (%d)", ep->rx_tcp, ep->rx_tcp - ep->rx );
-	    printf ( "\n" );
+	    ep->send_tcp = ET_FLAG;
+	    ep->a = ET_FLAG;
+	    ep->b = ET_FLAG;
+	    ep->send = ET_FLAG;
+	    ep->tx = ET_FLAG;
+	    ep->rx = ET_FLAG;
+	    ep->rx_tcp = ET_FLAG;
 	}
 }
 
@@ -111,16 +138,33 @@ et_stcp ( void )
 	    if ( et_skip ) return;
 	    et_idle = 0;
 	    et_index = -1;
+	    etimer_clear ();
 	}
 	if ( et_idle == 1 ) return;
 	et_index++;
 	if ( et_index >= ET_MAX ) {
 	    et_idle = 1;
 	}
+
+	et[et_index].name = cur_thread->name;
 	if ( et_index == 0 )
-	    et[et_index].send_tcp = 0;
+	    et[et_index].send_tcp = ET_FLAG;
 	else
 	    et[et_index].send_tcp = etimer ();
+}
+
+void
+et_A ( void )
+{
+	if ( et_idle ) return;
+	et[et_index].a = etimer ();
+}
+
+void
+et_B ( void )
+{
+	if ( et_idle ) return;
+	et[et_index].b = etimer ();
 }
 
 void
