@@ -451,6 +451,7 @@ sys_init ( long xxx )
 	// hardware_debug ();
 
 	board_init ();
+	etimer_init ();
 
 	// timer_bogus (); OK to here
 

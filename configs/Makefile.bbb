@@ -38,6 +38,7 @@ OBJS =  machine.o \
     random.o \
     net.o \
     kyulib.o \
+    etimer.o \
     lib.o
 
 #OBJS += tcp_kyu.o

@@ -223,17 +223,6 @@ static struct emac_desc *clean_tx_dma;
 static int emac_wait_flag = 0;
 static struct sem *emac_sem;
 
-/* gross, but let's see about this.
- */
-// static volatile int emac_busy = 0;
-
-static struct emac_times {
-	int send;
-	int send_tx;
-	int rx;
-	int rx_tcp;
-} et;
-
 void emac_debug ( void );
 
 // rx_list_show ( rx_list, NUM_RX );
@@ -557,26 +546,6 @@ static char last_buf[2048];
 static int prior_len;
 static char prior_buf[2048];
 
-#ifdef notdef
-static struct emac_times {
-	int send;
-	int send_tx;
-	int rx;
-	int rx_tcp;
-} et;
-#endif
-
-
-void
-emac_show_times ( void )
-{
-	et.rx_tcp = r_CCNT ();
-	printf ( "ET send  = %d\n", et.send );
-	printf ( "ET txint = %d (%d)\n", et.send_tx, et.send_tx - et.send );
-	printf ( "ET rxint = %d (%d)\n", et.rx, et.rx - et.send_tx );
-	printf ( "ET rxtcp = %d (%d)\n", et.rx_tcp, et.rx_tcp - et.rx );
-}
-
 static void
 rx_handler ( int stat )
 {
@@ -585,7 +554,7 @@ rx_handler ( int stat )
 	int tag = ' ';
 
 	// printf ( "Rx interrupt, packet incoming (emac)\n" );
-	et.rx = r_CCNT ();
+	et_rx ();
 
 	// invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -721,7 +690,7 @@ tx_handler ( int stat )
 	// printf ( "Emac tx interrupt %08x\n", stat );
 	// phy_show ();
 	// emac_debug ();
-	et.send_tx = r_CCNT ();
+	et_tx ();
 	tx_cleaner ();
 
 	if ( emac_wait_flag ) {
@@ -1055,7 +1024,7 @@ emac_init_new ( void )
 
 	// phy_init ();	// 1-10-2023
 
-#define INHERIT_UBOOT
+// #define INHERIT_UBOOT
 #ifndef INHERIT_UBOOT
 	// This used to just leave the emac useless, but is working now
 	// 1-16-2023
@@ -1146,6 +1115,12 @@ emac_init_new ( void )
 	printf ( "emac CTL0 (orig) = %08x\n", ep->ctl0 );
 
 #ifndef INHERIT_UBOOT
+	/* interestingly when inheriting 100 Mbit from U-boot 2022.10
+	 * I see this register 0xc -- I usually set it to 0xd
+	 * when I leave it 0xc I get RxEARLY interrupts, which
+	 * is the interesting part
+	 */
+#endif
 	reg = 0;
 	if ( phy_get_speed () )
 	    reg |= CTL_SPEED_100;
@@ -1153,7 +1128,6 @@ emac_init_new ( void )
 	    reg |= CTL_FULL_DUPLEX;
 	ep->ctl0 = reg;
 	printf ( "emac CTL0 (new) = %08x\n", ep->ctl0 );
-#endif
 
 	return 1;
 }
@@ -1357,7 +1331,7 @@ emac_init ( void )
 void
 emac_activate ( void )
 {
-	// printf ( "Emac activate\n" );
+	printf ( "Emac activated\n" );
 
 	emac_enable ();
 }
@@ -1471,7 +1445,7 @@ emac_send_int ( struct netbuf *nbp, int wait )
 
 	// tx_list_show ();
 
-	et.send = r_CCNT ();
+	et_snd ();
 	tx_dma_start ();
 
 	if ( wait ) {

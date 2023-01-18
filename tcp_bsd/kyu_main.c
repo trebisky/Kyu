@@ -668,6 +668,9 @@ tcp_bsd_process ( struct netbuf *nbp )
 	 * already been acquired.
 	 */
 
+	// XXX - hook for timing test
+	et_rtcp();
+
 	tcp_input ( m, len );
 	master_lock.input_busy = 0;
 	sem_unblock ( master_lock.sem );
@@ -688,6 +691,9 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
         int len;
         int size;
 	char *buf;
+
+	// XXX - hook for timing test
+	et_stcp ();
 
 #ifdef notdef
 	bpf3 ( "TCP(bsd): ip_output\n" );

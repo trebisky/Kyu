@@ -139,6 +139,12 @@ board_hardware_init ( void )
 	ram_init ( ram_start, ram_size );
 }
 
+int
+board_get_cpu_mhz ( void )
+{
+	return cpu_clock_mhz;
+}
+
 void
 board_init ( void )
 {

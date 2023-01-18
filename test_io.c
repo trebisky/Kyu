@@ -77,6 +77,7 @@ static void test_blink_d ( long );
 static void test_clear ( long );
 static void test_cache ( long );
 static void test_generic ( long );
+static void test_cpu_clock ( long );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -126,6 +127,7 @@ struct test io_test_list[] = {
 	test_timer,	"Timer test",		0,
 	test_gic,	"GIC test",		0,
 #endif
+	test_cpu_clock,	"CPU clock test",	0,
 	test_generic,	"generic board test",	0,
 
 
@@ -483,6 +485,71 @@ static void
 test_cache ( long arg )
 {
 	arch_cache_test ();
+}
+
+/* =================================== */
+/* =================================== */
+
+static struct sem *zz_sem;
+static int zz_msg = 0;
+
+void
+ear_thread ( long xxx )
+{
+	int t0;
+
+	printf ( "Ear waiting\n" );
+
+	for ( ;; ) {
+	    INT_lock;
+	    sem_block_cpu ( zz_sem );
+	    t0 = etimer ();
+
+	    printf ( "Ear got msg = %d at %d\n", zz_msg, t0 );
+	}
+}
+
+static void
+test_sigs ( void )
+{
+	int i;
+
+	zz_sem = sem_signal_new ( SEM_FIFO );
+	if ( ! zz_sem )
+	    panic ("Cannot get zz semaphore");
+	sem_set_name ( zz_sem, "net-zz" );
+
+	(void) safe_thr_new ( "ear", ear_thread, 0 , 19, 0 );
+	thr_delay ( 1000 );
+
+	for ( i=0; i < 5; i++ ) {
+
+	    INT_lock;
+	    zz_msg = i+1;
+	    INT_unlock;
+
+	    (void) etimer ();
+	    cpu_signal ( zz_sem );
+	    thr_delay ( 1000 );
+	}
+}
+
+static void
+test_cpu_clock ( long arg )
+{
+	int rate;
+	int t0;
+
+	rate = board_get_cpu_mhz ();
+	set_CCNT ( 0 );
+	thr_delay ( 1000 );
+	t0 = r_CCNT ();
+	printf ( "CPU rate (mhz) = %d\n", rate );
+	printf ( "CCNT for 1 sec = %d\n", t0 );
+	t0 /= rate;
+	printf ( "CCNT (normalized) for 1 sec = %d\n", t0 );
+
+	test_sigs ();
 }
 
 /* XXX - for now I am lazy and just setting

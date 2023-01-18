@@ -452,6 +452,7 @@ test_fast ( long xxx )
 	printf ( "end 5 sec delay\n" );
 #endif
 
+#ifdef BOARD_ORANGE_PI
 	set_CCNT ( 0 );
 	t1 = r_CCNT ();
 	thr_delay ( 100 );
@@ -478,6 +479,9 @@ test_fast ( long xxx )
 	printf ( "1M data = %d\n", t2-t1 );
 
 	netbuf_free ( nbp );
+#else
+	printf ( "Only works on the Orange Pi\n" );
+#endif /* BOARD_ORANGE_PI */
 }
 
 /* Hook for board specific network statistics

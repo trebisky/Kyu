@@ -310,6 +310,12 @@ board_hardware_init ( void )
 	// stack_addr_show ();
 }
 
+int
+board_get_cpu_mhz ( void )
+{
+	return cpu_clock_mhz;
+}
+
 static void
 board_cpu_init ( void )
 {
@@ -318,6 +324,8 @@ board_cpu_init ( void )
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
 
 	/* The Neo comes up at 408 Mhz, but let's fix that.
+	 * (actually it isn't bad to run the Neo at 400
+	 *  for thermal reasons).
 	 */
 	if ( cpu_clock_mhz != 1008 ) {
 	    printf ( "Resetting CPU clock\n" );

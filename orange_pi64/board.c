@@ -300,6 +300,12 @@ board_check_el ( void )
 	// printf ( "ARM SCR = %d\n", get_secure() );
 }
 
+int
+board_get_cpu_mhz ( void )
+{
+	return cpu_clock_mhz;
+}
+
 void
 board_init ( void )
 {

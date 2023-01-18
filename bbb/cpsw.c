@@ -1199,6 +1199,8 @@ tx_submit ( char *buffer, int len )
 	desc->len = len;
 	desc->mode = CPDMA_DESC_OWN | CPDMA_DESC_SOP | CPDMA_DESC_EOP | len;
 
+	et_snd ();
+
 	if ( priv->tx_head == 0 ) {
 	    /* simple case - first packet enqueued */
 	    priv->tx_head = desc;
@@ -1604,6 +1606,7 @@ cpsw_tx_isr ( int dummy )
 	struct stateram_regs *stram = (struct stateram_regs *) STATERAM_BASE;
 	struct cpdma_desc *desc;
 
+	et_tx ();
 	// if ( tx_int_count < 20 )
 	//    printf ( "Interrupt (TX): %08x\n", dma->tx_intstat );
 	tx_int_count++;
@@ -1674,6 +1677,7 @@ cpsw_rx_isr ( int dummy )
 	struct dma_regs *dma = (struct dma_regs *) CPDMA_BASE;
 	struct cpdma_desc *desc;
 
+	et_rx ();
 	// if ( rx_int_count < 20 )
 	//    printf ( "Interrupt (RX): %08x\n", dma->rx_intstat );
 	rx_int_count++;
