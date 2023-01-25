@@ -240,7 +240,21 @@ board_mmu_init ( void )
 	ram_size = ram_probe ( ram_start );
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
 
-	mmu_initialize ( ram_start, ram_size );
+	mmu_initialize_opi ( ram_start, ram_size );
+}
+
+/* Experiment 1-19-2023 */
+void
+board_ram_init ( void )
+{
+	ram_start = BOARD_RAM_START;
+	// ram_size = BOARD_RAM_SIZE;
+
+	printf ( "Probing for amount of ram\n" );
+	ram_size = ram_probe ( ram_start );
+	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
+
+	// mmu_initialize ( ram_start, ram_size );
 }
 
 /* Comes here when a new core starts up */

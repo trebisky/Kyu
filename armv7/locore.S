@@ -133,8 +133,9 @@ primary_start:
 	b primary_start_bbb
 #endif
 
-#ifdef BOARD_ORANGE_PI
-	b primary_start_bbb
+#define TEST_PI
+#ifdef BOARD_ORANGE_PIXX
+	b primary_start_opi
 #endif
 
 	// switch to SVR mode and disable interrupts
@@ -182,11 +183,15 @@ primary_start:
 	    dsb
 1:
 
-        // enable SMP -- near as I can tell this sets
-	// the IBE bit, which enables invalidate all
-	// instructions.
+	// NOTE !!  The ACTLR is unique and different for each
+	// Cortex processor.
 	//
-        // (this needs to be done before the MMU is enabled)
+        // enable SMP -- for the Orange Pi.
+	// This is specific to the Cortex-A7 MPCore
+	// Clearing it "disables coherent requests to the processor"
+	// They say it must be set to 1 before the caches and MMU
+	// are enabled, or any cache and TLB maintenance operations
+	// are done.
 	read_ACTLR ( r0 )
         bic     r0, r0, #0x040
 	write_ACTLR ( r0 )
@@ -201,6 +206,7 @@ primary_start:
 1:
 
 	// disable I cache, D cache and MMU
+	// bic is "bit clear" (does an AND with the invert of the mask)
         // (we want to set up everything from scratch)
 	// May as well set the whole register to zero.
 @	read_SCTLR ( r0 )
@@ -262,6 +268,14 @@ primary_start:
 	    bl	kyu_newcore
 1:	    b	1b
 2:
+
+	// Turn on the SMP bit now and see what happens
+	// It boots, but the network don't work.
+	// I wonder what that means.
+	// read_ACTLR ( r0 )
+        // orr     r0, r0, #0x040
+	// write_ACTLR ( r0 )
+
 	// start Kyu
 	bl	kyu_startup
 
@@ -342,6 +356,40 @@ setup_stacks_kyu:
 	sub sp, r4, #SVR_STACK
 
 	bx lr
+
+/* Experimental startup for single core Orange Pi.
+ * Try to do almost nothing at all and inherit the setup
+ * from U-Boot.
+ */
+primary_start_opi:
+	mrs	r0, cpsr		/* disable interrupts */
+	orr	r0, r0, #PSR_INT_DIS	/* both IRQ and FIQ */
+	msr	cpsr, r0
+
+	// allow unaligned data access
+	read_SCTLR ( r0 )
+	bic      r0, r0, #CTLR_ALIGN
+	write_SCTLR ( r0 )
+
+	movw	r0, #:lower16:vectors
+	movt	r0, #:upper16:vectors
+	write_VBAR ( r0 )
+
+	bl	clear_bss
+	dsb
+
+	bl	board_ram_init
+	dsb
+
+	// bl	board_mmu_init
+	// dsb
+
+	// bl	mmu_set_ttbr
+
+	bl	kyu_startup
+
+// spin if we return
+1:	b	1b
 
 /* This is the old standard Kyu startup,
  *  with some tweaks so we can use it for the BBB,

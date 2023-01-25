@@ -6,7 +6,13 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * ram.c for the Orange Pi PC and PC Plus
+ * mmu.c for ARMv7 boards.
+ *
+ * Working great for the BBB with a Cortex-A8
+ *
+ * Works for the H3 Allwnner (Cortex-A7 MPCore)
+ *   albeit with some issues.
+ * This is the Orange Pi PC, PC Plus, and NanoPi Neo
  *
  * Tom Trebisky  4/20/2017
  */
@@ -72,9 +78,10 @@ void mmu_status ( void );
 
 #ifdef BOARD_ORANGE_PI
 /* copied from U-Boot setup */
-// #define TTBR_BITS	0x59
+#define TTBR_BITS	0x59	// works, not fast
 // #define TTBR_BITS	(TTBR_INNER_WBNOWA | TTBR_OUTER_WBNOWA) 
-#define TTBR_BITS	0x00
+// #define TTBR_BITS	0x01	// blows up
+// #define TTBR_BITS	0x00	// works, not fast
 #else
 /* on the BBB, U-Boot sets zero for these bits.
  * if I set 0x59 like the Orange Pi, it reads back 0x19
@@ -95,23 +102,31 @@ mmu_set_ttbr ( void )
 {
 	unsigned int new_ttbr;
 
+	printf ( "TJT in mmu_set_ttbr: %08x\n", page_table );
+
 	set_TTBCR ( 0 );
 
-	printf ( "TJT in mmu_set_ttbr: %08x\n", page_table );
+	printf ( "TJT mmu_set_ttbr 1\n" );
+
 	new_ttbr = (unsigned int) page_table;
 	new_ttbr |= TTBR_BITS;
 
 	set_TTBR0 ( new_ttbr );
+	printf ( "TJT mmu_set_ttbr 2\n" );
 
 	/* "just in case" */
 	set_TTBR1 ( new_ttbr );
+	printf ( "TJT mmu_set_ttbr 3\n" );
 
 	// set DACR to manager level for all domains
 	set_DACR ( 0xffffffff );
+	printf ( "TJT mmu_set_ttbr 4\n" );
 
 	asm volatile ( "isb" );
 	asm volatile ( "dsb" );
 	asm volatile ( "dmb" );
+
+	printf ( "TJT mmu_set_ttbr finished\n" );
 }
 
 #ifdef notdef
@@ -141,21 +156,39 @@ invalidate_tlb ( void )
 /* Oddly enough, U-Boot sets the XN bit for all of RAM and we had no problems ...
  * But we don't do that.
  */
-#define	MMU_SEC		0x02	/* descriptor maps 1M section */
+#define	MMU_SECTION	0x02	/* descriptor maps 1M section */
+
 #define	MMU_BUF		0x04	/* enable write buffering */
 #define	MMU_CACHE	0x08	/* enable caching */
 #define	MMU_XN		0x10	/* execute never, disallow execution from this address */
 
 /* other access bits differentiate user/kernel access */
-#define	MMU_RW		0x0c00	/* allow r/w access */
+/* Note that there are actually 3 AP bits */
+#define	MMU_AP_RW	0x0c00	/* allow r/w access */
 #define	MMU_NONE	0x0000	/* allow no access */
 
-#define MMU_NOCACHE	(MMU_SEC | MMU_RW)
-#define MMU_DOCACHE	(MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW)
+#define	MMU_TEX0	0x00000000
+#define	MMU_TEX7	0x00007000
+
+#define MMU_NOCACHE	(MMU_SECTION | MMU_AP_RW)
+// #define MMU_DOCACHE	(MMU_SECTION | MMU_BUF | MMU_CACHE | MMU_AP_RW)
+
+/* TEX and C and B give 5 bits and together they yield "attribute"
+ * 
+ *   TEX0 with C=B=0 is "strongly ordered" and not cacheable
+ *   TEX7 with C=B=1 is cacheable (the upper bit in TEX indicates this
+ *      the C=B=1 indicates write back, no write allocate
+ */
+
+// These work nicely for the BBB
+#define BBB_IO		( MMU_SECTION | MMU_TEX0 | MMU_XN | MMU_AP_RW )
+#define BBB_RAM_ORIG	( MMU_SECTION | MMU_BUF | MMU_CACHE | MMU_AP_RW )
+#define BBB_RAM		( MMU_SECTION | MMU_TEX7 | MMU_BUF | MMU_CACHE | MMU_AP_RW )
 
 /* From Marco */
 
 #define	PDE_PTSEC	0x00000002 	/* Page Table Entry is 1 MB Section */
+
 #define	PDE_B		0x00000004      /* Bufferable */
 #define	PDE_C		0x00000008	/* Cacheable */
 #define	PDE_XN		0x00000010      /* Execute Never */
@@ -188,15 +221,28 @@ invalidate_tlb ( void )
 #define	PDE_TEX7	0x00007000
 
 #define PDE_MARCO_IO	(PDE_PTSEC | PDE_B | PDE_AP3 | PDE_TEX0	| PDE_S | PDE_XN )
-#define PDE_MARCO_RAM	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5 )
+// #define PDE_MARCO_RAM	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5 )
 
 // including PDE_S  will make ldrex/strex data abort
-#define PDE_MARCO_RAM_S	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5	| PDE_S )
+// ldrex/strex are atomic memory update instructions
+// used to create "monitors".
+// I am not sure why we would want them to yield an abort.
+// #define PDE_MARCO_RAM_S	(PDE_PTSEC | PDE_B | PDE_C | PDE_AP3 | PDE_TEX5	| PDE_S )
+#define PDE_MARCO_RAM_S	(PDE_PTSEC | PDE_B | PDE_AP3 | PDE_TEX5	| PDE_S )
 
-// I think these are what I used for the bbb XXX
-#define PDE_TOM_IO		( MMU_SEC | MMU_XN | MMU_RW )
-#define PDE_TOM_RAM_ORIG	( MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW )
-#define PDE_TOM_RAM		( MMU_SEC | PDE_TEX7 | MMU_BUF | MMU_CACHE | MMU_RW )
+/* Here for IO we have TEX0 along with B
+ *   this is "shareable device" (and not cacheable).
+ *
+ * We really should think of TEXCB as a 5 bit thing.
+ * The upper bit indicates cacheable or not.
+ * When it is set, we take the remaining 4 bits as 2 groups
+ *  EX = outer cacheable (L2)
+ *  CB = inner cacheable (L1)
+ * Consider TEX5 and C=0, B=1 --> 10101
+ *    Here 01 indicates Write back and Write allocate for both inner and outer.
+ * Consider TEX7 and C=1, B=1 --> 11111
+ *    Here 11 indicates Write back and no Write allocate for both inner and outer.
+ */
 
 /* Use this to black out a page so it gives data aborts */
 #define	MMU_INVALID	0
@@ -204,27 +250,123 @@ invalidate_tlb ( void )
 // #define MMU_TICK	0x100000
 #define MMU_TICK	MEG
 
-static int is_bbb = 1;
-
 static void
-mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
+mmu_setup_bbb ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 {
 	unsigned int addr;
 	int size;
 	int start;
 	int i;
+	int is_bbb = 1;
 
+	printf ( "MMU setup for the BBB\n" );
 	printf ( "mmu_setup, page table at: %08x\n", mmu );
-	printf ( "Ram at %08x, %d bytes\n", ram_start, ram_size );
+	printf ( "Ram at %08x, %d bytes (%dK)\n", ram_start, ram_size, ram_size/1024 );
 
 	/* First make everything transparent and uncacheable */
 	addr = 0;
 	for ( i=0; i<MMU_SIZE; i++ ) {
-	    // mmu[i] = addr | MMU_SEC | MMU_XN | MMU_RW;
 	    if ( is_bbb )
-		mmu[i] = PDE_TOM_IO | addr;
+		mmu[i] = BBB_IO | addr;
 	    else
 		mmu[i] = PDE_MARCO_IO | addr;
+	    addr += MMU_TICK;
+	}
+
+	/* This is primarily for the Orange Pi that aliases existing
+	 * ram all through a 2G address space, we make accesses to those
+	 * addresses invalid here, then open up those that actually exist
+	 * in the loop below.
+	 */
+	size = BOARD_RAM_MAX >> MMU_SHIFT;
+	addr = ram_start;
+	start = addr >> MMU_SHIFT;
+
+	for ( i=0; i<size; i++ ) {
+	    mmu[start+i] = MMU_INVALID | addr;
+	    addr += MMU_TICK;
+	}
+
+	size = ram_size >> MMU_SHIFT;
+	addr = ram_start;
+	start = addr >> MMU_SHIFT;
+
+	/* Redo the ram addresses so they are cacheable */
+	for ( i=0; i<size; i++ ) {
+	    // mmu[start+i] = addr | MMU_SECTION | MMU_BUF | MMU_CACHE | MMU_AP_RW;
+	    // mmu[start+i] = BBB_RAM | addr;
+	    // mmu[start+i] = PDE_MARCO_RAM | addr;
+	    if ( is_bbb )
+		mmu[start+i] = BBB_RAM | addr;
+	    else
+		mmu[start+i] = PDE_MARCO_RAM_S | addr;
+	    addr += MMU_TICK;
+	}
+
+	/* And for the Orange Pi, make accesses to address 0 cause faults
+	 * (This kills the multicore code, so commented out 6-12-2018)
+	 */
+	// mmu[0] = MMU_INVALID;
+
+	asm volatile ( "isb" );
+	asm volatile ( "dsb" );
+	asm volatile ( "dmb" );
+}
+
+/* Currently this is called very early in startup.
+ * locore.S calls board_hardware_init()
+ *  which calls ram_init(), which calls this.
+ * The main goal is to set up our MMU tables.
+ * It will be called with interrupts off.
+ */
+/* Call this to set up our very own MMU tables */
+void
+mmu_initialize_bbb ( unsigned long ram_start, unsigned long ram_size )
+{
+	unsigned int *new_mmu;
+
+	new_mmu = page_table;
+
+	// This just loads values into the page table
+	// in ram, but does not try to enable anything.
+	mmu_setup_bbb ( new_mmu, ram_start, ram_size );
+
+	// We now call this with the D cache disabled
+	// and it was flushed before disabling it.
+	// flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
+
+	// mmu_display ( (unsigned int) new_mmu );
+
+	// We do all this in locore.S now
+	// invalidate_tlb ();
+	// mmu_set_ttbr ();
+}
+
+/* A general summary of the Orange Pi (Allwinner H3) address map.
+ *
+ * Ram is at 0x4000_0000 and there is from 0.5G to 1.0G of it.
+ * IO addresses are below that (often 0x1xxx_xxxx)
+ */
+
+static void
+mmu_setup_opi ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
+{
+	unsigned int addr;
+	int size;
+	int start;
+	int i;
+	// int is_bbb = 0;
+
+	printf ( "MMU setup for Orange Pi\n" );
+	printf ( "mmu_setup, page table at: %08x\n", mmu );
+	printf ( "Ram at %08x, %d bytes (%dK)\n", ram_start, ram_size, ram_size/1024 );
+
+	/* First make everything transparent and uncacheable */
+	addr = 0;
+	for ( i=0; i<MMU_SIZE; i++ ) {
+	    // mmu[i] = addr | MMU_SECTION | MMU_XN | MMU_AP_RW;
+	    // if ( is_bbb ) mmu[i] = BBB_IO | addr;
+	    mmu[i] = PDE_MARCO_IO | addr;
 	    addr += MMU_TICK;
 	}
 
@@ -249,13 +391,12 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 
 	/* Redo the ram addresses so they are cacheable */
 	for ( i=0; i<size; i++ ) {
-	    // mmu[start+i] = addr | MMU_SEC | MMU_BUF | MMU_CACHE | MMU_RW;
-	    // mmu[start+i] = PDE_TOM_RAM | addr;
+	    // mmu[start+i] = addr | MMU_SECTION | MMU_BUF | MMU_CACHE | MMU_AP_RW;
+	    // mmu[start+i] = BBB_RAM | addr;
 	    // mmu[start+i] = PDE_MARCO_RAM | addr;
-	    if ( is_bbb )
-		mmu[start+i] = PDE_TOM_RAM | addr;
-	    else
-		mmu[start+i] = PDE_MARCO_RAM_S | addr;
+
+	    // if ( is_bbb ) mmu[start+i] = BBB_RAM | addr;
+	    mmu[start+i] = PDE_MARCO_RAM_S | addr;
 	    addr += MMU_TICK;
 	}
 
@@ -269,33 +410,21 @@ mmu_setup ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size )
 	asm volatile ( "dmb" );
 }
 
-/* Currently this is called very early in startup.
- * locore.S calls board_hardware_init()
- *  which calls ram_init(), which calls this.
- * The main goal is to set up our MMU tables.
- * It will be called with interrupts off.
+
+/* The BBB works great, so while I experiment to get
+ * things working right on the Orange Pi
+ * (Cortex A7 MPCore), I am keeping it strictly separate.
  */
-/* Call this to set up our very own MMU tables */
 void
-mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
+mmu_initialize_opi ( unsigned long ram_start, unsigned long ram_size )
 {
 	unsigned int *new_mmu;
 
 	new_mmu = page_table;
 
-	// This just loads values into the page table
+	// This loads values into the page table
 	// in ram, but does not try to enable anything.
-	mmu_setup ( new_mmu, ram_start, ram_size );
-
-	// We now call this with the D cache disabled
-	// and it was flushed before disabling it.
-	// flush_dcache_range ( new_mmu, &new_mmu[MMU_SIZE] );
-
-	// mmu_display ( (unsigned int) new_mmu );
-
-	// We do all this in locore.S now
-	// invalidate_tlb ();
-	// mmu_set_ttbr ();
+	mmu_setup_opi ( new_mmu, ram_start, ram_size );
 }
 
 #ifdef notdef
@@ -486,7 +615,7 @@ mmu_tester ( int xxx )
 #endif
 
 	/* We wish this would give a data abort, but it doesn't */
-	mmu_remap ( evil, evil, MMU_SEC );
+	mmu_remap ( evil, evil, MMU_SECTION );
 
 	printf ( "Try to read at %08x\n", evil );
 	val = * (unsigned long *) evil;

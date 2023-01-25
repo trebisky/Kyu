@@ -359,7 +359,7 @@ uart_putc ( int uart, int c )
 
 	/* Be able to generate output before serial_init is called */
         if ( early )
-            up = CONSOLE_UART_BASE;
+            up = (struct h3_uart *) CONSOLE_UART_BASE;
         else
             up = sc->base;
 

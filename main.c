@@ -196,6 +196,20 @@ kyu_startup ( void )
 	reg_t val;
 
 	printf ( "We made it to kyu_startup!\n" );
+	get_SCTLR (val);
+	printf ( "SCTLR = %08x\n", val );
+	get_ACTLR (val);
+	printf ( "ACTLR = %08x\n", val );
+
+#ifdef notdef
+	// Enable the I cache
+	get_SCTLR (val);
+	val |= 0x1000;
+	set_SCTLR (val);
+
+	get_SCTLR (val);
+	printf ( "SCTLR = %08x\n", val );
+#endif
 
 #ifdef notdef
 	// ensure core stack pointer valid

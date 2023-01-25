@@ -78,6 +78,7 @@ static void test_clear ( long );
 static void test_cache ( long );
 static void test_generic ( long );
 static void test_cpu_clock ( long );
+static void test_cache2 ( long );
 
 /* Here is the IO test menu */
 /* arguments are now ignored */
@@ -129,7 +130,7 @@ struct test io_test_list[] = {
 #endif
 	test_cpu_clock,	"CPU clock test",	0,
 	test_generic,	"generic board test",	0,
-
+	test_cache2,	"show cache status",	0,
 
 	0,		0,			0
 };
@@ -487,6 +488,22 @@ test_cache ( long arg )
 	arch_cache_test ();
 }
 
+/* Just show the cache status info */
+static void
+test_cache2 ( long arg )
+{
+	int reg;
+
+	get_SCTLR ( reg );
+	printf ( "SCTLR = %08x\n", reg );
+	get_ACTLR ( reg );
+	printf ( "ACTLR = %08x\n", reg );
+
+	get_SCTLR ( reg );
+	printf ( "D cache: %s\n", reg & 0x04 ? "enabled" : "disabled" );
+	printf ( "I cache: %s\n", reg & 0x1000 ? "enabled" : "disabled" );
+}
+
 /* =================================== */
 /* =================================== */
 
@@ -711,7 +728,7 @@ test_blink_d ( long arg )
 
             test_led_off ();
 
-            delay_ms ( b );
+            delay_ms ( b );	/* long delay */
         }
 }
 
