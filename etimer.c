@@ -65,6 +65,8 @@ etimer ( void )
 	return rv / cpu_mhz;
 }
 
+/* ---------- */
+
 void
 etimer_arm ( int skip )
 {
@@ -193,6 +195,57 @@ et_rtcp ( void )
 {
 	if ( et_idle ) return;
 	et[et_index].rx_tcp = etimer ();
+}
+
+/* ======================================================= */
+/* ======================================================= */
+/* Tacking this on the end for lack of a better place.
+ *  1-26-2023
+ */
+
+static int
+time_one ( int nk )
+{
+	int nb = nk * 1000;
+	// char *adr = (char *) 0x48000000;
+	// char *adr = (char *) 0x47000000;
+	// char *adr = (char *) 0x44000000;
+	char *adr = (char *) BOARD_RAM_START;
+	int rv;
+
+	/* BBB has 512M from 0x8... to 0x9ff... */
+	adr += 64*1024*1024;
+
+	(void) etimer ();
+	memcpy ( adr, adr, nb );
+	rv = etimer ();
+
+	return rv;
+}
+
+static void
+time_set ( int nk )
+{
+	int tpk;
+
+	printf ( "%4dK:", nk );
+	printf ( " %6d", time_one ( nk ) );
+	printf ( " %6d", time_one ( nk ) );
+	printf ( " %6d", time_one ( nk ) );
+	printf ( " %6d", time_one ( nk ) );
+	tpk = time_one ( nk ) / nk;
+	printf ( " per 1K = %5d", tpk );
+	printf ( "\n" );
+}
+
+void
+cache_timings ( void )
+{
+	printf ( " -- Cache timings:\n" );
+	time_set ( 500 );
+	time_set ( 100 );
+	time_set ( 20 );
+	time_set ( 1 );
 }
 
 /* THE END */

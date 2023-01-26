@@ -182,7 +182,9 @@ tjt_startup ( void )
 }
 #endif
 
+int orig_sp = 0xdeadbeef;
 int orig_sctlr = 0xdeadbeef;
+int orig_actlr = 0xdeadbeef;
 int orig_ttbr0 = 0xdeadbeef;
 int orig_ttbr1 = 0xdeadbeef;
 int orig_ttbcr = 0xdeadbeef;
@@ -204,6 +206,8 @@ kyu_startup ( void )
 	printf ( "  ======================== We made it to kyu_startup!\n" );
 
 	printf ( "orig SCTLR = %08x\n", orig_sctlr );
+	printf ( "orig ACTLR = %08x\n", orig_actlr );
+	printf ( "orig    SP = %08x\n", orig_sp );
 	printf ( "orig TTBR0 = %08x\n", orig_ttbr0 );
 	printf ( "orig TTBR1 = %08x\n", orig_ttbr1 );
 	printf ( "orig TTBCR = %08x\n", orig_ttbcr );
@@ -481,6 +485,9 @@ sys_init ( long xxx )
 
 	board_init ();
 	etimer_init ();
+
+	// 1-26-2023
+	cache_timings ();
 
 	// timer_bogus (); OK to here
 

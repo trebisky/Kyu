@@ -32,8 +32,8 @@ zprune
 board
 arch
 kyu.lds
-./Makefile
-./Makefile.inc
+Makefile
+Makefile.inc
 Zsizes
 bsd
 bsd_tcp

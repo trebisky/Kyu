@@ -236,6 +236,13 @@ main_help ( void )
 #define MAXB	64
 #define MAXW	4
 
+// static char * kyu_prompt = "Kyu, ready> ";
+#ifdef BOARD_BBB
+static char * kyu_prompt = "Kyu (bbb), ready> ";
+#else
+static char * kyu_prompt = "Kyu (opi), ready> ";
+#endif
+
 /* This normally gets run as the user thread
  *  during development and testing.
  * This is the default Kyu console.
@@ -265,7 +272,7 @@ shell_main ( long xx )
 
 	for ( ;; ) {
 
-	    printf ( "Kyu, ready> " );
+	    printf ( kyu_prompt );
 	    getline ( buf, MAXB );
 	    if ( ! buf[0] )
 	    	continue;

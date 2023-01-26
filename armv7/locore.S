@@ -134,24 +134,6 @@ secondary_start:
 
 primary_start:
 
-#ifdef BOARD_BBB
-	b primary_start_bbb
-#endif
-
-#define TEST_PI
-#ifdef BOARD_ORANGE_PIXX
-	b primary_start_opi
-#endif
-
-	// switch to SVR mode and disable interrupts
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr cpsr, r0
-
-	// set the spsr to a known value
-	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
-	msr spsr_cxsf, r0
-	mrs r0, spsr
-
 	// record SCTLR for debug 1-25-2023
 	// ldr r0,=0xaabbccdd
 	read_SCTLR ( r0 )
@@ -159,6 +141,15 @@ primary_start:
 	movw	r11, #:lower16:orig_sctlr
 	movt	r11, #:upper16:orig_sctlr
         str r0, [r11]
+
+	read_ACTLR ( r0 )
+	movw	r11, #:lower16:orig_actlr
+	movt	r11, #:upper16:orig_actlr
+        str r0, [r11]
+
+	movw	r11, #:lower16:orig_sp
+	movt	r11, #:upper16:orig_sp
+        str sp, [r11]
 
 	read_TTBR0 ( r0 )
 	movw	r11, #:lower16:orig_ttbr0
@@ -179,6 +170,25 @@ primary_start:
 	movw	r11, #:lower16:orig_dacr
 	movt	r11, #:upper16:orig_dacr
         str r0, [r11]
+
+
+#ifdef BOARD_BBB
+	b primary_start_bbb
+#endif
+
+#define TEST_PI
+#ifdef BOARD_ORANGE_PIXX
+	b primary_start_opi
+#endif
+
+	// switch to SVR mode and disable interrupts
+	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
+	msr cpsr, r0
+
+	// set the spsr to a known value
+	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
+	msr spsr_cxsf, r0
+	mrs r0, spsr
 
 	// clear this bit to
 	// allow unaligned data access
