@@ -68,6 +68,7 @@
  * In particular, it reads the processor affinity register and
  *  discovers that the low 2 bits are non-zero (the core number).
  * Once it discovers this, it loads the PC from the value at 0x01f01da4
+ * (This is the register I call "ROM_START")
  *
  * Also as a side note on the bootrom.  The data sheet says various
  *  contradictory things about it (such as it being 32K, 64K, and 96K)
@@ -152,7 +153,9 @@ h3_start_core ( int core, cfptr func, void *arg )
 	*ROM_START = 0;
 }
 
-/* When a core comes alive, this is the first C code it runs.
+/* When a core comes alive, it will end up here.
+ * To get here it bounces through locore.S,
+ * kyu/main.c and board.c in this directory.
  */
 void
 run_newcore ( int core )

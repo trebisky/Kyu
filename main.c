@@ -182,6 +182,12 @@ tjt_startup ( void )
 }
 #endif
 
+int orig_sctlr = 0xdeadbeef;
+int orig_ttbr0 = 0xdeadbeef;
+int orig_ttbr1 = 0xdeadbeef;
+int orig_ttbcr = 0xdeadbeef;
+int orig_dacr = 0xdeadbeef;
+
 /* This is --almost-- the first bit of C code that runs in 32 bit mode.
  *  almost, because we call board_mmu_init() before calling this.
  *
@@ -195,7 +201,14 @@ kyu_startup ( void )
 	unsigned long malloc_base;
 	reg_t val;
 
-	printf ( "We made it to kyu_startup!\n" );
+	printf ( "  ======================== We made it to kyu_startup!\n" );
+
+	printf ( "orig SCTLR = %08x\n", orig_sctlr );
+	printf ( "orig TTBR0 = %08x\n", orig_ttbr0 );
+	printf ( "orig TTBR1 = %08x\n", orig_ttbr1 );
+	printf ( "orig TTBCR = %08x\n", orig_ttbcr );
+	printf ( "orig DACR  = %08x\n", orig_dacr );
+
 	get_SCTLR (val);
 	printf ( "SCTLR = %08x\n", val );
 	get_ACTLR (val);

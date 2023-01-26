@@ -86,15 +86,16 @@ typedef unsigned long __u32;
 #define get_ACTLR(val)	asm volatile ( "mrc p15, 0, %0, c1, c0, 1" : "=r" ( val ) )
 #define set_ACTLR(val)	asm volatile ( "mcr p15, 0, %0, c1, c0, 1" : : "r" ( val ) )
 
-#define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
 #define get_TTBR0(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 0" : "=r" ( val ) )
+#define set_TTBR0(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 0" : : "r" ( val ) )
 
-#define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
 #define get_TTBR1(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 1" : "=r" ( val ) )
-#define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
+#define set_TTBR1(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 1" : : "r" ( val ) )
 #define get_TTBCR(val)	asm volatile ( "mrc p15, 0, %0, c2, c0, 2" : "=r" ( val ) )
+#define set_TTBCR(val)	asm volatile ( "mcr p15, 0, %0, c2, c0, 2" : : "r" ( val ) )
 
 #define set_DACR(val)	asm volatile ( "mcr p15, 0, %0, c3, c0, 0" : : "r" ( val ) )
+#define get_DACR(val)	asm volatile ( "mrc p15, 0, %0, c3, c0, 0" : "=r" ( val ) )
 
 #define get_VBAR(val)	asm volatile ( "mrc p15, 0, %0, c12, c0, 0" : "=r" ( val ) )
 #define set_VBAR(val)	asm volatile ( "mcr p15, 0, %0, c12, c0, 0" : : "r" ( val ) )

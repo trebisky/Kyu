@@ -68,6 +68,11 @@
 #define read_SCTLR_alt(reg)	MRS reg, SCTLR_EL1
 #define write_SCTLR_alt(reg)	MSR SCTLR_EL1, reg
 
+#define read_TTBR0(reg)		MRC p15, 0, reg, c2, c0, 0
+#define read_TTBR1(reg)		MRC p15, 0, reg, c2, c0, 1
+#define read_TTBCR(reg)		MRC p15, 0, reg, c2, c0, 2
+#define read_DACR(reg)		MRC p15, 0, reg, c3, c0, 0
+
 /* Auxiliary control register */
 #define read_ACTLR(reg)		MRC p15, 0, reg, c1, c0, 1
 #define write_ACTLR(reg)	MCR p15, 0, reg, c1, c0, 1
@@ -146,6 +151,34 @@ primary_start:
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
 	msr spsr_cxsf, r0
 	mrs r0, spsr
+
+	// record SCTLR for debug 1-25-2023
+	// ldr r0,=0xaabbccdd
+	read_SCTLR ( r0 )
+	// MRC p15, 0, r0, c1, c0, 0
+	movw	r11, #:lower16:orig_sctlr
+	movt	r11, #:upper16:orig_sctlr
+        str r0, [r11]
+
+	read_TTBR0 ( r0 )
+	movw	r11, #:lower16:orig_ttbr0
+	movt	r11, #:upper16:orig_ttbr0
+        str r0, [r11]
+
+	read_TTBR1 ( r0 )
+	movw	r11, #:lower16:orig_ttbr1
+	movt	r11, #:upper16:orig_ttbr1
+        str r0, [r11]
+
+	read_TTBCR ( r0 )
+	movw	r11, #:lower16:orig_ttbcr
+	movt	r11, #:upper16:orig_ttbcr
+        str r0, [r11]
+
+	read_DACR ( r0 )
+	movw	r11, #:lower16:orig_dacr
+	movt	r11, #:upper16:orig_dacr
+        str r0, [r11]
 
 	// clear this bit to
 	// allow unaligned data access
@@ -235,6 +268,7 @@ primary_start:
 	write_SCTLR ( r1 )
 	isb
 
+	// all the cores should share the same page tables
 	bl	mmu_set_ttbr
 
 	// invalidate TLB for both I and D

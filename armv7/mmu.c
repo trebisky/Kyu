@@ -101,32 +101,41 @@ void
 mmu_set_ttbr ( void )
 {
 	unsigned int new_ttbr;
+	unsigned int val;
 
-	printf ( "TJT in mmu_set_ttbr: %08x\n", page_table );
+	printf ( "TJT in mmu_set_ttbr, page table: %08x\n", page_table );
 
 	set_TTBCR ( 0 );
+	get_TTBCR ( val );
+	printf ( " set TTBCR to 0, read back: %08x\n", val );
 
-	printf ( "TJT mmu_set_ttbr 1\n" );
+	//printf ( "TJT mmu_set_ttbr 1\n" );
 
 	new_ttbr = (unsigned int) page_table;
 	new_ttbr |= TTBR_BITS;
 
 	set_TTBR0 ( new_ttbr );
-	printf ( "TJT mmu_set_ttbr 2\n" );
+	get_TTBR0 ( val );
+	printf ( " set TTBR0 to %08x, read back: %08x\n", new_ttbr, val );
+	// printf ( "TJT mmu_set_ttbr 2\n" );
 
 	/* "just in case" */
 	set_TTBR1 ( new_ttbr );
-	printf ( "TJT mmu_set_ttbr 3\n" );
+	get_TTBR1 ( val );
+	printf ( " set TTBR1 to %08x, read back: %08x\n", new_ttbr, val );
+	// printf ( "TJT mmu_set_ttbr 3\n" );
 
 	// set DACR to manager level for all domains
 	set_DACR ( 0xffffffff );
-	printf ( "TJT mmu_set_ttbr 4\n" );
+	get_DACR ( val );
+	printf ( " set DACR to %08x, read back: %08x\n", 0xffffffff, val );
+	// printf ( "TJT mmu_set_ttbr 4\n" );
 
 	asm volatile ( "isb" );
 	asm volatile ( "dsb" );
 	asm volatile ( "dmb" );
 
-	printf ( "TJT mmu_set_ttbr finished\n" );
+	// printf ( "TJT mmu_set_ttbr finished\n" );
 }
 
 #ifdef notdef
