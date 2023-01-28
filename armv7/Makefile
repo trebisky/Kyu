@@ -16,7 +16,8 @@ OBJS =  locore.o \
 	cache.o \
 	cache_v7.o \
 	mmu.o \
-	show_regs.o
+	show_regs.o \
+	eabi_stubs.o
 
 all: ../machine.o
 

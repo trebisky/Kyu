@@ -488,13 +488,15 @@ sys_init ( long xxx )
 
 #ifdef notdef
 	// 1-26-2023
-#endif
 	invalidate_icache_all ();
 	icache_disable ();
+#endif
 
 	icache_timings ();
-	core_debug ();
 	cache_timings ();
+#ifdef BOARD_ORANGE_PI
+	core_debug ();
+#endif
 
 	// timer_bogus (); OK to here
 

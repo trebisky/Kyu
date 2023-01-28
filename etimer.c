@@ -252,12 +252,9 @@ cache_timings ( void )
 // static int us_delay_count = 249;	// BBB
 static int us_delay_count = 160;
 
-/* These are good for ballpark timings,
- * and are calibrated by trial and error
- */
 __attribute__ ((optimize(1)))
 static void
-e_delay_us ( int delay )
+e_delay_us_opt ( int delay )
 {
         // volatile unsigned int count;
         register unsigned int count;
@@ -268,6 +265,16 @@ e_delay_us ( int delay )
 	    asm volatile ( "nop" );
 	    asm volatile ( "nop" );
 	}
+}
+
+static void
+e_delay_us ( int delay )
+{
+        volatile unsigned int count;
+
+        count = delay * us_delay_count;
+        while ( count -- )
+	    ;
 }
 
 // 1003 gives 0.999 ms

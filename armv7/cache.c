@@ -56,6 +56,39 @@ get_cache_line_size ( void )
 #define SCTLR_ALIGN	2
 #define SCTLR_MMU	1
 
+void
+dcache_off ( void )
+{
+}
+
+void
+dcache_on ( void )
+{
+}
+
+void
+icache_off ( void )
+{
+	reg_t sctlr;
+
+	get_SCTLR ( sctlr );
+	sctlr &= ~SCTLR_I_CACHE;
+	set_SCTLR ( sctlr );
+}
+
+void
+icache_on ( void )
+{
+	reg_t sctlr;
+
+	get_SCTLR ( sctlr );
+	sctlr |= SCTLR_I_CACHE;
+	set_SCTLR ( sctlr );
+}
+
+/* ========================================== */
+/* ========================================== */
+
 static void
 sctlr_show ( void )
 {
@@ -73,15 +106,6 @@ sctlr_show ( void )
             printf ( "I cache enabled\n" );
 }
 
-void
-icache_disable ( void )
-{
-	reg_t sctlr;
-
-	get_SCTLR ( sctlr );
-	sctlr &= ~SCTLR_I_CACHE;
-	set_SCTLR ( sctlr );
-}
 
 /* Called from IO test menu */
 void
