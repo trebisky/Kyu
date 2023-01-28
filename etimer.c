@@ -242,10 +242,53 @@ void
 cache_timings ( void )
 {
 	printf ( " -- Cache timings:\n" );
-	time_set ( 500 );
+	printf ( " - Cpu running at %d Mhz\n", cpu_mhz );
+	// time_set ( 500 );
 	time_set ( 100 );
 	time_set ( 20 );
 	time_set ( 1 );
+}
+
+// static int us_delay_count = 249;	// BBB
+static int us_delay_count = 160;
+
+/* These are good for ballpark timings,
+ * and are calibrated by trial and error
+ */
+__attribute__ ((optimize(1)))
+static void
+e_delay_us ( int delay )
+{
+        // volatile unsigned int count;
+        register unsigned int count;
+
+        count = delay * us_delay_count;
+        while ( count -- ) {
+	    asm volatile ( "nop" );
+	    asm volatile ( "nop" );
+	    asm volatile ( "nop" );
+	}
+}
+
+// 1003 gives 0.999 ms
+static void
+e_delay_ms ( int delay )
+{
+        unsigned int n;
+
+        for ( n=delay; n; n-- )
+            delay_us ( 1003 );
+}
+
+void
+icache_timings ( void )
+{
+	int tt;
+
+	(void) etimer ();
+	e_delay_ms ( 10 );
+	tt = etimer ();
+	printf ( "Delay for 10 ms = %d\n", tt );
 }
 
 /* THE END */

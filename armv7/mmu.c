@@ -131,9 +131,9 @@ mmu_set_ttbr ( void )
 	printf ( " set DACR to %08x, read back: %08x\n", 0xffffffff, val );
 	// printf ( "TJT mmu_set_ttbr 4\n" );
 
-	asm volatile ( "isb" );
-	asm volatile ( "dsb" );
-	asm volatile ( "dmb" );
+	isb ();
+	dsb ();
+	dmb ();
 
 	// printf ( "TJT mmu_set_ttbr finished\n" );
 }
@@ -157,8 +157,8 @@ invalidate_tlb ( void )
 	set_TLB_INV_ASID ( 0 );
 
         /* Barriers so we don't move on until this is complete */
-	asm volatile ( "dsb" );
-	asm volatile ( "isb" );
+	dsb();
+	isb();
 }
 #endif
 
@@ -317,9 +317,9 @@ mmu_setup_bbb ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size
 	 */
 	// mmu[0] = MMU_INVALID;
 
-	asm volatile ( "isb" );
-	asm volatile ( "dsb" );
-	asm volatile ( "dmb" );
+	isb ();
+	dsb ();
+	dmb ();
 }
 
 /* Currently this is called very early in startup.
@@ -414,9 +414,9 @@ mmu_setup_opi ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size
 	 */
 	// mmu[0] = MMU_INVALID;
 
-	asm volatile ( "isb" );
-	asm volatile ( "dsb" );
-	asm volatile ( "dmb" );
+	isb ();
+	dsb ();
+	dmb ();
 }
 
 
@@ -840,7 +840,9 @@ paging_init (void)
 		xinu_page_table[i] = ( PDE_MARCO_RAM | (i << 20) );
 	}
 
-	asm volatile ("isb\ndsb\ndmb\n");
+	isb ();
+	dsb ();
+	dmb ();
 }
 #endif
 

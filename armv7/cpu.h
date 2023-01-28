@@ -65,16 +65,10 @@ typedef unsigned long __u32;
 #define ntohl(x)        ___swab32(x)
 #endif /* __SWAP_H */
 
-#ifdef notdef
-/* ARM v7 now has actual barrier instructions, but these work for
- * older ARM (like v5) as well as v7.
- * At some point U-boot used these since it compiled with -march=armv5
- * but we compile Kyu with -marm -march=armv7-a
- */
-#define CP15ISB asm volatile ("mcr     p15, 0, %0, c7, c5, 4" : : "r" (0))
-#define CP15DSB asm volatile ("mcr     p15, 0, %0, c7, c10, 4" : : "r" (0))
-#define CP15DMB asm volatile ("mcr     p15, 0, %0, c7, c10, 5" : : "r" (0))
-#endif
+
+#define isb()   asm volatile ("isb sy" : : : "memory")
+#define dsb()   asm volatile ("dsb sy" : : : "memory")
+#define dmb()   asm volatile ("dmb sy" : : : "memory")
 
 /* Added 6-14-2018
  * A collection of inline assembly for ARM control register access

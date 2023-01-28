@@ -73,6 +73,15 @@ sctlr_show ( void )
             printf ( "I cache enabled\n" );
 }
 
+void
+icache_disable ( void )
+{
+	reg_t sctlr;
+
+	get_SCTLR ( sctlr );
+	sctlr &= ~SCTLR_I_CACHE;
+	set_SCTLR ( sctlr );
+}
 
 /* Called from IO test menu */
 void

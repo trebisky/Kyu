@@ -171,6 +171,7 @@ primary_start:
 	movt	r11, #:upper16:orig_dacr
         str r0, [r11]
 
+	// sev
 
 #ifdef BOARD_BBB
 	b primary_start_bbb

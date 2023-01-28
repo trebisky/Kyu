@@ -486,7 +486,14 @@ sys_init ( long xxx )
 	board_init ();
 	etimer_init ();
 
+#ifdef notdef
 	// 1-26-2023
+#endif
+	invalidate_icache_all ();
+	icache_disable ();
+
+	icache_timings ();
+	core_debug ();
 	cache_timings ();
 
 	// timer_bogus (); OK to here

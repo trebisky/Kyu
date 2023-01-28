@@ -732,6 +732,13 @@ test_blink_d ( long arg )
         }
 }
 
+/* For external use */
+void
+blink_d ( void )
+{
+	test_blink_d ( 0 );
+}
+
 /* Nice idea, but this won't work without timer interrupts.
  * It simply hogs the CPU and we don't get a console.
  */

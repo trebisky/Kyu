@@ -60,6 +60,8 @@
 #define GATE_CPU2	0x04
 #define GATE_CPU3	0x08
 
+#define CPU_CLK_GATE       ((volatile unsigned long *) (CPUCFG_BASE + 0x144))
+
 #define POWER_OFF       ((unsigned long *) (PRCM_BASE + 0x100))
 
 /* When any ARM cpu starts running, it will set the PC to 0xffff0000
@@ -96,6 +98,7 @@ static void start_test2 ( void );
 // static void start_test3 ( void );
 static void start_test4 ( void );
 static void start_test5 ( void );
+static void start_test6 ( void );
 
 static void pulses ( int, int );
 static void run_blink ( int, int, int );
@@ -114,6 +117,17 @@ static int	core_run[NUM_CORES] = { 1, 0, 0, 0 };
 
 static int wait_core ( void );
 static void launch_core ( int );
+
+void
+core_debug ( void )
+{
+	volatile unsigned long *reg;
+
+	reg = CPU_CLK_GATE;
+	printf ( "++ CPU_CLK_GATE %08x = %08x\n", reg, *reg );
+	reg = GEN_CTRL;
+	printf ( "++ CPU_GEN_CTRL %08x = %08x\n", reg, *reg );
+}
 
 /* Start a single core.
  * This is the public entry point.
@@ -263,7 +277,11 @@ test_core ( void )
 
 	// test interrupt between cores 
 	// OK 10-13-2018
-	start_test4 ();
+	// start_test4 ();
+
+	// start and park all cores
+	// 1-26-2023
+	start_test6 ();
 
 	// 10-12-2018 OK
 	// start_test5 ();
@@ -443,6 +461,14 @@ test4_handler_3 ( int xxx )
 	printf ( "BONK!\n" );
 }
 
+static void
+park_core ( void )
+{
+	for ( ;; ) {
+	    asm volatile ( "wfe" );
+	}
+}
+
 /* The extra core itself, just sets up a handler and
  * waits for the interrupt.
  */
@@ -453,10 +479,13 @@ core_demo4 ( int core, void *xxx )
 
 	// printf ( "Core %d started\n", core );
 
+	park_core ();
+#ifdef notdef
 	/* Spin */
 	for ( ;; ) {
 	    delay_ms ( 1000 );
 	}
+#endif
 }
 
 /* Set up core 0 to receive BANG and BOOM.
@@ -524,6 +553,127 @@ start_test5 ( void )
 	}
 
 	printf ( "Core %d failed to start\n", CORE_1 );
+}
+
+static volatile int core_count;
+static int wfe_counts[4];
+
+static int want_core = 0;
+static vfptr func_core = 0;
+
+static void
+park_core_t6 ( int core )
+{
+	vfptr go;
+
+	wfe_counts[core] = 0;
+
+	for ( ;; ) {
+	    asm volatile ( "wfe" );
+	    wfe_counts[core]++;
+	    if ( want_core == core && func_core ) {
+		go = func_core;
+		func_core = 0;
+		want_core = 0;
+		(*go) ();
+	    }
+	}
+}
+
+static void
+show_cregs ( int core )
+{
+	int val;
+
+	get_SCTLR (val);
+	printf ( "core %d SCTLR = %08x\n", core, val );
+	get_ACTLR (val);
+	printf ( "core %d ACTLR = %08x\n", core, val );
+}
+
+static void
+core_start_t6 ( int core, void *xxx )
+{
+
+	delay_ms ( 50 );
+	show_cregs ( core );
+
+	/* Just enables the CCNT */
+	hardware_init ();
+
+	core_count++;
+	// park_core ();
+	park_core_t6 ( core );
+}
+
+static void
+wfe_show ( void )
+{
+	int c;
+
+	printf ( "wfe_counts --" );
+	for ( c=1; c<4; c++ )
+	    printf ( "%3d", wfe_counts[c] );
+	printf ( "\n" );
+}
+
+void cache_timings ( void );
+void blink_d ( void );
+
+static void
+extra_t6 ( void )
+{
+	cache_timings ();
+	// I get 10 blink sets in 8 seconds
+	// blink_d ();
+}
+
+static void
+start_test6 ( void )
+{
+	show_cregs ( 0 );
+
+	core_debug ();
+	printf ( "Starting all cores\n" );
+	core_count = 0;
+
+	h3_start_core ( CORE_1, core_start_t6, NULL );
+	while ( core_count < 1 )
+	    ;
+	h3_start_core ( CORE_2, core_start_t6, NULL );
+	while ( core_count < 2 )
+	    ;
+	h3_start_core ( CORE_3, core_start_t6, NULL );
+	while ( core_count < 3 )
+	    ;
+	printf ( "%d new cores started\n", core_count );
+
+	/* This test yields the following; Why 2 per SEV? 
+	3 new cores started
+	wfe_counts --  0  0  0
+	wfe_counts --  0  0  0
+	wfe_counts --  4  4  4
+	*
+	* It certainly doesn't matter that there are 2 wakeups,
+	* but I wonder why.
+	*/
+
+	wfe_show ();
+	thr_delay ( 500 );
+	wfe_show ();
+	asm volatile ( "sev" );
+	thr_delay ( 1 );
+	asm volatile ( "sev" );
+	thr_delay ( 50 );
+	wfe_show ();
+
+	cache_timings ();
+
+	printf ( "Timings from core 3 ------\n" );
+	// func_core = cache_timings;
+	func_core = extra_t6;
+	want_core = 3;
+	asm volatile ( "sev" );
 }
 
 /* -------------------------------------------------------------------------------- */
