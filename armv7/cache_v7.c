@@ -18,22 +18,15 @@
  * arch/arm/cpu/armv7/cache_v7.c
  */
 
-#ifndef KYU
-#include <linux/types.h>
-#include <common.h>
-#include <asm/armv7.h>
-#include <asm/utils.h>
-#endif
-
-#ifdef KYU
 #include <kyu.h>
 #include <kyulib.h>
 typedef unsigned long u32;
 typedef long s32;
 #include <armv7.h>
+#include <cpu.h>
+
 #ifndef __weak
 #define __weak
-#endif
 #endif
 
 /* Copied here from U-boot
@@ -68,14 +61,6 @@ static inline s32 log_2_n_round_down(u32 n)
 
         return log2n;
 }
-
-/*  Stub implementations for outer cache operations */
-__weak void v7_outer_cache_enable(void) {}
-__weak void v7_outer_cache_disable(void) {}
-__weak void v7_outer_cache_flush_all(void) {}
-__weak void v7_outer_cache_inval_all(void) {}
-__weak void v7_outer_cache_flush_range(u32 start, u32 end) {}
-__weak void v7_outer_cache_inval_range(u32 start, u32 end) {}
 
 #define ARMV7_DCACHE_INVAL_ALL		1
 #define ARMV7_DCACHE_CLEAN_INVAL_ALL	2
@@ -134,8 +119,9 @@ static void v7_inval_dcache_level_setway(u32 level, u32 num_sets,
 					: : "r" (setway));
 		}
 	}
+
 	/* DSB to make sure the operation is complete */
-	CP15DSB;
+	dsb ();
 }
 
 static void v7_clean_inval_dcache_level_setway(u32 level, u32 num_sets,
@@ -162,8 +148,9 @@ static void v7_clean_inval_dcache_level_setway(u32 level, u32 num_sets,
 					: : "r" (setway));
 		}
 	}
+
 	/* DSB to make sure the operation is complete */
-	CP15DSB;
+	dsb ();
 }
 
 static void v7_maint_dcache_level_setway(u32 level, u32 operation)
@@ -284,7 +271,7 @@ static void v7_dcache_maint_range(u32 start, u32 stop, u32 range_op)
 	}
 
 	/* DSB to make sure the operation is complete */
-	CP15DSB;
+	dsb ();
 }
 
 /* Invalidate TLB */
@@ -296,10 +283,12 @@ static void v7_inval_tlb(void)
 	asm volatile ("mcr p15, 0, %0, c8, c6, 0" : : "r" (0));
 	/* Invalidate entire instruction TLB */
 	asm volatile ("mcr p15, 0, %0, c8, c5, 0" : : "r" (0));
+
 	/* Full system DSB - make sure that the invalidation is complete */
-	CP15DSB;
+	dsb ();
+
 	/* Full system ISB - make sure the instruction stream sees it */
-	CP15ISB;
+	isb ();
 }
 
 void invalidate_dcache_all(void)
@@ -398,7 +387,22 @@ void arm_init_domains(void)
 }
 #endif /* #ifndef CONFIG_SYS_DCACHE_OFF */
 
-#ifndef CONFIG_SYS_ICACHE_OFF
+/*  Stub implementations for outer cache operations */
+__weak void v7_outer_cache_enable(void) {}
+__weak void v7_outer_cache_disable(void) {}
+__weak void v7_outer_cache_flush_all(void) {}
+__weak void v7_outer_cache_inval_all(void) {}
+__weak void v7_outer_cache_flush_range(u32 start, u32 end) {}
+__weak void v7_outer_cache_inval_range(u32 start, u32 end) {}
+
+
+/* ======================================================================================================= */
+/* ======================================================================================================= */
+/* ======================================================================================================= */
+/* ======================================================================================================= */
+
+#ifdef not_any_more
+
 /* Invalidate entire I-cache and branch predictor array */
 void invalidate_icache_all(void)
 {
@@ -412,15 +416,14 @@ void invalidate_icache_all(void)
 	asm volatile ("mcr p15, 0, %0, c7, c5, 6" : : "r" (0));
 
 	/* Full system DSB - make sure that the invalidation is complete */
-	CP15DSB;
+	// CP15DSB;
+	dsb ();
 
 	/* ISB - make sure the instruction stream sees it */
-	CP15ISB;
+	// CP15ISB;
+	isb ();
 }
-#else
-void invalidate_icache_all(void)
-{
-}
-#endif
+
+#endif /* not_any_more */
 
 /* THE END */

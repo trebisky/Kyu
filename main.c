@@ -488,9 +488,8 @@ sys_init ( long xxx )
 
 #ifdef notdef
 	// 1-26-2023
-	invalidate_icache_all ();
-	icache_disable ();
 #endif
+	icache_off ();
 
 	icache_timings ();
 	cache_timings ();

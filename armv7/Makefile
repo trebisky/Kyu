@@ -12,12 +12,16 @@ OBJS =  locore.o \
 	hardware.o \
 	ram.o \
 	interrupts.o \
-	armv7_cache.o \
 	cache.o \
 	cache_v7.o \
 	mmu.o \
 	show_regs.o \
+	cpufunc_asm_armv7.o \
 	eabi_stubs.o
+
+OLDOBJ = xyz.o \
+	armv7_cache.o \
+	abc.o
 
 all: ../machine.o
 
