@@ -242,6 +242,20 @@ serial_setup ( int devnum, int baud )
 	up->mdr1 = 0;
 }
 
+void
+serial_early_putc ( int c )
+{
+	struct uart *up = CONSOLE_UART_BASE;
+
+	while ( ! (up->lsr & UART_LSR_THRE) )
+	    ;
+
+	up->thr = c;
+
+	if ( c == '\n' )
+	    serial_early_putc ( '\r' );
+}
+
 /* Good old polled output */
 void
 serial_putc ( int c )

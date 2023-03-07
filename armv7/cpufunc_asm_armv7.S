@@ -1,3 +1,7 @@
+/* cpufunc_asm_armv7.S
+ * Copied verbatim for Kyu 1-31-2023
+ *  from: /u1/NetBSD/Git/src/sys/arch/arm/arm/cpufunc_asm_armv7.S
+ */
 /*-
  * Copyright (c) 2010 Per Odlund <per.odlund@armagedon.se>
  *

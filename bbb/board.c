@@ -73,6 +73,13 @@ delay_calib ( void )
 	}
 }
 
+void
+board_early_putchar ( int c )
+{
+	serial_early_putc ( c );
+}
+
+
 #ifdef NOTSAFE
 // works OK, but assumes 1Ghz cpu clock
 // and is not thread safe.

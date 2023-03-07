@@ -9,6 +9,7 @@ include ../Makefile.inc
 
 # locore must be first
 OBJS =  locore.o \
+	armv6_start.o \
 	hardware.o \
 	ram.o \
 	interrupts.o \

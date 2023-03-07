@@ -350,6 +350,22 @@ aux_uart_init ( int devnum, int baud )
 /* ================================================================================ */
 /* ================================================================================ */
 
+/* Added 2-2-2023 as an entrypoint to allow character output
+ * during early board initialization.
+ */
+void
+uart_early_putc ( int c )
+{
+	struct h3_uart *up = (struct h3_uart *) CONSOLE_UART_BASE;
+
+	while ( !(up->lsr & TX_READY) )
+	    ;
+	up->data = c;
+
+	if ( c == '\n' )
+	    uart_early_putc ( '\r' );
+}
+
 // Polling loops like this could use a timeout maybe.
 void
 uart_putc ( int uart, int c )

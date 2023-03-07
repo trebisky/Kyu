@@ -215,6 +215,12 @@ delay_calib ( void )
 }
 #endif
 
+void
+board_early_putchar ( int c )
+{
+	uart_early_putc ( c );
+}
+
 /* Let the compiler find a place for this so
  * that we can use this as early as possible during
  * initialization.
