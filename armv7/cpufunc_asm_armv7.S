@@ -551,3 +551,8 @@ ENTRY_NP(armv7_dcache_wbinv_all)
 	isb
 	bx	lr
 END(armv7_dcache_wbinv_all)
+
+	/* Avoid stupid linker warning */
+        .section        .note.GNU-stack,"",%progbits
+
+/* THE END */

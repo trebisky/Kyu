@@ -47,7 +47,9 @@
 /* from linux/compiler_gcc.h in U-Boot */
 #define __aligned(x)            __attribute__((aligned(x)))
 
+/*
 #define EMAC_NOCACHE
+*/
 
 #ifdef EMAC_NOCACHE
 #define emac_cache_flush(a,b)
@@ -329,7 +331,7 @@ rx_list_init ( void )
 
 	desc[NUM_RX-1].next = &desc[0];
 
-	// emac_cache_flush ( (void *) desc, &desc[NUM_RX] );
+	emac_cache_flush ( (void *) desc, &desc[NUM_RX] );
 	// rx_list_show ( desc, NUM_RX );
 
 	return desc;
@@ -1100,6 +1102,8 @@ emac_init_new ( void )
 	irq_hookup ( IRQ_EMAC, emac_handler, 0 );
 
 	init_rings ();
+	// XXX 2023
+	emac_debug ();
 
 	/* the "emac_activate" entry point really kicks things off */
 
@@ -1466,6 +1470,35 @@ emac_send_wait ( struct netbuf *nbp )
 	emac_send_int ( nbp, 1 );
 }
 
+#ifdef notdef
+/* Added by tom 10-7-2023 for Xinu driver */
+void
+eth_tom_debug ( void )
+{
+        struct  ethcblk *ethptr;
+        struct  eth_aw_csreg *ep;
+
+        /* XXX we only have one */
+        ethptr = &ethertab[0];
+        ep = (struct eth_aw_csreg *) ethptr->csr;
+
+        show_reg ( "EMAC regs ", ep );
+        show_reg ( "int ena  ", &ep->int_en );
+        show_reg ( "int stat ", &ep->int_sta );
+
+        show_reg ( "Rx_ctl0 ", &ep->rx_ctl_0 );
+        show_reg ( "Rx_ctl1 ", &ep->rx_ctl_1 );
+        show_reg ( "Tx_ctl0 ", &ep->tx_ctl_0 );
+        show_reg ( "Tx_ctl1 ", &ep->tx_ctl_1 );
+
+        show_rings ();
+        //printf ( " - Tx ring\n" );
+        //tx_list_show(ethptr->txRing);
+        //printf ( " - Rx ring\n" );
+        //rx_list_show(ethptr->rxRing);
+}
+#endif
+
 /* Displayed as "n 11" command output.
  *  more details than the above.
  */
@@ -1479,6 +1512,10 @@ emac_debug ( void )
 
 	printf ( "Emac int count: %d, rx/tx = %d/%d\n", int_count, rx_int_count, tx_int_count );
 	printf ( "Emac rx_count / tx_count: %d / %d\n", rx_count, tx_count );
+
+        show_reg ( "EMAC regs ", ep );
+        show_reg ( "int ena  ", &ep->int_ena );
+        show_reg ( "int stat ", &ep->int_stat );
 
 	printf ( " Tx list\n" );
 	// tx_list_show ( tx_list, NUM_TX );

@@ -4,7 +4,15 @@
 #
 # Tom Trebisky  5-18-2015  12-12-2016
 
-CCX = arm-linux-gnu-gcc
+GCC_PREFIX = arm-none-eabi
+GCC_PATH = /usr/lib/gcc/arm-none-eabi/$(GCCVERSION)
+
+# Changed 12-30-2023
+#CCX = arm-linux-gnu-gcc
+CCX = $(GCC_PREFIX)-gcc
+BIN = $(GCC_PREFIX)-objcopy -O binary
+DUMP = $(GCC_PREFIX)-objdump -d
+NM = $(GCC_PREFIX)-nm
 
 # For a long time it was an issue to keep stdarg.h in sync
 #  with the compiler.  Then I realized it was best to just let
@@ -27,10 +35,12 @@ CCX = arm-linux-gnu-gcc
 #GCCVERSION = 6.1.1
 
 GCCVERSION = `$(CCX) -dumpversion`
+###GCCVERSION = $(shell $(CCX) -dumpversion)
 
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
-ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION)/include
+#ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION)/include
+ABI = -isystem $(GCC_PATH)/include
 
 # IMPORTANT --
 # I have tried several times to use the gcc builtin functions
@@ -80,16 +90,13 @@ OCC = $(CCX) -Os $(COPTS)
 
 # It is a bug that we cannot invoke gcc to do this,
 # but doing this directly gets the job done.
-LD = arm-linux-gnu-ld.bfd
+#LD = arm-linux-gnu-ld.bfd --no-warn-rwx-segments
+LD = $(GCC_PREFIX)-ld.bfd --no-warn-rwx-segments
 
 # Should we get this via linux arch/arm/asm/lib ??
 # for LINUX comment this out -----
 #LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/5.1.1 -lgcc
-LIBS = -L /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION) -lgcc
-
-BIN = arm-linux-gnu-objcopy -O binary
-DUMP = arm-linux-gnu-objdump -d
-NM = arm-linux-gnu-nm
+LIBS = -L $(GCC_PATH) -lgcc
 
 .c.o:
 	$(CC) -o $@ -c $<

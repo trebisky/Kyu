@@ -1274,6 +1274,7 @@ start:
         .word   0
         .word   start_stacks_top
 
-
+	/* Avoid stupid linker warning */
+        .section        .note.GNU-stack,"",%progbits
 
 // THE END

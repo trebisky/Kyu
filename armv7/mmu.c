@@ -376,6 +376,7 @@ mmu_setup_opi ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size
 	    // mmu[i] = addr | MMU_SECTION | MMU_XN | MMU_AP_RW;
 	    // if ( is_bbb ) mmu[i] = BBB_IO | addr;
 	    mmu[i] = PDE_MARCO_IO | addr;
+	    //printf ( "mmu %d: %08x\n", i, mmu[i] );
 	    addr += MMU_TICK;
 	}
 
@@ -391,6 +392,7 @@ mmu_setup_opi ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size
 	for ( i=0; i<size; i++ ) {
 	    // mmu[start+i] = addr | MMU_INVALID;
 	    mmu[start+i] = MMU_INVALID | addr;
+	    //printf ( "mmu %d: %08x\n", start+i, mmu[start+i] );
 	    addr += MMU_TICK;
 	}
 
@@ -406,6 +408,7 @@ mmu_setup_opi ( unsigned int *mmu, unsigned int ram_start, unsigned int ram_size
 
 	    // if ( is_bbb ) mmu[start+i] = BBB_RAM | addr;
 	    mmu[start+i] = PDE_MARCO_RAM_S | addr;
+	    //printf ( "mmu %d: %08x\n", start+i, mmu[start+i] );
 	    addr += MMU_TICK;
 	}
 
