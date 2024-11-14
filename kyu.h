@@ -48,28 +48,19 @@
  */
 #define DEFAULT_TIMER_RATE	1000
 
+// We handle this in board/board.h now
+// #define WANT_NET
 
 #ifdef notdef
 #define WANT_MMT_PADDLE
 #define WANT_DELAY
 #define WANT_PCI
-#define WANT_NET
 #define WANT_SLAB
 #define WANT_BENCH
 #define WANT_USER
 #define WANT_FLOAT
 #define WANT_PUTS_LOCK		/* orange pi experimental */
 #define WANT_SETJMP
-#endif
-
-#define WANT_HOST_DHCP
-#define WANT_SYMBOLS
-
-// XXX - while bringing up PC2 and Fire3
-#if defined(BOARD_FIRE3) || defined(BOARD_ORANGE_PI64)
-// #define WANT_NET
-#else
-#define WANT_NET
 #endif
 
 #define WANT_USER

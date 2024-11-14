@@ -25,6 +25,9 @@
 // #define BOARD_ORANGE_PI_PC
 // #define BOARD_NANOPI_NEO
 
+// not yet
+// #define WANT_NET
+
 #define ARCH_ARM
 #define ARCH_ARM64
 #define ARCH_ARMV8

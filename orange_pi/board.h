@@ -26,6 +26,8 @@
 /* The following is currently not used */
 #define BOARD_ORANGE_PI_PC
 
+#define WANT_NET
+
 #define ARCH_ARM
 #define ARCH_ARM32
 

@@ -5,7 +5,7 @@
 #  Tom Trebisky  1-6-2017
 #
 
-$targets = %w( bbb orange_pi orange_pi64 fire3 )
+$targets = %w( bbb orange_pi orange_pi64 fire3 zynq )
 
 def usage
     puts "Pick one of the following:"

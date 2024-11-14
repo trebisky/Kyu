@@ -17,6 +17,9 @@
 
 #define BOARD_FIRE3
 
+// not yet
+// #define WANT_NET
+
 #define ARCH_ARM
 #define ARCH_ARM64
 #define ARCH_ARMV8

@@ -19,6 +19,8 @@
 #define ARCH_ARM
 #define ARCH_ARM32
 
+#define WANT_NET
+
 /* The am3359 defines 128 interrupts.
  *
  * Interrupts are chapter 6 in the TRM, table on pages 212-215
