@@ -42,7 +42,6 @@ static void test_wait ( long );
 static void test_unroll ( long );
 static void test_fault ( long );
 static void test_zdiv ( long );
-static void test_gpio ( long );
 static void test_clock ( long );
 static void test_regs ( long );
 
@@ -73,7 +72,11 @@ static void test_gic ( long );
 static void test_led_t ( long );
 #endif
 
+#ifndef BOARD_ZYNQ
+static void test_gpio ( long );
 static void test_blink_d ( long );
+#endif
+
 static void test_clear ( long );
 static void test_cache ( long );
 static void test_generic ( long );
@@ -91,7 +94,6 @@ struct test io_test_list[] = {
 	test_unroll,	"stack traceback",	0,
 	test_fault,	"Fault test",		0,
 	test_zdiv,	"Zero divide test",	0,
-	test_gpio,	"GPIO test",		0,
 	test_clock,	"CPU clock test",	0,
 	test_regs,	"Show registers",	0,
 
@@ -120,7 +122,11 @@ struct test io_test_list[] = {
 #if defined(BOARD_ORANGE_PI64)
 	test_led_t,	"toggle LEDs",		0,
 #endif
+
+#ifndef BOARD_ZYNQ
+	test_gpio,	"GPIO test",		0,
 	test_blink_d,	"LED blink test (via delay)",	0,
+#endif
 	test_clear,	"clear memory test",	0,
 	test_cache,	"cache test",		0,
 
@@ -704,6 +710,7 @@ test_led_t ( long arg )
 }
 #endif
 
+#ifndef BOARD_ZYNQ
 /* Useful for seeing if D cache is enabled or not.
  * Should blink two quick pulses, 1 second apart.
  * This has also been handy on the H5 without timer interrupts available.
@@ -738,6 +745,7 @@ blink_d ( void )
 {
 	test_blink_d ( 0 );
 }
+#endif
 
 /* Nice idea, but this won't work without timer interrupts.
  * It simply hogs the CPU and we don't get a console.
@@ -819,7 +827,9 @@ static void test_clock ( long count ) {
 	check_clock ();
 }
 
+#ifndef BOARD_ZYNQ
 static void test_gpio ( long count ) { gpio_test (); }
+#endif
 
 #ifdef BOARD_ORANGE_PI
 /* Test watchdog on Orange Pi */

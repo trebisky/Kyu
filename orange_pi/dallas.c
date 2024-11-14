@@ -22,8 +22,7 @@
  * to lock out interrupts during transactions.
  * I base all of my code on two primitives.
  *  - one is the ability to generate the 1 us read pulse
- *  - the other is a 5 us delay function.
- * Longer delays may be produced by a call to the system function delay_us();
+ *  - all others are done via calls to the system function delay_us();
  */
 
 #include "kyu.h"
@@ -78,6 +77,28 @@ dallas_read_pulse ( void )
 	*dp = val_off;
 	*dp = val_on;
 }
+
+static void
+dallas_write_bit ( int bit )
+{
+	gpio_out_init ( dallas_pin );
+
+	gpio_clear_bit ( dallas_pin );
+	delay_us ( 15 );
+
+	if ( bit ) {
+	    gpio_set_bit ( dallas_pin );
+	}
+	delay_us ( 45 );
+
+	/* recovery time */
+	delay_us ( 2 );
+}
+
+static void
+dallas_write_bit ( int bit )
+{
+
 
 /* Here is our 5 us delay primitive.
  */

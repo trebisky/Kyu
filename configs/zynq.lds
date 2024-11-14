@@ -1,16 +1,15 @@
-/* ld script to make kyu for the orange_pi
+/* ld script to make kyu for the Zynq
  * Modified from the linux .lds script, 8/2002 tjt
  * Modified from the skidoo .lds script, 9/2015 tjt
  * Modified from the BBB .lds script, 1/2017 tjt
- *
- * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
+ * Modified from the orage_pi .lds script, 11/2024 tjt
  */
 OUTPUT_ARCH(arm)
 ENTRY(_begin)
 SECTIONS
 {
   /* Text and read-only data */
-  . = 0x40000000;
+  . = 0x20000000;
   .text : {
 	*(.text)
 	*(.text.unlikely)
