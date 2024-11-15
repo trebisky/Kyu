@@ -22,8 +22,11 @@
 #define ARCH_ARM
 #define ARCH_ARM32
 
-/* XXX XXX */
-#define NUM_INTS	157
+/* The Zynq TRM has a nice chapter on interrupts (Ch-7)
+ * pages 230-231 has the all important table showing
+ * the various SPI interrupts.
+ */
+#define NUM_INTS	96
 
 #define NUM_CORES	2
 
@@ -38,17 +41,13 @@
  * Most Antminer S9 boards have 512M
  * I have one Antminer S9 board with 1024M (1G)
  */
-// #define BOARD_RAM_SIZE	0x40000000	/* 1G */
+// #define BOARD_RAM_SIZE	0x20000000	/* 512M */
 #define BOARD_RAM_SIZE	0	/* Force probing */
 
 #define BOARD_RAM_MAX	0x40000000	/* 1G */
 
 /* Memory on the Zynq starts at 0 */
 #define BOARD_RAM_START	0x0
-
-// #define BOARD_RAM_ENDP	(BOARD_RAM_START + BOARD_RAM_SIZE)	/* 0x80000000 */
-// #define BOARD_RAM_END	(BOARD_RAM_ENDP - 1)
-// #define BOARD_RAM_END	0x7FFFFFFF
 
 #define THR_STACK_LIMIT	4096 * 128
 #define MALLOC_SIZE	4 * 1024 * 1024

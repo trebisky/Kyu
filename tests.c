@@ -274,6 +274,10 @@ shell_main ( long xx )
 
 	for ( ;; ) {
 
+		// XXX ugly hack --
+		printf ( "Hello Zynq\n" );
+		zynq_timer_show ();
+
 	    printf ( kyu_prompt );
 	    getline ( buf, MAXB );
 	    if ( ! buf[0] )

@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2016  Tom Trebisky  <tom@mmto.org>
+ * Copyright (C) 2024  Tom Trebisky  <tom@mmto.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation. See README and COPYING for
+ * more details.
+ *
+ * serial.c for the Zynq
+ *
+ * Tom Trebisky  11/14/2024
+ *
+ */
+
 /* serial.c
  * simple serial driver for the Zynq
  *

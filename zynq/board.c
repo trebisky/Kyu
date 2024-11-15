@@ -301,6 +301,19 @@ board_init ( void )
 
 	board_cpu_init ();
 
+	gic_init ();
+
+	serial_init ( CONSOLE_BAUD );
+	// serial_aux_init ();
+
+	// upstream in Kyu code
+	timer_init ( DEFAULT_TIMER_RATE );
+
+	// delay_calib ();
+
+	/* CPU interrupts on */
+	INT_unlock;
+
 #ifdef OLD_ORANGE_PI
 #endif /* OLD_ORANGE_PI */
 
@@ -341,13 +354,13 @@ board_init ( void )
 void
 board_timer_init ( int rate )
 {
-	// opi_timer_init ( rate );
+	zynq_timer_init ( rate );
 }
 
 void
 board_timer_rate_set ( int rate )
 {
-	// opi_timer_rate_set ( rate );
+	zynq_timer_rate_set ( rate );
 }
 
 /* This gets called after the network is alive and well
@@ -359,10 +372,14 @@ board_after_net ( void )
 {
 }
 
+#define SLCR_UNLOCK		((volatile unsigned int *)0xf8000008)
+#define PSS_RST_CTRL	((volatile unsigned int *)0xf8000200)
+
 void
 reset_cpu ( void )
 {
-	// system_reset ();
+	*SLCR_UNLOCK = 0xdf0d;
+	*PSS_RST_CTRL = 1;
 }
 
 /* ---------------------------------- */
