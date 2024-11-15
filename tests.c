@@ -239,6 +239,8 @@ main_help ( void )
 // static char * kyu_prompt = "Kyu, ready> ";
 #ifdef BOARD_BBB
 static char * kyu_prompt = "Kyu (bbb), ready> ";
+#elif defined(BOARD_ZYNQ)
+static char * kyu_prompt = "Kyu (zynq), ready> ";
 #else
 static char * kyu_prompt = "Kyu (opi), ready> ";
 #endif

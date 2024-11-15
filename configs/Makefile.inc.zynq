@@ -78,10 +78,11 @@ OPT = -fno-omit-frame-pointer
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -mfpu=vfpv2 $(INCS) $(ABI) $(DEFS)
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
 
-# Orange Pi is ARM Cortex-A7, BBB is ARM Cortex-A8
+# Orange Pi is ARM Cortex-A7, BBB is ARM Cortex-A8, Zynq is Cortex-A9
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a8 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS) $(ABI) $(DEFS)
-COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a7 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
+#COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a7 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
+COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a9 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
 
 CC = $(CCX) $(COPTS)
 

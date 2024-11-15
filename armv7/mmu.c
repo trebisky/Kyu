@@ -135,7 +135,7 @@ mmu_set_ttbr ( void )
 	dsb ();
 	dmb ();
 
-	// printf ( "TJT mmu_set_ttbr finished\n" );
+	printf ( "TJT mmu_set_ttbr finished\n" );
 }
 
 #ifdef notdef

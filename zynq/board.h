@@ -23,10 +23,9 @@
 #define ARCH_ARM32
 
 /* XXX XXX */
-
 #define NUM_INTS	157
 
-#define NUM_CORES	4
+#define NUM_CORES	2
 
 /* Allow 16K of stack per mode */
 /* These things are used in locore.S */
@@ -35,17 +34,17 @@
 
 #define STACK_PER_CORE    MODE_STACK_SIZE * NUM_MODES
 
-/* XXX - This is 1G of RAM as I have on my PC and PC plus boards.
- * There are H3 based boards with 1/2 G (the Lite and One)
- * as well as H3 based boards with 2 G (the PC 2),
- *  but I am not working with any of those.
+/* Ebaz boards have 256M
+ * Most Antminer S9 boards have 512M
+ * I have one Antminer S9 board with 1024M (1G)
  */
 // #define BOARD_RAM_SIZE	0x40000000	/* 1G */
 #define BOARD_RAM_SIZE	0	/* Force probing */
 
-#define BOARD_RAM_MAX	0x80000000	/* 2G */
+#define BOARD_RAM_MAX	0x40000000	/* 1G */
 
-#define BOARD_RAM_START	0x40000000
+/* Memory on the Zynq starts at 0 */
+#define BOARD_RAM_START	0x0
 
 // #define BOARD_RAM_ENDP	(BOARD_RAM_START + BOARD_RAM_SIZE)	/* 0x80000000 */
 // #define BOARD_RAM_END	(BOARD_RAM_ENDP - 1)

@@ -107,6 +107,10 @@
  * and U-boot simply branches to a hard address.
  *  0x80000000 on the BBB
  *  0x40000000 on the Orange Pi
+ *  0x20000000 on the Zynq
+ *
+ * Observe that for the BBB and Orange Pi this is the start of ram.
+ * But for the Zynq, ram starts at 0 and the load is further along.
  *
  * As long as locore.o is the first thing linked,
  * we should be OK.
@@ -177,10 +181,17 @@ primary_start:
 	b primary_start_bbb
 #endif
 
+#ifdef BOARD_ZYNQ
+	// b primary_start_bbb
+	b primary_start_zynq
+#endif
+
 #define TEST_PI
 #ifdef BOARD_ORANGE_PIXX
 	b primary_start_opi
 #endif
+
+	// for the Orange PI (H3) we fall thru into what follows --
 
 	// switch to SVR mode and disable interrupts
 	mov r0, #(CPSR_IRQ_INHIBIT | CPSR_FIQ_INHIBIT | CPSR_MODE_SVR)
@@ -467,10 +478,52 @@ primary_start_bbb:
 	bl	clear_bss
 	dsb
 
+	/* Added 11-15-2024 */
+	bl	board_ram_init
+	dsb
+
 	bl	board_mmu_init
 	dsb
 
 	bl	mmu_set_ttbr
+
+	bl	kyu_startup
+
+// spin if we return
+1:	b	1b
+
+/* This is a copy of the BBB initialization above,
+ * but skipping the MMU init
+ */
+primary_start_zynq:
+	mrs	r0, cpsr		/* disable interrupts */
+	orr	r0, r0, #PSR_INT_DIS	/* both IRQ and FIQ */
+	msr	cpsr, r0
+
+	// bug fix 11-1-2018
+	// -- somehow this got left out of the BBB initialization.
+	//
+	// clear this bit to
+	// allow unaligned data access
+	read_SCTLR ( r0 )
+	bic      r0, r0, #CTLR_ALIGN
+	write_SCTLR ( r0 )
+
+	movw	r0, #:lower16:vectors
+	movt	r0, #:upper16:vectors
+	write_VBAR ( r0 )
+
+	bl	clear_bss
+	dsb
+
+	/* Added 11-15-2024 */
+	bl	board_ram_init
+	dsb
+
+	// bl	board_mmu_init
+	// dsb
+
+	// bl	mmu_set_ttbr
 
 	bl	kyu_startup
 

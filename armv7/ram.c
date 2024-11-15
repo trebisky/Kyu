@@ -69,6 +69,7 @@ void mmu_invalid ( unsigned long );
 addr_t ram_alloc ( int );
 
 extern char _end;
+extern char asm_startup;
 
 static unsigned long ram_start;
 static unsigned long ram_endp;	/* end + 1 */
@@ -138,6 +139,7 @@ ram_probe ( unsigned long start )
 void
 ram_init ( unsigned long start, unsigned long size )
 {
+	unsigned long kernel_start;
 	unsigned long kernel_end;
 
 	cache_line_size = get_cache_line_size();
@@ -160,16 +162,38 @@ ram_init ( unsigned long start, unsigned long size )
 
 	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
 
+	kernel_start = (unsigned long) &asm_startup;
 	kernel_end = (unsigned long) &_end;
-	printf ( "Kyu image size: %d bytes\n", kernel_end - start );
 
-	printf ( "kernel end: %08x\n", kernel_end );
+	printf ( "kernel start: 0x%08x\n", kernel_start );
+	printf ( "kernel end: 0x%08x\n", kernel_end );
+
+	printf ( "Kyu image size: %d bytes\n", kernel_end - kernel_start );
+
 	// printf ( "Quanta kernel end: %08x\n", RAM_QUANTA );
 	// printf ( "Modulo kernel end: %08x\n", kernel_end % RAM_QUANTA );
 	if ( (kernel_end % RAM_QUANTA) != 0 )
 	    kernel_end = ram_round ( kernel_end );
 	// printf ( "Nice kernel end: %08x\n", kernel_end );
 	// printf ( "Round kernel end: %08x\n", ram_round(kernel_end) );
+
+	/* These are sanity checks, and were OK
+	 * for BBB and Orange Pi where the kernel sits at
+	 * the very start of ram
+	 * The Zynq loads the kernel to 0x2000_0000, which is
+	 * just past the 512M of actual ram.  This actually gets
+	 * aliased to 0.  We fix that here.
+	 * I got data aborts when I allocated ram in the 0 based area.
+	 * (I don't know why)
+	 * So I move the pointers up into the same aliased area as
+	 * the kernel.
+	 */
+
+#ifdef BOARD_ZYNQ
+	// kernel_end -= kernel_start;
+	next_ram += kernel_start;
+	last_ram += kernel_start;
+#endif
 
 	if ( kernel_end < next_ram )
 	    panic ( "Kernel lost before ram" );
@@ -182,6 +206,7 @@ ram_init ( unsigned long start, unsigned long size )
 
 	// printf ( "Ram start: %08x\n", next_ram );
 	// printf ( "Ram end: %08x\n", last_ram );
+
 	printf ( "Ram alloc start: %08x\n", next_ram );
 	if ( next_ram & cache_line_mask )
 	    panic_spin ( "Invalid cache alignment in ram_init\n" );

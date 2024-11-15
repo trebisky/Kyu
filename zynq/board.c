@@ -20,10 +20,12 @@
 
 #include "netbuf.h"
 
-// static void mmu_initialize ( unsigned long, unsigned long );
-
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
+
+static unsigned int ram_start;
+static unsigned int ram_size;
+
 
 // This is for the standard 1008 Mhz CPU clock
 // This value can be adjusted at run time if
@@ -90,7 +92,7 @@ delay_calib ( void )
 void
 board_early_putchar ( int c )
 {
-	// uart_early_putc ( c );
+	uart_early_putc ( c );
 }
 
 /* Let the compiler find a place for this so
@@ -106,9 +108,20 @@ void
 board_mmu_init ( void )
 {}
 
+// static void mmu_initialize ( unsigned long, unsigned long );
+
 void
 board_ram_init ( void )
-{}
+{
+	ram_start = BOARD_RAM_START;
+	// ram_size = BOARD_RAM_SIZE;
+
+	printf ( "Probing for amount of ram\n" );
+	ram_size = ram_probe ( ram_start );
+	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
+
+	// mmu_initialize ( ram_start, ram_size );
+}
 
 /* This is called to start a new core */
 void
@@ -136,8 +149,8 @@ board_hardware_init ( void )
         printf ( "board_hardware_init - cpsr: %08x\n",  reg );
 
 	cache_init ();
-	// Orange Pi
-	// ram_init ( ram_start, ram_size );
+
+	ram_init ( ram_start, ram_size );
 
 	// OLD way
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
@@ -145,9 +158,6 @@ board_hardware_init ( void )
 }
 
 #ifdef OLD_ORANGE_PI
-static unsigned int ram_start;
-static unsigned int ram_size;
-
 /* Called very early in initialization
  *  (now from locore.S to set up MMU)
  */
@@ -162,20 +172,6 @@ board_mmu_init ( void )
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
 
 	// mmu_initialize_opi ( ram_start, ram_size );
-}
-
-/* Experiment 1-19-2023 */
-void
-board_ram_init ( void )
-{
-	ram_start = BOARD_RAM_START;
-	// ram_size = BOARD_RAM_SIZE;
-
-	printf ( "Probing for amount of ram\n" );
-	ram_size = ram_probe ( ram_start );
-	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
-
-	// mmu_initialize ( ram_start, ram_size );
 }
 
 /* Comes here when a new core starts up */
@@ -241,6 +237,7 @@ board_hardware_init ( void )
 
 	cache_init ();
 	ram_init ( ram_start, ram_size );
+
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
 	// stack_addr_show ();
 }
