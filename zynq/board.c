@@ -26,7 +26,7 @@ static int cpu_clock_mhz;
 static unsigned int ram_start;
 static unsigned int ram_size;
 
-
+/* These comments are all for the Orange Pi H3 */
 // This is for the standard 1008 Mhz CPU clock
 // This value can be adjusted at run time if
 //  we change the CPU clock frequency.
@@ -314,6 +314,9 @@ board_init ( void )
 	/* CPU interrupts on */
 	INT_unlock;
 
+	// It works here, but the rest of Kyu never starts
+	// led_demo ();
+
 #ifdef OLD_ORANGE_PI
 #endif /* OLD_ORANGE_PI */
 
@@ -370,6 +373,8 @@ board_timer_rate_set ( int rate )
 void
 board_after_net ( void )
 {
+	// A bit unconventional to call from here, but it works
+	led_demo ();
 }
 
 #define SLCR_UNLOCK		((volatile unsigned int *)0xf8000008)
