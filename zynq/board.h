@@ -19,6 +19,12 @@
 
 // #define WANT_NET
 
+/* The Ebaz and Antminer S9 have the console on Uart-1
+ * The Zedboard may have it on Uart-0
+ */
+#define CONSOLE_BAUD		115200
+#define CONSOLE_UART		1
+
 #define ARCH_ARM
 #define ARCH_ARM32
 
@@ -51,10 +57,6 @@
 
 #define THR_STACK_LIMIT	4096 * 128
 #define MALLOC_SIZE	4 * 1024 * 1024
-
-#define CONSOLE_BAUD		115200
-
-#define INITIAL_CONSOLE		SERIAL
 
 /* We add the 2 bytes on the ARM to get 4 byte alignment
  * of the IP addresses in the IP header.
