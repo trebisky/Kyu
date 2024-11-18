@@ -375,6 +375,7 @@ board_after_net ( void )
 {
 	// A bit unconventional to call from here, but it works
 	led_demo ();
+	(void) eth_init ();
 }
 
 #define SLCR_UNLOCK		((volatile unsigned int *)0xf8000008)
@@ -390,11 +391,12 @@ reset_cpu ( void )
 /* ---------------------------------- */
 
 /* Initialize the network device */
+/* only called if WANT_NET */
 int
 board_net_init ( void )
 {
 #ifdef WANT_NET
-        return emac_init ();
+        return eth_init ();
 #endif
 }
 

@@ -134,7 +134,7 @@ help_tests ( struct test *tp, int nt )
 
 	for ( i=0; ; i++ ) {
 	    if ( ! tp->desc )
-		break;
+			break;
 	    printf ( "Test %2d: %s\n", i+1, tp->desc );
 	    ++tp;
 	}
@@ -231,6 +231,7 @@ main_help ( void )
 	printf ( "n [num] - Network test menu.\n" );
 	printf ( "t [num] - TCP test menu.\n" );
 	printf ( "u name - details on thread by name\n" );
+	printf ( "d[l,w,b,i] addr count - dump memory\n" );
 }
 
 #define MAXB	64
@@ -286,7 +287,7 @@ shell_main ( long xx )
 	    nw = split ( buf, wp, MAXW );
 
 	    if ( **wp == 'h' )
-		main_help ();
+			main_help ();
 
 	    /* We use this more than anything else in
 	     * this menu.  It usually calls some board specific
@@ -294,7 +295,7 @@ shell_main ( long xx )
 	     */
 	    if ( **wp == 'R' ) {
 	    	/* Reboot the machine */
-		printf ( "Rebooting\n" );
+			printf ( "Rebooting\n" );
 	    	reset_cpu ();
 	    }
 
@@ -309,7 +310,7 @@ shell_main ( long xx )
 	    /* Run a C function by name
 	     */
 	    if ( **wp == 'x' ) {
-		shell_x ( &wp[1], nw-1 );
+			shell_x ( &wp[1], nw-1 );
 	    }
 
 	    /* kyu thread test submenu
@@ -317,53 +318,53 @@ shell_main ( long xx )
 	     * 'k' is for Kyu
 	     */
 	    if ( **wp == 'k' )
-		submenu ( kyu_test_list, wp, nw );
+			submenu ( kyu_test_list, wp, nw );
 
 	    /* IO test submenu
 	     */
 	    if ( **wp == 'i' )
-		submenu ( io_test_list, wp, nw );
+			submenu ( io_test_list, wp, nw );
 
 	    /* network test submenu
 	     */
 	    if ( **wp == 'n' )
-		submenu ( net_test_list, wp, nw );
+			submenu ( net_test_list, wp, nw );
 
 #ifdef WANT_NET
 	    if ( **wp == 't' )
-		submenu ( tcp_test_list, wp, nw );
+			submenu ( tcp_test_list, wp, nw );
 #endif
 	    if ( **wp == 'y' ) {
-		kyu_debugger ();
+			kyu_debugger ();
 	    }
 
 	    /* Dump without ram safety check */
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'i' && nw == 3 ) {
-		mem_dumper ( 'i', wp[1], wp[2] );
-		continue;
+			mem_dumper ( 'i', wp[1], wp[2] );
+			continue;
 	    }
 
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'b' && nw == 3 ) {
-		mem_dumper ( 'b', wp[1], wp[2] );
-		continue;
+			mem_dumper ( 'b', wp[1], wp[2] );
+			continue;
 	    }
 
 	    if ( wp[0][0] == 'd' && wp[0][1] == 'w' && nw == 3 ) {
-		mem_dumper ( 'w', wp[1], wp[2] );
-		continue;
+			mem_dumper ( 'w', wp[1], wp[2] );
+			continue;
 	    }
 
 	    if ( **wp == 'd' && nw == 3 ) {
-		mem_dumper ( 'l', wp[1], wp[2] );
-		continue;
+			mem_dumper ( 'l', wp[1], wp[2] );
+			continue;
 	    }
 
 	    /* Turn on Kyu thread debugging */
 	    if ( **wp == 'o' ) {
-		if ( nw > 1 )
-		    thr_debug ( atoi (wp[1]) );
-		else
-		    thr_debug ( 0 );
+			if ( nw > 1 )
+				thr_debug ( atoi (wp[1]) );
+			else
+				thr_debug ( 0 );
 	    }
 
 	    /* Show a specific thread given its name.

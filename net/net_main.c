@@ -105,10 +105,10 @@ net_hw_init ( long bogus )
     // puts ( "TJT after board_net_activate" );
 
     if ( num_eth > 0 )
-	net_state = NET_RUN;
+		net_state = NET_RUN;
     else {
-	net_state = NET_IDLE;
-	printf ( "No network devices found\n" );
+		net_state = NET_IDLE;
+		printf ( "No network devices found\n" );
     }
 }
 
@@ -117,7 +117,7 @@ int
 net_running ( void )
 {
     if ( net_state == NET_RUN )
-	return 1;
+		return 1;
     return 0;
 }
 
@@ -228,12 +228,12 @@ net_init ( void )
 
     inq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! inq_sem )
-	panic ("Cannot get net input semaphore");
+		panic ("Cannot get net input semaphore");
     sem_set_name ( inq_sem, "net-inq" );
 
     outq_sem = sem_signal_new ( SEM_FIFO );
     if ( ! outq_sem )
-	panic ("Cannot get net output semaphore");
+		panic ("Cannot get net output semaphore");
     sem_set_name ( outq_sem, "net-outq" );
 
 
@@ -266,15 +266,15 @@ net_init ( void )
     count = 0;
     // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
     while ( net_state == NET_INIT && count++ < NET_STARTUP_WAIT ) {
-	// printf ( "Net wait %d\n", count );
-	thr_delay ( system_clock_rate/2 );
-	// puts ( "TJT -tick" );
+		// printf ( "Net wait %d\n", count );
+		thr_delay ( system_clock_rate/2 );
+		// puts ( "TJT -tick" );
     }
     // puts ( "TJT -after net wait" );
 
     if ( num_eth == 0 ) {
-	net_state = NET_IDLE;
-	return;
+		net_state = NET_IDLE;
+		return;
     }
 
     host_info_init ();
@@ -364,7 +364,7 @@ net_rcv ( struct netbuf *nbp )
 {
 	nbp->next = (struct netbuf *) 0;
 
-    	if ( inq_tail ) {
+	if ( inq_tail ) {
 	    inq_tail->next = nbp;
 	    inq_tail = nbp;
 	} else {
@@ -390,17 +390,17 @@ net_thread ( long xxx )
 	    /* Do we have a packet to process ? */
 	    nbp = NULL;
 	    if ( inq_head ) {
-		nbp = inq_head;
-		inq_head = nbp->next;
-		if ( ! inq_head )
-		    inq_tail = (struct netbuf *) 0;
-		inq_count--;	
+			nbp = inq_head;
+			inq_head = nbp->next;
+			if ( ! inq_head )
+				inq_tail = (struct netbuf *) 0;
+			inq_count--;	
 	    }
 
 	    if ( nbp ) {
-		INT_unlock;
-		net_handle ( nbp );
-		continue;
+			INT_unlock;
+			net_handle ( nbp );
+			continue;
 	    }
 
 	    /* Special to block while keeping interrupts
@@ -434,19 +434,19 @@ output_thread ( long xxx )
 	    /* Do we have a packet to process ? */
 	    nbp = NULL;
 	    if ( outq_head ) {
-		nbp = outq_head;
-		outq_head = nbp->next;
-		if ( ! outq_head )
-		    outq_tail = (struct netbuf *) 0;
-		outq_count--;	
+			nbp = outq_head;
+			outq_head = nbp->next;
+			if ( ! outq_head )
+				outq_tail = (struct netbuf *) 0;
+			outq_count--;	
 	    }
 
 	    if ( nbp ) {
-		INT_unlock;
-		// net_handle ( nbp );
-		board_net_send ( nbp );
-		netbuf_free ( nbp );
-		continue;
+			INT_unlock;
+			// net_handle ( nbp );
+			board_net_send ( nbp );
+			netbuf_free ( nbp );
+			continue;
 	    }
 
 	    /* Special to block while keeping interrupts
@@ -479,7 +479,7 @@ net_send ( struct netbuf *nbp )
 	if ( net_debug_f > 0 ) {
 	    net_show_packet ( "net_send", nbp );
 	    if ( net_debug_f == 1 )
-		net_debug_f = 0;
+			net_debug_f = 0;
 	}
 
 	/*
@@ -488,17 +488,17 @@ net_send ( struct netbuf *nbp )
 	nbp->next = (struct netbuf *) 0;
 
 	INT_lock;
-        if ( outq_tail ) {
-            outq_tail->next = nbp;
-            outq_tail = nbp;
-        } else {
-            outq_tail = nbp;
-            outq_head = nbp;
-        }
-        outq_count++;
+	if ( outq_tail ) {
+		outq_tail->next = nbp;
+		outq_tail = nbp;
+	} else {
+		outq_tail = nbp;
+		outq_head = nbp;
+	}
+	outq_count++;
 	INT_unlock;
 
-        cpu_signal ( outq_sem );
+	cpu_signal ( outq_sem );
 
 	// board_net_send ( nbp );
 	// netbuf_free ( nbp );
@@ -524,7 +524,7 @@ not_our_mac ( struct netbuf *nbp )
 static void
 net_handle ( struct netbuf *nbp )
 {
-    	struct eth_hdr *ehp;
+	struct eth_hdr *ehp;
 
 	nbp->ilen = nbp->elen - sizeof ( struct eth_hdr );
 
@@ -628,7 +628,7 @@ void
 net_addr_get ( char *buf )
 {
     if ( net_state != NET_RUN )
-	panic ( "Premature MAC address access" );
+		panic ( "Premature MAC address access" );
 
 	get_board_net_addr ( buf );
 }
