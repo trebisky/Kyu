@@ -95,7 +95,7 @@ struct zynq_eth {
 /* Bits in the phymnt */
 #define MDIO_ALWAYS		0x40020000
 #define MDIO_READ		(MDIO_ALWAYS | 0x20000000)
-#define MDIO_WRITE		(MDIO_ALWAYS | 0x40000000)
+#define MDIO_WRITE		(MDIO_ALWAYS | 0x10000000)
 #define MDIO_ADDR_SHIFT		23
 #define MDIO_REG_SHIFT		18
 
@@ -107,8 +107,55 @@ eth_init ( void )
 		return 1;
 }
 
+/* ===================================================================== */
+/* ===================================================================== */
+
 /* Phy stuff, eventually migrate to its own file
  */
+
+/* Here are the registers in the PHY device that we use.
+ * The first PHY registers are standardized and device
+ * independent
+ */
+#define PHY_BMCR        0
+#define PHY_BMSR        1
+#define PHY_ID1         2
+#define PHY_ID2         3
+#define PHY_ADVERT      4
+#define PHY_PEER        5
+#define PHY_XSR         0xf
+
+/* Bits in the basic mode control register. */
+#define BMCR_RESET              0x8000
+#define BMCR_LOOPBACK           0x4000
+#define BMCR_100                0x2000      /* Set for 100 Mbit, else 10 */
+#define BMCR_ANEG_ENA           0x1000      /* enable autonegotiation */
+#define BMCR_POWERDOWN          0x0800      /* set to power down */
+#define BMCR_ISOLATE            0x0400
+#define BMCR_ANEG               0x0200      /* restart autonegotiation */
+#define BMCR_FULL               0x0100      /* Set for full, else half */
+#define BMCR_CT_ENABLE          0x0080      /* enable collision test */
+
+/* Bits in the basic mode status register. */
+
+#define BMSR_100FULL            0x4000
+#define BMSR_100HALF            0x2000
+#define BMSR_10FULL             0x1000
+#define BMSR_10HALF             0x0800
+#define BMSR_ANEGCOMPLETE       0x0020
+#define BMSR_ANEGCAPABLE        0x0008
+#define BMSR_LINK_UP            0x0004
+
+/* Bits in the link partner ability register. */
+#define LPA_10HALF              0x0020
+#define LPA_10FULL              0x0040
+#define LPA_100HALF             0x0080
+#define LPA_100FULL             0x0100
+
+#define LPA_ADVERT              LPA_10HALF | LPA_10FULL | LPA_100HALF | LPA_100FULL
+
+void phy_show ( void );
+void phy_ztest ( void );
 
 static int
 phy_read ( int reg )
@@ -117,28 +164,61 @@ phy_read ( int reg )
 		int phy_addr = 1;	/* this works */
 		int tmo;
 		int rv;
-		int stat;
+		//int stat;
 		int cmd;
 
 		cmd = MDIO_READ | (phy_addr<<MDIO_ADDR_SHIFT) | (reg<<MDIO_REG_SHIFT);
 		ep->phymntnc = cmd;
-		stat = ep->nwsr;
-		printf ( "Eth stat = %08x\n", stat );
 
-		tmo = 10000;
+		// stat = ep->nwsr;
+		// See: Eth stat = 00000002
+		// printf ( "Eth stat = %08x\n", stat );
+
+		tmo = 100;
 		while ( tmo-- && !(ep->nwsr & SR_MDIO_DONE) )
 			;
 
 		if ( tmo <= 0 ) {
 			printf ( "Phy read timeout\n" );
-			// return 0xffff;
+			return 0xffff;
 		}
-		printf ( "Eth stat = %08x\n", ep->nwsr );
-		printf ( "Eth phy = %08x\n", ep->phymntnc );
+
+		// printf ( "Phy tmo = %d\n", tmo);
+		// printf ( "Eth stat = %08x\n", ep->nwsr );
+		// printf ( "Eth phy = %08x\n", ep->phymntnc );
 
 		rv = ep->phymntnc;
 
 		return rv & 0xffff;
+}
+
+static void
+phy_write ( int reg, int value )
+{
+		struct zynq_eth *ep = ETH_BASE;
+		int phy_addr = 1;	/* this works */
+		int tmo;
+		int cmd;
+
+		cmd = MDIO_WRITE | (phy_addr<<MDIO_ADDR_SHIFT) | (reg<<MDIO_REG_SHIFT) | (value&0xffff);
+		ep->phymntnc = cmd;
+
+		// stat = ep->nwsr;
+		// printf ( "Eth stat = %08x\n", stat );
+
+		/* These timeouts are very short, maybe 2 iterations
+		 */
+		tmo = 100;
+		while ( tmo-- && !(ep->nwsr & SR_MDIO_DONE) )
+			;
+
+		if ( tmo <= 0 ) {
+			printf ( "Phy write timeout\n" );
+		}
+
+		// printf ( "Phy tmo = %d\n", tmo);
+		// printf ( "Eth stat = %08x\n", ep->nwsr );
+		// printf ( "Eth phy = %08x\n", ep->phymntnc );
 }
 
 int
@@ -150,16 +230,75 @@ phy_init ( void )
 		printf ( "             *********************\n" );
 		printf ( "In phy_init()\n" );
 
+		phy_show ();
+		// phy_ztest ();
+		// phy_show ();
+
 		ep->phymntnc = 0;
 
-		aa = phy_read ( 2 );
-		bb = phy_read ( 3 );
+		aa = phy_read ( PHY_ID1 );
+		bb = phy_read ( PHY_ID2 );
 
 		/* This gets: Phy ID = 362 5e62
 		 * exactly the value in the Broadcom B50612D datasheet
 		 */
 		printf ( "Phy ID = %x %x\n", aa, bb );
 		printf ( "             *********************\n" );
+}
+
+/* This was an experiment to see which registers I could clear:
+ *  The SR are thus read only.
+ *  Note that the PEER register cleared itself.
+ *  Due to my writes to the BMCR or ADVERT register.
+ *  PEER  = cde1
+ *  BMSR  : 7949 --> 7949
+ *  XSR   : 3000 --> 3000
+ *  BMCR  : 1140 -->    0
+ *  ADVERT:  1e1 -->    0
+ *  PEER  :    0 -->    0
+ */
+
+static void
+ztest ( char *msg, int reg )
+{
+		int ini, aft;
+
+		ini = phy_read ( reg );
+		phy_write ( reg, 0 );
+		aft = phy_read ( reg );
+		printf ( "%s: %4x --> %4x\n", msg, ini, aft );
+}
+
+void
+phy_ztest ( void )
+{
+    ztest ( "BMCR  ", PHY_BMCR );
+    ztest ( "BMSR  ", PHY_BMSR );
+    ztest ( "XSR   ", PHY_XSR );
+    ztest ( "ADVERT", PHY_ADVERT );
+    ztest ( "PEER  ", PHY_PEER );
+}
+
+/* Initiallly I see this (left from U-Boot)
+ *  ADV   = 01e1
+ *  PEER  = cde1
+ *  BMCR  = 1140
+ *  BMSR  = 796d
+ *  XSR   = 3000
+ * My network switch shows that it is in 1000 Mbit mode.
+ * (during autonegotiation the status lights on my switch
+ *  go out -- indicating no connection)
+/* 
+ */
+
+void
+phy_show ( void )
+{
+    printf ( "ADV   = %04x\n", phy_read ( PHY_ADVERT ) );
+    printf ( "PEER  = %04x\n", phy_read ( PHY_PEER ) );
+    printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+    printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+    printf ( "XSR   = %04x\n", phy_read ( PHY_XSR ) );
 }
 
 /* THE END */

@@ -71,4 +71,14 @@ mio_gpio ( int pin )
 	mp->ctrl[pin] = MIO_GPIO_VAL;
 }
 
+void
+mio_extra ( int pin )
+{
+	struct mio_pins *mp = MIO_PIN_BASE;
+
+
+	printf ( "MIO for pin %d = %08x\n", pin, &mp->ctrl[pin] );
+	mp->ctrl[pin] = 0x0300;
+}
+
 /* THE END */

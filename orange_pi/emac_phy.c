@@ -239,7 +239,7 @@ phy_link_setup ( void )
 {
 	int reg;
 
-        reg = phy_read ( PHY_BMCR );
+	reg = phy_read ( PHY_BMCR );
 	reg &= ~(BMCR_100|BMCR_FULL);
 
 	if ( phy_speed ==100 )
@@ -374,16 +374,16 @@ phy_reset ( void )
         int reg;
         int tmo = RESET_TIMEOUT;
 
-	/* start reset, this bit self clears */
+		/* start reset, this bit self clears */
         reg = phy_read ( PHY_BMCR );
         phy_write ( PHY_BMCR, reg | BMCR_RESET );
 
         while ( tmo-- && (phy_read(PHY_BMCR) & BMCR_RESET ) )
-	    ;
+			;
 
         // printf ( "PHY reset cleared in %d counts\n", (RESET_TIMEOUT-tmo) );
-	if ( phy_read(PHY_BMCR) & BMCR_RESET )
-	    printf ( "PHY reset fails\n" );
+		if ( phy_read(PHY_BMCR) & BMCR_RESET )
+			printf ( "PHY reset fails\n" );
 }
 
 /* With the cpu clock at 1008 Mhz, this polls 90 times
