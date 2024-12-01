@@ -1,5 +1,8 @@
 /* Zynq - mio pin driver
  *
+ * This configures MIO pins, but has nothing
+ *  at all to do with EMIO (nothing to configure for it).
+ *
  * Tom Trebisky  6-17-2024
  */
 

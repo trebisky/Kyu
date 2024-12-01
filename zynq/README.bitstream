@@ -1,0 +1,12 @@
+12-1-2024
+
+Handling bitstreams in this code:
+
+1) The utility "bitread" is required, which converts a bitstream file
+like "bozo.bit" into C code (namely pl_data.c).
+
+2) Various C drivers will be needed, depending on the bitstream functionality.
+
+The first bitstream for the Antminer S9 allows the four onboard LED to
+be controlled via EMIO.
+

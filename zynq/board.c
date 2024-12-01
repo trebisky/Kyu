@@ -317,8 +317,13 @@ board_init ( void )
 	// It works here, but the rest of Kyu never starts
 	// led_demo ();
 
-#ifdef OLD_ORANGE_PI
-#endif /* OLD_ORANGE_PI */
+	// This kills the on-board LED light show
+	//  from the bitstream loaded by U-boot
+	// pl_reset ();
+
+	// This loads our bitstream
+	pl_load ();
+	// emio_test ();
 
 #ifdef OLD_ORANGE_PI
 	// wdt_disable ();

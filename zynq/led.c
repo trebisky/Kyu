@@ -31,6 +31,8 @@
 
 // #define EXTRA 1
 
+static void emio_blink ( int );
+
 static void
 mio_setup ( void )
 {
@@ -67,6 +69,8 @@ blinker ( int xx )
 	}
 #endif
 
+	emio_blink ( state );
+
 	state = (state + 1) % 2;
 }
 
@@ -79,9 +83,21 @@ led_demo ( void )
     mio_setup ();
 
     gpio_init ();
+
     gpio_config_output ( MIO_RED );
     gpio_config_output ( MIO_GREEN );
     gpio_config_output ( MIO_EXTRA );
+
+	emio_config_output ( 0 );
+	emio_config_output ( 1 );
+	emio_config_output ( 2 );
+	emio_config_output ( 3 );
+
+	/* Turn them all out */
+	emio_write ( 0, 1 );
+	emio_write ( 1, 1 );
+	emio_write ( 2, 1 );
+	emio_write ( 3, 1 );
 
 	// Works, but nothing else runs
 	// (a topic for investigation someday - XXX
@@ -90,6 +106,54 @@ led_demo ( void )
 	// This works just fine
 	// (void) thr_new_repeat ( char *name, tfptr func, void *arg, int prio, int flags, int nticks )
 	(void) thr_new_repeat ( "led", blinker, 0, 25, 0, 500 );
+}
+
+/* Writing 1 turns them off */
+
+#ifdef notdef
+static int emio_last = 0;
+static int emio_next = 0;
+
+/* Blink in order 0 1 2 3 0 1 2 3 ... */
+static void
+emio_blink ( int xxx )
+{
+		emio_write ( emio_last, 1 );
+		emio_write ( emio_next, 0 );
+
+		emio_last = emio_next;
+		emio_next = (emio_next + 1) % 4;
+}
+#endif
+
+#define BLINK_LED	3
+
+enum emio_state { WAIT, ON, OFF };
+
+static enum emio_state emio_state = WAIT;
+static int emio_count = 0;
+
+static void
+emio_blink ( int xxx )
+{
+		if ( emio_state == WAIT ) {
+			emio_count++;
+			if ( emio_count >= 10 ) {
+				emio_state = ON;
+			}
+			return;
+		}
+
+		if ( emio_state == ON ) {
+			emio_write ( BLINK_LED, 0 );
+			emio_state = OFF;
+			return;
+		}
+
+		/* OFF */
+		emio_write ( BLINK_LED, 1 );
+		emio_state = WAIT;
+		emio_count = 0;
 }
 
 /* THE END */

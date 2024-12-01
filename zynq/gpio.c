@@ -41,7 +41,8 @@ struct zynq_gpio {
         vu32    output0_high;
         vu32    output1_low;
         vu32    output1_high;
-        vu32    output2_low;
+
+        vu32    output2_low;	/* EMIO */
         vu32    output2_high;
         vu32    output3_low;
         vu32    output3_high;
@@ -50,14 +51,14 @@ struct zynq_gpio {
 
         vu32    output0;        /* 0x40 */
         vu32    output1;
-        vu32    output2;
+        vu32    output2;		/* EMIO */
         vu32    output3;
 
         int     _pad2[4];
 
         vu32    input0;         /* 0x60 */
         vu32    input1;
-        vu32    input2;
+        vu32    input2;			/* EMIO */
         vu32    input3;
 
         int     _pad3[101];
@@ -76,9 +77,37 @@ struct zynq_gpio {
 
         vu32    dir1;           /* 0x244 */
         vu32    oe1;
-	/* incomplete */
+        vu32    im1;
+        vu32    ie1;
+        vu32    id1;
+        vu32    is1;
+        vu32    it1;
+        vu32    ip1;
+        vu32    iany1;
 
-        /* .... */
+        int     _pad5[7];
+
+        vu32    dir2;           /* 0x284 */
+        vu32    oe2;
+        vu32    im2;
+        vu32    ie2;
+        vu32    id2;
+        vu32    is2;
+        vu32    it2;
+        vu32    ip2;
+        vu32    iany2;
+
+        int     _pad6[7];
+
+        vu32    dir3;           /* 0x2c4 */
+        vu32    oe3;
+        vu32    im3;
+        vu32    ie3;
+        vu32    id3;
+        vu32    is3;
+        vu32    it3;
+        vu32    ip3;
+        vu32    iany3;			/* 0x2e4 */
 };
 
 /* On the EBAZ 4205 these are inputs, connected to buttons */
@@ -96,10 +125,11 @@ gpio_init ( void )
         // gp->dir0 &= ~BIT(MIO_S2_BUTTON);
 }
 
+/* For bits 0-53 (MIO) */
 void
 gpio_config_output ( int bit )
 {
-        struct zynq_gpio *gp = GPIO_BASE;
+	struct zynq_gpio *gp = GPIO_BASE;
 
 	printf ( "Config output for %d\n", bit );
 	printf ( "dir0 %08x\n", &gp->dir0 );
@@ -117,7 +147,7 @@ gpio_config_output ( int bit )
 int
 gpio_read ( int who )
 {
-        struct zynq_gpio *gp = GPIO_BASE;
+	struct zynq_gpio *gp = GPIO_BASE;
 
 	if ( who == 0 )
 	    return gp->input0;
@@ -128,7 +158,7 @@ gpio_read ( int who )
 void
 gpio_write ( int bit, int val )
 {
-        struct zynq_gpio *gp = GPIO_BASE;
+	struct zynq_gpio *gp = GPIO_BASE;
 	u32 m;
 
 	// printf ( "Write: bit %d = %d\n", bit, val );
@@ -162,6 +192,80 @@ gpio_write ( int bit, int val )
 	    m = (~m) & 0xffff0000;
 	    m |= val << (bit-16);
 	    gp->output1_high = m;
+	    return;
+	}
+}
+
+/* These are the above routines, but for EMIO.
+ * We fool with gpio 2 and 3 rather than 0 and 1
+ */
+
+void
+emio_config_output ( int bit )
+{
+	struct zynq_gpio *gp = GPIO_BASE;
+
+	printf ( "Config EMIO output for %d\n", bit );
+	printf ( "dir2 %08x\n", &gp->dir2 );
+	printf ( "dir3 %08x\n", &gp->dir3 );
+
+	if ( bit < 32 ) {
+	    gp->dir2 |= 1 << bit;
+	    gp->oe2 |= 1 << bit;
+	} else {
+	    gp->dir3 |= 1 << (bit-32);
+	    gp->oe3 |= 1 << (bit-32);
+	}
+}
+
+int
+emio_read ( int who )
+{
+	struct zynq_gpio *gp = GPIO_BASE;
+
+	if ( who == 0 )
+	    return gp->input2;
+	else
+	    return gp->input3;
+}
+
+void
+emio_write ( int bit, int val )
+{
+	struct zynq_gpio *gp = GPIO_BASE;
+	u32 m;
+
+	// printf ( "Write: bit %d = %d\n", bit, val );
+
+	if ( bit < 16 ) {
+	    m = 1 << (16+bit);
+	    m = (~m) & 0xffff0000;
+	    m |= val << (bit);
+	    gp->output2_low = m;
+	    return;
+	}
+	if ( bit < 32 ) {
+	    m = 1 << (bit);
+	    m = (~m) & 0xffff0000;
+	    m |= val << (bit-16);
+	    gp->output2_high = m;
+	    return;
+	}
+
+	bit -= 32;
+
+	if ( bit < 16 ) {
+	    m = 1 << (16+bit);
+	    m = (~m) & 0xffff0000;
+	    m |= val << (bit);
+	    gp->output3_low = m;
+	    return;
+	}
+	if ( bit < 32 ) {
+	    m = 1 << (bit);
+	    m = (~m) & 0xffff0000;
+	    m |= val << (bit-16);
+	    gp->output3_high = m;
 	    return;
 	}
 }

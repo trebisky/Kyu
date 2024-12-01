@@ -17,10 +17,15 @@
 
 #define BOARD_ZYNQ
 
+/* Also one of the following */
+#define BOARD_ZYNQ_ANTMINER
+// #define BOARD_ZYNQ_EBAZ
+// #define BOARD_ZYNQ_ZEDBOARD
+
 // #define WANT_NET
 
 /* The Ebaz and Antminer S9 have the console on Uart-1
- * The Zedboard may have it on Uart-0
+ * The Zedboard also seems to have it on Uart-1
  */
 #define CONSOLE_BAUD		115200
 #define CONSOLE_UART		1

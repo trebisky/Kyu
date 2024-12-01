@@ -12,9 +12,14 @@
  * A diagram on page 52 of the TRM is entitled
  *  "MIO at a glance" and summarizes things.
  * The register array is on pages 1573 to 1575.
+ *
+ * Note that details of this file are dependent on the specific board.
+ * i.e. the Ebaz and Antminer are different in detail
+ * So far this file only has details for the Antminer S9
  */
 
-/* pins 0-15 are NAND memory */
+#ifdef BOARD_ZYNQ_ANTMINER
+/* pins 0-14 are NAND memory */
 
 /* A sneaky super bright green LED on the board near the
  * Zynq chip on the side towards the ethernet connector.
@@ -63,5 +68,6 @@
 #define MIO_S2		51
 
 /* pins 52 and 53 are MDC and MDIO for ethernet Phy */
+#endif /* BOARD_ZYNQ_ANTMINER */
 
 /* THE END */
