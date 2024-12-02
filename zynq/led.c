@@ -46,11 +46,20 @@ mio_setup ( void )
 }
 
 static int state = 0;
+static int count = 0;
 
-/* runs ever 200 ms */
+/* runs every 100 ms */
 static void
 blinker ( int xx )
 {
+	/* run full rate */
+	emio_blink ( state );
+
+	count++;
+	if ( count < 5 )
+		return;
+	count = 0;
+
 	if ( state ) {
         // printf ( "Blink off\n" );
         gpio_write ( MIO_RED, 0 );
@@ -69,7 +78,6 @@ blinker ( int xx )
 	}
 #endif
 
-	emio_blink ( state );
 
 	state = (state + 1) % 2;
 }
@@ -81,8 +89,8 @@ led_demo ( void )
     // slcr_unlock ();
 
     mio_setup ();
-
     gpio_init ();
+	gb_init_rand ( 0x55392 );
 
     gpio_config_output ( MIO_RED );
     gpio_config_output ( MIO_GREEN );
@@ -105,7 +113,7 @@ led_demo ( void )
 
 	// This works just fine
 	// (void) thr_new_repeat ( char *name, tfptr func, void *arg, int prio, int flags, int nticks )
-	(void) thr_new_repeat ( "led", blinker, 0, 25, 0, 500 );
+	(void) thr_new_repeat ( "led", blinker, 0, 25, 0, 100 );
 }
 
 /* Writing 1 turns them off */
@@ -134,7 +142,7 @@ static enum emio_state emio_state = WAIT;
 static int emio_count = 0;
 
 static void
-emio_blink ( int xxx )
+emio_blink_A ( int xxx )
 {
 		if ( emio_state == WAIT ) {
 			emio_count++;
@@ -154,6 +162,53 @@ emio_blink ( int xxx )
 		emio_write ( BLINK_LED, 1 );
 		emio_state = WAIT;
 		emio_count = 0;
+}
+
+static void
+emio_blink_B ( int xxx )
+{
+		emio_write ( BLINK_LED, 0 );
+		thr_delay ( 10 );
+		emio_write ( BLINK_LED, 1 );
+}
+
+static void
+emio_blink_C ( int xxx )
+{
+		long rr;
+		int who;
+
+		rr = gb_next_rand ();
+		who = (rr>>1) & 0x3;
+
+		emio_write ( who, 0 );
+		thr_delay ( 10 );
+		emio_write ( who, 1 );
+}
+
+static void
+emio_blink_D ( int xxx )
+{
+		long rr;
+
+		rr = gb_next_rand ();
+
+		emio_write ( 0, (rr>>1) & 1 );
+		emio_write ( 1, (rr>>2) & 1 );
+		emio_write ( 2, (rr>>3) & 1 );
+		emio_write ( 3, (rr>>4) & 1 );
+
+		thr_delay ( 10 );
+		emio_write ( 0, 1 );
+		emio_write ( 1, 1 );
+		emio_write ( 2, 1 );
+		emio_write ( 3, 1 );
+}
+
+/* Just leave the darn things off */
+static void
+emio_blink ( int xxx )
+{
 }
 
 /* THE END */
