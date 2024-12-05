@@ -380,6 +380,8 @@ board_after_net ( void )
 {
 	// A bit unconventional to call from here, but it works
 	led_demo ();
+	axi_test ();
+
 	(void) eth_init ();
 }
 

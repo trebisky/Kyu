@@ -53,7 +53,7 @@ static void
 blinker ( int xx )
 {
 	/* run full rate */
-	emio_blink ( state );
+	// emio_blink ( state );
 
 	count++;
 	if ( count < 5 )
