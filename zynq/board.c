@@ -378,9 +378,11 @@ board_timer_rate_set ( int rate )
 void
 board_after_net ( void )
 {
-	// A bit unconventional to call from here, but it works
+	// A bit unconventional to call from here, but it works well
 	led_demo ();
 	axi_test ();
+	// axi_gpio_test ();
+	// fabric_test ();
 
 	(void) eth_init ();
 }

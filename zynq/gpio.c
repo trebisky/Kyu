@@ -131,9 +131,11 @@ gpio_config_output ( int bit )
 {
 	struct zynq_gpio *gp = GPIO_BASE;
 
+	/*
 	printf ( "Config output for %d\n", bit );
 	printf ( "dir0 %08x\n", &gp->dir0 );
 	printf ( "dir1 %08x\n", &gp->dir1 );
+	*/
 
 	if ( bit < 32 ) {
 	    gp->dir0 |= 1 << bit;

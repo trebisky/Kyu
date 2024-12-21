@@ -37,3 +37,5 @@ Makefile.inc
 Zsizes
 bsd
 bsd_tcp
+
+zynq/*.bit

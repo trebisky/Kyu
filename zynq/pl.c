@@ -151,7 +151,7 @@ struct slcr {
 
 static int slcr_locked = 1; /* 1 means locked, 0 means unlocked */
 
-static void
+void
 slcr_lock(void)
 {
 	struct slcr *sp = SLCR_BASE;
@@ -163,7 +163,7 @@ slcr_lock(void)
 	}
 }
 
-static void
+void
 slcr_unlock(void)
 {
 	struct slcr *sp = SLCR_BASE;
