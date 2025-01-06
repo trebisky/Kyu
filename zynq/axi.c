@@ -35,14 +35,16 @@ axi_blinker ( void )
 		if ( bl_state ) {
 			bl_state = 0;
 			ap->reg1 = 0;
+			// printf ( "A" );
 		} else {
 			bl_state = 1;
 			ap->reg1 = 0xf;
+			// printf ( "B" );
 		}
 }
 
 void
-axi_test ( void )
+axi_test_ORIG ( void )
 {
 		struct axi_test *ap = AXI_BASE;
 		int i;
@@ -85,6 +87,79 @@ axi_test ( void )
 		*/
 
 		(void) thr_new_repeat ( "axibl", axi_blinker, 0, 25, 0, 500 );
+}
+
+enum bmode { DOWN, UP, HOLD };
+
+static int bval = 0;
+static enum bmode bmode = UP;
+static int hold = 0;
+
+static void
+axi_breather ( void )
+{
+		struct axi_test *ap = AXI_BASE;
+
+		if ( bmode == UP ) {
+			bval++;
+			ap->reg3 = bval;
+			if ( bval >= 160 )
+				bmode = DOWN;
+		} else if ( bmode == DOWN ) {
+			bval--;
+			ap->reg3 = bval;
+			if ( bval <= 0 ) {
+				bmode = HOLD;
+				hold = 0;
+			}
+		} else { // HOLD
+			hold++;
+			if ( hold >= 100 )
+				bmode = UP;
+		}
+}
+
+
+// #define AXI_OFF
+// #define AXI_TEST
+#define AXI_BTEST
+
+void
+axi_test ( void )
+{
+		struct axi_test *ap = AXI_BASE;
+		int i;
+
+		printf ( "AXI reg 0 (ID) = %08x\n", ap->reg0 );
+		// ap->reg0 = 0x8800;
+
+#ifdef AXI_OFF
+		// turn off all 4 LED
+		ap->reg1 = 0xf;
+		printf ( " ----- AXI test bypassed for now\n" );
+		printf ( " ----- AXI test bypassed for now\n" );
+		printf ( " ----- AXI test bypassed for now\n" );
+#endif
+
+#ifdef AXI_TEST
+		(void) thr_new_repeat ( "axibl", axi_blinker, 0, 25, 0, 500 );
+
+		/* Set PWM parameters */
+		ap->reg2 = 500;
+		ap->reg3 = 50;
+#endif
+
+#ifdef AXI_BTEST
+		// all 4 LED on
+		ap->reg1 = 0x0;
+
+		/* Set PWM parameters */
+		ap->reg2 = 500;
+		ap->reg3 = 0;
+
+		// (void) thr_new_repeat ( "axibl", axi_breather, 0, 25, 0, 5 );
+		(void) thr_new_repeat ( "axibl", axi_breather, 0, 25, 0, 8 );
+#endif
 }
 
 /* THE END */
