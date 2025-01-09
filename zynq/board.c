@@ -383,7 +383,9 @@ board_after_net ( void )
 	axi_test ();
 	// axi_gpio_test ();
 	// fabric_test ();
+	hub_test ();
 
+	/* The normal thing */
 	(void) eth_init ();
 }
 

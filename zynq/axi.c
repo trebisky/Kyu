@@ -120,15 +120,21 @@ axi_breather ( void )
 }
 
 
+#define AXI_NONE
 // #define AXI_OFF
 // #define AXI_TEST
-#define AXI_BTEST
+// #define AXI_BTEST
 
 void
 axi_test ( void )
 {
 		struct axi_test *ap = AXI_BASE;
 		int i;
+
+#ifdef AXI_NONE
+		printf ( "no AXI custom peripheral (bypassing)\n" );
+		return;
+#endif
 
 		printf ( "AXI reg 0 (ID) = %08x\n", ap->reg0 );
 		// ap->reg0 = 0x8800;
