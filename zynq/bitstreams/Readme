@@ -4,6 +4,12 @@ These are of little use without some documentation and appropriate code running 
 the ARM side.
 
 ----------------
+add.bit 12-2024
+This was (I think) an axi peripheral with register that added the value in
+two registers and returned it in another.  This was a first experiment with
+making my own custom AXI peripheral and is of no real use.
+
+----------------
 pwm.bit -- 1-6-2025
   PROJ=custom1
   BPATH=/home/tom/vivado/$(PROJ)/$(PROJ).runs/impl_1
