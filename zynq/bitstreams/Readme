@@ -1,0 +1,29 @@
+Here is my bitstream collection.  1-8-2025
+
+These are of little use without some documentation and appropriate code running in
+the ARM side.
+
+----------------
+pwm.bit -- 1-6-2025
+  PROJ=custom1
+  BPATH=/home/tom/vivado/$(PROJ)/$(PROJ).runs/impl_1
+This is the first success at pwm brightness control of the four on-board LED.
+It uses some custom IP that sets up an AXI peripheral with several registers.
+See axi.c and AXI_BTEST
+	reg0 is read only and gives 0xabcd0012
+	reg1 controls the LED (0xf is off, 0 is all on)
+	reg2 divides 50 Mhz for the PWM frequency (use 500 to get 100 kHz)
+	reg3 splits that to give the PWM duty cycle (use 250 to get half of full)
+
+----------------
+emio47.bit -- 1-8-2025
+  PROJ=zzz
+  BPATH=/home/tom/vivado/$(PROJ)/$(PROJ).runs/impl_1
+This is super simple, route 47 emio signals to various pins.
+All the work is in the constraints file.
+See my Antiminer Github and project emio.
+
+
+
+
+
