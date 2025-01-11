@@ -307,6 +307,73 @@ hub_test2 ( void )
 		(void) thr_new_repeat ( "hub_t2", hub_t2, 0, 25, 0, 1 );
 }
 
+/* ================================================== */
+/* ================================================== */
+
+static int row_walk;	// which line
+static int col_walk;	// where in line
+
+static char walk_data[64];
+
+static void
+rwalk_show_pos ( void )
+{
+		int i;
+
+		for ( i=0; i<64; i++ )
+			walk_data[i] = 0;
+
+		if ( row_walk < 32 )
+			walk_data[col_walk] = H1_RED;
+		else
+			walk_data[col_walk] = H2_RED;
+
+		hub_line ( row_walk % 32, walk_data, 64 );
+}
+
+static int row_next[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+static int col_next[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+
+/* Runs as a Kyu thread at 2 Hz
+ */
+static void
+hub_rwalk_run ( int xxx )
+{
+		long rnum;
+		int rnext, cnext;
+
+		for ( ;; ) {
+			rnum = gb_unif_rand ( 8 );
+			rnext = row_walk + row_next[rnum];
+			cnext = col_walk + col_next[rnum];
+			if ( rnext < 0 || rnext >= 64 )
+				continue;
+			if ( cnext < 0 || cnext >= 64 )
+				continue;
+			break;
+		}
+
+		row_walk = rnext;
+		col_walk = cnext;
+		rwalk_show_pos ();
+}
+
+static void
+hub_rwalk ( void )
+{
+		// long seed = 99999999977L;
+		long seed = 1215752169;
+
+		gb_init_rand ( seed );
+
+		row_walk = 32;
+		col_walk = 32;
+		rwalk_show_pos ();
+
+		// (void) thr_new_repeat ( "hub_rw", hub_rwalk_run, 0, 25, 0, 500 );
+		(void) thr_new_repeat ( "hub_rw", hub_rwalk_run, 0, 25, 0, 200 );
+}
+
 static void
 hub_demo_test ( void )
 {
@@ -315,10 +382,11 @@ hub_demo_test ( void )
 		hub_init ();
 
 		// hub_check ();
-		hub_timing ();
+		// hub_timing ();
 
 		// hub_test1 ();
 		// hub_test2 ();
+		hub_rwalk ();
 
 		printf ( "HUB75 demo is launched (done)\n" );
 }
