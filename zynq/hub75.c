@@ -162,14 +162,31 @@ hub_init ( void )
 		emio_write ( OE_HUB, 1 );
 }
 
+/* This gives a nice 318 kHz square wave.
+ * The on period is 1.56 us
+ */
+static void
+hub_check ( void )
+{
+		for ( ;; ) {
+			emio_write ( CLK_HUB, 1 );
+			emio_write ( CLK_HUB, 0 );
+		}
+}
+
 /* colors in a byte are:
- * 0 - 0 - b2, g2, r2 -- b1, g1, r1
+ * 0 - 0 - rgb2 - rgb1
+ *
+ * Using a scope, I see this code gets run at about 800 Hz.
+ * The LAT pulse is 4.5 us in size with 3 writes high.
  */
 static void
 hub_line ( int addr, char colors[], int ncolors )
 {
 		int i;
 		int color;
+
+		// printf ( "+" );
 
 		// turn off the line
 		emio_write ( OE_HUB, 1 );
@@ -179,27 +196,23 @@ hub_line ( int addr, char colors[], int ncolors )
 		emio_write ( B_HUB, (addr >> 1) & 1 );
 		emio_write ( C_HUB, (addr >> 2) & 1 );
 		emio_write ( D_HUB, (addr >> 3) & 1 );
-		emio_write ( E_HUB, (addr >> 5) & 1 );
+		emio_write ( E_HUB, (addr >> 4) & 1 );
 
 		for ( i=0; i<ncolors; i++ ) {
 			color = colors[i];
-			emio_write ( R1_HUB, color & 1 );
+			emio_write ( B1_HUB, color & 1 );
 			emio_write ( G1_HUB, (color >> 1) & 1 );
-			emio_write ( B1_HUB, (color >> 2) & 1 );
-			emio_write ( R2_HUB, (color >> 3) & 1 );
+			emio_write ( R1_HUB, (color >> 2) & 1 );
+			emio_write ( B2_HUB, (color >> 3) & 1 );
 			emio_write ( G2_HUB, (color >> 4) & 1 );
-			emio_write ( B2_HUB, (color >> 5) & 1 );
+			emio_write ( R2_HUB, (color >> 5) & 1 );
 
 			// pulse clk
-			emio_write ( CLK_HUB, 0 );
-			emio_write ( CLK_HUB, 0 );
-			emio_write ( CLK_HUB, 0 );
 			emio_write ( CLK_HUB, 1 );
+			emio_write ( CLK_HUB, 0 );
 		}
 
 		// pulse lat
-		emio_write ( LAT_HUB, 1 );
-		emio_write ( LAT_HUB, 1 );
 		emio_write ( LAT_HUB, 1 );
 		emio_write ( LAT_HUB, 0 );
 
@@ -215,20 +228,105 @@ static char hello_line[] = {
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0
+	0, 0, 0, 0, 0, 4, 2, 1
 };
+
+/* This is the first thing that ever worked.
+ * It lights up the last 3 pixels on the top line RGB
+ * Putting this in a loop simply reduces the brightness,
+ * as we have the LED's off during the update.
+ */
+static void
+hub_test1 ( void )
+{
+		hub_line ( 0, hello_line, 64 );
+}
+
+/* The idea here is to use the scope, and look at
+ * LAT to see how fast we can crank out lines going
+ * as fast as possible.
+ * It looks like 1100 Hz !!
+ * This sort of makes sense.  There are 521 calls
+ * to emio_write() involved sending a line, each
+ * yields a 1.56 us timing, so that totals to
+ * 813 us which would be 1230 Hz.  We must have
+ * a bit of extra overhead and/or that 1.56 timing
+ * is not the whole story.
+ * Whatever the case, to send 32 lines and refresh
+ * the entire panel can only be done in this manner
+ * and get a 34 Hz refresh rate.
+ */
+static void
+hub_timing ( void )
+{
+		for ( ;; )
+			hub_line ( 0, hello_line, 64 );
+}
+
+#define H1_RED		4
+#define H1_GREEN	2
+#define H1_BLUE		1
+#define H2_RED		0x20
+#define H2_GREEN	0x10
+#define H2_BLUE		8
+
+static int t2_line;
+static char t2_data[64];
+
+static void
+t2_mkline ( int line, char data[] )
+{
+		int i;
+
+		for ( i=0; i<64; i++ )
+			data[i] = 0;
+
+		data[line] = H1_RED;
+		data[line+32] = H1_GREEN;
+		data[31-line] |= H2_BLUE;
+		data[63-line] |= H2_RED;
+}
+
+/* Runs as a Kyu thread at 1000 Hz
+ */
+static void
+hub_t2 ( int xxx )
+{
+		t2_mkline ( t2_line, t2_data );
+		hub_line ( t2_line, t2_data, 64 );
+
+		t2_line += 1;
+		if ( t2_line >= 32 )
+			t2_line = 0;
+}
+
+static void
+hub_test2 ( void )
+{
+		t2_line = 0;
+		(void) thr_new_repeat ( "hub_t2", hub_t2, 0, 25, 0, 1 );
+}
 
 static void
 hub_demo_test ( void )
 {
+		printf ( "Running HUB75 demo\n" );
+
 		hub_init ();
-		hub_line ( 0, hello_line, 64 );
+
+		// hub_check ();
+		hub_timing ();
+
+		// hub_test1 ();
+		// hub_test2 ();
+
+		printf ( "HUB75 demo is launched (done)\n" );
 }
 
 void
 hub_test ( void )
 {
-		hub_diag_test ();
+		// hub_diag_test ();
 		hub_demo_test ();
 }
 

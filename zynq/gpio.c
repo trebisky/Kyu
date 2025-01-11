@@ -207,9 +207,9 @@ emio_config_output ( int bit )
 {
 	struct zynq_gpio *gp = GPIO_BASE;
 
-	printf ( "Config EMIO output for %d\n", bit );
-	printf ( "dir2 %08x\n", &gp->dir2 );
-	printf ( "dir3 %08x\n", &gp->dir3 );
+	// printf ( "Config EMIO output for %d\n", bit );
+	// printf ( "dir2 %08x\n", &gp->dir2 );
+	// printf ( "dir3 %08x\n", &gp->dir3 );
 
 	if ( bit < 32 ) {
 	    gp->dir2 |= 1 << bit;
