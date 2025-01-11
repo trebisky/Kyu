@@ -310,8 +310,12 @@ hub_test2 ( void )
 /* ================================================== */
 /* ================================================== */
 
+// enum color { RED. GREEN, BLUE };
+
 static int row_walk;	// which line
 static int col_walk;	// where in line
+static int color_walk;
+static int walk_count;
 
 static char walk_data[64];
 
@@ -324,12 +328,59 @@ rwalk_show_pos ( void )
 			walk_data[i] = 0;
 
 		if ( row_walk < 32 )
-			walk_data[col_walk] = H1_RED;
+			walk_data[col_walk] = color_walk;
 		else
-			walk_data[col_walk] = H2_RED;
+			walk_data[col_walk] = color_walk << 3;
 
 		hub_line ( row_walk % 32, walk_data, 64 );
 }
+
+/* random color every time! */
+static int
+cycle_color ( int xxx )
+{
+		// avoid 0
+		return 1 + gb_unif_rand ( 7 );
+}
+
+#ifdef notdef
+/* random color every 20 seconds */
+static int
+cycle_color ( int color )
+{
+		walk_count++;
+		if ( walk_count < 20*5 ) {
+			return color;
+		}
+
+		walk_count = 0;
+
+		// avoid 0
+		return 1 + gb_unif_rand ( 7 );
+}
+
+static int
+cycle_color ( int color )
+{
+		walk_count++;
+		if ( walk_count < 30*5 ) {
+			return color;
+		}
+
+		walk_count = 0;
+
+		switch ( color ) {
+			case H1_RED:
+				return H1_GREEN;
+			case H1_GREEN:
+				return H1_BLUE;
+			case H1_BLUE:
+				return H1_RED;
+			default:
+				return H1_RED;
+		}
+}
+#endif
 
 static int row_next[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
 static int col_next[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
@@ -353,6 +404,9 @@ hub_rwalk_run ( int xxx )
 			break;
 		}
 
+		/* Change color every 30 seconds */
+		color_walk = cycle_color ( color_walk );
+
 		row_walk = rnext;
 		col_walk = cnext;
 		rwalk_show_pos ();
@@ -365,6 +419,8 @@ hub_rwalk ( void )
 		long seed = 1215752169;
 
 		gb_init_rand ( seed );
+		walk_count = 0;
+		color_walk = H1_RED;
 
 		row_walk = 32;
 		col_walk = 32;
