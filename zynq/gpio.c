@@ -272,4 +272,42 @@ emio_write ( int bit, int val )
 	}
 }
 
+/* 1-11-2025 an experiment.
+ * The idea is to see if we can write a group of bits
+ *  in one call.  As currently coded this only works with
+ *  the first 32 emio bits in output2.
+ */
+
+#ifdef notdef
+// This routine works
+void
+emio_write_m ( int val, int mask )
+{
+		struct zynq_gpio *gp = GPIO_BASE;
+		u32 keep = ~mask;
+		u32 m;
+
+		m = (keep & 0xffff) << 16;
+		m |= val & 0xffff;
+		gp->output2_low = m;
+
+		m = keep & 0xffff0000;
+		m |= val >> 16;
+		gp->output2_high = m;
+}
+#endif
+
+/* This also works, and is certainly the
+ *  simplest and fastest.
+ */
+void
+emio_write_m ( int val, int mask )
+{
+	struct zynq_gpio *gp = GPIO_BASE;
+	u32 prev;
+
+	prev = gp->output2 & (~mask);
+	gp->output2 = val | prev;
+}
+
 /* THE END */

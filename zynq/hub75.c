@@ -3,6 +3,17 @@
  * Tom Trebisky  1-9-2025
  */
 
+#define BIT(x)	(1<<(x))
+
+#define FAST_COLOR
+
+/* First a big messy section that has important values
+ * for pin allocation and emio assignments.
+ * Note that this expects emio47.bit to be in use
+ * or some other bitstream that maps these emio bits
+ * to board connections in the same way.
+ */
+
 // First pin is J5-5 == T16 == emio16
 // J5-5
 // #define TEST_PIN	16
@@ -59,6 +70,18 @@
 // #define TEST_PIN	6
 // J2-15
 #define TEST_PIN	7
+
+/* ================================================== */
+/* ================================================== */
+
+#ifdef FAST_COLOR
+#define F1_RED		BIT(14)
+#define F1_GREEN	BIT(9)
+#define F1_BLUE		BIT(8)
+#define F2_RED		BIT(15)
+#define F2_GREEN	BIT(10)
+#define F2_BLUE		BIT(19)
+#endif
 
 static int hub_pin;
 static int hub_state = 0;
@@ -135,9 +158,22 @@ hub_diag_test ( void )
  * a rising edge on clk should clock data into the panel
  */
 
+static int color_mask;
+
 static void
 hub_init ( void )
 {
+#ifdef FAST_COLOR
+		color_mask = 0;
+		color_mask |= F1_RED;
+		color_mask |= F1_GREEN;
+		color_mask |= F1_BLUE;
+		color_mask |= F2_RED;
+		color_mask |= F2_GREEN;
+		color_mask |= F2_BLUE;
+		printf ( "HUB -- color mask: %08x\n", color_mask );
+#endif
+
 		// make all emio signals outputs
 		emio_config_output ( CLK_HUB );
 		emio_config_output ( LAT_HUB );
@@ -174,6 +210,38 @@ hub_check ( void )
 		}
 }
 
+#define H1_RED		4
+#define H1_GREEN	2
+#define H1_BLUE		1
+#define H2_RED		0x20
+#define H2_GREEN	0x10
+#define H2_BLUE		8
+
+
+#ifdef FAST_COLOR
+static int
+to_fast ( int color )
+{
+		int rv = 0;
+
+		if ( color & H1_RED )
+			rv |= F1_RED;
+		if ( color & H1_GREEN )
+			rv |= F1_GREEN;
+		if ( color & H1_BLUE )
+			rv |= F1_BLUE;
+
+		if ( color & H2_RED )
+			rv |= F2_RED;
+		if ( color & H2_GREEN )
+			rv |= F2_GREEN;
+		if ( color & H2_BLUE )
+			rv |= F2_BLUE;
+
+		return rv;
+}
+#endif
+
 /* colors in a byte are:
  * 0 - 0 - rgb2 - rgb1
  *
@@ -188,29 +256,39 @@ hub_line ( int addr, char colors[], int ncolors )
 
 		// printf ( "+" );
 
+		// no need to do that here
 		// turn off the line
-		emio_write ( OE_HUB, 1 );
-
-		// I am guessing that A is the lsb
-		emio_write ( A_HUB, addr & 1 );
-		emio_write ( B_HUB, (addr >> 1) & 1 );
-		emio_write ( C_HUB, (addr >> 2) & 1 );
-		emio_write ( D_HUB, (addr >> 3) & 1 );
-		emio_write ( E_HUB, (addr >> 4) & 1 );
+		// emio_write ( OE_HUB, 1 );
 
 		for ( i=0; i<ncolors; i++ ) {
 			color = colors[i];
+#ifdef FAST_COLOR
+			emio_write_m ( to_fast(color), color_mask );
+			// emio_write_m ( 0, color_mask );
+#endif
+#ifndef FAST_COLOR
 			emio_write ( B1_HUB, color & 1 );
 			emio_write ( G1_HUB, (color >> 1) & 1 );
 			emio_write ( R1_HUB, (color >> 2) & 1 );
 			emio_write ( B2_HUB, (color >> 3) & 1 );
 			emio_write ( G2_HUB, (color >> 4) & 1 );
 			emio_write ( R2_HUB, (color >> 5) & 1 );
+#endif
 
 			// pulse clk
 			emio_write ( CLK_HUB, 1 );
 			emio_write ( CLK_HUB, 0 );
 		}
+
+		// blank display while switching lines
+		emio_write ( OE_HUB, 1 );
+
+		// A is the lsb
+		emio_write ( A_HUB, addr & 1 );
+		emio_write ( B_HUB, (addr >> 1) & 1 );
+		emio_write ( C_HUB, (addr >> 2) & 1 );
+		emio_write ( D_HUB, (addr >> 3) & 1 );
+		emio_write ( E_HUB, (addr >> 4) & 1 );
 
 		// pulse lat
 		emio_write ( LAT_HUB, 1 );
@@ -262,13 +340,6 @@ hub_timing ( void )
 		for ( ;; )
 			hub_line ( 0, hello_line, 64 );
 }
-
-#define H1_RED		4
-#define H1_GREEN	2
-#define H1_BLUE		1
-#define H2_RED		0x20
-#define H2_GREEN	0x10
-#define H2_BLUE		8
 
 static int t2_line;
 static char t2_data[64];
