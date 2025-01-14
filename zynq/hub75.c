@@ -275,8 +275,18 @@ hub_line ( int addr, char colors[], int ncolors )
 			emio_write ( R2_HUB, (color >> 5) & 1 );
 #endif
 
-			// pulse clk
+#ifdef notdef
+			// if we clock things like this the display
+			// is entirely blank -- proving that the
+			// data gets latched on a rising edge.
+			emio_write ( CLK_HUB, 0 );
+			emio_write_m ( 0, color_mask );
 			emio_write ( CLK_HUB, 1 );
+#endif
+			// pulse clk
+			// rising edge clocks in the data
+			emio_write ( CLK_HUB, 1 );
+			emio_write_m ( 0, color_mask );
 			emio_write ( CLK_HUB, 0 );
 		}
 
@@ -339,6 +349,24 @@ hub_timing ( void )
 {
 		for ( ;; )
 			hub_line ( 0, hello_line, 64 );
+}
+
+/* The idea here is similar, but I am going to use a
+ * stopwatch to measure how long it takes to crank
+ * out 10,000 line
+ * I got 4.1 seconds with a 10 Mhz ARM clock.
+ */
+static void
+hub_timing2 ( void )
+{
+		int i;
+
+		for ( ;; ) {
+			printf ( "HUB start\n" );
+			for ( i=0; i<10000; i++ )
+				hub_line ( 0, hello_line, 64 );
+			printf ( "HUB end\n" );
+		}
 }
 
 static int t2_line;
@@ -510,6 +538,7 @@ hub_demo_test ( void )
 
 		// hub_check ();
 		// hub_timing ();
+		// hub_timing2 ();
 
 		// hub_test1 ();
 		// hub_test2 ();

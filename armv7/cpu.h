@@ -152,6 +152,13 @@ r_CCNT ( void )
 
     // Read CCNT Register
     asm volatile ("mrc p15, 0, %0, c9, c13, 0": "=r" (rv) );
+#ifdef ARCH_ARM_CORTEX_A9
+	/* On the Zynq, we discovered that the value is being
+	 * divided by 64 -- I have yet to find proper documentation
+	 * so I have added this unfortunate hack.
+	 */
+	rv *= 64;
+#endif
     return rv;
 }
 

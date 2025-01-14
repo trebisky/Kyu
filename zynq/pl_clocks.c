@@ -59,7 +59,13 @@ fabric_set ( int src, int div0, int div1 )
 static void
 reg_show ( char *msg, u32 val )
 {
-	printf ( "%s %X\n", msg, val );
+	printf ( "%s %08x\n", msg, val );
+}
+
+static void
+reg_show2 ( char *msg, char *addr, u32 val )
+{
+	printf ( "%s (addr = %08x) %08x\n", msg, addr, val );
 }
 
 static void
@@ -83,6 +89,48 @@ fabric_show ( char *msg, u32 val )
 
 }
 
+#ifdef notdef
+static void
+cpu_kick ( void )
+{
+	struct slcr_regs *sp;
+	u32 val;
+
+	sp = (struct slcr_regs *) ZYNQ_SYS_CTRL_BASEADDR;
+
+	printf ( "Start kick\n" );
+	reg_show2 ( "--- pll status:", (char *) &sp->pll_status, sp->pll_status );
+
+	slcr_unlock();
+
+	// assert reset
+	val = sp->arm_pll_ctrl |= 1;
+
+	// New divisor
+	// val = sp->arm_pll_ctrl & ~(0x7f<<12);
+	// val |= (0x14) << 12;
+
+	// This causes a fault:
+	// val |= (80) << 12;
+
+	// clear bypass
+	// (oops, this is not bypass, never mind
+	val &= ~8;
+	sp->arm_pll_ctrl = val;
+
+	// clear reset
+	val = sp->arm_pll_ctrl &= ~1;
+
+	slcr_lock();
+
+	reg_show2 ( "--- pll status:", (char *) &sp->pll_status, sp->pll_status );
+	reg_show2 ( "ARM pll ctrl:  ", (char *) &sp->arm_pll_ctrl, sp->arm_pll_ctrl );
+	reg_show2 ( "--- pll status:", (char *) &sp->pll_status, sp->pll_status );
+
+	printf ( "End kick\n" );
+}
+#endif
+
 void
 fabric_test ( void )
 {
@@ -100,7 +148,7 @@ fabric_test ( void )
 	 *  We have a 33.33 Mhz crystal, so using the multipliers we get:
 	 *  33.3 * 0x28 (40) = 1332 Mhz (cpu runs at half this, i.e. 666 Mhz
 	 *  33.3 * 0x20 (32) = 1066 Mhz
-	 *  33.3 * 0x18 (30) = 1000 Mhz
+	 *  33.3 * 0x1E (30) = 1000 Mhz
 	 *
 	 * But the fabric clocks come from the IO clock, which is 1000 Mhz
 	 */
@@ -127,7 +175,8 @@ fabric_test ( void )
 	 */
 
 	/* In other words we come out of reset with FCLK-0 running
-	 * at 50 Mhz.  It divides the 1000 Mhz IO clock by 20.
+	 * at 50 Mhz.  (Actually we come out of U-boot).
+	 * The 1000 Mhz IO clock gets divided by 20 to give 50 Mhz
 	 * Both div1 and div2 are 6 bit divisors.
 	 * What happens if a divisor is 0?  Who knows.
 	 */
@@ -136,6 +185,17 @@ fabric_test ( void )
 	// fabric_norm ();
 	// fabric_50 ();
 	// reg_show ( "FPGA0 clock ctrl:", sp->fpga0_clk_ctrl );
+
+	//reg_show ( "ARM pll ctrl:", sp->arm_pll_ctrl );
+	//reg_show ( "ARM pll cfg:", sp->arm_pll_cfg );
+	//reg_show ( "ARM clock ctrl:", sp->arm_clk_ctrl );
+
+	reg_show2 ( "ARM pll ctrl:  ", (char *) &sp->arm_pll_ctrl, sp->arm_pll_ctrl );
+	reg_show2 ( "--- pll status:", (char *) &sp->pll_status, sp->pll_status );
+	reg_show2 ( "ARM pll cfg:   ", (char *) &sp->arm_pll_cfg, sp->arm_pll_cfg );
+	reg_show2 ( "ARM clock ctrl:", (char *) &sp->arm_clk_ctrl, sp->arm_clk_ctrl );
+
+	// cpu_kick ();
 }
 
 /* 50 Mhz */

@@ -26,6 +26,10 @@ static int cpu_clock_mhz;
 static unsigned int ram_start;
 static unsigned int ram_size;
 
+/* XXX XXX this delay stuff needs rework and checking for Zynq */
+/* XXX XXX this delay stuff needs rework and checking for Zynq */
+/* XXX XXX this delay stuff needs rework and checking for Zynq */
+
 /* These comments are all for the Orange Pi H3 */
 // This is for the standard 1008 Mhz CPU clock
 // This value can be adjusted at run time if
@@ -249,15 +253,15 @@ board_get_cpu_mhz ( void )
 	return cpu_clock_mhz;
 }
 
-/* On the orange Pi this was in ccu.c and poked around
- * with the CPU PLL hardware.
+/*
  * Returns rate in Hz
+ * Use the Kyu "i 8" command to check this
  */
 static unsigned int
 get_cpu_clock ( void )
 {
 		/* XXX Hack for Zynq */
-		return 666*100*1000;
+		return 666*1000*1000;
 }
 
 static void
@@ -266,19 +270,6 @@ board_cpu_init ( void )
 	cpu_clock = get_cpu_clock ();
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
-
-	/* The Neo comes up at 408 Mhz, but let's fix that.
-	 * (actually it isn't bad to run the Neo at 400
-	 *  for thermal reasons).
-	 */
-	if ( cpu_clock_mhz != 1008 ) {
-	    printf ( "Resetting CPU clock\n" );
-		// Orange Pi
-	    // set_cpu_clock_1008 ();
-	    cpu_clock = get_cpu_clock ();
-	    cpu_clock_mhz = cpu_clock / 1000 / 1000;
-	    printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
-	}
 }
 
 #ifdef notdef
@@ -382,7 +373,11 @@ board_after_net ( void )
 	led_demo ();
 	axi_test ();
 	// axi_gpio_test ();
-	// fabric_test ();
+
+	/* investigate fabric (and CPU) clocks */
+	fabric_test ();
+
+	/* My Hub75 64x64 led panel */
 	hub_test ();
 
 	/* The normal thing */

@@ -799,7 +799,7 @@ check_clock_DETAIL ( void )
  * one "thing" can use this at a time.
  */
 
-#define NVALS 20
+#define NVALS 8
 
 static void
 check_clock ( void )
@@ -808,6 +808,7 @@ check_clock ( void )
 	int i;
 	int secs;
 	int delay = 1000;
+	int hz;
 
 	secs = NVALS * delay / 1000;
 
@@ -819,7 +820,10 @@ check_clock ( void )
 	}
 
 	for ( i=0; i< NVALS; i++ )
-	    printf ( "CCNT for 1 sec: %d\n", vals[i] );
+	    printf ( "CCNT for 1/10 sec: %d\n", vals[i] );
+
+	hz = vals[1] / (1000*1000);
+	printf ( "Looks like %d Mhz CPU clock\n", hz );
 }
 
 

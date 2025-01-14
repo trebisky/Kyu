@@ -23,6 +23,11 @@
  * registers on other ARM variants have different addresses.
  * (They are the same on the Cortex-A7 in the Allwinner H3).
  *
+ * On the Cortex-A9 (Zynq) some weird stuff happens using this
+ *  code.  There is every indication that the divide by 64 thing
+ *  is enabled by default, which is a bad surprise if so.
+ *  Documentation is hard to impossible to find.
+ *
  * All of this ARM cycle count stuff is supported by code
  * in locore.S (we could use inline assembly, but we don't.)
  * The counter runs at the full CPU clock rate (1 Ghz),

@@ -13,6 +13,7 @@
  * Tom Trebisky  11/14/2024
  *
  */
+
 /* This was worked up for my Ebaz bare metal demos,
  * then moved into Kyu as a timer driver.
  * As noted below, there are other timer resources
@@ -29,6 +30,12 @@
 
 #define TTC0_BASE	0xf8001000
 #define TTC1_BASE	0xf8002000
+
+/* We did a bunch of digging 1-12-2025 and learned that the timer is among
+ * a special gang of peripherals that get fed the cpu_1x clock
+ * In our system, where the CPU runs at 666 Mhz, this clock is 111 Mhz.
+ */
+#define PCLK_RATE 111000000L
 
 #include "zynq_ints.h"
 
@@ -120,6 +127,9 @@ struct ttc {
 #define CCR_EXT_SRC	BIT(5)
 #define CCR_EXT_EDGE	BIT(6)
 
+// Prescaler is 2^(N+1)
+#define PRESCALE_16		3
+
 /* Bits in the mode register */
 #define MODE_DISABLE	BIT(0)
 #define MODE_INTER	BIT(1)
@@ -139,9 +149,12 @@ void timer_handler ( int );
 
 volatile int timer_count;
 
-/* With a prescaler of 8, a preload of 10000 gave us 667 ticks per second */
+/* With a prescaler of 16, a preload of 10000 gave us 667 ticks per second */
 /* So a preload of 6666 gives us a nice 1000 ticks per second */
-#define PRELOAD	6666
+// #define PRELOAD	6666
+
+/* Should be correct with a 111 Mhz Pclk */
+#define PRELOAD	6937
 
 /* XXX - currently rate is ignored */
 void
@@ -152,9 +165,9 @@ zynq_timer_init ( int rate )
 	timer_count = 0;
 
 	/* select pclk as source,
-	 * prescaler of 8 (2^3)
+	 * prescaler of 16 (2^(3+1))
 	 */
-	tp->ccr1 = CCR_PRE_ENA | (3<<CCR_PRE_SHIFT);
+	tp->ccr1 = CCR_PRE_ENA | (PRESCALE_16<<CCR_PRE_SHIFT);
 
 	tp->mode1 = MODE_INTER;
 	tp->ie1 = IE_INTERVAL;

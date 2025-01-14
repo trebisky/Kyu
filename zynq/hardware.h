@@ -35,7 +35,10 @@ struct slcr_regs {
 	u32 arm_pll_ctrl; /* 0x100 */
 	u32 ddr_pll_ctrl; /* 0x104 */
 	u32 io_pll_ctrl; /* 0x108 */
-	u32 reserved0_2[5];
+
+	u32 pll_status; /* 0x10c */
+	u32 arm_pll_cfg; /* 0x110 */
+	u32 reserved0_2[3];
 	u32 arm_clk_ctrl; /* 0x120 */
 	u32 ddr_clk_ctrl; /* 0x124 */
 	u32 dci_clk_ctrl; /* 0x128 */

@@ -30,8 +30,11 @@
 #define CONSOLE_BAUD		115200
 #define CONSOLE_UART		1
 
+#define INITIAL_CONSOLE     SERIAL
+
 #define ARCH_ARM
 #define ARCH_ARM32
+#define ARCH_ARM_CORTEX_A9
 
 /* The Zynq TRM has a nice chapter on interrupts (Ch-7)
  * pages 230-231 has the all important table showing
