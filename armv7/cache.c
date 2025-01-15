@@ -125,6 +125,7 @@ show_ccsidr ( char *msg, unsigned int reg )
 	printf ( " line size = %d words (%d bytes)\n", lwords, lwords*4 );
 }
 
+/* Cache type register */
 static void
 show_ctr ( unsigned int reg )
 {
@@ -178,6 +179,11 @@ show_clidr ( unsigned int reg )
 	}
 }
 
+#define SCTLR_I_CACHE	0x1000
+#define SCTLR_D_CACHE	4
+#define SCTLR_ALIGN	2
+#define SCTLR_MMU	1
+
 void
 cache_init ( void )
 {
@@ -186,9 +192,26 @@ cache_init ( void )
 	unsigned int ctr;
 	int line_len;
 	int val;
+	u32 sctlr;
 
 	printf ( "-- Cache init --\n" );
 
+	get_SCTLR ( sctlr );
+	printf ( "ARM SCTLR = %08x\n", sctlr );
+	if ( sctlr & SCTLR_D_CACHE )
+		printf ( " D cache is enabled\n" );
+	else
+		printf ( " D cache is disabled\n" );
+	if ( sctlr & SCTLR_I_CACHE )
+		printf ( " I cache is enabled\n" );
+	else
+		printf ( " I cache is disabled\n" );
+	if ( sctlr & SCTLR_MMU )
+		printf ( " MMU is enabled\n" );
+	else
+		printf ( " MMU is disabled\n" );
+
+#ifdef SHOW_CACHE_INFO
 	get_CLIDR ( clidr );
 	show_clidr ( clidr );
 
@@ -216,9 +239,10 @@ cache_init ( void )
 	set_CSSELR ( val );
 	get_CCSIDR ( ccsidr );
 	show_ccsidr ( "L2-I", ccsidr );
+#endif
 
 	/* On Orange Pi --
-ARM cache line size: 64
+	 * ARM cache line size: 64
 	 * CLIDR = 0a200023
 	 * CLIDR says:
 	 *   LoUU is  001 (clear/invalidate to level 1)
@@ -240,14 +264,13 @@ ARM cache line size: 64
 	 *  associativity = 4 way
 	 */
 
-
-        line_len = ((ccsidr & CCSIDR_LINE_SIZE_MASK) >> CCSIDR_LINE_SIZE_OFFSET) + 2;
+    line_len = ((ccsidr & CCSIDR_LINE_SIZE_MASK) >> CCSIDR_LINE_SIZE_OFFSET) + 2;
 
 	/* Convert to bytes
 	 * get 64 on Orange Pi H3 (cortex-A7)
 	 * get 64 on BBB (cortex-A8)
 	 */
-        cache_line_size = 1 << (line_len + 2 );
+    cache_line_size = 1 << (line_len + 2 );
 
 	printf ( "ARM cache line size: %d\n", cache_line_size );
 }
@@ -257,11 +280,6 @@ get_cache_line_size ( void )
 {
 	return cache_line_size;
 }
-
-#define SCTLR_I_CACHE	0x1000
-#define SCTLR_D_CACHE	4
-#define SCTLR_ALIGN	2
-#define SCTLR_MMU	1
 
 void
 dcache_off ( void )

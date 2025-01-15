@@ -44,6 +44,7 @@ static void test_fault ( long );
 static void test_zdiv ( long );
 static void test_clock ( long );
 static void test_regs ( long );
+static void test_dhry ( long );
 
 #ifdef BOARD_BBB
 static void test_adc ( long );
@@ -96,6 +97,7 @@ struct test io_test_list[] = {
 	test_zdiv,	"Zero divide test",	0,
 	test_clock,	"CPU clock test",	0,
 	test_regs,	"Show registers",	0,
+	test_dhry,	"Dhrystone Benchmark",	0,
 
 #ifdef BOARD_BBB
 	test_adc,	"BBB adc test",		0,
@@ -826,9 +828,14 @@ check_clock ( void )
 	printf ( "Looks like %d Mhz CPU clock\n", hz );
 }
 
-
 static void test_clock ( long count ) {
 	check_clock ();
+}
+
+void dhry_main ( void );
+
+static void test_dhry ( long count ) {
+	dhry_main ();
 }
 
 #ifndef BOARD_ZYNQ

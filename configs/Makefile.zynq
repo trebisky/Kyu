@@ -23,6 +23,8 @@ OBJS =  machine.o \
     thread.o \
     prf.o \
     symbols.o \
+	dhry_1.o \
+	dhry_2.o \
     dlmalloc.o \
     random.o \
     net.o \

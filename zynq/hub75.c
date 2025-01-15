@@ -71,17 +71,16 @@
 // J2-15
 #define TEST_PIN	7
 
+/* Prototypes --
+ */
+static void hub_line ( int, char *, int );
+
 /* ================================================== */
 /* ================================================== */
 
-#ifdef FAST_COLOR
-#define F1_RED		BIT(14)
-#define F1_GREEN	BIT(9)
-#define F1_BLUE		BIT(8)
-#define F2_RED		BIT(15)
-#define F2_GREEN	BIT(10)
-#define F2_BLUE		BIT(19)
-#endif
+/* First we have some very basic diagnostics and
+ *  hardware related tests.
+ */
 
 static int hub_pin;
 static int hub_state = 0;
@@ -97,6 +96,18 @@ hub_wave ( int xxx )
 		} else {
 			emio_write ( hub_pin, 0 );
 			hub_state = 1;
+		}
+}
+
+/* This gives a nice 318 kHz square wave.
+ * The on period is 1.56 us
+ */
+static void
+hub_check ( void )
+{
+		for ( ;; ) {
+			emio_write ( CLK_HUB, 1 );
+			emio_write ( CLK_HUB, 0 );
 		}
 }
 
@@ -125,187 +136,6 @@ hub_tester ( void )
 			hub_pin = nn;
 			printf ( "Testing on pin %d\n", hub_pin );
 		}
-}
-
-static void
-hub_diag_test ( void )
-{
-		hub_pin = TEST_PIN;
-
-		emio_config_output ( hub_pin );
-
-		/* run at 1000/5 = 200 Hz - gives 100 Hz square wave*/
-		// (void) thr_new_repeat ( "hub", hub_wave, 0, 25, 0, 5 );
-		/* run at 1000 = gives 500 Hz square wave*/
-		(void) thr_new_repeat ( "hub", hub_wave, 0, 25, 0, 1 );
-
-		hub_tester ();
-}
-
-/* The HUB75 interface is not standardized in any official way, but it seems
- * that outfits making this panels have enough sense to allow them to interoperate.
- * The cable has 16 pins.  There are 14 signals and a ground.
- * The extra pin is ambiguous -- it is usually a ground.
- * Here is what the signals are all about:
- * 6 bits for color (two lines, 3 bits for each)
- * 5 bits for a line address (used to be just 4, but that is only 16 lines)
- * The other 3 signals are the interesting ones.
- * clk - a clock to shift the colors into a line.
- * oe - to enable output, pull low to turn on the line.
- * lat - latch signal, pulses high when the line is complete.
- *
- * Different panels can have different rules about oe* and maybe even lat
- * a rising edge on clk should clock data into the panel
- */
-
-static int color_mask;
-
-static void
-hub_init ( void )
-{
-#ifdef FAST_COLOR
-		color_mask = 0;
-		color_mask |= F1_RED;
-		color_mask |= F1_GREEN;
-		color_mask |= F1_BLUE;
-		color_mask |= F2_RED;
-		color_mask |= F2_GREEN;
-		color_mask |= F2_BLUE;
-		printf ( "HUB -- color mask: %08x\n", color_mask );
-#endif
-
-		// make all emio signals outputs
-		emio_config_output ( CLK_HUB );
-		emio_config_output ( LAT_HUB );
-		emio_config_output ( OE_HUB );
-
-		emio_config_output ( A_HUB );
-		emio_config_output ( B_HUB );
-		emio_config_output ( C_HUB );
-		emio_config_output ( D_HUB );
-		emio_config_output ( E_HUB );
-
-		emio_config_output ( R1_HUB );
-		emio_config_output ( G1_HUB );
-		emio_config_output ( B1_HUB );
-		emio_config_output ( R2_HUB );
-		emio_config_output ( G2_HUB );
-		emio_config_output ( B2_HUB );
-
-		/* initialize these */
-		emio_write ( CLK_HUB, 0 );
-		emio_write ( LAT_HUB, 0 );
-		emio_write ( OE_HUB, 1 );
-}
-
-/* This gives a nice 318 kHz square wave.
- * The on period is 1.56 us
- */
-static void
-hub_check ( void )
-{
-		for ( ;; ) {
-			emio_write ( CLK_HUB, 1 );
-			emio_write ( CLK_HUB, 0 );
-		}
-}
-
-#define H1_RED		4
-#define H1_GREEN	2
-#define H1_BLUE		1
-#define H2_RED		0x20
-#define H2_GREEN	0x10
-#define H2_BLUE		8
-
-
-#ifdef FAST_COLOR
-static int
-to_fast ( int color )
-{
-		int rv = 0;
-
-		if ( color & H1_RED )
-			rv |= F1_RED;
-		if ( color & H1_GREEN )
-			rv |= F1_GREEN;
-		if ( color & H1_BLUE )
-			rv |= F1_BLUE;
-
-		if ( color & H2_RED )
-			rv |= F2_RED;
-		if ( color & H2_GREEN )
-			rv |= F2_GREEN;
-		if ( color & H2_BLUE )
-			rv |= F2_BLUE;
-
-		return rv;
-}
-#endif
-
-/* colors in a byte are:
- * 0 - 0 - rgb2 - rgb1
- *
- * Using a scope, I see this code gets run at about 800 Hz.
- * The LAT pulse is 4.5 us in size with 3 writes high.
- */
-static void
-hub_line ( int addr, char colors[], int ncolors )
-{
-		int i;
-		int color;
-
-		// printf ( "+" );
-
-		// no need to do that here
-		// turn off the line
-		// emio_write ( OE_HUB, 1 );
-
-		for ( i=0; i<ncolors; i++ ) {
-			color = colors[i];
-#ifdef FAST_COLOR
-			emio_write_m ( to_fast(color), color_mask );
-			// emio_write_m ( 0, color_mask );
-#endif
-#ifndef FAST_COLOR
-			emio_write ( B1_HUB, color & 1 );
-			emio_write ( G1_HUB, (color >> 1) & 1 );
-			emio_write ( R1_HUB, (color >> 2) & 1 );
-			emio_write ( B2_HUB, (color >> 3) & 1 );
-			emio_write ( G2_HUB, (color >> 4) & 1 );
-			emio_write ( R2_HUB, (color >> 5) & 1 );
-#endif
-
-#ifdef notdef
-			// if we clock things like this the display
-			// is entirely blank -- proving that the
-			// data gets latched on a rising edge.
-			emio_write ( CLK_HUB, 0 );
-			emio_write_m ( 0, color_mask );
-			emio_write ( CLK_HUB, 1 );
-#endif
-			// pulse clk
-			// rising edge clocks in the data
-			emio_write ( CLK_HUB, 1 );
-			emio_write_m ( 0, color_mask );
-			emio_write ( CLK_HUB, 0 );
-		}
-
-		// blank display while switching lines
-		emio_write ( OE_HUB, 1 );
-
-		// A is the lsb
-		emio_write ( A_HUB, addr & 1 );
-		emio_write ( B_HUB, (addr >> 1) & 1 );
-		emio_write ( C_HUB, (addr >> 2) & 1 );
-		emio_write ( D_HUB, (addr >> 3) & 1 );
-		emio_write ( E_HUB, (addr >> 4) & 1 );
-
-		// pulse lat
-		emio_write ( LAT_HUB, 1 );
-		emio_write ( LAT_HUB, 0 );
-
-		// turn on the line
-		emio_write ( OE_HUB, 0 );
 }
 
 static char hello_line[] = {
@@ -369,6 +199,196 @@ hub_timing2 ( void )
 		}
 }
 
+
+static void
+hub_diag_test ( void )
+{
+		hub_pin = TEST_PIN;
+
+		emio_config_output ( hub_pin );
+
+		/* run at 1000/5 = 200 Hz - gives 100 Hz square wave*/
+		// (void) thr_new_repeat ( "hub", hub_wave, 0, 25, 0, 5 );
+		/* run at 1000 = gives 500 Hz square wave*/
+		(void) thr_new_repeat ( "hub", hub_wave, 0, 25, 0, 1 );
+
+		hub_tester ();
+}
+
+/* ================================================== */
+/* ================================================== */
+
+/* The HUB75 interface is not standardized in any official way, but it seems
+ * that outfits making this panels have enough sense to allow them to interoperate.
+ * The cable has 16 pins.  There are 14 signals and a ground.
+ * The extra pin is ambiguous -- it is usually a ground.
+ * Here is what the signals are all about:
+ * 6 bits for color (two lines, 3 bits for each)
+ * 5 bits for a line address (used to be just 4, but that is only 16 lines)
+ *
+ * The other 3 signals are the interesting ones.
+ * clk - a clock to shift the colors into a line (rising edge does it)
+ * oe - to enable output, pull low to turn on the line.
+ * lat - latch signal, pulses high when the line is complete.
+ *
+ * Different panels can have different rules about oe*
+ *  (or so I have been told).
+ */
+
+#ifdef FAST_COLOR
+#define F1_RED		BIT(14)
+#define F1_GREEN	BIT(9)
+#define F1_BLUE		BIT(8)
+#define F2_RED		BIT(15)
+#define F2_GREEN	BIT(10)
+#define F2_BLUE		BIT(19)
+#endif
+
+#define H1_RED		4
+#define H1_GREEN	2
+#define H1_BLUE		1
+#define H2_RED		0x20
+#define H2_GREEN	0x10
+#define H2_BLUE		8
+
+#ifdef FAST_COLOR
+/* XXX would be better to remap entire line outside of
+ * the display loop, than to call this there.
+ * We could do this with a lookup table.
+ */
+static int
+to_fast ( int color )
+{
+		int rv = 0;
+
+		if ( color & H1_RED )
+			rv |= F1_RED;
+		if ( color & H1_GREEN )
+			rv |= F1_GREEN;
+		if ( color & H1_BLUE )
+			rv |= F1_BLUE;
+
+		if ( color & H2_RED )
+			rv |= F2_RED;
+		if ( color & H2_GREEN )
+			rv |= F2_GREEN;
+		if ( color & H2_BLUE )
+			rv |= F2_BLUE;
+
+		return rv;
+}
+
+static int color_mask;
+#endif
+
+static void
+hub_init ( void )
+{
+#ifdef FAST_COLOR
+		color_mask = 0;
+		color_mask |= F1_RED;
+		color_mask |= F1_GREEN;
+		color_mask |= F1_BLUE;
+		color_mask |= F2_RED;
+		color_mask |= F2_GREEN;
+		color_mask |= F2_BLUE;
+		printf ( "HUB -- color mask: %08x\n", color_mask );
+#endif
+
+		// make all emio signals outputs
+		emio_config_output ( CLK_HUB );
+		emio_config_output ( LAT_HUB );
+		emio_config_output ( OE_HUB );
+
+		emio_config_output ( A_HUB );
+		emio_config_output ( B_HUB );
+		emio_config_output ( C_HUB );
+		emio_config_output ( D_HUB );
+		emio_config_output ( E_HUB );
+
+		emio_config_output ( R1_HUB );
+		emio_config_output ( G1_HUB );
+		emio_config_output ( B1_HUB );
+		emio_config_output ( R2_HUB );
+		emio_config_output ( G2_HUB );
+		emio_config_output ( B2_HUB );
+
+		/* initialize these */
+		emio_write ( CLK_HUB, 0 );
+		emio_write ( LAT_HUB, 0 );
+		emio_write ( OE_HUB, 1 );
+}
+
+/* colors in a byte are:
+ * 0 - 0 - rgb2 - rgb1
+ *
+ * Using a scope, I see this code gets run at about 800 Hz.
+ * The LAT pulse is 4.5 us in size with 3 writes high.
+ *
+ * XXX - ORIG
+ */
+static void
+hub_line ( int addr, char *colors, int ncolors )
+{
+		int i;
+		int color;
+
+		// printf ( "+" );
+
+		// no need to do that here
+		// turn off the line
+		// emio_write ( OE_HUB, 1 );
+
+		for ( i=0; i<ncolors; i++ ) {
+			color = colors[i];
+#ifdef FAST_COLOR
+			emio_write_m ( to_fast(color), color_mask );
+			// emio_write_m ( 0, color_mask );
+#endif
+#ifndef FAST_COLOR
+			emio_write ( B1_HUB, color & 1 );
+			emio_write ( G1_HUB, (color >> 1) & 1 );
+			emio_write ( R1_HUB, (color >> 2) & 1 );
+			emio_write ( B2_HUB, (color >> 3) & 1 );
+			emio_write ( G2_HUB, (color >> 4) & 1 );
+			emio_write ( R2_HUB, (color >> 5) & 1 );
+#endif
+
+#ifdef notdef
+			// if we clock things like this the display
+			// is entirely blank -- proving that the
+			// data gets latched on a rising edge.
+			emio_write ( CLK_HUB, 0 );
+			emio_write_m ( 0, color_mask );
+			emio_write ( CLK_HUB, 1 );
+#endif
+			// pulse clk
+			// rising edge clocks in the data
+			emio_write ( CLK_HUB, 1 );
+			// emio_write_m ( 0, color_mask );
+			emio_write ( CLK_HUB, 0 );
+		}
+
+		// blank display while switching lines
+		emio_write ( OE_HUB, 1 );
+
+		// A is the lsb
+		emio_write ( A_HUB, addr & 1 );
+		emio_write ( B_HUB, (addr >> 1) & 1 );
+		emio_write ( C_HUB, (addr >> 2) & 1 );
+		emio_write ( D_HUB, (addr >> 3) & 1 );
+		emio_write ( E_HUB, (addr >> 4) & 1 );
+
+		// pulse lat
+		emio_write ( LAT_HUB, 1 );
+		emio_write ( LAT_HUB, 0 );
+
+		// turn on the line
+		emio_write ( OE_HUB, 0 );
+}
+
+/* ================================================== */
+
 static int t2_line;
 static char t2_data[64];
 
@@ -409,7 +429,30 @@ hub_test2 ( void )
 /* ================================================== */
 /* ================================================== */
 
+/* Some things that are common between the original
+ * simple random walk and the multi-pixel version.
+ */
+
+// never used
 // enum color { RED. GREEN, BLUE };
+
+static int row_next[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+static int col_next[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+
+/* random color every time! */
+static int
+cycle_color ( int xxx )
+{
+		// avoid 0
+		return 1 + gb_unif_rand ( 7 );
+}
+
+/* ================================================== */
+/* ================================================== */
+
+/* This is my original simple random walk with only
+ * a single pixel
+ */
 
 static int row_walk;	// which line
 static int col_walk;	// where in line
@@ -418,8 +461,29 @@ static int walk_count;
 
 static char walk_data[64];
 
+static void hub_rwalk_run_ez ( int );
+static void rwalk_show_pos_ez ( void );
+
 static void
-rwalk_show_pos ( void )
+hub_rwalk_ez ( void )
+{
+		// long seed = 99999999977L;
+		long seed = 1215752169;
+
+		gb_init_rand ( seed );
+		walk_count = 0;
+		color_walk = H1_RED;
+
+		row_walk = 32;
+		col_walk = 32;
+		rwalk_show_pos_ez ();
+
+		// (void) thr_new_repeat ( "hub_rw", hub_rwalk_run_ez, 0, 25, 0, 500 );
+		(void) thr_new_repeat ( "hub_rw", hub_rwalk_run_ez, 0, 25, 0, 200 );
+}
+
+static void
+rwalk_show_pos_ez ( void )
 {
 		int i;
 
@@ -434,12 +498,104 @@ rwalk_show_pos ( void )
 		hub_line ( row_walk % 32, walk_data, 64 );
 }
 
-/* random color every time! */
-static int
-cycle_color ( int xxx )
+
+/* Runs as a Kyu thread at 2 Hz
+ */
+static void
+hub_rwalk_run_ez ( int xxx )
 {
-		// avoid 0
-		return 1 + gb_unif_rand ( 7 );
+		long rnum;
+		int rnext, cnext;
+
+		for ( ;; ) {
+			rnum = gb_unif_rand ( 8 );
+			rnext = row_walk + row_next[rnum];
+			cnext = col_walk + col_next[rnum];
+			if ( rnext < 0 || rnext >= 64 )
+				continue;
+			if ( cnext < 0 || cnext >= 64 )
+				continue;
+			break;
+		}
+
+		/* Change color every 30 seconds */
+		color_walk = cycle_color ( color_walk );
+
+		row_walk = rnext;
+		col_walk = cnext;
+		rwalk_show_pos_ez ();
+}
+
+
+/* ================================================== */
+/* ================================================== */
+
+#ifdef notdef
+static int row_walk;	// which line
+static int col_walk;	// where in line
+static int color_walk;
+static int walk_count;
+
+static char walk_data[64];
+#endif
+
+static char walk_data_hi[64];
+
+static int size_walk;
+static int walk_skip;
+
+/* To put more than one line up, we need this which
+ * runs at 1000 Hz
+ * It scans through as many lines as needed to
+ *  be duplicated on the panel.
+ */
+
+static int walk_upline;
+static int walk_skipper;
+
+static void
+rwalk_updater ( int xxx )
+{
+		int line;
+
+		/* Control brightness */
+		if ( walk_skipper < walk_skip ) {
+			walk_skipper++;
+			/* blank the display this tick */
+			emio_write ( OE_HUB, 0 );
+			return;
+		}
+		walk_skipper = 0;
+
+		walk_upline++;
+		if ( walk_upline >= size_walk )
+			walk_upline = 0;
+
+		line = row_walk + walk_upline;
+		if ( line < 32 )
+			hub_line ( line, walk_data, 64 );
+		else
+			hub_line ( line - 32, walk_data_hi, 64 );
+}
+
+static void
+rwalk_show_pos ( void )
+{
+		int i;
+		int color;
+
+		for ( i=0; i<64; i++ ) {
+			walk_data[i] = 0;
+			walk_data_hi[i] = 0;
+		}
+
+		for ( i=col_walk; i<col_walk+size_walk; i++ ) {
+			walk_data[i] = color_walk;
+			walk_data_hi[i] = color_walk << 3;
+		}
+
+		// let the updater handle this.
+		// hub_line ( row_walk % 32, walk_data, 64 );
 }
 
 #ifdef notdef
@@ -481,9 +637,6 @@ cycle_color ( int color )
 }
 #endif
 
-static int row_next[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
-static int col_next[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
-
 /* Runs as a Kyu thread at 2 Hz
  */
 static void
@@ -496,9 +649,9 @@ hub_rwalk_run ( int xxx )
 			rnum = gb_unif_rand ( 8 );
 			rnext = row_walk + row_next[rnum];
 			cnext = col_walk + col_next[rnum];
-			if ( rnext < 0 || rnext >= 64 )
+			if ( rnext < 0 || rnext + (size_walk-1) >= 64 )
 				continue;
-			if ( cnext < 0 || cnext >= 64 )
+			if ( cnext < 0 || cnext + (size_walk-1) >= 64 )
 				continue;
 			break;
 		}
@@ -521,13 +674,31 @@ hub_rwalk ( void )
 		walk_count = 0;
 		color_walk = H1_RED;
 
+		// Allow 2x2 or 4x4 or ... */
+		size_walk = 1;
+		walk_upline = 0;
+
+		/* Control brightness */
+		walk_skipper = 0;
+		// too slow with 3x3
+		// walk_skip = 20;
+
+		// OK with 2x2
+		// walk_skip = 10;
+
+		walk_skip = 25;
+
+		// starting position
 		row_walk = 32;
 		col_walk = 32;
 		rwalk_show_pos ();
 
-		// (void) thr_new_repeat ( "hub_rw", hub_rwalk_run, 0, 25, 0, 500 );
-		(void) thr_new_repeat ( "hub_rw", hub_rwalk_run, 0, 25, 0, 200 );
+		(void) thr_new_repeat ( "hub_rw", hub_rwalk_run, 0, 40, 0, 200 );
+		(void) thr_new_repeat ( "hub_up", rwalk_updater, 0, 50, 0, 1 );
 }
+
+/* ================================================== */
+/* ================================================== */
 
 static void
 hub_demo_test ( void )
@@ -539,10 +710,12 @@ hub_demo_test ( void )
 		// hub_check ();
 		// hub_timing ();
 		// hub_timing2 ();
+		// lat_loop ();
 
 		// hub_test1 ();
 		// hub_test2 ();
-		hub_rwalk ();
+		hub_rwalk_ez ();
+		// hub_rwalk ();
 
 		printf ( "HUB75 demo is launched (done)\n" );
 }

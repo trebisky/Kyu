@@ -310,4 +310,34 @@ emio_write_m ( int val, int mask )
 	gp->output2 = val | prev;
 }
 
+#ifdef notdef
+/* special one time experiment.
+ * I want to pulse one pin and see how
+ * fast I can do it.  1-14-2025
+ */
+void
+lat_loop ( void )
+{
+	struct zynq_gpio *gp = GPIO_BASE;
+	u32 m;
+    /* this is LAT on the hub75 setup */
+	int bit = 5;
+	u32 m_on, m_off;
+
+	/* The upper 16 bits determine which bits
+	 * are protected by the mask.
+	 */
+	m = 1 << (16+bit);
+	m = (~m) & 0xffff0000;
+
+	m_on = m | (1 << bit);
+	m_off = m;
+
+	for ( ;; ) {
+	    gp->output2_low = m_on;
+	    gp->output2_low = m_off;
+	}
+}
+#endif
+
 /* THE END */

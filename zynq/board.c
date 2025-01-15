@@ -264,9 +264,20 @@ get_cpu_clock ( void )
 		return 666*1000*1000;
 }
 
+/* See TRM section 3.4 and registers on page 1393
+ */
+static void
+zynq_l2_check ( void )
+{
+		vu32 *rp = (vu32 *) 0xF8F02100;
+
+		printf ( "Zynq L2 control: %08x\n", *rp );
+}
+
 static void
 board_cpu_init ( void )
 {
+	zynq_l2_check ();
 	cpu_clock = get_cpu_clock ();
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
