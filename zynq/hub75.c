@@ -324,8 +324,6 @@ hub_init ( void )
  *
  * Using a scope, I see this code gets run at about 800 Hz.
  * The LAT pulse is 4.5 us in size with 3 writes high.
- *
- * XXX - ORIG
  */
 static void
 hub_line ( int addr, char *colors, int ncolors )
@@ -384,6 +382,32 @@ hub_line ( int addr, char *colors, int ncolors )
 		emio_write ( LAT_HUB, 0 );
 
 		// turn on the line
+		emio_write ( OE_HUB, 0 );
+}
+
+/* This just copies the tail end code of the above,
+ * the idea being that we have the line data already
+ * clocked out and we now just want to display it on
+ * a different line.
+ * We don't need or want to fool with LAT
+ * We do blank the display since we are changing
+ * address bits one by one, and that will yield
+ * a bunch of crazy addresses while in transition.
+ */
+static void
+hub_dup ( int addr )
+{
+		// blank display while switching lines
+		emio_write ( OE_HUB, 1 );
+
+		// A is the lsb
+		emio_write ( A_HUB, addr & 1 );
+		emio_write ( B_HUB, (addr >> 1) & 1 );
+		emio_write ( C_HUB, (addr >> 2) & 1 );
+		emio_write ( D_HUB, (addr >> 3) & 1 );
+		emio_write ( E_HUB, (addr >> 4) & 1 );
+
+		// turn display back on
 		emio_write ( OE_HUB, 0 );
 }
 
@@ -700,6 +724,56 @@ hub_rwalk ( void )
 /* ================================================== */
 /* ================================================== */
 
+/* This lights up the whole display, but with quite a bit
+ * of flicker.  With a 1000 Hz line update rate and
+ * a loop over 32 lines, that is a 31 Hz update, and that
+ * just doesn't cut it for a nice display.
+ * It does demonstrate that once we have clocked in a line
+ * we only need to change the display address.
+ */
+
+static char sweep_data[64];
+
+static int sweep_line;
+
+static int
+sweeper ( int xxx )
+{
+		hub_dup ( sweep_line );
+
+		sweep_line++;
+		if ( sweep_line > 31 )
+			sweep_line = 0;
+}
+
+static void
+hub_sweep ( void )
+{
+		int i;
+		int data;
+
+		data = H1_RED | H2_BLUE;
+		for ( i=0; i<32; i++ )
+			sweep_data[i] = data;
+
+		data = H1_GREEN | H2_BLUE | H2_GREEN;
+		for ( i=32; i<64; i++ )
+			sweep_data[i] = data;
+
+		sweep_line = 0;
+
+		/* Clock the line in once */
+		hub_line ( sweep_line, sweep_data, 64 );
+
+		for ( ;; )
+			sweeper ( 0 );
+
+		// (void) thr_new_repeat ( "hub_sw", sweeper, 0, 50, 0, 1 );
+}
+
+/* ================================================== */
+/* ================================================== */
+
 static void
 hub_demo_test ( void )
 {
@@ -714,8 +788,9 @@ hub_demo_test ( void )
 
 		// hub_test1 ();
 		// hub_test2 ();
-		hub_rwalk_ez ();
 		// hub_rwalk ();
+		// hub_rwalk_ez ();
+		hub_sweep ();
 
 		printf ( "HUB75 demo is launched (done)\n" );
 }
