@@ -58,10 +58,20 @@ struct mio_pins {
 // #define MIO_GPIO_VAL	( MIO_DISRCVR | MIO_IO_33 )
 #define MIO_GPIO_VAL	0x0
 
+static void
+mio_pin_show ( int pin )
+{
+	struct mio_pins *mp = MIO_PIN_BASE;
+
+	printf ( "MIO pin %2d; reg at %08x = %08x\n", pin, &mp->ctrl[pin], mp->ctrl[pin] );
+}
+
 void
 mio_init ( void )
 {
-	// nothing to do
+	/* for Uart */
+	mio_pin_show ( 48 );
+	mio_pin_show ( 49 );
 }
 
 void
@@ -70,7 +80,7 @@ mio_gpio ( int pin )
 	struct mio_pins *mp = MIO_PIN_BASE;
 
 
-	printf ( "MIO for pin %d = %08x\n", pin, &mp->ctrl[pin] );
+	// printf ( "MIO for pin %d = %08x\n", pin, &mp->ctrl[pin] );
 	mp->ctrl[pin] = MIO_GPIO_VAL;
 }
 
@@ -80,7 +90,7 @@ mio_extra ( int pin )
 	struct mio_pins *mp = MIO_PIN_BASE;
 
 
-	printf ( "MIO for pin %d = %08x\n", pin, &mp->ctrl[pin] );
+	// printf ( "MIO for pin %d = %08x\n", pin, &mp->ctrl[pin] );
 	mp->ctrl[pin] = 0x0300;
 }
 

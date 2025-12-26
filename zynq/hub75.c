@@ -409,6 +409,19 @@ hub_dup ( int addr )
 
 		// turn display back on
 		emio_write ( OE_HUB, 0 );
+
+		/* if we don't insert some delay, the display is
+		 * off more than it is on and is not
+		 * very bright.
+		 */
+
+		// OK, barely noticeable flicker
+		// I don't know for sure what the delay_us()
+		// calibration is yet.
+		delay_us ( 20 );
+
+		// gives wacky refresh waves
+		// delay_us ( 100 );
 }
 
 /* ================================================== */
@@ -724,12 +737,19 @@ hub_rwalk ( void )
 /* ================================================== */
 /* ================================================== */
 
-/* This lights up the whole display, but with quite a bit
- * of flicker.  With a 1000 Hz line update rate and
- * a loop over 32 lines, that is a 31 Hz update, and that
- * just doesn't cut it for a nice display.
- * It does demonstrate that once we have clocked in a line
- * we only need to change the display address.
+/* This lights up the whole display.
+ *
+ * Using the 1000 Hz timer via the Kyu task delay yields
+ *  quite a bit of flicker.
+ * With a 1000 Hz line update rate and a loop over 32 lines,
+ *   that is a 31 Hz update, and that just doesn't cut it
+ *   for a nice display.
+ * When I do the refresh via a endless loop, I never get
+ *   the Kyu prompt, but the display is decent with a
+ *   barely detectable flicker.
+ *
+ * The idea here was to demonstrate that once we have clocked
+ *  in a line we only need to change the display address.
  */
 
 static char sweep_data[64];
@@ -788,9 +808,10 @@ hub_demo_test ( void )
 
 		// hub_test1 ();
 		// hub_test2 ();
-		// hub_rwalk ();
+
+		hub_rwalk ();
 		// hub_rwalk_ez ();
-		hub_sweep ();
+		// hub_sweep ();
 
 		printf ( "HUB75 demo is launched (done)\n" );
 }

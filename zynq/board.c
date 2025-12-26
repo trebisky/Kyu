@@ -114,6 +114,8 @@ board_mmu_init ( void )
 
 // static void mmu_initialize ( unsigned long, unsigned long );
 
+#define MEG (1024*1024)
+
 void
 board_ram_init ( void )
 {
@@ -121,7 +123,10 @@ board_ram_init ( void )
 	// ram_size = BOARD_RAM_SIZE;
 
 	printf ( "Probing for amount of ram\n" );
-	ram_size = ram_probe ( ram_start );
+	// ram_size = ram_probe ( ram_start );
+	// the above stopped working when I moved
+	// the Kyu link address from 0x20000000 to 0
+	ram_size = 512 * MEG;
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
 
 	// mmu_initialize ( ram_start, ram_size );
