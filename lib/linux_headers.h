@@ -80,7 +80,15 @@ typedef __u32 __bitwise __wsum;
 /* --------------------------------------------*/
 /* --------------------------------------------*/
 /* This is actually an ANSI datatype now */
+// #include <stdbool.h>
+#ifdef notdef
 typedef _Bool	bool;
+
+enum {
+        false   = 0,
+        true    = 1
+};
+#endif
 
 /* These might do .... */
 // typedef unsigned int size_t;
@@ -127,11 +135,6 @@ bool is_power_of_2(unsigned long n)
 /* in linux/stddef.h */
 #undef NULL
 #define NULL ((void *)0)
-
-enum {
-        false   = 0,
-        true    = 1
-};
 
 #define ENOMEM	1
 #define EINVAL	1

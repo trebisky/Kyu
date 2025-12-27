@@ -636,10 +636,11 @@ mb_clget ( struct mbuf *m )
  * offset parameter might be used for hardware that
  * puts the ethernet header at the end (trailing packet).
  * I have yet to encounter one of these.
+	struct ifnet *ifp, void (*copy)()  )
  */
 struct mbuf *
 mb_devget ( char *buf, int totlen, int off0,
-	struct ifnet *ifp, void (*copy)()  )
+	struct ifnet *ifp, void (*copy)( const void *, void *, u_int ) )
 {
 	struct mbuf *m;
 	struct mbuf *top = 0;

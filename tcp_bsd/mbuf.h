@@ -308,6 +308,6 @@ struct mbuf * mb_gethdr ( int );
 struct mbuf * mb_free ( struct mbuf * );
 void mb_freem ( struct mbuf * );
 
-struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)() );
+struct	mbuf *mb_devget ( char *, int, int, struct ifnet *, void (*)(const void*, void*, unsigned int) );
 
 /* THE END */

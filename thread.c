@@ -2044,7 +2044,7 @@ sem_new ( int state, int flags )
 	sp->state = state;
 	sp->flags = flags;
 
-	sprintf ( name, "sem-%04x", ((int)sp) & 0xffff );
+	sprintf ( name, "sem-%04x", ((long)sp) & 0xffff );
 	sem_set_name ( sp, name );
 
 	sp->list = (struct thread *) 0;

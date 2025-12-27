@@ -1,1 +1,1 @@
-configs/Makefile.zynq
+configs/Makefile.orange_pi64

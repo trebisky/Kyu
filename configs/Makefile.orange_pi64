@@ -109,8 +109,10 @@ help:
 
 kyu:	kyu.lds
 
+LDFLAGS = -g --no-warn-rwx-segments
+
 kyu: $(OBJS)
-	$(LD) -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
+	$(LD) $(LDFLAGS) -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
 
 kyu.bin: kyu
 	$(BIN) kyu kyu.bin

@@ -148,50 +148,49 @@ void	setstatclockrate __P((int hzrate));
  */
 
 static inline int
-imax(a, b)
-	int a, b;
+imax ( int a, int b )
 {
 	return (a > b ? a : b);
 }
+
 static inline int
-imin(a, b)
-	int a, b;
+imin ( int a, int b )
 {
 	return (a < b ? a : b);
 }
+
 static inline long
-lmax(a, b)
-	long a, b;
+lmax ( long a, long b )
 {
 	return (a > b ? a : b);
 }
+
 static inline long
-lmin(a, b)
-	long a, b;
+lmin ( long a, long b )
 {
 	return (a < b ? a : b);
 }
+
 static inline u_int
-max(a, b)
-	u_int a, b;
+max ( u_int a, u_int b )
 {
 	return (a > b ? a : b);
 }
+
 static inline u_int
-min(a, b)
-	u_int a, b;
+min ( u_int a, u_int b )
 {
 	return (a < b ? a : b);
 }
+
 static inline u_long
-ulmax(a, b)
-	u_long a, b;
+ulmax ( u_long a, u_long b )
 {
 	return (a > b ? a : b);
 }
+
 static inline u_long
-ulmin(a, b)
-	u_long a, b;
+ulmin ( u_long a, u_long b )
 {
 	return (a < b ? a : b);
 }

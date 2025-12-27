@@ -7,6 +7,16 @@
 INCS = -I. -I..
 # INCS += -I$(BSD_SRC)
 
+# Added 12-27-2025
+# This code is mostly traditional C
+XTRA = -Wno-old-style-definition -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+# The pointer warnings are more serious.
+# right now none of my hardware has addresses outside 32 bits.
+
+# overriding .c.o did not work, so we have this:
+%.o: %.c
+	$(CCX) $(COPTS) $(XTRA) -o $@ -c $<
+
 # Including ".." in the above lets us get the kyu include
 # files - such as arch/cpu.h for htonl() and such.
 
