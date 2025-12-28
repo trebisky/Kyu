@@ -343,7 +343,7 @@ static void
 timer_handler ( int junk )
 {
 	timer_tick ();
-
+	// printf ( "Timer INT\n" );
 	timer_ack ();
 }
 
