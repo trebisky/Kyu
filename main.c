@@ -443,6 +443,32 @@ basic_checkout_c ( void )
 }
 #endif
 
+/* A place for trash and experiments */
+static void
+zzz ( void )
+{
+	unsigned long val;
+
+	val = 99;
+	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	printf ( "PMCCNTR = %X\n", val );
+	val = 99;
+	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	printf ( "PMCCNTR = %X\n", val );
+	val = 99;
+	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	printf ( "PMCCNTR = %X\n", val );
+
+	delay_ms ( 10 );
+
+	val = 99;
+	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	printf ( "PMCCNTR = %X\n", val );
+	val = 99;
+	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	printf ( "PMCCNTR = %X\n", val );
+}
+
 /* This is the first thread.
  * (many things expect to run with a valid current_thread).
  *
@@ -498,6 +524,8 @@ sys_init ( long xxx )
 	cache_timings ();
 	core_debug ();
 #endif
+
+	zzz ();
 
 	// timer_bogus (); OK to here
 

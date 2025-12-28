@@ -39,7 +39,7 @@ reset:
 	bl	remap_vectors
 
 	bl      clear_bss
-        dsb	sy
+    dsb		sy
 
 	/*
 	ldr	x0, =0x400f4100
@@ -52,8 +52,24 @@ reset:
 	str	x1, [x0]
 	*/
 
-        bl      board_mmu_init
-        dsb	sy
+	/* Now set the bits in the HCR registers
+	 * that let us get interrupts at EL2
+	 * 12-27-2025
+	 * Remember that we do NOT want to set these
+	 * bits if we are running at EL1
+	 */
+	mrs x0, CurrentEL
+	cmp w0, #2<<2
+	b.ne	1f
+
+	mrs x0, hcr_el2
+	orr x0, x0, #0x18
+	msr hcr_el2, x0
+
+1:
+	bl      board_mmu_init
+	dsb		sy
+
 	// bl	tjt_startup
 
         // bl      mmu_set_ttbr

@@ -52,6 +52,7 @@ reset_ccnt ( void )
 	asm volatile ("mrs %0, PMCR_EL0": "=r" (reg) );
 	rreg = reg | PMCR_CCNT_RESET;
 	asm volatile ("msr PMCR_EL0, %0": "=r" (rreg) );
+
 	asm volatile ("msr PMCR_EL0, %0": "=r" (reg) );
 	/* XXX - do we really need to clear the bit ? */
 }
