@@ -5,6 +5,10 @@
  */
 #include <kyu_compat.h>
 
+#ifdef notdef
+#define TCP_ETIMER
+#endif
+
 #define __P(protos)     protos
 #define NULL    0
 

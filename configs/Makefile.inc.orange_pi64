@@ -22,7 +22,13 @@ GCCVERSION = `$(CCX) -dumpversion`
 
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/4.9.2/include
 #ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/5.1.1/include
-ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION)/include
+#ABI = -isystem /usr/lib/gcc/arm-linux-gnueabi/$(GCCVERSION)/include
+
+# Something changed as of 12-27-2025
+# I use locate to find stdarg.h
+# /usr/lib/gcc/aarch64-linux-gnu/15/include/stdarg.h
+ABIDIR = /usr/lib/gcc/aarch64-linux-gnu/$(GCCVERSION)/include
+ABI = -isystem $(ABIDIR)
 
 # IMPORTANT --
 # I have tried several times to use the gcc builtin functions
@@ -65,9 +71,10 @@ OPT = -fno-omit-frame-pointer
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -march=armv7-a -msoft-float $(INCS) $(ABI) $(DEFS)
 #COPTS = -DKYU -nostdinc $(NOB) $(OPT) -marm -mcpu=cortex-a7 -mfpu=vfpv4 $(INCS) $(ABI) $(DEFS)
 
-# Allow stdinc 12/2025
-#COPTS = -DKYU $(DEFS) -nostdinc $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
-COPTS = -DKYU $(DEFS) $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
+# Allow stdinc temporarily 12/2025
+# This works, and we did this temporarily until we sorted out the ABIDIR
+COPTS = -DKYU $(DEFS) -nostdinc $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
+#COPTS = -DKYU $(DEFS) $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
 
 CC = $(CCX) $(COPTS)
 

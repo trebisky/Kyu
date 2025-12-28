@@ -11,7 +11,7 @@
  *
  * Event timer. 
  * Right now this is specific to the needs to debug some issues
- * with the orange pi emac driver.
+ * with the orange pi (H3) emac driver.
  * I expect that is will eventually develop into a more general facility
  *
  * The key idea is to time different events using the ARM CCNT counter

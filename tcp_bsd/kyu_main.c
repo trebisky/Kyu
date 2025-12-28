@@ -668,8 +668,10 @@ tcp_bsd_process ( struct netbuf *nbp )
 	 * already been acquired.
 	 */
 
+#ifdef TCP_ETIMER
 	// XXX - hook for timing test
 	et_rtcp();
+#endif
 
 	tcp_input ( m, len );
 	master_lock.input_busy = 0;
@@ -693,8 +695,10 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 	char *buf;
 	// int zz;
 
+#ifdef TCP_ETIMER
 	// XXX - hook for timing test
 	et_stcp ();
+#endif
 
 #ifdef notdef
 	bpf3 ( "TCP(bsd): ip_output\n" );
@@ -733,12 +737,16 @@ ip_output ( struct mbuf *A, struct mbuf *B, struct route *R, int N,  struct ip_m
 		    panic ( "ip_output = bad netbuf addr\n" );
 		}
 
+#ifdef TCP_ETIMER
 	et_A();
+#endif
                 // bcopy ( mtod(mp, char *), buf, len );
                 memcpy ( buf, mtod(mp, char *), len );
 		// zz++;
 		// printf ( "memcpy(%d) %d bytes\n", zz, len );
+#ifdef TCP_ETIMER
 	et_B();
+#endif
 
                 buf += len;
                 size += len;

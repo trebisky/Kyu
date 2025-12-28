@@ -504,8 +504,10 @@ test_cache2 ( long arg )
 
 	get_SCTLR ( reg );
 	printf ( "SCTLR = %08x\n", reg );
+#ifdef ARCH_ARM32
 	get_ACTLR ( reg );
 	printf ( "ACTLR = %08x\n", reg );
+#endif
 
 	get_SCTLR ( reg );
 	printf ( "D cache: %s\n", reg & 0x04 ? "enabled" : "disabled" );
@@ -520,6 +522,13 @@ test_cache2 ( long arg )
  *  (why should there be a difference?)
  *  1-17-2023
  */
+
+#ifndef ARCH_ARM32
+static int etimer ( void )
+{
+	return 0;
+}
+#endif
 
 static struct sem *zz_sem;
 static int zz_msg = 0;
@@ -832,7 +841,14 @@ static void test_clock ( long count ) {
 	check_clock ();
 }
 
+#ifdef ARCH_ARM32
 void dhry_main ( void );
+#else
+static void dhry_main ( void )
+{
+	printf ( "Sorry Charley - no dhrystone yet for arm64\n" );
+}
+#endif
 
 static void test_dhry ( long count ) {
 	dhry_main ();

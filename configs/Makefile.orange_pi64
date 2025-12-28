@@ -52,6 +52,10 @@ ver:
 	$(CC) --version
 	$(CC) --target-help
 
+abi:
+	echo $(ABIDIR)
+	ls $(ABIDIR)
+
 dump: kyu.dump
 
 sym: kyu.sym

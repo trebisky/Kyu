@@ -562,7 +562,9 @@ run_wangdoodle ( struct socket *so )
 	++wang_ccount;
 	printf ( "Wangdoodle connection %d ..", wang_ccount );
 
+#ifdef ETIMER_TCP
 	etimer_arm ( 20 );
+#endif
 
 	for ( ;; ) {
 
@@ -600,7 +602,9 @@ run_wangdoodle ( struct socket *so )
 	wang_state = 89;
 	printf ( " finished (%d)\n", wang_ccount );
 
+#ifdef ETIMER_TCP
 	etimer_show_times ();
+#endif
 
 	// printf ( "wangdoodle connection finished\n" );
 }

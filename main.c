@@ -213,10 +213,12 @@ kyu_startup ( void )
 	printf ( "orig TTBCR = %08x\n", orig_ttbcr );
 	printf ( "orig DACR  = %08x\n", orig_dacr );
 
+#ifdef ARCH_ARM32
 	get_SCTLR (val);
 	printf ( "SCTLR = %08x\n", val );
 	get_ACTLR (val);
 	printf ( "ACTLR = %08x\n", val );
+#endif
 
 #ifdef notdef
 	// Enable the I cache
@@ -484,16 +486,16 @@ sys_init ( long xxx )
 	// hardware_debug ();
 
 	board_init ();
+#ifdef BOARD_ORANGE_PI
 	etimer_init ();
-
-#ifdef notdef
-	// 1-26-2023
 #endif
+
+#ifdef BOARD_ORANGE_PI
+	// 1-26-2023
 	icache_off ();
 
 	icache_timings ();
 	cache_timings ();
-#ifdef BOARD_ORANGE_PI
 	core_debug ();
 #endif
 
