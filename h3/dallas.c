@@ -95,11 +95,6 @@ dallas_write_bit ( int bit )
 	delay_us ( 2 );
 }
 
-static void
-dallas_write_bit ( int bit )
-{
-
-
 /* Here is our 5 us delay primitive.
  */
 static inline void

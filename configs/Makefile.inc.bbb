@@ -1,6 +1,8 @@
 # Makefile.inc
+# vim: noexpandtab filetype=make
 # 
 # These are the common definitions for building on the ARM processor
+# for the BBB
 #
 # Tom Trebisky  5-18-2015  12-12-2016
 
@@ -75,7 +77,7 @@ CC = $(CCX) $(COPTS)
 
 # It is a bug that we cannot invoke gcc to do this,
 # but doing this directly gets the job done.
-LD = arm-linux-gnu-ld.bfd
+LD = arm-linux-gnu-ld.bfd --no-warn-rwx-segments
 
 # Should we get this via linux arch/arm/asm/lib ??
 # for LINUX comment this out -----

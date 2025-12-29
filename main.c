@@ -443,6 +443,7 @@ basic_checkout_c ( void )
 }
 #endif
 
+#ifdef ARM64
 /* A place for trash and experiments */
 static void
 zzz ( void )
@@ -468,6 +469,12 @@ zzz ( void )
 	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
 }
+#else /* ARM64 */
+static void
+zzz ( void )
+{
+}
+#endif /* ARM64 */
 
 /* This is the first thread.
  * (many things expect to run with a valid current_thread).

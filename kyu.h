@@ -61,6 +61,7 @@
 #define WANT_FLOAT
 #define WANT_PUTS_LOCK		/* orange pi experimental */
 #define WANT_SETJMP
+#define WANT_DHRY
 #endif
 
 #define WANT_USER

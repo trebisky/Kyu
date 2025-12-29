@@ -182,4 +182,7 @@ armv7_icache_inv_all:
 	
 #endif
 
+	/* Avoid stupid linker warning */
+        .section        .note.GNU-stack,"",%progbits
+
 // THE END

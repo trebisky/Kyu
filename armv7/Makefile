@@ -27,7 +27,7 @@ OLDOBJ = xyz.o \
 all: ../machine.o
 
 ../machine.o: $(OBJS)
-	$(LD) -r -o ../machine.o $(OBJS)
+	$(LD) -z noexecstack -r -o ../machine.o $(OBJS)
 
 clean:
 	rm -f *.o

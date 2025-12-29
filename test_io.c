@@ -841,12 +841,12 @@ static void test_clock ( long count ) {
 	check_clock ();
 }
 
-#ifdef ARCH_ARM32
+#ifdef WANT_DHRY
 void dhry_main ( void );
 #else
 static void dhry_main ( void )
 {
-	printf ( "Sorry Charley - no dhrystone yet for arm64\n" );
+	printf ( "Sorry Charley - no dhrystone configured\n" );
 }
 #endif
 

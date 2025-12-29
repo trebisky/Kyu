@@ -134,7 +134,7 @@ help:
 kyu:	kyu.lds
 
 kyu: $(OBJS)
-	$(LD) -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
+	$(LD) -z noexecstack -g -T kyu.lds -e asm_startup -o kyu $(OBJS) $(LIBS)
 
 kyu.bin: kyu
 	$(BIN) kyu kyu.bin

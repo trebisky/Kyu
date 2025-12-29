@@ -5,7 +5,7 @@
 #  Tom Trebisky  1-6-2017
 #
 
-$targets = %w( bbb orange_pi orange_pi64 fire3 zynq )
+$targets = %w( bbb h3 h5 fire3 zynq )
 
 def usage
     puts "Pick one of the following:"
@@ -55,7 +55,7 @@ system "rm -f arch"
 
 if target == "fire3"
     system "ln -s armv8 arch"
-elsif target == "orange_pi64"
+elsif target == "h5"
     system "ln -s armv8 arch"
 else
     system "ln -s armv7 arch"
