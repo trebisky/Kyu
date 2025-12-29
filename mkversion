@@ -2,7 +2,7 @@
 
 # Holy cow! A perl script!!
 # usage: mkversion -ihexapod_version -v$(shell cat VERSION) >version.c
-# ./mkversion -ikyu_version -v$(VERSION) >version.c
+# ./mkversion -ikyu_version -v$(VERSION) -aarch >version.c
 
 $ident = "kyu_version";
 $vernum = "";
@@ -17,6 +17,8 @@ chomp $board;
 $vernum = `cat VERSION`;
 chomp $vernum;
 
+$arch = "aarch32";
+
 # Command line arguments, -v and -i
 while ( $_ = $ARGV[0] ) {
     last unless /^-/;
@@ -24,6 +26,7 @@ while ( $_ = $ARGV[0] ) {
 
     ($ident = $_) =~ s/^..// if /^-i/;
     ($vernum = $_) =~ s/^..// if /^-v/;
+    ($arch = $_) =~ s/^..// if /^-a/;
 }
 
 $ident = "kyu_version" if ( $ident eq "" );
@@ -40,7 +43,7 @@ print <<EOF;
 EOF
 
 print "char \*$ident";
-print " = \"version $vernum for $board, Compiled by $user: $date\"\;\n";
+print " = \"version $vernum for $board ($arch), Compiled by $user: $date\"\;\n";
 
 print <<EOF;
 

@@ -88,7 +88,7 @@ FORCE:
 
 version.c:	FORCE
 	rm -f version.c
-	./mkversion >version.c
+	./mkversion -aaarch64 >version.c
 
 #.PHONY: subdirs $(SUBDIRS)
 #
