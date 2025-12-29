@@ -400,7 +400,7 @@ gpio_blink_green ( void )
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 
-#include "h3_ints.h"
+#include "interrupts.h"
 
 void
 button_handler ( int xx )

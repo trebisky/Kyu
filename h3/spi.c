@@ -18,7 +18,7 @@
 
 #include "kyu.h"
 #include "thread.h"
-#include "h3_ints.h"
+#include "interrupts.h"
 
 /* See p. 107 in the datasheet for gating */
 /* See p. 135 in the datasheet for reset control */

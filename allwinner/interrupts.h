@@ -6,7 +6,8 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * h3_ints.h
+ * interrupts.h -- shared by H3 and H5
+ *
  *  Kyu project  1-6-2017  Tom Trebisky
  *
  */

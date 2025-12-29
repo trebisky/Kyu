@@ -32,7 +32,7 @@
 #include <kyulib.h>
 #include <thread.h>
 #include <malloc.h>
-#include <h3_ints.h>
+#include <interrupts.h>
 #include <arch/cpu.h>
 
 #include "netbuf.h"

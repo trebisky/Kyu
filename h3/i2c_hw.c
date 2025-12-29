@@ -30,7 +30,7 @@
  * section 8 - TWI section
  * gpio.c - pinmux settings
  * gic, via calls here to irq_hookup()
- *  interrupt numbers in h3_ints.h
+ *  interrupt numbers in interrupts.h
  * test hooks in test_io.c
  *
  * Valuable information in Armbian/drivers/i2c/busses/i2c-sunxi.c
@@ -59,7 +59,7 @@ static int twi_debug = 0;
 
 #include "kyu.h"
 #include "thread.h"
-#include "h3_ints.h"
+#include "interrupts.h"
 
 #define TWI0_BASE      0x01c2ac00
 #define TWI1_BASE      0x01c2b000

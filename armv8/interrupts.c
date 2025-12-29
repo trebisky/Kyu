@@ -17,7 +17,7 @@
 #include "cpu.h"
 
 #include "board/board.h"
-#include "board/ints.h"
+#include "board/interrupts.h"
 
 extern struct thread static_thread[NUM_CORES];
 extern struct thread *cur_thread;

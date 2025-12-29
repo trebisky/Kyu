@@ -15,7 +15,7 @@
 #include <arch/types.h>
 
 #include "kyu.h"
-#include "h3_ints.h"
+#include "interrupts.h"
 #include "arch/cpu.h"
 
 #define CORE_0	0
