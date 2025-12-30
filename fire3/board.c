@@ -24,7 +24,7 @@
 static unsigned int cpu_clock;
 static int cpu_clock_mhz;
 
-#ifdef ORANGE_PI
+#ifdef BOARD_H3
 // This is for the standard 1008 Mhz CPU clock
 // This value can be adjusted at run time if
 //  we change the CPU clock frequency.
@@ -76,7 +76,7 @@ delay_ms ( int delay )
 	    delay_us ( DELAY_MS );
 }
 
-#ifdef ORANGE_PI
+#ifdef OLD_H3
 static void
 delay_calib ( void )
 {

@@ -166,7 +166,7 @@ board_hardware_init ( void )
 	// stack_addr_show ();
 }
 
-#ifdef OLD_ORANGE_PI
+#ifdef OLD_H3
 /* Called very early in initialization
  *  (now from locore.S to set up MMU)
  */
@@ -250,7 +250,7 @@ board_hardware_init ( void )
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
 	// stack_addr_show ();
 }
-#endif /* OLD_ORANGE_PI */
+#endif /* OLD_H3 */
 
 int
 board_get_cpu_mhz ( void )
@@ -332,7 +332,7 @@ board_init ( void )
 	pl_load ();
 	// emio_test ();
 
-#ifdef OLD_ORANGE_PI
+#ifdef OLD_H3
 	// wdt_disable ();
 
 	/* Turn on the green LED */
@@ -362,7 +362,7 @@ board_init ( void )
 
 	/* CPU interrupts on */
 	INT_unlock;
-#endif /* OLD_ORANGE_PI */
+#endif /* OLD_H3 */
 }
 
 /* Called by timer_init () */

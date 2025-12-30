@@ -92,7 +92,7 @@ mmu_nocache ( unsigned long addr )
  * with it, and set them zero like the BBB, it certainly works just fine.
  */
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 /* copied from U-Boot setup */
 // #define TTBR_BITS	0x59
 // #define TTBR_BITS	(TTBR_INNER_WBNOWA | TTBR_OUTER_WBNOWA) 
@@ -400,7 +400,7 @@ mmu_tester ( int xxx )
  * then verify that the mapping worked.
  */
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	evil = (unsigned long) 0x50000000;
 	nice = (unsigned long) 0x20000000;
 #else	/* BBB */

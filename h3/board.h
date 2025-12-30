@@ -15,16 +15,18 @@
  *
  */
 
-#define BOARD_ORANGE_PI
-
-/* As far as we are concerned, the NanoPi Neo is just a flavor of Orange Pi
- *  (it is simply another Allwinner H3 board)
- * There are some minor differences (such as the status LED).
- */
-// #define BOARD_NANOPI_NEO
+#define BOARD_H3
+// This was "H3" but now it is too vague, there are many Orange Pis
+//   see ORANGE_PI_PC below
+// #define BOARD_ORANGE_PI
 
 /* The following is currently not used */
 #define BOARD_ORANGE_PI_PC
+
+/* The NanoPi Neo is the "other" H3 board we support
+ * There are some minor differences (such as the status LED).
+ */
+// #define BOARD_NANOPI_NEO
 
 #define WANT_NET
 

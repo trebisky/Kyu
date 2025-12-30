@@ -353,7 +353,7 @@ endless_rcv ( struct netbuf *nbp )
 	    printf ( "First UDP echo seen\n" );
 	if ( (endless_count % 1000) == 0 ) {
 	    printf ( "%5d UDP echos\n", endless_count );
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	    // emac_show_last ( 0 );
 #endif
 	}
@@ -387,7 +387,7 @@ endless_watch ( long xxx )
 		break;
 	}
 	printf ( "Stalled at %d\n", count );
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	capture_last ( 0 );
 #endif
 }
@@ -415,7 +415,7 @@ test_udp_echo ( long test )
 
 	printf ( "Endless UDP test from our port %d\n", endless_port );
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	capture_last ( 1 );
 #endif
 
@@ -452,7 +452,7 @@ test_fast ( long xxx )
 	printf ( "end 5 sec delay\n" );
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	set_CCNT ( 0 );
 	t1 = r_CCNT ();
 	thr_delay ( 100 );
@@ -481,7 +481,7 @@ test_fast ( long xxx )
 	netbuf_free ( nbp );
 #else
 	printf ( "Only works on the Orange Pi\n" );
-#endif /* BOARD_ORANGE_PI */
+#endif /* BOARD_H3 */
 }
 
 /* Hook for board specific network statistics

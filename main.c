@@ -537,11 +537,11 @@ sys_init ( long xxx )
 	// hardware_debug ();
 
 	board_init ();
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	etimer_init ();
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	// 1-26-2023
 	icache_off ();
 

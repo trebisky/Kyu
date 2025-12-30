@@ -187,7 +187,7 @@ primary_start:
 #endif
 
 #define TEST_PI
-#ifdef BOARD_ORANGE_PIXX
+#ifdef BOARD_H3_XX
 	b primary_start_opi
 #endif
 
@@ -1011,7 +1011,7 @@ sanity:
 	b	sanity
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 
 .globl go_red
 .globl spin_red
@@ -1045,7 +1045,7 @@ spin_alt:
 	str	r11, [r12]
 1:	b	1b
 
-#endif /* BOARD_ORANGE_PI */
+#endif /* BOARD_H3 */
 
 	/* Avoid stupid linker warning */
     .section        .note.GNU-stack,"",%progbits

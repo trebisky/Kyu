@@ -51,11 +51,11 @@ static void test_adc ( long );
 static void test_fault2 ( long );
 #endif
 
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+#if defined(BOARD_H3) || defined(BOARD_FIRE3)
 static void test_cores ( long );
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 static void test_wdog ( long );
 static void test_thermal ( long );
 static void test_uart ( long );
@@ -67,7 +67,7 @@ static void test_blink ( long );
 static void test_i2c ( long );
 #endif
 
-#if defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H5)
 static void test_timer ( long );
 static void test_gic ( long );
 static void test_led_t ( long );
@@ -104,11 +104,11 @@ struct test io_test_list[] = {
 	test_fault2,	"data abort probe",	0,
 #endif
 
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+#if defined(BOARD_H3) || defined(BOARD_FIRE3)
 	test_cores,	"Multiple core test",	0,
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	test_wdog,	"Watchdog test",	0,
 	test_thermal,	"H3 thermal test",	0,
 	test_uart,	"uart test",		0,
@@ -121,7 +121,7 @@ struct test io_test_list[] = {
 	test_i2c,	"i2c test",		0,
 #endif
 
-#if defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H5)
 	test_led_t,	"toggle LEDs",		0,
 #endif
 
@@ -132,7 +132,7 @@ struct test io_test_list[] = {
 	test_clear,	"clear memory test",	0,
 	test_cache,	"cache test",		0,
 
-#if defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H5)
 	test_timer,	"Timer test",		0,
 	test_gic,	"GIC test",		0,
 #endif
@@ -172,7 +172,7 @@ test_ram2 ( long xxx )
 	mem_test ( 0x10000, 0x20000 );
 }
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 /* Test Orange Pi button */
 static void
 test_button ( long xxx )
@@ -370,7 +370,7 @@ test_fault2 ( long xxx )
 }
 #endif
 
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3)
+#if defined(BOARD_H3) || defined(BOARD_FIRE3)
 void
 test_cores ( long xxx )
 {
@@ -382,7 +382,7 @@ test_cores ( long xxx )
 }
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 void
 test_thermal ( long xxx )
 {
@@ -416,7 +416,7 @@ led_norm ( void )
 
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 int led_state = 0;
 #define BLINK_RATE	500
 
@@ -444,7 +444,7 @@ led_norm ( void )
 
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 #define X_UART	3
 
 static void
@@ -600,14 +600,14 @@ test_cpu_clock ( long arg )
 static void
 test_generic ( long arg )
 {
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 	board_test_generic ( (int) arg );
 #else
 	printf ( "None yet for this hardware\n" );
 #endif
 }
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 static struct thread *blink_tp;
 
 /* start the blink */
@@ -631,7 +631,7 @@ test_blink_s ( long xxx )
 }
 #endif
 
-#if defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H5)
 static void
 test_timer ( long xxx )
 {
@@ -667,7 +667,7 @@ test_gic ( long xxx )
 /* XXX - doing both for now, why trying to sort out why
  * the H5 board won't blink status (it does blink pwr now)
  */
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_FIRE3) || defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H3) || defined(BOARD_FIRE3) || defined(BOARD_H5)
 static void
 test_led_on ( void )
 {
@@ -700,7 +700,7 @@ test_led_off ( void )
 
 
 /* toggle the state of BOTH led's */
-#if defined(BOARD_ORANGE_PI) || defined(BOARD_ORANGE_PI64)
+#if defined(BOARD_H3) || defined(BOARD_H5)
 
 static int led_state2 = 0;
 
@@ -858,7 +858,7 @@ static void test_dhry ( long count ) {
 static void test_gpio ( long count ) { gpio_test (); }
 #endif
 
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
 /* Test watchdog on Orange Pi */
 static void test_wdog ( long count ) { wd_test (); }
 #endif

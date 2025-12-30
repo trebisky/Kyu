@@ -265,7 +265,7 @@ putchar ( int ch )
 void
 console_puts ( char *buf )
 {
-#ifdef BOARD_ORANGE_PI
+#ifdef BOARD_H3
  #ifdef WANT_PUTS_LOCK
 	h3_spin_lock ( 3 );
  #endif

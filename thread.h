@@ -19,6 +19,10 @@
 
 enum console_mode { SERIAL, VGA, SIO_0, SIO_1 };
 
+/* Why should tfptr have a long argument you ask?
+ * It needs to be able to be cast to a pointer
+ *  on aarch64, that is why.
+ */
 typedef void (*tfptr) ( long );
 typedef void (*vfptr) ( void );
 
