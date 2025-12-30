@@ -17,23 +17,6 @@
 
 void shell_main ( long );
 
-#ifdef notdef
-volatile double q;
-
-static void
-floater ( void )
-{
-	double x;
-	double y;
-
-	x = 3.141593;
-	y = 1.0 / 3.0;
-	q /= x + y;
-
-	// printf ( "Pi = %.7f\n", x );
-}
-#endif
-
 /*
  * user_init is the hook that allows the user to
  * set up his threads and such, to customize the
@@ -47,7 +30,7 @@ user_init ( long xx )
 	timer_rate_set ( 100 );
 #endif
 
-	// printf ( "In user_init\n" );
+	printf ( "In user_init\n" );
 
 #ifdef WANT_MMT_PADDLE
 	mmt_paddle_init ();
@@ -62,11 +45,6 @@ user_init ( long xx )
 }
 
 #ifdef TEST_DELAY_A
-/*
- * user_init is the hook that allows the user to
- * set up his threads and such, to customize the
- * system for his application.
- */
 void
 user_init ( long val )
 {
@@ -79,11 +57,6 @@ user_init ( long val )
 #ifdef TEST_DELAY_Q
 static int tooter = 0;
 
-/*
- * user_init is the hook that allows the user to
- * set up his threads and such, to customize the
- * system for his application.
- */
 void
 user_init ( long xx )
 {
@@ -94,6 +67,23 @@ user_init ( long xx )
 	*/
 	thr_delay_a ( 25, user_init, 0 );
 	printf ( "Exits\n" );
+}
+#endif
+
+#ifdef notdef
+volatile double q;
+
+static void
+floater ( void )
+{
+	double x;
+	double y;
+
+	x = 3.141593;
+	y = 1.0 / 3.0;
+	q /= x + y;
+
+	// printf ( "Pi = %.7f\n", x );
 }
 #endif
 

@@ -1,3 +1,6 @@
+
+November 12, 2018 --
+
 I began the port of Kyu to the Allwinner H5 chip on 11-11-2018.
 I did a bit of bare metal coding, to confirm that the H5 chip is
 virtually the same as the H3, but with a 64 bit A53 core in lieu
@@ -51,3 +54,15 @@ problem is that we aren't handling interrupts properly.
 Getting to the Kyu prompt in less than 24 hours is a pretty
 amazing thing for a new board though.
 
+==============================================================================
+==============================================================================
+
+December 29, 2025  --
+
+7 years later, and I am working on this again.
+
+I have renamed the orangepi directories h3 and h5, which seems better
+since I also work with non-orange-pi boards.
+I introduce an allwinner directory, with the intent of placing common
+code there.  I am dismayed though that most of the files have diverged
+and this will take significant work.

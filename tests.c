@@ -242,8 +242,10 @@ main_help ( void )
 static char * kyu_prompt = "Kyu (bbb), ready> ";
 #elif defined(BOARD_ZYNQ)
 static char * kyu_prompt = "Kyu (zynq), ready> ";
+#elif defined(BOARD_H5)
+static char * kyu_prompt = "Kyu (opi-h5), ready> ";
 #else
-static char * kyu_prompt = "Kyu (opi), ready> ";
+static char * kyu_prompt = "Kyu (opi-h3), ready> ";
 #endif
 
 /* This normally gets run as the user thread

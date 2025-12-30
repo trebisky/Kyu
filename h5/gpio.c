@@ -316,6 +316,7 @@ void gpio_init ( void )
 
 	printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
 }
+
 /* This is the green LED */
 void
 pwr_on ( void )

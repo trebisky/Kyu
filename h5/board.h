@@ -9,21 +9,20 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * board.h for the Orange Pi PC
+ * board.h for the Allwinner H5
  *
  *  Kyu project  1-6-2017  Tom Trebisky
+ *	12-29-2025
  *
  */
 
-#define BOARD_ORANGE_PI64
-
-/* As far as we are concerned, the NanoPi Neo is just a flavor of Orange Pi
- *  (it is simply another Allwinner H3 board)
- * There are some minor differences (such as the status LED).
- */
+#define BOARD_H5
+// #define BOARD_ORANGE_PI64
 #define BOARD_ORANGE_PI_PC2
-// #define BOARD_ORANGE_PI_PC
-// #define BOARD_NANOPI_NEO
+
+/* At this time the Orange Pi PC 2 is the only H5 board we have.
+ * Someday we expect to also support the NanoPi Neo Plus 2
+ */
 
 // not yet
 // #define WANT_NET

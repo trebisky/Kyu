@@ -476,6 +476,24 @@ zzz ( void )
 }
 #endif /* ARM64 */
 
+#ifdef BOARD_H5
+static int led_s = 0;
+
+void
+h5_blinker ( long xx )
+{
+	if ( led_s ) {
+		led_s = 0;
+		status_on ();
+		pwr_on ();
+	} else {
+		led_s = 1;
+		status_off ();
+		pwr_off ();
+	}
+}
+#endif
+
 /* This is the first thread.
  * (many things expect to run with a valid current_thread).
  *
@@ -639,6 +657,11 @@ sys_init ( long xxx )
 	// test_core (); works here
 
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
+
+#ifdef BOARD_H5
+	printf ( "Run H5 blink thread\n" );
+	thr_new_repeat ( "blinker", h5_blinker, 0, 10, 0, 500 );
+#endif
 
 	//thr_show ();
 	//printf ( "TJT done with sys_init\n" );
