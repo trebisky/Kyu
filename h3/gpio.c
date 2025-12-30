@@ -153,6 +153,12 @@ gpio_input ( int gpio, int pin )
 	return (gp->data >> pin) & 1;
 }
 
+void
+gpio_test ( void )
+{
+	printf ( "GPIO test!!\n" );
+}
+
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
 
@@ -491,7 +497,7 @@ gpio_test3 ( void )
 
 /* Called from tests.c */
 void
-gpio_test ( void )
+gpio_test_OLD ( void )
 {
 	// gpio_test3 ();
 	gpio_test2 ();

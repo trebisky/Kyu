@@ -205,6 +205,7 @@ kyu_startup ( void )
 
 	printf ( "  ======================== We made it to kyu_startup!\n" );
 
+#ifdef notdef
 	printf ( "orig SCTLR = %08x\n", orig_sctlr );
 	printf ( "orig ACTLR = %08x\n", orig_actlr );
 	printf ( "orig    SP = %08x\n", orig_sp );
@@ -212,6 +213,7 @@ kyu_startup ( void )
 	printf ( "orig TTBR1 = %08x\n", orig_ttbr1 );
 	printf ( "orig TTBCR = %08x\n", orig_ttbcr );
 	printf ( "orig DACR  = %08x\n", orig_dacr );
+#endif
 
 #ifdef ARCH_ARM32
 	get_SCTLR (val);
@@ -273,7 +275,6 @@ kyu_startup ( void )
 	// emac_probe (); /* XXX */
 
 	board_hardware_init ();
-
 
 	malloc_base = ram_alloc ( MALLOC_SIZE );
 	mem_malloc_init ( malloc_base, MALLOC_SIZE );
@@ -450,23 +451,28 @@ zzz ( void )
 {
 	unsigned long val;
 
-	val = 99;
-	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	/* So far this always reads 0 on the H5.
+	 * Either it needs initializing or the
+	 * feature just is not present on the H5
+	 */
+
+	val = 0xabc;
+	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
-	val = 99;
-	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	val = 0xabc;
+	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
-	val = 99;
-	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	val = 0xabc;
+	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
 
 	delay_ms ( 10 );
 
-	val = 99;
-	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	val = 0xabc;
+	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
-	val = 99;
-	asm volatile ("msr PMCCNTR_EL0, %0": "=r" (val) );
+	val = 0xabc;
+	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
 }
 #else /* ARM64 */
@@ -484,11 +490,11 @@ h5_blinker ( long xx )
 {
 	if ( led_s ) {
 		led_s = 0;
-		status_on ();
+		status_off ();
 		pwr_on ();
 	} else {
 		led_s = 1;
-		status_off ();
+		status_on ();
 		pwr_off ();
 	}
 }
@@ -537,6 +543,7 @@ sys_init ( long xxx )
 	// hardware_debug ();
 
 	board_init ();
+
 #ifdef BOARD_H3
 	etimer_init ();
 #endif
@@ -550,7 +557,7 @@ sys_init ( long xxx )
 	core_debug ();
 #endif
 
-	zzz ();
+	// zzz ();
 
 	// timer_bogus (); OK to here
 
@@ -649,6 +656,7 @@ sys_init ( long xxx )
 	/* This is a nice idea, but doesn't always work
 	 */
 	printf ( "Kyu %s running\n", kyu_version );
+
 	/*
 	printf ( "Sys thread finished with stack: %08x\n",  get_sp() );
 	printf ( "Sys thread finished with cpsr: %08x\n",  get_cpsr() );

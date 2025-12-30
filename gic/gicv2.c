@@ -246,7 +246,7 @@ gic_cpu_init ( void )
 	struct gic_cpu *cp = GIC_CPU_BASE;
 	int i;
 
-	printf ( "GIC cpu_init called\n" );
+	// printf ( "GIC cpu_init called\n" );
 
 	/* disable and clear all PPI and SGI */
 	gp->eclear[0] = 0xffffffff;
@@ -269,7 +269,8 @@ gic_init ( void )
 	struct gic_dist *gp = GIC_DIST_BASE;
 	int i;
 
-	printf ( "GIC init called\n" );
+	// printf ( "GIC init called\n" );
+
 	gic_initialized = 1;
 
 	/* Initialize the distributor */

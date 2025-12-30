@@ -10,6 +10,17 @@
  *
  * Tom Trebisky  8/24/2020
  *
+ * The things here can be found in the linux sources:
+ *		/u1/linux/linux-git/include/dt-bindings/clock/sun8i-h3-ccu.h
+ *		/u1/linux/linux-git/include/dt-bindings/reset/sun8i-h3-ccu.h
+ * As well as the U-boot sources
+ *		/u2/Projects/U-boot/u-boot.Git/include/dt-bindings/clock/sun8i-h3-ccu.h
+ *		/u2/Projects/U-boot/u-boot.Git/include/dt-bindings/reset/sun8i-h3-ccu.h
+ *
+ * This was thrown together as a "brute force" way to take every
+ *   possible peripheral out of reset when I was thrashing around
+ *   trying to get interrupts to work.
+ *
  */
 #include <arch/types.h>
 
@@ -180,7 +191,8 @@ reset_release_all ( void )
 	vu32 *lp;
 	struct ccu_reset_map *rp;
 
-	printf ( "BIT(31) = %08x\n", BIT(31) );
+	printf ( "reset_release_all()\n" );
+	// printf ( "BIT(31) = %08x\n", BIT(31) );
 
 	n = ARRAY_SIZE(sun8i_h3_r_ccu_resets);
 
@@ -192,7 +204,7 @@ reset_release_all ( void )
 	    *lp |= rp->bit;
 	}
 
-	show_reg ( "  R ccu reset ", lp );
+	// show_reg ( "  R ccu reset ", lp );
 
 	n = ARRAY_SIZE(sun50i_h5_ccu_resets);
 
@@ -204,7 +216,7 @@ reset_release_all ( void )
 	    *lp |= rp->bit;
 	}
 
-	show_reg ( "  - ccu reset ", lp );
+	// show_reg ( "  - ccu reset ", lp );
 }
 
 /* THE END */

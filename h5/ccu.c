@@ -112,24 +112,24 @@ ccu_init ( void )
 {
 	struct h3_ccu *ccp = CCU_BASE;
 
-	ccu_show ();
+	// ccu_show ();
 
 	ccp->pll9 |= PLL_ENABLE;
 	while ( ! (ccp->pll9 & PLL_LOCK) )
 	    ;
 
-	ccu_show ();
+	// ccu_show ();
 
 	ccp->gate3 |= ALL_UART;
-	show_reg ("CCU gate3: ", &ccp->gate3 );
+	// show_reg ("CCU gate3: ", &ccp->gate3 );
 
 	ccp->reset4 |= ALL_UART;;
-	show_reg ("CCU reset4: ", &ccp->reset4 );
+	// show_reg ("CCU reset4: ", &ccp->reset4 );
 
 	ccp->gate2 |= PIO_BIT;
-	show_reg ("CCU gate2 (PIO) : ", &ccp->gate2 );
+	// show_reg ("CCU gate2 (PIO) : ", &ccp->gate2 );
 
-	// PIO has no reset ??
+	// PIO has no reset ?? !!
 	// ccp->reset3 |= PIO_BIT;;
 
 	reset_release_all ();
@@ -204,8 +204,9 @@ get_cpu_clock ( void )
 	// printf ( "sizeof int: %d\n", sizeof(val) );
 	// printf ( "sizeof long: %d\n", sizeof(freq) );
 	// printf ( "clock source: %d\n", source );
-	printf ( "PLL %08x\n", val );
-	printf ( "CPU clock: %d\n", freq );
+
+	// printf ( "PLL %08x\n", val );
+	// printf ( "CPU clock: %d\n", freq );
 	return freq;
 }
 
@@ -419,12 +420,12 @@ r_ccu_init ( void )
 {
 	struct r_ccu *rcp = (struct r_ccu *) R_CCU_BASE;
 
-	r_ccu_show ();
+	// r_ccu_show ();
 
 	rcp->apb0_gate |= R_PIO_BIT;
 	rcp->apb0_reset |= R_PIO_BIT;
 
-	r_ccu_show ();
+	// r_ccu_show ();
 
 	// dump SRAM A2
 	// count is lines on screen
@@ -435,7 +436,7 @@ r_ccu_init ( void )
 	// 00044000  94000003 d2a94000 d61f0000 d2800600 
 	// 00044010  b2760000 b27e0000 b2400000 d51e1100 
 
-	dump_l ( 0x44000, 4 );
+	// dump_l ( 0x44000, 4 );
 
 	// When we do this, we continue running, but
 	// get into trouble on a watchdog reset.

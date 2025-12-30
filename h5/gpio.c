@@ -141,6 +141,38 @@ gpio_input ( int gpio, int pin )
 	return (gp->data >> pin) & 1;
 }
 
+#define OUTS	0x11111111
+
+void
+gpio_test ( void )
+{
+		struct h3_gpio *gp;
+		int gpio = 0;
+
+		gp = gpio_base[gpio];
+		gp->config[0] = OUTS;
+		gp->config[1] = OUTS;
+		gp->config[2] = OUTS;
+		gp->config[3] = OUTS;
+
+		printf ( "GPIO test started on port %d\n", gpio );
+
+		for ( ;; ) {
+			thr_delay ( 10 );
+			gp->data = 0;
+			thr_delay ( 10 );
+			// gp->data = 0xffffffff; -- yes
+			// gp->data = 0x000000ff; -- no
+			// gp->data = 0xffff0000; -- yes
+			// gp->data = 0xff000000; -- no
+			// gp->data = 0x00ff0000; -- yes
+			// gp->data = 0x000f0000; -- no
+			// gp->data = 0x00f00000; -- yes
+			// gp->data = 0x00300000; -- yes
+			gp->data = 0x00100000;
+		}
+}
+
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
 
@@ -305,6 +337,8 @@ gpio_led_init ( void )
 {
 	gpio_out_init ( POWER_LED );
 	gpio_out_init ( STATUS_LED );
+	printf ( "LED init, status bit is: %d\n", STATUS_LED );
+	printf ( "LED init, power bit is: %d\n", POWER_LED );
 }
 
 /* Called from board.c */
@@ -487,7 +521,7 @@ gpio_test3 ( void )
 
 /* Called from tests.c */
 void
-gpio_test ( void )
+gpio_test_OLD ( void )
 {
 	// gpio_test3 ();
 	gpio_test2 ();
