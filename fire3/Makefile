@@ -13,7 +13,7 @@ OBJS =  board.o \
 	gpio.o \
 	timer.o \
 	emac.o \
-	intcon_gic400.o
+	intcon_gic.o
 
 all: ../board.o
 

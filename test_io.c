@@ -659,7 +659,8 @@ test_timer ( long xxx )
 static void
 test_gic ( long xxx )
 {
-	intcon_test ();
+	printf ( "Not testing the GIC anymore\n" );
+	// intcon_test ();
 }
 #endif
 

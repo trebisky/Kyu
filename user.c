@@ -30,7 +30,7 @@ user_init ( long xx )
 	timer_rate_set ( 100 );
 #endif
 
-	printf ( "In user_init\n" );
+	// printf ( "In user_init\n" );
 
 #ifdef WANT_MMT_PADDLE
 	mmt_paddle_init ();

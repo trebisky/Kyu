@@ -128,6 +128,7 @@ ccu_init ( void )
 
 	ccp->gate2 |= PIO_BIT;
 	show_reg ("CCU gate2 (PIO) : ", &ccp->gate2 );
+
 	// PIO has no reset ??
 	// ccp->reset3 |= PIO_BIT;;
 
