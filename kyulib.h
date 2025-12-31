@@ -11,6 +11,8 @@
  *	Tom Trebisky 9/23/2015
  */
 
+#define BIT(nr)		(1<<(nr))
+
 /* This whole gcc builtin thing is a pain in the butt.
  * We would like to use the compiler builtins, but
  * getting it all straight is a big headache right now.

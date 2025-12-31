@@ -31,6 +31,7 @@
 #endif
 
 #include <arch/types.h>
+#include "board.h"
 #include "gpio.h"
 
 struct h3_gpio {

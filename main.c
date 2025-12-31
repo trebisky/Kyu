@@ -450,6 +450,12 @@ static void
 zzz ( void )
 {
 	unsigned long val;
+	unsigned long lval;
+
+	/* Enable counting in EL2 */
+	val = 0;
+	val |= BIT(27);
+	asm volatile ("msr PMCCFILTR_EL0, %0" : : "r" (val) );
 
 	/* So far this always reads 0 on the H5.
 	 * Either it needs initializing or the
@@ -459,21 +465,33 @@ zzz ( void )
 	val = 0xabc;
 	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
 	printf ( "PMCCNTR = %X\n", val );
+	lval = val;
+
 	val = 0xabc;
 	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
-	printf ( "PMCCNTR = %X\n", val );
+	printf ( "PMCCNTR = %X %d\n", val, val-lval );
+	lval = val;
+
 	val = 0xabc;
 	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
-	printf ( "PMCCNTR = %X\n", val );
+	printf ( "PMCCNTR = %X %d\n", val, val-lval );
+	lval = val;
 
 	delay_ms ( 10 );
+	/* We see 8413516 counts in 10ms,
+	 * so that would be 841,351,600 in 1 second
+	 * so it looks like we are running at about 800 Mhz.
+	 * (reading PLL registers says 816 Mhz)
+	 */
 
 	val = 0xabc;
 	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
-	printf ( "PMCCNTR = %X\n", val );
+	printf ( "PMCCNTR = %X %d\n", val, val-lval );
+	lval = val;
+
 	val = 0xabc;
 	asm volatile ("mrs %0, PMCCNTR_EL0": "=r" (val) );
-	printf ( "PMCCNTR = %X\n", val );
+	printf ( "PMCCNTR = %X %d\n", val, val-lval );
 }
 #else /* ARM64 */
 static void
@@ -557,7 +575,7 @@ sys_init ( long xxx )
 	core_debug ();
 #endif
 
-	// zzz ();
+	zzz ();
 
 	// timer_bogus (); OK to here
 
