@@ -6,16 +6,21 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * gpio.c for the Orange Pi PC and PC Plus
+ * gpio.c for the Allwinner H3 and H5 chips
+ *  Orange Pi PC and PC Plus (H3) as well as their PC 2 (H5)
+ *   also the NanoPi Neo (H3)
  *
  * Tom Trebisky  12-22-2016
  * Tom Trebisky  1/19/2017
+ * Tom Trebisky  12/30/2025
  *
- * Driver for the H3 gpio
- * These are described in the datasheet in chapter 4-22 as "port controllers"
+ * Driver for the Allwinner H3 and H5 gpio
+ * These are described in the H3 datasheet in chapter 4-22 as "port controllers"
+ *		Similarly for the H5 in chapter 4-21
  */
 
 #ifdef notdef
+/* no longer needed - but informative */
 #define GPIO_A    0
 #define GPIO_B    1	/* unpopulated */
 #define GPIO_C    2
@@ -34,6 +39,9 @@
 #include "board.h"
 #include "gpio.h"
 
+/* This says "h3" but it works equally well for the H5
+ *  The struct could be renamed, but I am lazy right now.
+ */
 struct h3_gpio {
 	vu32 config[4];
 	vu32 data;
