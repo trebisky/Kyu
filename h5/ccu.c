@@ -131,8 +131,6 @@ ccu_init ( void )
 
 	// PIO has no reset ?? !!
 	// ccp->reset3 |= PIO_BIT;;
-
-	reset_release_all ();
 }
 
 #ifdef notdef
@@ -359,6 +357,7 @@ serial_clocks_on ( void )
 }
 #endif
 
+/* Not much going on here. */
 void
 gpio_clocks_on ( void )
 {

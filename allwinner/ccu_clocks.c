@@ -6,7 +6,9 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * ccu_clocks.c for the Orange Pi PC and PC Plus
+ * ccu_clocks.c for the Orange Pi PC and PC 2 (H3 and H5)
+ *
+ * Never actually used.  Has interesting code from linux drivers.
  *
  * Tom Trebisky  8/24/2020
  *

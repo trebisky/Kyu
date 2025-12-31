@@ -6,9 +6,14 @@
  * published by the Free Software Foundation. See README and COPYING for
  * more details.
  *
- * ccu_reset.c for the Orange Pi PC and PC Plus
+ * ccu_reset.c for the Orange Pi PC and PC 2 (H3 and H5)
  *
  * Tom Trebisky  8/24/2020
+ *
+ * This is no longer used.  It was used during desperate times when
+ *  I could not figure out why interrupts were not working.
+ *
+ * It has some interesting code from linux drivers.
  *
  * The things here can be found in the linux sources:
  *		/u1/linux/linux-git/include/dt-bindings/clock/sun8i-h3-ccu.h

@@ -28,7 +28,7 @@ OBJS =  board.o \
 	i2c.o \
 	i2c_hw.o \
 	timer.o \
-	h3_spinlocks.o \
+	spinlocks.o \
 	ccu.o \
 	multicore.o
 

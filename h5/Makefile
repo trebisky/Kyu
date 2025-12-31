@@ -2,7 +2,7 @@
 #
 # build board.o
 #
-# Tom Trebisky  1-6-2017
+# Tom Trebisky  1-6-2017  12-30-2025
 
 INCS = -I. -I..
 include ../Makefile.inc
@@ -11,20 +11,19 @@ include ../Makefile.inc
 XX_OBJS = \
 	h3_thermal.o \
 	h3_sid.o \
-	ccu_clocks.o \
 	bogus.o
 
 NOT_YET = \
 	multicore.o
 
-OBJS =  board.o \
+OBJS = \
+	board.o \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
 	emac.o \
 	timer.o \
-	h3_spinlocks.o \
-	ccu_reset.o \
+	spinlocks.o \
 	ccu.o
 
 all: ../board.o
