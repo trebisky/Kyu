@@ -56,7 +56,7 @@ dallas_init ( int gpio_pin )
 static void
 dallas_read_pulse ( void )
 {
-	volatile unsigned int *dp;
+	volatile u32 *dp;
 	int p, m;
 	unsigned int val_on, val_off;
 

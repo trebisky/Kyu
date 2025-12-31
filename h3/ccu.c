@@ -180,4 +180,46 @@ serial_clocks_on ( void )
         *lp |= ALL_UART;
 }
 
+/* These are registers in the CCM (clock control module)
+ */
+#define CCM_GATE	((unsigned int *) 0x01c2006c)
+#define CCM_RESET4	((unsigned int *) 0x01c202d8)
+
+#define GATE_UART0	0x00010000
+#define GATE_UART1	0x00020000
+#define GATE_UART2	0x00040000
+#define GATE_UART3	0x00080000
+
+#define RESET4_UART0	0x00010000
+#define RESET4_UART1	0x00020000
+#define RESET4_UART2	0x00040000
+#define RESET4_UART3	0x00080000
+
+/* This is probably set up for us by U-boot,
+ * true bare metal would need this.
+ * XXX do we want this routine, or the above ??
+ */
+void
+uart_clock_init ( int uart )
+{
+	if ( uart == 0 ) {
+	    *CCM_GATE |= GATE_UART0;
+	    *CCM_RESET4 |= RESET4_UART0;
+	} else if ( uart == 1 ) {
+	    *CCM_GATE |= GATE_UART1;
+	    *CCM_RESET4 |= RESET4_UART1;
+	} else if ( uart == 2 ) {
+	    *CCM_GATE |= GATE_UART2;
+	    *CCM_RESET4 |= RESET4_UART2;
+	} else if ( uart == 3 ) {
+	    *CCM_GATE |= GATE_UART3;
+	    *CCM_RESET4 |= RESET4_UART3;
+	}
+}
+
+void
+gpio_clocks_on ( void )
+{
+}
+
 /* THE END */

@@ -136,6 +136,7 @@ ccu_init ( void )
 }
 
 #ifdef notdef
+/* XXX - this is done for the H3 */
 /* These are registers in the CCM (clock control module)
  */
 #define CCM_GATE	((u32 *) 0x01c2006c)
