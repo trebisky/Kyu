@@ -103,6 +103,18 @@ gpio_config ( int bit, int val )
 	gp->config[reg] = tmp | (val << shift);
 }
 
+struct h3_gpio *
+gpio_get_base ( int bit )
+{
+	return gpio_base[bit/32];
+}
+
+volatile u32 *
+gpio_get_reg ( int bit )
+{
+	return &gpio_base[bit/32]->data;
+}
+
 /* There are two pull registers,
  * each with 16 fields of 2 bits.
  */
@@ -240,15 +252,10 @@ gpio_int_ack ( int bit )
 
 /* ----------------------------------------------------------- */
 /* ----------------------------------------------------------- */
-/* We only support the H3 for now,
- *   the code for the H5 is parked here for a rainy day.
- */
-#define CHIP_H3
 
 void
 uart_gpio_init ( int uart )
 {
-#ifdef CHIP_H3
 	if ( uart == 0 ) {
 	    gpio_config ( GPIO_A_4, GPIO_F2 );
 	    gpio_config ( GPIO_A_5, GPIO_F2 );
@@ -266,12 +273,34 @@ uart_gpio_init ( int uart )
 	    gpio_config ( GPIO_A_14, GPIO_F3 );
 	    gpio_pull ( GPIO_A_14, GPIO_PULL_UP );
 	}
+}
 
-#else	/* H5 */
-	gpio_config ( GPIO_A_4, GPIO_F2 );
-	gpio_config ( GPIO_A_5, GPIO_F2 );
-	gpio_pull ( GPIO_A_5, GPIO_PULL_UP );
-#endif
+/* For the BBB we have mux.c to handle the gpio/pinmux
+ * Maybe we should have something like that for the H3?
+ */
+
+void
+setup_twi_mux ( void )
+{
+    // BBB stuff
+    // int *psp = (int *) MUX_BASE;
+    // psp[MUX_I2C0_SDA] = MODE(0) | RXACTIVE | SLEWCTRL;
+    // psp[MUX_I2C0_SCL] = MODE(0) | RXACTIVE | SLEWCTRL;
+
+    /* TWI 0 */
+    gpio_config ( GPIO_A_11, GPIO_F2 );
+    gpio_config ( GPIO_A_12, GPIO_F2 );
+    // ?? How do we set the pullups ?
+    // gpio_pull ( GPIO_A_x, GPIO_PULL_UP );
+
+    /* TWI 1 */
+    gpio_config ( GPIO_A_18, GPIO_F3 );
+    gpio_config ( GPIO_A_19, GPIO_F3 );
+
+    /* TWI 2 */
+    /* Not routed to connector on Orange Pi */
+    // gpio_config ( GPIO_E_12, GPIO_F3 );
+    // gpio_config ( GPIO_E_13, GPIO_F3 );
 }
 
 /* -------------------------------------------------- */
@@ -338,8 +367,8 @@ gpio_led_init ( void )
 {
 	gpio_out_init ( POWER_LED );
 	gpio_out_init ( STATUS_LED );
-	printf ( "LED init, status bit is: %d\n", STATUS_LED );
-	printf ( "LED init, power bit is: %d\n", POWER_LED );
+	// printf ( "LED init, status bit is: %d\n", STATUS_LED );
+	// printf ( "LED init, power bit is: %d\n", POWER_LED );
 }
 
 /* Called from board.c */
@@ -527,5 +556,24 @@ gpio_test_OLD ( void )
 	// gpio_test3 ();
 	gpio_test2 ();
 }
+
+/* Quick and dirty test to pulse some IO pin.
+ * Scope loop
+ * I see a 4 uS period (250 kHz)
+ */
+void
+gpio_rapid ( void )
+{
+    // int pin = 0;
+    int pin = GPIO_A_0;
+
+    gpio_out_init ( pin );
+
+    for ( ;; ) {
+        gpio_set_bit ( pin );
+        gpio_clear_bit ( pin );
+    }
+}
+
 
 /* THE END */

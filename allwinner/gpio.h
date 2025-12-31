@@ -21,8 +21,8 @@
 // not a good idea
 // #include "board.h"
 
-// For H3
-// volatile int * gpio_get_reg ( int );
+// For H3 -- dallas.c driver
+volatile u32 * gpio_get_reg ( int );
 
 #define GPIO_A_0	0
 #define GPIO_A_1	1
