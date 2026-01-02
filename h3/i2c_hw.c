@@ -493,7 +493,6 @@ twi_devinit ( int devnum, struct twi_dev *base, int irq )
 void
 i2c_init ( void )
 {
-	twi_clocks_on ();
         setup_twi_mux ();
 
         twi_devinit ( 0, (struct twi_dev *) TWI0_BASE, IRQ_TWI0 );

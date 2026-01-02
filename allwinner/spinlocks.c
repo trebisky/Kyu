@@ -29,8 +29,6 @@ struct h3_spinlocks {
 void
 h3_spinlocks_init ( void )
 {
-	spin_clocks_on ();
-
 	// h3_spinlocks_test ();
 }
 

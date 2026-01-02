@@ -143,6 +143,9 @@ ccu_show ( void )
 #define PLL_ENABLE	0x80000000
 #define PLL_LOCK	0x10000000
 
+static void twi_clocks_on ( void );
+static void spin_clocks_on ( void );
+
 /* Rather than enable each thing one by one and trip
  * over needing to do so for each device, we just
  * enable ALL the uart and gpio right here up front
@@ -171,6 +174,9 @@ ccu_init ( void )
 
 	ccp->gate2 |= PIO_BIT;
 	// show_reg ("CCU gate2 (PIO) : ", &ccp->gate2 );
+
+	twi_clocks_on ();
+	spin_clocks_on ();
 
 	// PIO has no reset ?? !!
 	// ccp->reset3 |= PIO_BIT;;
@@ -203,7 +209,7 @@ ccu_init ( void )
  * outside world.
  * TWI (two wire interface) is actually i2c.
  */
-void
+static void
 twi_clocks_on ( void )
 {
         struct h3_ccu *cp = CCU_BASE;
@@ -230,7 +236,7 @@ twi_clocks_on ( void )
 
 /* Hardware spin locks
  */
-void
+static void
 spin_clocks_on ( void )
 {
 	vu32 *lp;
