@@ -382,11 +382,8 @@ gpio_led_init ( void )
 /* Called from board.c */
 void gpio_init ( void )
 {
-	struct h3_gpio *gp = (struct h3_gpio *) 0;
-
-	gpio_clocks_on ();
-
-	printf ( "GPIO INT at %08x\n", &gp->int_config[0] );
+	// struct h3_gpio *gp = (struct h3_gpio *) 0;
+	// printf ( "GPIO int_config[0] at %08x\n", &gp->int_config[0] );
 }
 
 /* This is the green LED */
@@ -409,22 +406,14 @@ void
 status_on ( void )
 {
 	// gpio_output ( GPIO_A, STATUS_PIN, 1 );
-#ifdef BOARD_NANOPI_NEO
-	gpio_set_bit ( STATUS_LED_NEO );
-#else
 	gpio_set_bit ( STATUS_LED );
-#endif
 }
 
 void
 status_off ( void )
 {
 	// gpio_output ( GPIO_A, STATUS_PIN, 0 );
-#ifdef BOARD_NANOPI_NEO
-	gpio_clear_bit ( STATUS_LED_NEO );
-#else
 	gpio_clear_bit ( STATUS_LED );
-#endif
 }
 
 /* A reasonable delay for blinking an LED

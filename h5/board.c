@@ -315,7 +315,7 @@ board_init ( void )
 	printf ( "CPU clock %d Mhz\n", cpu_clock_mhz );
 
 	ccu_init ();
-	r_ccu_init ();
+	// r_ccu_init ();
 
 	printf ( "Board_init - initializing GPIO and LED\n" );
 	gpio_init ();

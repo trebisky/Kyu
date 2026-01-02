@@ -24,24 +24,12 @@ struct h3_spinlocks {
 	vu32 lock[NLOCKS];
 };
 
-#define CCU_BASE		0x01c20000
-
-#define BUS_GATING_REG1     	0x64
-#define BUS_RESET_REG1     	0x02C4
-
-#define SPINLOCK_BIT		(1<<22)
-
 /* Initially all locks are unlocked */
 
 void
 h3_spinlocks_init ( void )
 {
-	vu32 *lp;
-
-	lp = (vu32 *) (CCU_BASE + BUS_GATING_REG1);
-	*lp |= SPINLOCK_BIT;
-	lp = (vu32 *) (CCU_BASE + BUS_RESET_REG1);
-	*lp |= SPINLOCK_BIT;
+	spin_clocks_on ();
 
 	// h3_spinlocks_test ();
 }

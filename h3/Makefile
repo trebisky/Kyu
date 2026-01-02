@@ -30,6 +30,7 @@ OBJS =  board.o \
 	timer.o \
 	spinlocks.o \
 	ccu.o \
+	ccu_pll.o \
 	multicore.o
 
 all: ../board.o

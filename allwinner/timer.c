@@ -196,9 +196,6 @@ timer_check2 ( void )
 	// hp->irq_status = IE_T0;
 	timer_ack ();
 	printf ( "Timer - IRQ status: %08x\n", hp->irq_status );
-
-	// does nothing
-	// gic_bypass ();
 }
 #endif	/* ARCH_ARM64 */
 

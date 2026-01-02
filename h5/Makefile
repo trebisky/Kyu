@@ -24,6 +24,7 @@ OBJS = \
 	emac.o \
 	timer.o \
 	spinlocks.o \
+	ccu_pll.o \
 	ccu.o
 
 all: ../board.o

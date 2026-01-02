@@ -371,6 +371,8 @@ board_init ( void )
 	printf ( "Starting board initialization for Orange Pi\n" );
 	// show_compiler_sizes ();
 
+	ccu_init ();
+
 	// wdt_disable ();
 	board_cpu_init ();
 
