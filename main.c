@@ -575,6 +575,8 @@ sys_init ( long xxx )
 	core_debug ();
 #endif
 
+	cache_init ();
+
 	zzz ();
 
 	// timer_bogus (); OK to here
