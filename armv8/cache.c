@@ -31,11 +31,36 @@ static int cache_line_size;
 #define SEL_L2_CACHE	0x002	/* bits 3:1 */
 #define SEL_L3_CACHE	0x004	/* bits 3:1 */
 
+static void
+cache_stuff ( u32 val, char *who )
+{
+	printf ( "--------   cache CCSIDR for %s = %08x\n", who, val );
+	if ( val & 0x80000000 )
+		printf ( "Write through\n" );
+	else
+		printf ( "NO Write through\n" );
+
+	if ( val & 0x40000000 )
+		printf ( "Write back\n" );
+	else
+		printf ( "NO Write back\n" );
+
+	if ( val & 0x20000000 )
+		printf ( "Read allocate\n" );
+	else
+		printf ( "NO Read allocate\n" );
+
+	if ( val & 0x10000000 )
+		printf ( "Write allocate\n" );
+	else
+		printf ( "NO Write allocate\n" );
+}
+
 // tjt 1-2-2026 -- needs work
 void
 cache_init ( void )
 {
-	unsigned int val;
+	u32 val;
 	int line_len;
 	int asso;
 	int sets;
@@ -48,7 +73,7 @@ cache_init ( void )
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	printf ( "cache CCSIDR for L1 D = %08x\n", val );
+	cache_stuff ( val, "L1 D" );
 
 	/* line size gives log2(words)-2 */
 	/* What is a word?  4 bytes apparently */
@@ -76,7 +101,7 @@ cache_init ( void )
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	printf ( "cache CCSIDR for L1 I = %08x\n", val );
+	cache_stuff ( val, "L1 I" );
 
 	line_len = (val & CCSIDR_LINE_SIZE_MASK) + 2;
 	cache_line_size = 1 << (line_len + 2);
@@ -97,7 +122,7 @@ cache_init ( void )
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	printf ( "cache CCSIDR for L2 = %08x\n", val );
+	cache_stuff ( val, "L2" );
 
 	line_len = (val & CCSIDR_LINE_SIZE_MASK) + 2;
 	cache_line_size = 1 << (line_len + 2);
