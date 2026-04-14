@@ -20,6 +20,8 @@ include Makefile.inc
 # We park things here
 BOGUS = \
     tcp_xinu.o \
+    tcp_kyu.o \
+    tcp_bsd.o \
     bogus.o
 
 # machine.o must come first
@@ -45,6 +47,7 @@ OBJS =  machine.o \
     lib.o
 
 all: install dump sym tags
+	@echo "  READY"
 
 ver:
 	@echo $(GCCVERSION)

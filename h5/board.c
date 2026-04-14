@@ -309,6 +309,8 @@ board_get_cpu_mhz ( void )
 void
 board_init ( void )
 {
+	u32 val;
+
 	// wdt_disable ();
 	cpu_clock = get_cpu_clock ();
 	cpu_clock_mhz = cpu_clock / 1000 / 1000;
@@ -342,6 +344,11 @@ board_init ( void )
 	timer_init ( DEFAULT_TIMER_RATE );
 
 	delay_calib ();
+
+	// total hack, curiosity 1-11-2026
+#define EMAC_SYSCON ((unsigned int *) 0x01c00030)
+	val = *EMAC_SYSCON;
+	printf ( "EMAC syscon: %08x\n", val );
 
 	/* CPU interrupts on */
 	INT_unlock;

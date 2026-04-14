@@ -73,7 +73,10 @@ OPT = -fno-omit-frame-pointer
 
 # Allow stdinc temporarily 12/2025
 # This works, and we did this temporarily until we sorted out the ABIDIR
+# 1-14-2026
 COPTS = -DKYU $(DEFS) -nostdinc $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
+#COPTS = -DKYU $(DEFS) -nostdinc $(NOB) $(OPT) -O -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
+
 #COPTS = -DKYU $(DEFS) $(NOB) $(OPT) -march=armv8-a+crc -mtune=cortex-a53 -DARM64 $(INCS) $(ABI)
 
 CC = $(CCX) $(COPTS)

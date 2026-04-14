@@ -418,22 +418,22 @@ init_rings ( void )
 #else
 	desc = rx_list_init ();
 #endif
-	rx_list = desc;
+	rx_list = (void *) desc;
 
 	/* Reload the dma pointer register.
 	 * This causes the dma list pointer to get reset. 
 	 */
-	ep->rx_desc = desc;
+	ep->rx_desc = (u32) desc;
 	cur_rx_dma = desc;
 
 	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
 
 	/* Now set up the Tx list */
 	desc = tx_list_init ();
-	tx_list = desc;
+	tx_list = (void *) desc;
 
 	clean_tx_dma = cur_tx_dma = desc;
-	ep->tx_desc = desc;
+	ep->tx_desc = (u32) desc;
 }
 
 /* ------------------------------------------------------------ */

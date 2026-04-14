@@ -518,6 +518,24 @@ h5_blinker ( long xx )
 }
 #endif
 
+#ifdef BOARD_H3
+static int led_s = 0;
+
+void
+h3_blinker ( long xx )
+{
+	if ( led_s ) {
+		led_s = 0;
+		status_off ();
+		pwr_on ();
+	} else {
+		led_s = 1;
+		status_on ();
+		pwr_off ();
+	}
+}
+#endif
+
 /* This is the first thread.
  * (many things expect to run with a valid current_thread).
  *
@@ -689,6 +707,10 @@ sys_init ( long xxx )
 #ifdef BOARD_H5
 	printf ( "Run H5 blink thread\n" );
 	thr_new_repeat ( "blinker", h5_blinker, 0, 10, 0, 500 );
+#endif
+#ifdef BOARD_H3
+	printf ( "Run H3 blink thread\n" );
+	thr_new_repeat ( "blinker", h3_blinker, 0, 10, 0, 500 );
 #endif
 
 	//thr_show ();

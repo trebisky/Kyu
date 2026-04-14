@@ -21,7 +21,7 @@
 #include "arch/cpu.h"
 
 /* XXX - Still not fully complete.
- * For example it fails to resolve pre.ai.mit.edu
+ * For example it fails to resolve prep.ai.mit.edu
  * This is now an alias for ftp.gnu.org
  * nslookup shows this as:
  * prep.ai.mit.edu	canonical name = ftp.gnu.org
@@ -196,17 +196,26 @@ static u32 dns_ip;
 void
 dns_test ( void )
 {
-	dns_show ( "sol.as.arizona.edu" );
+	dns_show ( "as.arizona.edu" );
+	/* nonsense - this will fail */
 	dns_show ( "fish.edu" );
-	dns_show ( "sol.as.arizona.edu" );
-	dns_show ( "sol.as.arizona.edu" );
 	dns_show ( "www.the-oasis.org" );
-	dns_show ( "www.the-oasis.org" );
+#ifdef notdef
+	/* Does not work, but it should */
 	dns_show ( "prep.ai.mit.edu" );
+	/* This fails in the same way.
+	 * both of these hang the DNS subsystem.
+	 */
+	dns_show ( "mmtvme1.mmto.arizona.edu" );
+	/* nslookup shows:
+	prep.ai.mit.edu	canonical name = ftp.gnu.org.
+	mmtvme1.mmto.arizona.edu	canonical name = mount.mmto.arizona.edu.
+	-- so clearly I am not handling this canonical name stuff properly
+	*/
+#endif
 	dns_show ( "yahoo.com" );
 	dns_show ( "hacksaw.mmto.arizona.edu" );
 	dns_show ( "mount.mmto.arizona.edu" );
-	dns_show ( "mmtvme1.mmto.arizona.edu" );
 	/*
 	*/
 }

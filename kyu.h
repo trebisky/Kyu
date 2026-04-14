@@ -70,17 +70,22 @@
 #define WANT_SMP
 
 // #define WANT_TCP_XINU
-#define WANT_TCP_BSD
+// #define WANT_TCP_BSD
 // #define WANT_TCP_KYU
+#define WANT_TCP_NONE
 
 /* Xinu TCP needs the net timer */
 #ifdef WANT_TCP_XINU
 #define WANT_NET_TIMER
 #endif
 
+#ifdef notdef
+/* Somebody has to handle the TCP packets */
+/* See above, we now have TCP_NONE */
 #ifndef WANT_TCP_XINU
 #ifndef WANT_TCP_BSD
 #define		WANT_TCP_KYU
+#endif
 #endif
 #endif
 

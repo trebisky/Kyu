@@ -24,6 +24,8 @@
 
 static struct tcp_ops *tcp_ops;
 
+struct tcp_ops * tcp_none_init ( void );
+
 void
 kyu_tcp_init ( void )
 {
@@ -36,9 +38,40 @@ kyu_tcp_init ( void )
 #ifdef WANT_TCP_KYU
 	tcp_ops = tcp_kyu_init ();
 #endif
+#ifdef WANT_TCP_NONE
+	tcp_ops = tcp_none_init ();
+#endif
 
 	(*tcp_ops->init) ();
 }
+
+#ifdef WANT_TCP_NONE
+static void tcp_none_initialize ( void );
+static void tcp_none_rcv ( struct netbuf * );
+
+static
+struct tcp_ops none_ops = {
+    tcp_none_initialize,
+    tcp_none_rcv
+};
+
+/* Kyu calls this during initialization */
+struct tcp_ops *
+tcp_none_init ( void )
+{
+    return &none_ops;
+}
+
+static void
+tcp_none_initialize ( void )
+{
+}
+
+static void
+tcp_none_rcv ( struct netbuf *nbp )
+{
+}
+#endif
 
 /* Pass a received packet on to TCP
  */

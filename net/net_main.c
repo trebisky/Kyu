@@ -250,8 +250,10 @@ net_init ( void )
      * We do the initialization in a separate thread
      * (and do this sloppy synchronization) because the cpsw driver
      * used to hang at least half the time.
-     * XXX - This went away when we rewrote it and we could do away
+     * This went away when we rewrote it and we could do away
      *  now with this extra thread and the synchronization.
+	 * But there are a variety of reasons why it is nice to call
+	 *  the driver "init" and "activate" functions from a thread.
      */
 
     net_state = NET_INIT;
