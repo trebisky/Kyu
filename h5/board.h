@@ -84,5 +84,7 @@
 // #define NETBUF_PREPAD	2
 #define NETBUF_PREPAD	0
 
+#define EMAC_DEBUG 1
+
 /* THE END */
 #endif /* _BOARD_H */

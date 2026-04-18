@@ -104,6 +104,7 @@ install: kyu.bin kyu.sym
 	cp kyu.bin /var/lib/tftpboot/h5.bin
 	cp kyu.sym /var/lib/tftpboot/kyu.sym
 	ls -l /var/lib/tftpboot/kyu.sym
+	@echo "Kyu for Allwinner h5 installed"
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump

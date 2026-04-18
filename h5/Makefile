@@ -11,8 +11,6 @@ include ../Makefile.inc
 XX_OBJS = \
 	h3_thermal.o \
 	h3_sid.o \
-	emac_phy.o \
-	emac_syscon.o \
 	bogus.o
 
 NOT_YET = \
@@ -24,6 +22,8 @@ OBJS = \
 	gpio.o \
 	serial.o \
 	emac.o \
+	emac_syscon.o \
+	emac_phy.o \
 	timer.o \
 	spinlocks.o \
 	ccu_pll.o \

@@ -960,6 +960,9 @@ emac_init_new ( void )
 	struct emac *ep = EMAC_BASE;
 	int i;
 
+	// Experiment 4-14-2026
+	emac_syscon_setup ();
+
 	// validate my structure layout
 	// printf ( "Shoud be 0xd0 == 0x%x\n", &ep->rgmii_status );
 	// verify_regs ();
@@ -979,6 +982,7 @@ emac_init_new ( void )
 	// emac_reset ();
 
 	// phy_init ();			/* sets ctl0 */
+	phy_init ();
 
 	show_sid ();
 
@@ -1041,6 +1045,7 @@ emac_init_new ( void )
 	init_rings ();
 
 	/* the "activate" entry point really kicks things off */
+	printf ( "emac_init() finished\n" );
 
 	return 1;
 }
@@ -1261,6 +1266,11 @@ emac_doublecheck ( void )
 /* These are the "official" production entry points to this driver.
  */
 
+void
+emac_debug ( int val )
+{
+}
+
 int
 emac_init ( void )
 {
@@ -1303,7 +1313,7 @@ emac_show_last ( int show_bufs )
  *  more details than the above.
  */
 void
-emac_debug ( void )
+emac_debug_info ( void )
 {
 	struct emac *ep = EMAC_BASE;
 

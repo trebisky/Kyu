@@ -12,6 +12,7 @@ XX_OBJS = \
 	h3_thermal.o \
 	h3_sid.o \
 	dallas_opt.o \
+	emac_phy.o \
 	bogus.o
 
 OBJS =  board.o \
@@ -19,6 +20,7 @@ OBJS =  board.o \
 	gpio.o \
 	serial.o \
 	emac.o \
+	emac_syscon.o \
 	emac_phy.o \
 	dallas.o \
 	i2c_lcd.o \

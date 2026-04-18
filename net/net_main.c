@@ -104,9 +104,10 @@ net_hw_init ( long bogus )
     board_net_activate ();
     // puts ( "TJT after board_net_activate" );
 
-    if ( num_eth > 0 )
+    if ( num_eth > 0 ) {
 		net_state = NET_RUN;
-    else {
+		printf ( "Network initialized (RUN!)\n" );
+    } else {
 		net_state = NET_IDLE;
 		printf ( "No network devices found\n" );
     }
@@ -137,6 +138,7 @@ net_running ( void )
 static void
 host_info_init ( void )
 {
+	printf ( "XX - host_info_init()\n" );
 	/* This will panic unless we are in NET_RUN */
 	net_addr_get ( host_info.our_mac );
 	init_ephem_port ();
@@ -236,7 +238,6 @@ net_init ( void )
 		panic ("Cannot get net output semaphore");
     sem_set_name ( outq_sem, "net-outq" );
 
-
     /* XXX review and revise priorities someday */
     (void) safe_thr_new ( "net-in", net_thread, (void *) 0, PRI_NET_IN, 0 );
     (void) safe_thr_new ( "net-out", output_thread, (void *) 0, PRI_NET_OUT, 0 );
@@ -256,15 +257,43 @@ net_init ( void )
 	 *  the driver "init" and "activate" functions from a thread.
      */
 
+#ifdef notdef
+	/* This crazy test 2-16-2026 when we had issues where
+	 * the wait below for hw_init seemed to time out on the H5.
+	 * This delay gave exactly 10 sec by stopwatch.
+	 */
+    puts ( "Starting test delay (10 sec)" );
+	thr_delay ( 10 * system_clock_rate );
+    puts ( " .. test delay done" );
+#endif
+
     net_state = NET_INIT;
     (void) safe_thr_new ( "net_initialize", net_hw_init, (void *) 0, PRI_HW_INIT, 0 );
 
 /* With the BBB, this usually takes about 3 seconds, with the
  * time for autonegotiation (about 2.1 seconds) dominating.
  */
-#define NET_STARTUP_WAIT	12
+// #define NET_STARTUP_WAIT	12
+/* Bumped up for h5.
+ * Before this bump, this was timing out, which gave us
+ * the Premature MAC address panic.
+ * 4-17-2026 - I added the Net wait panic below at this time.
+ * (This will be more informative if it happens again.).
+ * BUT - I see only about a 3 second delay for autonegotiation
+ * (I report 3.65 seconds), so why do we need this?
+ */
+#define NET_STARTUP_WAIT	20
 
     // puts ( "TJT -in net wait" );
+	printf ( "\n\n" );
+    puts ( "Starting net wait" );
+	printf ( "System clock rate: %d\n", system_clock_rate );
+	printf ( "+++++++++++++++++++++++++++++++++\n" );
+	printf ( "+++++++++++++++++++++++++++++++++\n" );
+	printf ( "+++++++++++++++++++++++++++++++++\n" );
+	printf ( "+++++++++++++++++++++++++++++++++\n" );
+	printf ( "+++++++++++++++++++++++++++++++++\n" );
+
     count = 0;
     // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
     while ( net_state == NET_INIT && count++ < NET_STARTUP_WAIT ) {
@@ -273,6 +302,9 @@ net_init ( void )
 		// puts ( "TJT -tick" );
     }
     // puts ( "TJT -after net wait" );
+
+	if ( net_state == NET_INIT )
+		panic ( "Net wait (in net_init) timed out" );
 
     if ( num_eth == 0 ) {
 		net_state = NET_IDLE;

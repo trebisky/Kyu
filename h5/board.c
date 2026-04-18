@@ -388,6 +388,7 @@ reset_cpu ( void )
 int
 board_net_init ( void )
 {
+		emac_debug ( EMAC_DEBUG );
         return emac_init ();
 }
 
@@ -419,7 +420,7 @@ board_net_send ( struct netbuf *nbp )
 void
 board_net_debug ( void )
 {
-	emac_debug ();
+	emac_debug_info ();
 }
 
 /* THE END */

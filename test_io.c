@@ -211,7 +211,7 @@ test_malloc ( long xxx )
 static void
 test_wait ( long secs )
 {
-	printf ( "Waiting ...\n" );
+	printf ( "Waiting for %d seconds ...\n", secs );
 	thr_delay ( secs * timer_rate_get() );
 	printf ( "Done waiting\n" );
 }

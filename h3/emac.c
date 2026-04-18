@@ -225,10 +225,11 @@ static struct emac_desc *clean_tx_dma;
 static int emac_wait_flag = 0;
 static struct sem *emac_sem;
 
-void emac_debug ( void );
+void emac_debug ( int );
 
 // rx_list_show ( rx_list, NUM_RX );
 // rx_list_show ( struct emac_desc *desc, int num )
+
 static void
 rx_list_show ( void )
 {
@@ -418,22 +419,22 @@ init_rings ( void )
 #else
 	desc = rx_list_init ();
 #endif
-	rx_list = (void *) desc;
+	rx_list = desc;
 
 	/* Reload the dma pointer register.
 	 * This causes the dma list pointer to get reset. 
 	 */
-	ep->rx_desc = (u32) desc;
+	ep->rx_desc = (u32) (u64) desc;
 	cur_rx_dma = desc;
 
 	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
 
 	/* Now set up the Tx list */
 	desc = tx_list_init ();
-	tx_list = (void *) desc;
+	tx_list = desc;
 
 	clean_tx_dma = cur_tx_dma = desc;
-	ep->tx_desc = (u32) desc;
+	ep->tx_desc = (u32) (u64) desc;
 }
 
 /* ------------------------------------------------------------ */
@@ -691,7 +692,6 @@ tx_handler ( int stat )
 {
 	// printf ( "Emac tx interrupt %08x\n", stat );
 	// phy_show ();
-	// emac_debug ();
 	et_tx ();
 	tx_cleaner ();
 
@@ -905,7 +905,7 @@ emac_init_ORIG ( void )
 	get_mac ( mac_buf );
 	set_mac ( mac_buf );
 
-	phy_init ();			/* sets ctl0 */
+	phy_init ();
 
 	ep->ctl1 = CTL1_BURST_8;
 
@@ -1103,16 +1103,14 @@ emac_init_new ( void )
 
 	init_rings ();
 	// XXX 2023
-	emac_debug ();
 
 	/* the "emac_activate" entry point really kicks things off */
 
 #ifndef INHERIT_UBOOT
 	phy_init ();	// 1-10-2023
-	// phy_init_10 ();	// FAILS 1-12-2023
 #endif
 
-	// never hurts
+	// never hurts, shows information
 	phy_update ();
 
 	// This seems to be 0 after reset
@@ -1125,12 +1123,21 @@ emac_init_new ( void )
 	 * is the interesting part
 	 */
 #endif
+
+	/* ctl0 has speed, loopback, and duplex */
 	reg = 0;
-	if ( phy_get_speed () )
+
+	if ( phy_get_speed () == 100 )
 	    reg |= CTL_SPEED_100;
+	if ( phy_get_speed () == 10 )
+	    reg |= CTL_SPEED_10;
+	// SPEED_1000 has bits set zero
+
 	if ( phy_get_duplex () )
 	    reg |= CTL_FULL_DUPLEX;
+
 	ep->ctl0 = reg;
+
 	printf ( "emac CTL0 (new) = %08x\n", ep->ctl0 );
 
 	return 1;
@@ -1325,6 +1332,12 @@ emac_poll ( void )
 /* These are the "official" production entry points to this driver.
  */
 
+/* New 4-18-2026 -- set debug level */
+void
+emac_debug ( int val )
+{
+}
+
 int
 emac_init ( void )
 {
@@ -1376,7 +1389,6 @@ emac_send_int ( struct netbuf *nbp, int wait )
 		printf ( "PHY link down --------------- **\n" );
 		printf ( "Dropping packet, will not send\n" );
 		phy_show ();
-		// emac_debug ();
 		phy_update ();
 	    }
 	    return;
@@ -1503,7 +1515,7 @@ eth_tom_debug ( void )
  *  more details than the above.
  */
 void
-emac_debug ( void )
+emac_debug_info ( void )
 {
 	struct emac *ep = EMAC_BASE;
 
