@@ -9,12 +9,17 @@
 #ifndef __TYPES_H_
 #define __TYPES_H_	1
 
-typedef	long				i32;
-typedef	unsigned long			u32;
-typedef	volatile unsigned long		vu32;
+typedef	int						i32;
+typedef	unsigned int			u32;
+typedef	volatile unsigned int	vu32;
 
-typedef	long long			i64;
-typedef	unsigned long long		u64;
+/* 32 bit pointer */
+typedef unsigned int            p32;
+typedef volatile unsigned int   vp32;
+
+
+typedef	long long					i64;
+typedef	unsigned long long			u64;
 typedef	volatile unsigned long long	vu64;
 
 typedef unsigned char			u8;

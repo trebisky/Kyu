@@ -73,7 +73,7 @@ cache_init ( void )
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	cache_stuff ( val, "L1 D" );
+	// cache_stuff ( val, "L1 D" );
 
 	/* line size gives log2(words)-2 */
 	/* What is a word?  4 bytes apparently */
@@ -84,57 +84,67 @@ cache_init ( void )
 	// cache_line_size = 1 << (line_len + 2 );
 	cache_line_size = 1 << (line_len + 2);
 
+#ifdef NOISE
+	printf ( "ARM L1 D cache line size: %d\n", cache_line_size );
 	/* Bits 12:3 are associativity - 1 */
 	asso = ((val>>3) & 0x3ff) + 1;
 	sets = ((val>>13) & 0x7fff) + 1;
 
-	printf ( "ARM L1 D cache line size: %d\n", cache_line_size );
 	printf ( " associativity: %d\n", asso );
 	printf ( " sets: %d\n", sets );
+#endif
 
 	/* ----------- */
 
-	val = SEL_I_CACHE;;
+	val = SEL_I_CACHE;
 	asm volatile ("msr csselr_el1, %0" : : "r" (val) );
 
 	/* Read current CP15 Cache Size ID Register */
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	cache_stuff ( val, "L1 I" );
+	// cache_stuff ( val, "L1 I" );
 
 	line_len = (val & CCSIDR_LINE_SIZE_MASK) + 2;
 	cache_line_size = 1 << (line_len + 2);
 
-	asso = ((val>>3) & 0x3ff) + 1;
-	sets = ((val>>13) & 0x7fff) + 1;
-
+#ifdef NOISE
 	printf ( "ARM L1 I cache line size: %d\n", cache_line_size );
+	asso = ((val>>3) & 0x3ff) + 1;
+	sets = ((val>>13) & 0x7fff) + 1;
+
 	printf ( " associativity: %d\n", asso );
 	printf ( " sets: %d\n", sets );
+#endif
 
 	/* ----------- */
 
-	val = SEL_L2_CACHE;;
+	val = SEL_L2_CACHE;
 	asm volatile ("msr csselr_el1, %0" : : "r" (val) );
 
 	/* Read current CP15 Cache Size ID Register */
 	// asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
 	asm volatile ("mrs %0, ccsidr_el1" : "=r" (val) );
 
-	cache_stuff ( val, "L2" );
+	// cache_stuff ( val, "L2" );
 
 	line_len = (val & CCSIDR_LINE_SIZE_MASK) + 2;
 	cache_line_size = 1 << (line_len + 2);
 
+#ifdef NOISE
+	printf ( "ARM L2 cache line size: %d\n", cache_line_size );
 	asso = ((val>>3) & 0x3ff) + 1;
 	sets = ((val>>13) & 0x7fff) + 1;
 
-	printf ( "ARM L2 cache line size: %d\n", cache_line_size );
 	printf ( " associativity: %d\n", asso );
 	printf ( " sets: %d\n", sets );
+#endif
 }
 
+/* We set this above in 3 places, which do we really want?
+ * On the Allwinner h5, this is 64 in all 3 places, so
+ * it doesn't matter.
+ */
 int
 get_cache_line_size ( void )
 {

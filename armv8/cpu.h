@@ -65,6 +65,11 @@ typedef unsigned long __u32;
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
+/*
+ *  MRS is "move to register from special register.
+ *  MSR is "move to special register from ARM core register.
+ */
+
 /* Provided for the sake of syntax, the macros below will yield better code.
  * This is a 64 bit counter in ARM v8
  */
@@ -96,8 +101,15 @@ r_CCNT ( void )
 #define get_SP(x)	asm volatile ("add %0, sp, #0\n" :"=r" ( x ) )
 #define get_FP(x)	asm volatile ("add %0, fp, #0\n" :"=r" ( x ) )
 
+/* up to 4-21-2026 */
+/* Setting the bit masks (disables) the interrupt */
 #define INT_unlock 	asm volatile("msr DAIFClr, #3" : : : "cc")
 #define INT_lock 	asm volatile("msr DAIFSet, #3" : : : "cc")
+
+#ifdef notdef
+#define INT_unlock 	asm volatile("msr DAIFSet, #3" : : : "cc")
+#define INT_lock 	asm volatile("msr DAIFClr, #3" : : : "cc")
+#endif
 
 // Returns the EL but in bits [3:2]
 #define get_EL(val)	asm volatile ( "mrs %0, CurrentEL" : "=r" ( val ) )

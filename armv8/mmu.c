@@ -62,6 +62,121 @@ mmu_nocache ( unsigned long addr )
 	panic ( "mmu_nocache not implemented yet for ARM v8" );
 }
 
+/*
+ *  MRS is "move to register from special register.
+ *  MSR is "move to special register from ARM core register.
+ *  ARM inline assembly:
+ *     asm ( "A" : O : I : C );
+ *     "r" indicates a register (being read from)
+ *     "=r" indicates a register (being read to)
+ * #define get_CCNT(val)   asm volatile ( "mrs %0, PMCCNTR_EL0" : "=r" ( val ) )
+ * #define set_CCNT(val)   asm volatile ( "msr PMCCNTR_EL0, %0" : : "r" ( val ) )
+ */
+
+/* The following shows the EL1 registers all zero, and:
+ *
+ * TTBR0_EL1 = 0000000000000000
+ * TTBR1_EL1 = 0000000000000000
+ * TCR_EL1 = 0000000000000000
+ * TTBR0_EL2 = 000000007fff0000
+ * TCR_EL2 = 0000000080803520
+ */
+void pte_show ( u64 * );
+
+void
+mmu_show ( void )
+{
+	u64 val;
+	void *ttbr;
+	u64 *tp;
+	int count;
+	u64 *bogus;
+
+	asm volatile("mrs %0, ttbr0_el1" : "=r" (val) );
+	printf ( "TTBR0_EL1 = %016x\n", val );
+	asm volatile("mrs %0, ttbr0_el2" : "=r" (val) );
+	printf ( "TTBR0_EL2 = %016x\n", val );
+	ttbr = (void *) val;
+
+	asm volatile("mrs %0, ttbr1_el1" : "=r" (val) );
+	printf ( "TTBR1_EL1 = %016x\n", val );
+	// This does not exist, at least in a Cortex-A53
+	// asm volatile("mrs %0, ttbr1_el2" : "=r" (val) );
+	// printf ( "TTBR1_EL2 = %016x\n", val );
+
+	asm volatile("mrs %0, tcr_el1" : "=r" (val) );
+	printf ( "TCR_EL1 = %016x\n", val );
+	asm volatile("mrs %0, tcr_el2" : "=r" (val) );
+	printf ( "TCR_EL2 = %016x\n", val );
+
+	printf ( " TCR:ips = %08x\n", (val>>32) & 0x7 );
+	printf ( " TCR:t1sz = %08x\n", (val>>16) & 0x3f );
+	printf ( " TCR:t0sz = %08x\n", val & 0x3f );
+
+	printf ( " TCR:tg0 = %08x\n", (val>>14) & 0x3 );
+	printf ( " TCR:tg1 = %08x\n", (val>>30) & 0x3 );
+
+	dump_b ( ttbr, 8 );
+	// 64 lines on screen
+	// dump_l ( ttbr, 64 );
+	tp = (u64 *) ttbr;
+
+	pte_show ( tp++ );
+	pte_show ( tp++ );
+	pte_show ( tp++ );
+	pte_show ( tp++ );
+	pte_show ( tp++ );
+
+	count = 0;
+	while ( count < 4 ) {
+		// pte_show ( tp );
+		if ( (u64) tp > (u64) 0x80000000 ) {
+			printf ( "Done\n" );
+			break;
+		}
+		if ( ! *tp ) {
+			tp++;
+			continue;
+		}
+		pte_show ( tp++ );
+		count++;
+	}
+
+#ifdef notdef
+	// should cause a fault
+	// it does -- a synchronous abort
+	bogus = (u64 *) 0x200000000;
+	val = *bogus;
+	printf ( "bogus = %016x\n", val );
+#endif
+}
+
+void
+pte_show ( u64 *addr )
+{
+	char *cp;
+
+	cp = (char *) addr;
+
+	printf ( "PTE-%08x ", addr );
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+	printf ( "%02x", *cp++ );
+	printf ( "\n" );
+}
+
+
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+
 #ifdef OLD_v7_code
 
 #define MMU_MASK	0xfffff

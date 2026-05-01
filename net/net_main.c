@@ -82,6 +82,14 @@ static int outq_count;
 
 static int system_clock_rate;
 
+static int net_debug = 0;
+
+void
+net_debug_set ( int val )
+{
+		net_debug = val;
+}
+
 static int net_debug_f = 0;
 
 void
@@ -138,7 +146,6 @@ net_running ( void )
 static void
 host_info_init ( void )
 {
-	printf ( "XX - host_info_init()\n" );
 	/* This will panic unless we are in NET_RUN */
 	net_addr_get ( host_info.our_mac );
 	init_ephem_port ();
@@ -148,7 +155,11 @@ host_info_init ( void )
 	/* Hopefully this gets overwritten by DHCP
 	 */
 	// (void) net_dots ( "192.168.0.11", &host_info.my_ip );	/* bbb */
-	(void) net_dots ( "192.168.0.61", &host_info.my_ip );		/* orange_pi */
+#ifdef BOARD_H5
+	(void) net_dots ( "192.168.0.68", &host_info.my_ip );		/* orange_pi h5 */
+#else
+	(void) net_dots ( "192.168.0.61", &host_info.my_ip );		/* orange_pi h3 */
+#endif
 	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
 	host_info.net_mask = htonl ( 0xffffff00 );
 
@@ -284,6 +295,12 @@ net_init ( void )
  */
 #define NET_STARTUP_WAIT	20
 
+#ifdef notdef
+2-18-2026 weird stuff here. XXX
+on the H5 this seemed to time out when I had the wait at 12
+rather than 20.  20 fixed it.  But autonegotiation only
+takes about 4 seconds, so this makes no sense.
+The clock seems to be running just at the rate it should.
     // puts ( "TJT -in net wait" );
 	printf ( "\n\n" );
     puts ( "Starting net wait" );
@@ -293,6 +310,7 @@ net_init ( void )
 	printf ( "+++++++++++++++++++++++++++++++++\n" );
 	printf ( "+++++++++++++++++++++++++++++++++\n" );
 	printf ( "+++++++++++++++++++++++++++++++++\n" );
+#endif
 
     count = 0;
     // while ( net_state != NET_RUN && count++ < NET_STARTUP_WAIT ) {
@@ -555,6 +573,45 @@ not_our_mac ( struct netbuf *nbp )
 	return 0;
 }
 
+/* Call this to display a packet in a netbuf */
+static void
+net_dump ( struct netbuf *nbp, char *msg )
+{
+	struct eth_hdr *ehp;
+	struct ip_hdr *ipp;
+
+	ehp = nbp->eptr;
+    ipp = nbp->iptr;
+
+	printf ( "%s (%d bytes) ", msg, nbp->elen );
+
+	printf ( "Netbuf at %08x, eptr, iptr = %08x %08x\n", nbp, ehp, ipp );
+	dump_buf ( nbp->eptr, nbp->elen );
+
+	if ( ehp->type == ETH_ARP_SWAP ) {
+		printf ( "ARP\n" );
+		return;
+	}
+	if ( not_our_mac ( nbp ) ) {
+		printf ( "wrong MAC destination\n" );
+		return;
+	}
+	if ( ehp->type == ETH_IP_SWAP ) {
+		if ( ipp->proto == IPPROTO_ICMP ) {
+			printf ( "IP - ICMP ********************************\n" );
+		} else if ( ipp->proto == IPPROTO_UDP ) {
+			printf ( "IP - UDP\n" );
+		} else if ( ipp->proto == IPPROTO_TCP ) {
+			printf ( "IP - TCP\n" );
+		} else {
+			printf ( "IP proto = %d\n", ipp->proto );
+		}
+		return;
+	}
+	printf ( "Oddball\n" );
+}
+
+/* Called in the net-in thread for each received packet */
 static void
 net_handle ( struct netbuf *nbp )
 {
@@ -563,6 +620,10 @@ net_handle ( struct netbuf *nbp )
 	nbp->ilen = nbp->elen - sizeof ( struct eth_hdr );
 
 	// printf ( "net_handle: %d, %d\n", nbp->elen, nbp->ilen );
+
+	if ( net_debug > 0 ) {
+		net_dump ( nbp, "Rx packet" );
+	}
 
 	ehp = nbp->eptr;
 
@@ -715,6 +776,7 @@ netbuf_init ( void )
 	nb_avail = 0;
 	for ( ap; ap < end; ap++ ) {
 	    ap->next = nb_free;
+		strncpy ( ap->data, "DEAD", 4 );
 	    nb_free = ap;
 	    ++nb_avail;
 	}
@@ -755,7 +817,7 @@ netbuf_alloc ( void )
 {
 	struct netbuf *rv;
 
-    	INT_lock;
+	INT_lock;
 	rv = netbuf_alloc_i ();
 	INT_unlock;
 
@@ -833,11 +895,16 @@ netbuf_free ( struct netbuf *old )
 	}
 
 	// printf ( " (%d --> %d free)\n", count, count+1 );
-    	INT_lock;
+	INT_lock;
+
+	/* Sanity check for h5-emac bug */
+	strncpy ( old->data, "DEAD", 4 );
+
 	old->next = nb_free;
 	nb_free = old;
 	++nb_avail;
-    	INT_unlock;
+
+	INT_unlock;
 }
 
 /* ------------------------------------------- */

@@ -292,16 +292,16 @@ console_use_ints ( void )
         struct serial_softc *sc = &serial_soft[CONSOLE_UART];
         struct h3_uart *up = sc->base;
 
-	sc->in_sem = sem_signal_new ( SEM_FIFO );
-	// should check
+		sc->in_sem = sem_signal_new ( SEM_FIFO );
+		// should check
 
         irq_hookup ( IRQ_UART0, uart_handler, CONSOLE_UART );
 
-	// up->ier = 0;
-	// up->ier = IE_RDA | IE_TXE;
-	up->ier = IE_RDA;
+		// up->ier = 0;
+		// up->ier = IE_RDA | IE_TXE;
+		up->ier = IE_RDA;
 
-	sc->use_ints = 1;
+		sc->use_ints = 1;
 }
 
 static void
@@ -309,14 +309,14 @@ serial_setup ( int devnum, int irq, int baud )
 {
         struct serial_softc *sc = &serial_soft[devnum];
 
-	printf ( "UART irq %d for device %d hookup\n", irq, devnum );
+		// printf ( "UART irq %d for device %d hookup\n", irq, devnum );
         irq_hookup ( irq, uart_handler, devnum );
 
-	sc->base = uart_base[devnum];
-	sc->irq = irq;
+		sc->base = uart_base[devnum];
+		sc->irq = irq;
 
-	aux_uart_init ( devnum, baud );
-	uart_gpio_init ( devnum );
+		aux_uart_init ( devnum, baud );
+		uart_gpio_init ( devnum );
 }
 
 // Enable serial interrupts
@@ -326,7 +326,7 @@ serial_listen ( int devnum )
         struct serial_softc *sc = &serial_soft[devnum];
         struct h3_uart *base = sc->base;
 
-	base->ier = IE_RDA;
+		base->ier = IE_RDA;
 }
 
 static void

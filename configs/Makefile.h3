@@ -119,8 +119,8 @@ version.c:	FORCE
 
 install: kyu.bin kyu.sym
 	cp kyu.bin /var/lib/tftpboot/orange.bin
-	cp kyu.sym /var/lib/tftpboot/kyu.sym
-	ls -l /var/lib/tftpboot/kyu.sym
+	cp kyu.sym /var/lib/tftpboot/kyu_h3.sym
+	ls -l /var/lib/tftpboot/kyu_h3.sym
 	@echo "Kyu for Allwinner h3 installed"
 
 kyu.dump:	kyu

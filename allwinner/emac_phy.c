@@ -181,13 +181,23 @@ phy_write ( int reg, int val )
 /* Bits in the basic mode control register. */
 #define BMCR_RESET              0x8000
 #define BMCR_LOOPBACK           0x4000
-#define BMCR_100                0x2000		/* Set for 100 Mbit, else 10 */
+#define BMCR_10                 0x0000		/* bits 
+#define BMCR_1000               0x4000		/* Set for 100 Mbit, else 10 */
 #define BMCR_ANEG_ENA           0x1000		/* enable autonegotiation */
 #define BMCR_POWERDOWN          0x0800		/* set to power down */
 #define BMCR_ISOLATE            0x0400
 #define BMCR_ANEG               0x0200		/* restart autonegotiation */
 #define BMCR_FULL               0x0100		/* Set for full, else half */
 #define BMCR_CT_ENABLE          0x0080		/* enable collision test */
+
+#define BMCR_SPEED0             0x2000		/* See below */
+#define BMCR_SPEED1             0x0040		/* See below */
+
+#define BMCR_10                 0x0000		/* both speed bits 0 */
+#define BMCR_100                BMCR_SPEED0
+#define BMCR_1000               BMCR_SPEED1
+#define BMCR_BOTH               (BMCR_SPEED0|BMCR_SPEED1)
+			/* setting both bits is reserved */
 
 /* Bits in the basic mode status register. */
 
@@ -352,21 +362,24 @@ phy_show ( void )
 	printf ( "STAT1000  = %04x\n", phy_read ( PHY_STAT1000 ) );
 }
 
-/* Needs work XXX */
 static void
 phy_link_setup ( void )
 {
 	int reg;
 
 	reg = phy_read ( PHY_BMCR );
-	reg &= ~(BMCR_100|BMCR_FULL);
+	reg &= ~(BMCR_BOTH|BMCR_FULL);
 
 	if ( phy_speed == 100 )
 	    reg |= BMCR_100;
+	if ( phy_speed == 1000 )
+	    reg |= BMCR_1000;
 
 	if ( phy_duplex == DUPLEX_FULL )
 	    reg |= BMCR_FULL;
-        phy_write ( PHY_BMCR, reg );
+
+	printf ( "PHY bmcr link set up for %d Mbit\n", phy_speed );
+	phy_write ( PHY_BMCR, reg );
 }
 
 void

@@ -24,14 +24,14 @@ struct emac {
 	int __pad0;			/* 18 --*/
 	vu32 tx_flow;		/* 1c -- never used */
 	// volatile void * tx_desc;
-	vu32 tx_desc;		/* 20 */
+	vp32 tx_desc;		/* 20 */
 
 	vu32 rx_ctl0;		/* 24 */
 	vu32 rx_ctl1;		/* 28 */
 	int __pad1;			/* 2c --*/
 	int __pad2;			/* 30 --*/
 	// volatile void * rx_desc;
-	vu32 rx_desc;		/* 34 */
+	vp32 rx_desc;		/* 34 */
 
 	vu32 rx_filt;		/* 38 -- never used*/
 	int __pad3;			/* 3C --*/

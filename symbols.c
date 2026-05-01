@@ -30,7 +30,16 @@ static char *sym_buf;
 static char *sym_last;
 static char *symp;
 
+#ifdef BOARD_H5
+static char *sym_file = "kyu_h5.sym";
+#endif
+#ifdef BOARD_H3
+static char *sym_file = "kyu_h3.sym";
+#endif
+
+#if !defined(BOARD_H3) && !defined(BOARD_H5)
 static char *sym_file = "kyu.sym";
+#endif
 
 /* ------------- */
 
@@ -215,6 +224,8 @@ shell_init ( void )
 	printf ( "fetched symbol table: %d bytes\n", count );
 	parse_table (count);
 	free ( sym_buf );
+#else
+	printf ( "Not configured to load symbols\n" );
 #endif
 
 #endif	/* WANT_NET */

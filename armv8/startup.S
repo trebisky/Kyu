@@ -34,6 +34,7 @@ after:
 /* ----------------------------------------------------------- */
 
 reset:
+	/* Mask (disable) all interrupts */
 	msr DAIFSet, #0xf
 
 	bl	remap_vectors

@@ -20,12 +20,12 @@
 // #define BOARD_ORANGE_PI64
 #define BOARD_ORANGE_PI_PC2
 
-/* At this time the Orange Pi PC 2 is the only H5 board we have.
+/* At this time the Orange Pi PC 2 is the only H5 board we have worked with..
  * Someday we expect to also support the NanoPi Neo Plus 2
  */
 
-// not yet
 #define WANT_NET
+// #define WANT_SYMBOLS
 
 #define ARCH_ARM
 #define ARCH_ARM64
@@ -83,8 +83,6 @@
  */
 // #define NETBUF_PREPAD	2
 #define NETBUF_PREPAD	0
-
-#define EMAC_DEBUG 1
 
 /* THE END */
 #endif /* _BOARD_H */

@@ -74,7 +74,7 @@ struct host_info {
 struct eth_hdr {
     	unsigned char dst[ETH_ADDR_SIZE];
     	unsigned char src[ETH_ADDR_SIZE];
-	unsigned short type;
+		unsigned short type;
 };
 
 /* these bit fields work only on little endian hardware.

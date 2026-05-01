@@ -20,8 +20,8 @@
 
 #include <kyu.h>
 #include <kyulib.h>
-typedef unsigned long u32;
-typedef long s32;
+// typedef unsigned long u32;
+// typedef long s32;
 #include <armv7.h>
 #include <cpu.h>
 
@@ -33,9 +33,9 @@ typedef long s32;
  *  arch/arm/include/asm/utils.h
  */
 
-static inline s32 log_2_n_round_up(u32 n)
+static inline i32 log_2_n_round_up(u32 n)
 {
-        s32 log2n = -1;
+        i32 log2n = -1;
         u32 temp = n;
 
         while (temp) {
@@ -49,9 +49,9 @@ static inline s32 log_2_n_round_up(u32 n)
                 return log2n; /* power of 2 */
 }
 
-static inline s32 log_2_n_round_down(u32 n)
+static inline i32 log_2_n_round_down(u32 n)
 {
-        s32 log2n = -1;
+        i32 log2n = -1;
         u32 temp = n;
 
         while (temp) {

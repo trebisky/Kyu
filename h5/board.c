@@ -345,10 +345,12 @@ board_init ( void )
 
 	delay_calib ();
 
+#ifdef notdef
 	// total hack, curiosity 1-11-2026
 #define EMAC_SYSCON ((unsigned int *) 0x01c00030)
 	val = *EMAC_SYSCON;
 	printf ( "EMAC syscon: %08x\n", val );
+#endif
 
 	/* CPU interrupts on */
 	INT_unlock;
@@ -388,7 +390,7 @@ reset_cpu ( void )
 int
 board_net_init ( void )
 {
-		emac_debug ( EMAC_DEBUG );
+		emac_debug_h5 ();
         return emac_init ();
 }
 
@@ -421,6 +423,53 @@ void
 board_net_debug ( void )
 {
 	emac_debug_info ();
+}
+
+static void h5_ram_test ( void );
+
+void
+board_test_generic ( int arg )
+{
+	printf ( "H5 board test\n" );
+	h5_ram_test ();
+}
+
+/* RAM address space starts at 0x4000_0000 and
+ * goes on for 3G to 0xffff_ffff.
+ * However, only 1G of ram chips are installed.
+ * We can look at 256M blocks like
+ * 0x4xxx_xxxx
+ */
+
+#define MAGIC	0xdeadabcd
+
+static void
+h5_ram_test ( void )
+{
+	u32	*mp;
+
+	mp = (u32 *) 0x50000000;
+	mp--;
+	printf ( "Write to %016x\n", mp );
+	*mp = MAGIC;
+
+	printf ( "Early %016x - %08x\n", mp, *mp );
+
+	mp = (u32 *) 0x8ffffffc;
+	printf ( "Early %016x - %08x\n", mp, *mp );
+	mp = (u32 *) 0xcffffffc;
+	printf ( "Early %016x - %08x\n", mp, *mp );
+
+	mp = (u32 *) 0x40000000;
+	for ( ;; ) {
+		if ( (u64) mp & 0x7fffffff == 0 )
+			printf ( "-- at %016x\n", mp );
+		if ( *mp == MAGIC )
+			printf ( "Found at %016x - %08x\n", mp, *mp );
+		*mp++;
+		if ( mp > (u32 *) 0xffffffff )
+			break;
+	}
 }
 
 /* THE END */

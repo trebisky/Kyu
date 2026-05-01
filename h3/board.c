@@ -440,7 +440,7 @@ int
 board_net_init ( void )
 {
 #ifdef WANT_NET
-		emac_debug ( EMAC_DEBUG );
+		emac_debug_h3 ();
         return emac_init ();
 #endif
 }

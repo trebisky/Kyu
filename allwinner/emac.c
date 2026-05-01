@@ -40,6 +40,49 @@
 
 #include "emac_regs.h"
 
+#ifdef BOARD_H5
+/* On the h5 (aarch64) I get lots of these warnings:
+emac.c: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+emac.c: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+ *
+ * I use the following pragmas to suppress them --
+ */
+#pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
+#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
+#endif
+
+/* To avoid allowing activate without init,
+ * but could/should be generalized with enum
+ */
+static int emac_state = 0;
+
+static u32	debug_mask = 0;
+
+#define DB_INT	0x0001
+#define DB_RX	0x0002
+#define DB_TX	0x0004
+#define DB_NET	0x0008
+
+/* New 4-18-2026 -- set debug level */
+void
+emac_debug_h3 ( void )
+{
+		debug_mask = 0;
+		if ( debug_mask & DB_NET )
+			net_debug_set ( 1 );
+}
+
+void
+emac_debug_h5 ( void )
+{
+		debug_mask = 0xff;
+		debug_mask = 0;
+		// debug_mask = DB_TX;
+		if ( debug_mask & DB_NET )
+			net_debug_set ( 1 );
+}
+
+
 /* line size for this flavor of ARM */
 /* XXX should be in some header file */
 #define	ARM_DMA_ALIGN	64
@@ -141,11 +184,20 @@ typedef union {
 } desc0_u;
 #endif
 
+#ifdef notdef
 struct emac_desc {
 	volatile unsigned long status;
 	long size;
 	char * buf;
 	struct emac_desc *next;
+}	__aligned(ARM_DMA_ALIGN);
+#endif
+
+struct emac_desc {
+	vu32 status;
+	vu32 size;
+	vp32 buf;
+	vp32 next;
 }	__aligned(ARM_DMA_ALIGN);
 
 /* status bits */
@@ -196,8 +248,16 @@ struct emac_desc {
 // #define NUM_TX	16
 // #define NUM_RX	16
 // #define NUM_TX	4
-#define NUM_RX	64
-#define NUM_TX	64
+
+#ifdef BOARD_H5
+#define NUM_RX	8
+#define NUM_TX	8
+#else
+// #define NUM_RX	64
+// #define NUM_TX	64
+#define NUM_RX	8
+#define NUM_TX	8
+#endif
 
 /* There are notes in the U-Boot driver that setting the value 2048
  * causes weird behavior and something less like 2044 should be used
@@ -234,7 +294,8 @@ static struct emac_desc *clean_tx_dma;
 static int emac_wait_flag = 0;
 static struct sem *emac_sem;
 
-void emac_debug ( int );
+void emac_debug_h3 ( void );
+void emac_debug_h5 ( void );
 
 // rx_list_show ( rx_list, NUM_RX );
 // rx_list_show ( struct emac_desc *desc, int num )
@@ -256,9 +317,9 @@ rx_list_show ( void )
 	    edp = &desc[i];
 	    len = (edp->status >> 16) & 0x3fff;
 	    if ( edp == cur_rx_dma )
-		printf ( "* Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+			printf ( "* Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
 	    else
-		printf ( "  Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
+			printf ( "  Rx Buf %2d (%08x) status: %08x  %d/%d %08x %08x\n", i, edp, edp->status, len, edp->size, edp->buf, edp->next );
 	}
 }
 
@@ -277,17 +338,25 @@ tx_list_show ( void )
 	// invalidate_dcache_range ( (void *) desc, &desc[num] );
 	emac_cache_invalidate ( (void *) desc, &desc[num] );
 
+	/* The initial state (ring empty) is with both pointers at 0.
+	 * Thereafter, any time the pointers match, the ring is empty.
+	 * "cur" will move ahead of "clean" as new packets get added.
+	 */
 	for ( i=0; i<num; i++ ) {
 	    edp = &desc[i];
 	    if ( edp == cur_tx_dma && cur_tx_dma == clean_tx_dma )
-		printf ( "* Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+			printf ( "*> Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else if ( edp == clean_tx_dma )
-		printf ( "> Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+			printf ( ">  Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else if ( edp == cur_tx_dma )
-		printf ( "* Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+			printf ( "*  Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	    else
-		printf ( "  Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
+			printf ( "   Tx Buf %2d (%08x) status: %08x %08x  %08x %08x\n", i, edp, edp->status, edp->size, edp->buf, edp->next );
 	}
+
+	printf ( "tx_list = %08x\n", tx_list );
+	printf ( "cur_tx_dma = %08x\n", cur_tx_dma );
+	printf ( "clean_tx_dma = %08x\n", clean_tx_dma );
 }
 
 /* We have 32 * 2k for Rx bufs (64K)
@@ -334,12 +403,12 @@ rx_list_init ( void )
 	for ( edp = desc; edp < &desc[NUM_RX]; edp ++ ) {
 	    edp->status = DS_ACTIVE;
 	    edp->size = RX_ETH_SIZE;
-	    edp->buf = buf;
-	    edp->next = &edp[1];
+	    edp->buf = (vp32) buf;
+	    edp->next = (vp32) &edp[1];
 	    buf += RX_SIZE;
 	}
 
-	desc[NUM_RX-1].next = &desc[0];
+	desc[NUM_RX-1].next = (vp32) &desc[0];
 
 	emac_cache_flush ( (void *) desc, &desc[NUM_RX] );
 	// rx_list_show ( desc, NUM_RX );
@@ -353,7 +422,7 @@ reset_rx_list ( struct emac_desc *list, int num )
 	struct emac_desc *edp;
 
 	list->status = DS_ACTIVE;
-	for ( edp = list->next; edp != list; edp = edp->next )
+	for ( edp = (struct emac_desc *) list->next; edp != list; edp = (struct emac_desc *) edp->next )
 	    edp->status = DS_ACTIVE;
 
 /* Doing this will trigger a bug in the emac silicon.
@@ -377,7 +446,7 @@ tx_list_init ( void )
 	int i;
 	struct emac_desc *edp;
 	struct emac_desc *desc;
-	// unsigned long mem;
+	// u32 mem;
 	char *buf;
 
 #ifdef EMAC_NOCACHE
@@ -395,12 +464,12 @@ tx_list_init ( void )
 	for ( edp = desc; edp < &desc[NUM_TX]; edp ++ ) {
 	    edp->status = DS_ACTIVE;
 	    edp->size = 0;
-	    edp->buf = buf;
-	    edp->next = &edp[1];
+	    edp->buf = (vp32) buf;
+	    edp->next = (vp32) &edp[1];
 	    buf += TX_SIZE;
 	}
 
-	desc[NUM_TX-1].next = &desc[0];
+	desc[NUM_TX-1].next = (vp32) &desc[0];
 
 	// flush_dcache_range ( (void *) desc, &desc[NUM_TX] );
 	emac_cache_flush ( (void *) desc, &desc[NUM_TX] );
@@ -433,7 +502,7 @@ init_rings ( void )
 	/* Reload the dma pointer register.
 	 * This causes the dma list pointer to get reset. 
 	 */
-	ep->rx_desc = (u32) (u64) desc;
+	ep->rx_desc = (vp32) desc;
 	cur_rx_dma = desc;
 
 	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
@@ -443,7 +512,7 @@ init_rings ( void )
 	tx_list = desc;
 
 	clean_tx_dma = cur_tx_dma = desc;
-	ep->tx_desc = (u32) (u64) desc;
+	ep->tx_desc = (vp32) desc;
 }
 
 /* ------------------------------------------------------------ */
@@ -558,6 +627,11 @@ static char last_buf[2048];
 static int prior_len;
 static char prior_buf[2048];
 
+/* !! remember.  This is called at interrupt level.
+ * Do as little as possible and hand the packet to
+ * net_rcv() as efficiently as possible.
+ */
+
 static void
 rx_handler ( int stat )
 {
@@ -565,7 +639,9 @@ rx_handler ( int stat )
 	int len;
 	int tag = ' ';
 
-	// printf ( "Rx interrupt, packet incoming (emac)\n" );
+	if ( debug_mask & DB_RX )
+		printf ( "Rx interrupt, packet incoming (emac)\n" );
+
 	et_rx ();
 
 	// invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -573,32 +649,42 @@ rx_handler ( int stat )
 
 	while ( ! (cur_rx_dma->status & DS_ACTIVE) ) {
 	    int i_dma = (cur_rx_dma - rx_list);
+		if ( debug_mask & DB_RX )
+			printf ( "Rx interrupt, %08x, slot %d, status = %08x\n",
+				cur_rx_dma, i_dma, cur_rx_dma->status );
 
 	    rx_count++;
 	    len = (cur_rx_dma->status >> 16) & 0x3fff;
 	    last_desc_stat = cur_rx_dma->status;
 
 	    if ( last_desc_stat & ~0x3fff0000 != 0x00000320 )
-		printf ( "Unusual desc status: %08x\n", cur_rx_dma->status );
+			printf ( "Unusual desc status: %08x\n", cur_rx_dma->status );
 
 	    // nbp = netbuf_alloc ();
 	    nbp = netbuf_alloc_i ();
 
-	    if ( ! nbp )
-		return;     /* drop packet */
+		// sanity check
+		if ( strncmp ( nbp->data, "DEAD", 4 ) != 0 )
+			panic ( "Rx emac netbuf overuse" );
+
+	    if ( ! nbp ) {
+			if ( debug_mask & DB_RX )
+				printf ( "Rx packet dropped, no netbuf available\n" );
+			return;     /* drop packet */
+		}
 
 	    // pkt_arrive ();
 
 	    nbp->elen = len - 4;
-	    memcpy ( (char *) nbp->eptr, cur_rx_dma->buf, len - 4 );
+	    memcpy ( (char *) nbp->eptr, (void *) cur_rx_dma->buf, len - 4 );
 
 	    if ( last_capture ) {
-		if ( last_len ) {
-		    prior_len = last_len;
-		    memcpy ( prior_buf, last_buf, last_len );
-		}
-		last_len = len - 4;
-		memcpy ( last_buf, cur_rx_dma->buf, len - 4 );
+			if ( last_len ) {
+				prior_len = last_len;
+				memcpy ( prior_buf, last_buf, last_len );
+			}
+			last_len = len - 4;
+			memcpy ( last_buf, (void *) cur_rx_dma->buf, len - 4 );
 	    }
 
 	    // emac_show_packet ( tag, i_dma, nbp );
@@ -609,18 +695,39 @@ rx_handler ( int stat )
 	    // flush_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	    emac_cache_flush ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 
+		// if ( debug_mask & DB_RX ) {
+			// printf ( "Rx packet len = %d\n", len );
+		// 	net_dump ( nbp, "Rx packet", len );
+		// }
+
 	    net_rcv ( nbp );
 
-	    cur_rx_dma = cur_rx_dma->next;
+		/* Next slot on ring, possible wrap around */
+	    cur_rx_dma = (struct emac_desc *) cur_rx_dma->next;
 
 	    // invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	    emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	}
+
+#ifdef BOARD_H5
+	{
+		int val;
+
+		get_DAIF ( val );
+		val = (val>>6) & 0x3;
+		if ( val == 0 )
+			panic ( "EMAC Rx violates DAIF expectations" );
+	}
+#endif
+
+	// if ( debug_mask & DB_RX )
+	//	printf ( "Rx interrupt, done)\n" );
 }
 
 #ifdef notdef
+/* What is this?  Why are we saving it? */
 static void
-rx_handler ( int stat )
+rx_handler_OLD ( int stat )
 {
 	int len;
 	// int i_dma;
@@ -677,29 +784,51 @@ rx_handler ( int stat )
  *  from the time the packet is queued and when we see the
  *  interrupt here to indicate it is finished.
  */
+
+/* !! Remember.  This is called at interrupt level.
+ */
 static void
 tx_cleaner ( void )
 {
-	if ( cur_tx_dma == clean_tx_dma )
-	    return;
 
-	// tx_list_show ();
+	if ( cur_tx_dma == clean_tx_dma ) {
+		if ( debug_mask & DB_TX )
+			printf ( "Emac tx cleaner - nothing to do\n" );
+	    return;
+	}
+
+	// if ( debug_mask & DB_TX ) {
+	// 	tx_list_show ();
+	// }
+
+	if ( debug_mask & DB_TX ) {
+		printf ( "Emac tx cleaner - working\n" );
+		tx_list_show ();
+	}
 
 	while ( clean_tx_dma != cur_tx_dma ) {
 	    if ( clean_tx_dma->status & DS_ACTIVE)
-		break;
+			break;
 	    // printf ( "Tx clean: %08x %08x\n", clean_tx_dma->status, clean_tx_dma->size );
-	    clean_tx_dma = clean_tx_dma->next;
+	    clean_tx_dma = (struct emac_desc *) clean_tx_dma->next;
 	    // pkt_finish ();
+	}
+	if ( debug_mask & DB_TX ) {
+		printf ( "Emac tx cleaner - done\n" );
+		tx_list_show ();
 	}
 
 	// emac_busy = 0;
 }
 
+/* !! Remember.  This is called at interrupt level.
+ */
+
 static void
 tx_handler ( int stat )
 {
-	// printf ( "Emac tx interrupt %08x\n", stat );
+	if ( debug_mask & DB_TX )
+		printf ( "Emac tx interrupt %08x\n", stat );
 	// phy_show ();
 	et_tx ();
 	tx_cleaner ();
@@ -947,12 +1076,21 @@ get_emac_addr ( char *addr )
 	memcpy ( addr, emac_mac, ETH_ADDR_SIZE );
 }
 
+/* XXX - This whole MAC address business is terrible.
+ * As it stands, all of my H3 boards will thus get
+ * the same MAC and so will all of my H5.
+ * At least the H3 and H5 are different now,
+ * which solves some of my current problems.
+ */
+
+#ifdef BOARD_H3
 /*
  * our MAC address on the wire is: 02:20:7f:9b:26:8c with U-Boot
  * When running linux however:     c2:c2:9b:ae:f9:5e
  */
 static void
-fetch_linux_mac ( char *addr )
+// fetch_linux_mac ( char *addr )
+fetch_bogus_mac ( char *addr )
 {
 	*addr++ = 0xc2;
 	*addr++ = 0xc2;
@@ -961,6 +1099,22 @@ fetch_linux_mac ( char *addr )
 	*addr++ = 0xf9;
 	*addr++ = 0x5e;
 }
+#else
+// BOARD_H5
+/* This we got from our H5 board using printenv
+ * in U-boot.
+ */
+static void
+fetch_bogus_mac ( char *addr )
+{
+	*addr++ = 0x02;
+	*addr++ = 0x01;
+	*addr++ = 0x05;
+	*addr++ = 0xd4;
+	*addr++ = 0x18;
+	*addr++ = 0xd4;
+}
+#endif
 
 #ifdef notdef
 /* Wireshark shows that my development board has the MAC address:
@@ -985,8 +1139,8 @@ fetch_uboot_mac ( char *addr )
 	struct emac *ep = EMAC_BASE;
 	// char *addr = emac_mac;
 
-	unsigned long mac_hi = ep->mac_addr[0].hi;
-	unsigned long mac_lo = ep->mac_addr[0].lo;
+	u32 mac_hi = ep->mac_addr[0].hi;
+	u32 mac_lo = ep->mac_addr[0].lo;
 
 	/* This is just from good old U-Boot
 	printf ( "MAC addr %d: %08x %08x\n", ep->mac_addr[0].hi, ep->mac_addr[0].lo );
@@ -1030,6 +1184,7 @@ emac_init_new ( void )
 
 	printf ( "Emac init\n" );
 	printf ( " *************************** Hello from the Emac driver\n" );
+	emac_state = 1;
 
 	emac_sem = sem_signal_new ( SEM_FIFO );
 
@@ -1064,6 +1219,8 @@ emac_init_new ( void )
 	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
 	// printf ( "emac rx_filt = %08x\n", ep->rx_filt );
 
+	printf ( "Number of rx/tx ring entries = %d/%d\n", NUM_RX, NUM_TX );
+
 	// for ( i=0; i<8; i++ ) {
 	for ( i=0; i<1; i++ ) {
 	    printf ( "MAC addr from U-Boot %d: %08x %08x\n", 
@@ -1082,13 +1239,16 @@ emac_init_new ( void )
 	 * MAC address.
 	 */
 
+//#define USE_UBOOT_MAC
+
 #ifdef USE_UBOOT_MAC
 	fetch_uboot_mac ( emac_mac );
+	printf ( "*** Using less BOGUS uboot MAC address ***\n" );
 #else
 	// get_mac ( emac_mac );
-	fetch_linux_mac ( emac_mac );
+	fetch_bogus_mac ( emac_mac );
 	set_mac ( emac_mac );
-	printf ( "*** Using BOGUS linux MAC address ***\n" );
+	printf ( "*** Using BOGUS MAC address ***\n" );
 #endif
 
 	printf ( "MAC addr in use: %08x %08x\n", ep->mac_addr[0].hi, ep->mac_addr[0].lo );
@@ -1112,6 +1272,9 @@ emac_init_new ( void )
 
 	init_rings ();
 	// XXX 2023
+	printf ( "Initial rings:\n" );
+	rx_list_show ();
+	tx_list_show ();
 
 	/* the "emac_activate" entry point really kicks things off */
 
@@ -1341,12 +1504,6 @@ emac_poll ( void )
 /* These are the "official" production entry points to this driver.
  */
 
-/* New 4-18-2026 -- set debug level */
-void
-emac_debug ( int val )
-{
-}
-
 int
 emac_init ( void )
 {
@@ -1357,8 +1514,10 @@ emac_init ( void )
 void
 emac_activate ( void )
 {
-	printf ( "Emac activated\n" );
+	if ( emac_state == 0 )
+		return;
 
+	printf ( "Emac activated\n" );
 	emac_enable ();
 }
 
@@ -1394,11 +1553,11 @@ emac_send_int ( struct netbuf *nbp, int wait )
 
 	if ( ! phy_get_link() ) {
 	    if ( first_drop ) {
-		first_drop = 0;
-		printf ( "PHY link down --------------- **\n" );
-		printf ( "Dropping packet, will not send\n" );
-		phy_show ();
-		phy_update ();
+			first_drop = 0;
+			printf ( "PHY link down --------------- **\n" );
+			printf ( "Dropping packet, will not send\n" );
+			phy_show ();
+			phy_update ();
 	    }
 	    return;
 	}
@@ -1407,7 +1566,7 @@ emac_send_int ( struct netbuf *nbp, int wait )
 	if ( emac_busy ) {
 	    printf ( "Emac, waiting to send\n" );
 	    while ( emac_busy )
-		thr_delay(1);
+			thr_delay(1);
 	    printf ( "Emac, done waiting .. sending ----\n" );
 	} else
 	    printf ( "Emac, clear -- sending packet -----\n" );
@@ -1426,16 +1585,19 @@ emac_send_int ( struct netbuf *nbp, int wait )
 	INT_lock;
 	// tx_cleaner ();
 
-	if ( cur_tx_dma->next == clean_tx_dma ) {
+	if ( cur_tx_dma->next == (vp32) clean_tx_dma ) {
 	    printf ( " !!! *** Tx ring full, packet not sent\n" );
+		tx_list_show ();
 	    INT_unlock;
 	    return;
 	}
 
-	// printf ( "Sending %d bytes\n", len );
+	if ( debug_mask & DB_TX ) {
+		printf ( "Sending %d bytes\n", len );
         // dump_buf ( nbp->eptr, len );
+	}
 
-	memcpy ( cur_tx_dma->buf, (char *) nbp->eptr, len );
+	memcpy ( (void *) cur_tx_dma->buf, (char *) nbp->eptr, len );
 
 	// flush_dcache_range ( (unsigned long ) cur_tx_dma->buf, (unsigned long) cur_tx_dma->buf + len );
 	emac_cache_flush ( (unsigned long ) cur_tx_dma->buf, (unsigned long) cur_tx_dma->buf + len );
@@ -1461,7 +1623,12 @@ emac_send_int ( struct netbuf *nbp, int wait )
 	// flush_dcache_range ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 	emac_cache_flush ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 
-	cur_tx_dma = cur_tx_dma->next;
+	cur_tx_dma = (struct emac_desc *) cur_tx_dma->next;
+
+	// if ( debug_mask & DB_TX ) {
+	// 	printf ( "Emac tx send --------\n" );
+	// 	tx_list_show ();
+	// }
 
 	// tx_cleaner ();
 	// emac_busy = 1;

@@ -81,7 +81,7 @@ emac_syscon_setup ( void )
 {
 	vu32 *sc = EMAC_SYSCON;
 
-	printf ( "Emac Syscon = %08x\n", *sc );
+	// printf ( "Emac Syscon = %08x\n", *sc );
 
 #ifdef BOARD_H3
 	*sc = SYSCON_EPHY_INTERNAL | SYSCON_CLK24 | SYSCON_PHY_ADDR;
@@ -89,7 +89,7 @@ emac_syscon_setup ( void )
 	*sc = SYSCON_CLK24 | SYSCON_PHY_ADDR | SYSCON_SHUTDOWN | SYSCON_PIT | SYSCON_TCS_RGMII_INT;
 #endif
 
-	printf ( "Emac Syscon = %08x\n", *sc );
+	// printf ( "Emac Syscon = %08x\n", *sc );
 }
 
 /* On the H3, I see:

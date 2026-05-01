@@ -29,6 +29,7 @@
 // #define BOARD_NANOPI_NEO
 
 #define WANT_NET
+#define WANT_SYMBOLS
 
 #define ARCH_ARM
 #define ARCH_ARM32
@@ -85,8 +86,6 @@
  */
 // #define NETBUF_PREPAD	2
 #define NETBUF_PREPAD	0
-
-#define EMAC_DEBUG	0
 
 /* THE END */
 #endif /* _BOARD_H */

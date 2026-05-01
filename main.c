@@ -203,7 +203,7 @@ kyu_startup ( void )
 	unsigned long malloc_base;
 	reg_t val;
 
-	printf ( "  ======================== We made it to kyu_startup!\n" );
+	printf ( "  ======================== Welcome to kyu_startup() !\n" );
 
 #ifdef notdef
 	printf ( "orig SCTLR = %08x\n", orig_sctlr );
@@ -242,19 +242,43 @@ kyu_startup ( void )
 	// check_bss ();
 	// timer_bogus ();
 
-// #define ARM64_TEST
+#define ARM64_TEST
+
 #ifdef ARM64_TEST
-	/* The following yields this:
-	    Kyu starting with stack: 7b63bab0
+	/* The following yields this on 4/22/2026:
+	        with Allwinner H5 (Opi PC2)
+		Kyu starting with stack: 7bf1ace0
 	    Kyu starting with DAIF: 000003c0
+		RAM 2048M total starting at 40000000
+		Kyu image size: 1529660 bytes
 	    So DAIF all are set to "1" (everything masked off)
 	    DAIF is shifted left 6 bits.
 	*/
+
 
 	get_SP ( val );
 	printf ( "Kyu starting with stack: %08x\n",  val );
 	get_DAIF ( val );
 	printf ( "Kyu starting with DAIF: %08x\n",  val );
+
+	get_SCTLR (val);
+	printf ( "Kyu starting with SCTLR = %08x\n", val );
+	if ( val & 0x4 )
+		printf ( "D cache enabled\n" );
+	if ( val & (1<<12))
+		printf ( "I cache enabled\n" );
+	if ( val & 0x1 )
+		printf ( "MMU enabled\n" );
+
+	asm volatile ("ic ialluis\n");
+	asm volatile ("isb\n");
+
+	printf ( "Disable I cache\n" );
+	val &= ~(1<<12);
+	set_SCTLR (val);
+
+	mmu_show ();
+
 	/*
 	INT_unlock;
 	get_DAIF ( val );
@@ -447,7 +471,7 @@ basic_checkout_c ( void )
 #ifdef ARM64
 /* A place for trash and experiments */
 static void
-zzz ( void )
+cache_show ( void )
 {
 	unsigned long val;
 	unsigned long lval;
@@ -495,7 +519,7 @@ zzz ( void )
 }
 #else /* ARM64 */
 static void
-zzz ( void )
+cache_show ( void )
 {
 }
 #endif /* ARM64 */
@@ -595,7 +619,8 @@ sys_init ( long xxx )
 
 	cache_init ();
 
-	zzz ();
+	// experiments and info
+	// cache_show ();
 
 	// timer_bogus (); OK to here
 

@@ -102,8 +102,8 @@ version.c:	FORCE
 
 install: kyu.bin kyu.sym
 	cp kyu.bin /var/lib/tftpboot/h5.bin
-	cp kyu.sym /var/lib/tftpboot/kyu.sym
-	ls -l /var/lib/tftpboot/kyu.sym
+	cp kyu.sym /var/lib/tftpboot/kyu_h5.sym
+	ls -l /var/lib/tftpboot/kyu_h5.sym
 	@echo "Kyu for Allwinner h5 installed"
 
 kyu.dump:	kyu

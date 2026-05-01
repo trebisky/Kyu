@@ -602,6 +602,8 @@ test_generic ( long arg )
 {
 #ifdef BOARD_H3
 	board_test_generic ( (int) arg );
+#elif defined(BOARD_H5)
+	board_test_generic ( (int) arg );
 #else
 	printf ( "None yet for this hardware\n" );
 #endif
@@ -642,7 +644,7 @@ test_timer ( long xxx )
 	timer_check2 ();
 
 	get_EL(el);
-        printf ( "Current EL = %d\n", el>>2 );
+	printf ( "Current EL = %d\n", el>>2 );
 
 	get_DAIF ( val );
 	printf ( "DAIF (initial) = %08x\n", val );
