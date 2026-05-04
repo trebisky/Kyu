@@ -90,24 +90,31 @@ mmu_show ( void )
 	void *ttbr;
 	u64 *tp;
 	int count;
-	u64 *bogus;
+	// u64 *bogus;
+
+	// U-boot dump code
+	dump_mmu ();
+
+	// val = 0x1234abcdaabbccdd;
+	// printf ( "Sanity check on printf: %016x\n", val );
+	// printf ( "Sanity check on printf: %016lx\n", val );
 
 	asm volatile("mrs %0, ttbr0_el1" : "=r" (val) );
-	printf ( "TTBR0_EL1 = %016x\n", val );
+	printf ( "TTBR0_EL1 = %016lx\n", val );
 	asm volatile("mrs %0, ttbr0_el2" : "=r" (val) );
-	printf ( "TTBR0_EL2 = %016x\n", val );
+	printf ( "TTBR0_EL2 = %016lx\n", val );
 	ttbr = (void *) val;
 
 	asm volatile("mrs %0, ttbr1_el1" : "=r" (val) );
-	printf ( "TTBR1_EL1 = %016x\n", val );
-	// This does not exist, at least in a Cortex-A53
+	printf ( "TTBR1_EL1 = %016lx\n", val );
+	// This does not exist, at least not in a Cortex-A53
 	// asm volatile("mrs %0, ttbr1_el2" : "=r" (val) );
-	// printf ( "TTBR1_EL2 = %016x\n", val );
+	// printf ( "TTBR1_EL2 = %016lx\n", val );
 
 	asm volatile("mrs %0, tcr_el1" : "=r" (val) );
-	printf ( "TCR_EL1 = %016x\n", val );
+	printf ( "TCR_EL1 = %016lx\n", val );
 	asm volatile("mrs %0, tcr_el2" : "=r" (val) );
-	printf ( "TCR_EL2 = %016x\n", val );
+	printf ( "TCR_EL2 = %016lx\n", val );
 
 	printf ( " TCR:ips = %08x\n", (val>>32) & 0x7 );
 	printf ( " TCR:t1sz = %08x\n", (val>>16) & 0x3f );
@@ -128,7 +135,7 @@ mmu_show ( void )
 	pte_show ( tp++ );
 
 	count = 0;
-	while ( count < 4 ) {
+	while ( count < 16 ) {
 		// pte_show ( tp );
 		if ( (u64) tp > (u64) 0x80000000 ) {
 			printf ( "Done\n" );
@@ -147,7 +154,7 @@ mmu_show ( void )
 	// it does -- a synchronous abort
 	bogus = (u64 *) 0x200000000;
 	val = *bogus;
-	printf ( "bogus = %016x\n", val );
+	printf ( "bogus = %016lx\n", val );
 #endif
 }
 
@@ -159,6 +166,7 @@ pte_show ( u64 *addr )
 	cp = (char *) addr;
 
 	printf ( "PTE-%08x ", addr );
+
 	printf ( "%02x", *cp++ );
 	printf ( "%02x", *cp++ );
 	printf ( "%02x", *cp++ );
@@ -168,6 +176,9 @@ pte_show ( u64 *addr )
 	printf ( "%02x", *cp++ );
 	printf ( "%02x", *cp++ );
 	printf ( "%02x", *cp++ );
+
+	printf ( " %016lx", *addr );
+
 	printf ( "\n" );
 }
 

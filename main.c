@@ -242,7 +242,9 @@ kyu_startup ( void )
 	// check_bss ();
 	// timer_bogus ();
 
+#ifdef BOARD_H5
 #define ARM64_TEST
+#endif
 
 #ifdef ARM64_TEST
 	/* The following yields this on 4/22/2026:
