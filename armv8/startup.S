@@ -37,7 +37,9 @@ reset:
 	/* Mask (disable) all interrupts */
 	msr DAIFSet, #0xf
 
-	bl	remap_vectors
+	// bl		dcache_disable
+
+	bl		remap_vectors
 
 	bl      clear_bss
     dsb		sy
@@ -86,13 +88,13 @@ clear_bss:
         ldr     x1, =__bss_end__
 
         mov     x2, #0
-	mov	x3, #0
+		mov	x3, #0
 // 1:	str     x2, [x0]
-1:	stp     x2, x3, [x0]
+1:		stp     x2, x3, [x0]
         add     x0, x0, #16
         cmp     x0, x1
         b.lo    1b
-	ret
+		ret
 
 /* ----------------------------------------------------------- */
 
@@ -122,23 +124,23 @@ clear_bss:
  */
         .globl resume_cc
 resume_cc:
-	ldp	x1, x2, [x0]
-	ldp	x3, x30, [x0,16]
-	mov	sp, x3
+		ldp	x1, x2, [x0]
+		ldp	x3, x30, [x0,16]
+		mov	sp, x3
 
         msr     elr_el2, x2
-	// ldr	x2, =INITIAL_PSR
-	mov	x2, #INITIAL_PSR
+		// ldr	x2, =INITIAL_PSR
+		mov	x2, #INITIAL_PSR
         msr     spsr_el2, x2
 
-	mov	fp, #0		/* to end backtraces */
-	mov	x0, x1
-	eret
+		mov	fp, #0		/* to end backtraces */
+		mov	x0, x1
+		eret
 
 // for testing and experimentation.
 	.globl get_regs
 get_regs:
-	stp	x0, x1, [x0]
+		stp	x0, x1, [x0]
         stp     x2, x3, [x0, 16]
         stp     x4, x5, [x0, 32]
         stp     x6, x7, [x0, 48]
@@ -154,10 +156,10 @@ get_regs:
         stp     x26, x27, [x0, 208]
         stp     x28, x29, [x0, 224]
 
-	mov	x1, sp
+		mov	x1, sp
         stp     x30, x1, [x0, 240]
         stp     xzr, xzr, [x0, 256]
-	ret
+		ret
 
 // resume_i ( iregs )
 // resume_j ( iregs )
@@ -535,5 +537,117 @@ __asm_invalidate_dcache_range:
         b.lo    1b
         dsb     sy
         ret
+
+.global  __asm_invalidate_tlb_all
+__asm_invalidate_tlb_all:
+		tlbi    alle2
+		dsb sy
+		isb
+		ret
+
+/*
+ * void __asm_dcache_level(level)
+ *
+ * flush or invalidate one level cache.
+ *
+ * x0: cache level
+ * x1: 0 clean & invalidate, 1 invalidate only
+ * x16: FEAT_CCIDX
+ * x2~x9: clobbered
+ */
+.global  __asm_dcache_level
+__asm_dcache_level:
+    lsl x12, x0, #1
+    msr csselr_el1, x12     /* select cache level */
+    isb             /* sync change of cssidr_el1 */
+    mrs x6, ccsidr_el1      /* read the new cssidr_el1 */
+    ubfx    x2, x6,  #0,  #3    /* x2 <- log2(cache line size)-4 */
+    cbz x16, 3f         /* check for FEAT_CCIDX */
+    ubfx    x3, x6,  #3, #21    /* x3 <- number of cache ways - 1 */
+    ubfx    x4, x6, #32, #24    /* x4 <- number of cache sets - 1 */
+    b   4f
+3:
+    ubfx    x3, x6,  #3, #10    /* x3 <- number of cache ways - 1 */
+    ubfx    x4, x6, #13, #15    /* x4 <- number of cache sets - 1 */
+4:
+    add x2, x2, #4      /* x2 <- log2(cache line size) */
+    clz w5, w3          /* bit position of #ways */
+    /* x12 <- cache level << 1 */
+    /* x2 <- line length offset */
+    /* x3 <- number of cache ways - 1 */
+    /* x4 <- number of cache sets - 1 */
+    /* x5 <- bit position of #ways */
+
+loop_set:
+    mov x6, x3          /* x6 <- working copy of #ways */
+loop_way:
+    lsl x7, x6, x5
+    orr x9, x12, x7     /* map way and level to cisw value */
+    lsl x7, x4, x2
+    orr x9, x9, x7      /* map set number to cisw value */
+    tbz w1, #0, 1f
+    dc  isw, x9
+    b   2f
+1:  dc  cisw, x9        /* clean & invalidate by set/way */
+2:  subs    x6, x6, #1      /* decrement the way */
+    b.ge    loop_way
+    subs    x4, x4, #1      /* decrement the set */
+    b.ge    loop_set
+
+    ret
+
+/*
+ * void __asm_flush_dcache_all(int invalidate_only)
+ *
+ * x0: 0 clean & invalidate, 1 invalidate only
+ *
+ * flush or invalidate all data cache by SET/WAY.
+ */
+.global  __asm_dcache_all
+__asm_dcache_all:
+    mov x1, x0
+    dsb sy
+    mrs x10, clidr_el1      /* read clidr_el1 */
+    ubfx    x11, x10, #24, #3   /* x11 <- loc */
+    cbz x11, finished       /* if loc is 0, exit */
+    mov x15, lr
+    mrs x16, s3_0_c0_c7_2   /* read value of id_aa64mmfr2_el1*/
+    ubfx    x16, x16, #20, #4   /* save FEAT_CCIDX identifier in x16 */
+    mov x0, #0          /* start flush at cache level 0 */
+    /* x0  <- cache level */
+    /* x10 <- clidr_el1 */
+    /* x11 <- loc */
+    /* x15 <- return address */
+
+loop_level:
+    add x12, x0, x0, lsl #1 /* x12 <- tripled cache level */
+    lsr x12, x10, x12
+    and x12, x12, #7        /* x12 <- cache type */
+    cmp x12, #2
+    b.lt    skip            /* skip if no cache or icache */
+    bl  __asm_dcache_level  /* x1 = 0 flush, 1 invalidate */
+skip:
+    add x0, x0, #1      /* increment cache level */
+    cmp x11, x0
+    b.gt    loop_level
+
+    mov x0, #0
+    msr csselr_el1, x0      /* restore csselr_el1 */
+    dsb sy
+    isb
+    mov lr, x15
+
+finished:
+    ret
+
+.global  __asm_flush_dcache_all
+__asm_flush_dcache_all:
+    mov x0, #0
+    b   __asm_dcache_all
+
+.global  __asm_invalidate_dcache_all
+__asm_invalidate_dcache_all:
+    mov x0, #0x1
+    b   __asm_dcache_all
 
 // THE END

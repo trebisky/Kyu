@@ -92,12 +92,30 @@ mmu_show ( void )
 	int count;
 	// u64 *bogus;
 
+#ifdef notdef
+	printf ( "fix HCR.SWIO bit\n" );
+	// Clear the SWIO bit
+	asm volatile ("mrs %0, HCR_EL2" : "=r" (val));
+	printf ( "HCR_EL2= %016lx\n", val );
+	val &= ~2;
+	// val = 0;
+	asm volatile ("msr HCR_EL2, %0" : : "r" (val));
+	asm volatile ("mrs %0, HCR_EL2" : "=r" (val));
+	printf ( "HCR_EL2= %016lx\n", val );
+#endif
+
+	/* xx for experiment */
+	mmu_xx ();
+
 	// U-boot dump code
-	dump_mmu ();
+	// dump_mmu ();
 
 	// val = 0x1234abcdaabbccdd;
 	// printf ( "Sanity check on printf: %016x\n", val );
 	// printf ( "Sanity check on printf: %016lx\n", val );
+
+	asm volatile ("mrs %0, HCR_EL2" : "=r" (val));
+	printf ( "HCR_EL2= %016lx\n", val );
 
 	asm volatile("mrs %0, ttbr0_el1" : "=r" (val) );
 	printf ( "TTBR0_EL1 = %016lx\n", val );
@@ -123,6 +141,7 @@ mmu_show ( void )
 	printf ( " TCR:tg0 = %08x\n", (val>>14) & 0x3 );
 	printf ( " TCR:tg1 = %08x\n", (val>>30) & 0x3 );
 
+#ifdef notdef
 	dump_b ( ttbr, 8 );
 	// 64 lines on screen
 	// dump_l ( ttbr, 64 );
@@ -148,6 +167,7 @@ mmu_show ( void )
 		pte_show ( tp++ );
 		count++;
 	}
+#endif
 
 #ifdef notdef
 	// should cause a fault
@@ -161,21 +181,19 @@ mmu_show ( void )
 void
 pte_show ( u64 *addr )
 {
-	char *cp;
-
-	cp = (char *) addr;
+//	char *cp = (char *) addr;
 
 	printf ( "PTE-%08x ", addr );
 
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
 
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
-	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
+//	printf ( "%02x", *cp++ );
 
 	printf ( " %016lx", *addr );
 

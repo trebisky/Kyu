@@ -13,6 +13,7 @@
  */
 
 #include "types.h"
+#include "cpu.h"
 
 /* From U-Boot sources, just a tiny extract from:
  *  u-boot-2018.09/arch/arm/cpu/armv8/cache_v8.c
@@ -59,6 +60,22 @@ invalidate_dcache_range ( addr_t start, addr_t stop )
 {
 		// printf ( "INVALIDATE ------------------- %08x %08x\n", start, stop );
         __asm_invalidate_dcache_range(start, stop);
+}
+
+void
+dcache_disable ( void )
+{
+		u64 val;
+
+		printf ( "Disable D cache\n" );
+		__asm_flush_dcache_all();
+
+		get_SCTLR (val);
+		val &= ~0x4;
+		set_SCTLR (val);
+
+		__asm_flush_dcache_all();
+		__asm_invalidate_tlb_all();
 }
 
 /* THE END */

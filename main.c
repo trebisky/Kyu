@@ -288,6 +288,14 @@ kyu_startup ( void )
 	*/
 #endif
 
+#ifdef notdef
+	// doing it here without flushing just crashes the system.
+	printf ( "Disable D cache\n" );
+	get_SCTLR (val);
+	val &= ~0x4;
+	set_SCTLR (val);
+#endif
+
 #ifdef ARCH_ARM32
 	// asm volatile ("add %0, sp, #0\n" :"=r"(sp));
 	get_SP ( val );
@@ -352,6 +360,9 @@ kyu_startup ( void )
 	// show_my_regs ();
 
 	// timer_bogus (); OK
+
+	// 5-5-2026 for H5 network
+	dcache_disable ();
 
 	thr_init ();	/* prep thread system */
 	thr_sched ();	/* set threads running */

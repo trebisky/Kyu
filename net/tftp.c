@@ -49,16 +49,18 @@ static void tftp_start ( char * );
 #define TEST_TFTP
 #ifdef TEST_TFTP
 #define TEST_SIZE	200000
-static char *test_file = "kyu.sym";
+// static char *test_file = "kyu.sym";
+static char *test_file = "tftp.test";
 static char test_buf[TEST_SIZE];
 
 /* Called from test.c */
 void
-test_tftp ( int arg )
+test_tftp ( int xxx )
 {
 	int count;
 
 	tftp_debug ( 1 );
+	printf ( "TFTP test fetching %s\n", test_file );
 	count = tftp_fetch ( test_file, test_buf, TEST_SIZE );
 	printf ( "TFTP test transfer finished: %d bytes\n", count );
 }

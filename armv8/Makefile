@@ -16,6 +16,7 @@ OBJS =  startup.o \
 	cache_v8.o \
 	mmu.o \
 	mmu_dump.o \
+	mmu_xx.o \
 	show_regs.o
 
 OBJS_V7 =  locore.o \

@@ -249,15 +249,8 @@ struct emac_desc {
 // #define NUM_RX	16
 // #define NUM_TX	4
 
-#ifdef BOARD_H5
-#define NUM_RX	8
-#define NUM_TX	8
-#else
-// #define NUM_RX	64
-// #define NUM_TX	64
-#define NUM_RX	8
-#define NUM_TX	8
-#endif
+#define NUM_RX	64
+#define NUM_TX	64
 
 /* There are notes in the U-Boot driver that setting the value 2048
  * causes weird behavior and something less like 2044 should be used
@@ -1271,10 +1264,10 @@ emac_init_new ( void )
 	irq_hookup ( IRQ_EMAC, emac_handler, 0 );
 
 	init_rings ();
-	// XXX 2023
-	printf ( "Initial rings:\n" );
-	rx_list_show ();
-	tx_list_show ();
+
+	// printf ( "Initial rings:\n" );
+	// rx_list_show ();
+	// tx_list_show ();
 
 	/* the "emac_activate" entry point really kicks things off */
 

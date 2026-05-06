@@ -169,6 +169,7 @@ raw_write_DAIF( unsigned int val )
 
 #endif
 
+#ifdef notdef
 /* from /Projects/ARM-sources/u-boot/arch/arm/include/asm/armv8/cpu.h
  * 5/2/2026
  */
@@ -210,6 +211,7 @@ is_cortex_a(72)
 is_cortex_a(73)
 is_cortex_a(75)
 is_cortex_a(76)
+#endif
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
