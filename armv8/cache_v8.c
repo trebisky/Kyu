@@ -68,7 +68,7 @@ dcache_disable ( void )
 {
 		u64 val;
 
-		printf ( "Disable D cache\n" );
+		// printf ( "Disable D cache\n" );
 		__asm_flush_dcache_all();
 
 		get_SCTLR (val);

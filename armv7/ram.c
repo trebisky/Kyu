@@ -160,7 +160,7 @@ ram_init ( unsigned long start, unsigned long size )
 	next_ram = start;
 	last_ram = start + size;
 
-	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
+	printf ( "RAM %dM available starting at %08x\n", size/MEG, start );
 
 	kernel_start = (unsigned long) &asm_startup;
 	kernel_end = (unsigned long) &_end;

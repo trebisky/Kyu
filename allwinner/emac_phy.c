@@ -298,11 +298,12 @@ phy_init ( void )
 {
 	int id;
 
-	printf ( "PHY for emac\n" );
+	// printf ( "PHY for emac\n" );
 	emac_syscon_setup ();
 
-	printf ( "Setup we inherited from U-Boot:\n" );
-	phy_show ();
+	// printf ( "Setup we inherited from U-Boot:\n" );
+	// phy_show ();
+
 	phy_update ();
 
 	//phy_write ( PHY_ADVERT, 0 );
@@ -310,19 +311,20 @@ phy_init ( void )
 
 	// phy_debug = 1;
 
-	printf ( "Start PHY reset\n" );
+	// printf ( "Start PHY reset\n" );
 	phy_reset ();
-        // printf ( "PHY ID = %04x\n", phy_id() );
+
+	// printf ( "PHY ID = %04x\n", phy_id() );
 	//phy_debug = 0;
 
-	phy_show ();
+	// phy_show ();
 
 	printf ( "Start autonegotiation\n" );
 	phy_autonegotiate ();
 
-	phy_show ();
+	// phy_show ();
 
-	// phy_update ();
+	phy_update ();
 	phy_set_link_status ( 1 );
 	phy_show_state ();
 
@@ -331,8 +333,8 @@ phy_init ( void )
 	 */
 	phy_link_setup ();
 
-	printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
-	printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+	// printf ( "BMCR  = %04x\n", phy_read ( PHY_BMCR ) );
+	// printf ( "BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
 }
 
 #ifdef notdef
@@ -378,7 +380,7 @@ phy_link_setup ( void )
 	if ( phy_duplex == DUPLEX_FULL )
 	    reg |= BMCR_FULL;
 
-	printf ( "PHY bmcr link set up for %d Mbit\n", phy_speed );
+	// printf ( "PHY bmcr link set up for %d Mbit\n", phy_speed );
 	phy_write ( PHY_BMCR, reg );
 }
 
@@ -400,7 +402,7 @@ void
 phy_update ( void )
 {
 	phy_set_link_status ( 0 );
-	phy_show_state ();
+	// phy_show_state ();
 }
 
 /* Examine the PHY registers and set local variables to
@@ -467,7 +469,8 @@ phy_autonegotiate ( void )
 	reg = phy_read ( PHY_BMCR );
 
 	// reg = 0;	// bad
-	printf ( "autonegotiation starting, BMCR = %04x\n", reg );
+	// printf ( "autonegotiation starting, BMCR = %04x\n", reg );
+
 	/* I see 0x3000 at this point, which is what we get after
 	 * the PHY reset. However, if I clear these bits,
 	 * the autonegotiation doesn't go right and I get all
@@ -489,23 +492,23 @@ phy_autonegotiate ( void )
 #endif
 
 	reg |= BMCR_ANEG_ENA;
-        phy_write ( PHY_BMCR, reg );
+	phy_write ( PHY_BMCR, reg );
 
 	/* this will self clear */
 	reg |= BMCR_ANEG;
-        phy_write ( PHY_BMCR, reg );
+	phy_write ( PHY_BMCR, reg );
 
-	printf ( "autonegotiation started: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+	// printf ( "autonegotiation started: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
 
-        while ( tmo-- && ! (phy_read(PHY_BMSR) & BMSR_ANEGCOMPLETE ) )
+	while ( tmo-- && ! (phy_read(PHY_BMSR) & BMSR_ANEGCOMPLETE ) )
 	    thr_delay ( 2 );
 
-        if ( ! (phy_read(PHY_BMSR) & BMSR_ANEGCOMPLETE ) )
+	if ( ! (phy_read(PHY_BMSR) & BMSR_ANEGCOMPLETE ) )
 	    printf ( "Autonegotiation fails\n" );
 	else {
-	    printf ( "autonegotion done: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
-	    printf ( "PHY autonegotion done in %d milliseconds\n", 2*(ANEG_TIMEOUT-tmo) );
-	    // I see 2.9 seconds, 3.0 seconds 
+	    printf ( "autonegotiation done: BMSR  = %04x\n", phy_read ( PHY_BMSR ) );
+	    // printf ( "PHY autonegotiation done in %d milliseconds\n", 2*(ANEG_TIMEOUT-tmo) );
+	    // I see 2.9 seconds, 3.0 seconds   (i.e. 3696 milliseconds)
 	}
 
 	// If we do this (disable ANEG) we run for a little while,

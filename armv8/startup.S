@@ -75,7 +75,7 @@ reset:
 
 	// bl	tjt_startup
 
-        // bl      mmu_set_ttbr
+	// bl      mmu_set_ttbr
 
 	bl	kyu_startup
 

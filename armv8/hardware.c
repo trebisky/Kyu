@@ -18,6 +18,27 @@
 #include "board/board.h"
 #include "cpu.h"
 
+void
+cpu_show ( void )
+{
+	u64 val;
+
+	get_SCTLR (val);
+	printf ( "SCTLR = %08x\n", val );
+	if ( val & 0x4 )
+		printf ( "D cache is enabled\n" );
+	else
+		printf ( "D cache is disabled\n" );
+	if ( val & (1<<12))
+		printf ( "I cache is enabled\n" );
+	else
+		printf ( "I cache is disabled\n" );
+	if ( val & 0x1 )
+		printf ( "MMU is enabled\n" );
+	else
+		printf ( "MMU is disabled\n" );
+}
+
 #define PMCR_CCNT_DIV64	0x8
 #define PMCR_CCNT_RESET	0x4
 #define PMCR_CCNT_ENA	0x1

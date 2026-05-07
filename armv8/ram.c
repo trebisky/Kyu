@@ -83,7 +83,7 @@ static unsigned long cache_line_mask;
 
 static int ram_sizes[] = { 2048, 1024, 512, 256 };
 
-/* This was introduced for the NanoPi Neo
+/* This was introduced for the NanoPi Neo (an h3 board)
  *  6-14-2017
  *
  * Now called very early in initialization in order to figure
@@ -96,12 +96,21 @@ static int ram_sizes[] = { 2048, 1024, 512, 256 };
  * gets replicated into the upper part of the address space.
  * I try to watch for that.
  *
- * XXX - it would not be a bad idea to have the mmu unmap
- *   the replicated addresses.
+ * Note that the cache complicates things.  This will only work
+ *  if the D cache is disabled.
  */
 
 #define RAM_MAGIC 0xabcd1234
+
 static void ram_scan ( unsigned long start, unsigned long val );
+
+/* This works now -- for reasons I don't really understand.
+ * It used to fail on the h5 due to values being cached.
+ * I would return 2G on my board with 1G
+ * No telling what it will do on a Neo2 with 512M
+ * I now disable the reenable the D cache,
+ * which should guarantee that it works.
+ */
 
 unsigned long
 ram_probe ( unsigned long start )
@@ -112,8 +121,11 @@ ram_probe ( unsigned long start )
 	unsigned long *p2;
 	int i;
 
+	// cpu_show ();
+	dcache_disable ();
+
 	for ( i=0; i< sizeof(ram_sizes) / sizeof(unsigned long); i++ ) {
-		printf ( "ram_probe, test size %d\n", ram_sizes[i] );
+		// printf ( "ram_probe, test size %d\n", ram_sizes[i] );
 	    p = (unsigned long *) (start + (ram_sizes[i]-1)*MEG );
 	    p2 = (unsigned long *) (start + (ram_sizes[i]/2-1)*MEG );
 	    // printf ( "Poke at %d %08x\n", ram_sizes[i], p );
@@ -123,17 +135,23 @@ ram_probe ( unsigned long start )
 	    // dump_l ( p, 2 );
 	    // flush_dcache_range ( p, &p[cache_line_size] );
 	    // invalidate_dcache_range ( p, &p[cache_line_size] );
-		printf ( "- probe  %016x %016x\n", p, *p );
-		printf ( "- probe2 %016x %016x\n", p2, *p2 );
-		ram_scan ( 0x70000000, RAM_MAGIC );
-		printf ( "- probe  %016x %016x\n", p, *p );
-		printf ( "- probe2 %016x %016x\n", p2, *p2 );
+
+		// printf ( "- probe  %016x %016x\n", p, *p );
+		// printf ( "- probe2 %016x %016x\n", p2, *p2 );
+		// this scan would deal with cache issues.
+		// ram_scan ( 0x70000000, RAM_MAGIC );
+		// printf ( "- probe  %016x %016x\n", p, *p );
+		// printf ( "- probe2 %016x %016x\n", p2, *p2 );
+
 	    if ( *p == flip && *p2 != flip ) {
-		*p = save;
+			*p = save;
+			dcache_enable ();
 			return ram_sizes[i] * MEG;
 	    }
 	    *p = save;
 	}
+
+	dcache_enable ();
 
 	/* This should not happen */
 	printf ( " *** Ram size wacky\n" );
@@ -187,7 +205,7 @@ ram_init ( unsigned long start, unsigned long size )
 	next_ram = start;
 	last_ram = start + size;
 
-	printf ( "RAM %dM total starting at %08x\n", size/MEG, start );
+	printf ( "RAM %dM available starting at %08x\n", size/MEG, start );
 
 	kernel_end = (unsigned long) &_end;
 	printf ( "Kyu image size: %d bytes\n", kernel_end - start );

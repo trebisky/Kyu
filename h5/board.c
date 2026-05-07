@@ -182,8 +182,9 @@ void
 board_mmu_init ( void )
 {
 	ram_start = BOARD_RAM_START;
-	ram_size = BOARD_RAM_SIZE;
 
+#ifdef notdef
+	ram_size = BOARD_RAM_SIZE;
 	/* 5-6-2026 avoid probing on the H5
 	 * the dcache_invalidate() bug makes this
 	 * impossible to do properly without disabling
@@ -195,14 +196,13 @@ board_mmu_init ( void )
 // #define BOARD_NEO_PLUS2
 	printf ( "ram size: %d M for Neo Plus2\n", ram_size/(1024*1024) );
 #endif
+#endif
 
-#ifdef notdef
 	printf ( "Probing for amount of ram\n" );
 	ram_size = ram_probe ( ram_start );
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
-#endif
 
-	mmu_initialize ( ram_start, ram_size );
+	ram_size = mmu_initialize ( ram_start, ram_size );
 }
 
 /* Comes here when a new core starts up */
@@ -267,13 +267,14 @@ board_hardware_init ( void )
 	/*
 	// armv7 calls XXX
 	get_SP ( reg );
-        printf ( "board_hardware_init - sp: %08x\n",  reg );
+	printf ( "board_hardware_init - sp: %08x\n",  reg );
 	get_CPSR ( reg );
-        printf ( "board_hardware_init - cpsr: %08x\n",  reg );
+	printf ( "board_hardware_init - cpsr: %08x\n",  reg );
 	*/
 
 	cache_init ();
 	ram_init ( ram_start, ram_size );
+
 	// core_stacks = ram_alloc ( NUM_CORES * STACK_PER_CORE );
 	// stack_addr_show ();
 }

@@ -22,6 +22,7 @@ typedef	long					i64;
 typedef	unsigned long			u64;
 typedef	volatile unsigned long	vu64;
 
+/* 64 bit */
 typedef	unsigned long			reg_t;
 typedef	unsigned long			addr_t;
 

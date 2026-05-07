@@ -190,27 +190,6 @@ int orig_ttbr1 = 0xdeadbeef;
 int orig_ttbcr = 0xdeadbeef;
 int orig_dacr = 0xdeadbeef;
 
-void
-cpu_show ( void )
-{
-	u64 val;
-
-	get_SCTLR (val);
-	printf ( "SCTLR = %08x\n", val );
-	if ( val & 0x4 )
-		printf ( "D cache is enabled\n" );
-	else
-		printf ( "D cache is disabled\n" );
-	if ( val & (1<<12))
-		printf ( "I cache is enabled\n" );
-	else
-		printf ( "I cache is disabled\n" );
-	if ( val & 0x1 )
-		printf ( "MMU is enabled\n" );
-	else
-		printf ( "MMU is disabled\n" );
-}
-
 /* This is --almost-- the first bit of C code that runs in 32 bit mode.
  *  almost, because we call board_mmu_init() before calling this.
  *
@@ -276,8 +255,8 @@ kyu_startup ( void )
 
 	cpu_show ();
 
-	printf ( "MMU setup is like so ...\n" );
-	mmu_show ();
+	// printf ( "MMU setup is like so ...\n" );
+	// mmu_show ();
 
 	/*
 	INT_unlock;

@@ -114,7 +114,7 @@ net_hw_init ( long bogus )
 
     if ( num_eth > 0 ) {
 		net_state = NET_RUN;
-		printf ( "Network initialized (RUN!)\n" );
+		// printf ( "Network initialized (RUN!)\n" );
     } else {
 		net_state = NET_IDLE;
 		printf ( "No network devices found\n" );

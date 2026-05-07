@@ -52,30 +52,22 @@
  *  but that needs to be tested.
  */
 
-/* My original idea was as follows and
- * would have been a big hack specific to the h5
+/* So, we are back to my original idea
+ * which is to set up a block of uncached ram
+ * for use by network buffers and structures.
+ *
+ * This "hack" would be specific to the h5
+ *
  * The first table (level 1) has 512 entries,
- *  only the first 4 are non-zero.
+ *  only the first 4 need to be non-zero.
  *  Each maps 1G of address.
- *  7fff0000 to 7fff0ff8
- *  (the table covers 4K)
  * The second table (level 2) also has 512 entries,
  *  each maps 2M (so 2*512 = 1024).
+ * The last of those 2M entries is set up uncached.
  *
  *  1M = 0x10_0000
  *  2M = 0x20_0000
  */
-
-#define MEG	(1024*1024)
-#define MMU_SIZE (4*1024)
-
-/* XXX - currently will NOT work on the Neo 2
- * with only 512M of ram
- */
-
-/* The h5 has 1G of ram */
-#define RAM_BASE	0x40000000
-#define RAM_SIZE	0x40000000
 
 /* Old U-boot layout
 PTE-7fff0000  0000000000000401
@@ -114,20 +106,35 @@ ADDR 000000007fff0ff8  000000007fe00000
 /* A "chunk" is one of the 2M sections that the
  * level 2 table maps.
  */
+#define CHUNK_SIZE 0x200000
 
+/* We set aside 64K for page tables,
+ * although we only need/user 8K
+ */
+#define PG_SIZE	64*1024
+
+/* XXX - note that having "wired" values here
+ * defeats the purpose of calling ram_probe()
+ * before mmu_setup().  We can clean this up when
+ * we tackle other 64 bit boards other than the H5
+ * We will have to unless those other boards have
+ *  the same ram layout as the H5.
+ */
 #ifdef BOARD_ORANGE_PI_PC2
 /* with 1G ram */
+#define RAM_BASE 0x40000000
 #define MMU_BASE 0x7fcf0000
-#define UNCACHED_BASE 0x7fe00000;
+#define UNCACHED_BASE 0x7fe00000
 #define NUM_CHUNKS  512
 #else
 /* Nano Pi Neo2 with 512M */
+#define RAM_BASE 0x40000000
 #define MMU_BASE 0x5fcf0000
-#define UNCACHED_BASE 0x5fe00000;
+#define UNCACHED_BASE 0x5fe00000
 #define NUM_CHUNKS  256
 #endif
 
-void mmu_setup ( void );
+static addr_t mmu_setup ( addr_t, u64 );
 
 static inline void
 mmu_on ( void )
@@ -151,14 +158,19 @@ mmu_off ( void )
 
 /* This gets called very very early as Kyu boots,
  * even before the Kyu main code runs.
+ * The assembly startup code calls board_mmu_init()
+ * This will call ram_probe() before calling this
+ * so that it can pass proper start and size values
  */
-void
-mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
+addr_t
+mmu_initialize ( addr_t ram_start, u64 ram_size )
 {
 	// puts ( "XXX mmu_initialize still pending for ARM v8" );
-	printf ( " -- mmu_initialize --\n" );
-	printf ( "Ram at %016lx, %ld bytes\n", ram_start, ram_size );
-	mmu_setup ();
+	// printf ( " -- mmu_initialize --\n" );
+	// printf ( "Ram at %016lx, %ld bytes\n", ram_start, ram_size );
+	// printf ( " %d M of ram\n", ram_size/(1024*1024) );
+
+	return mmu_setup ( ram_start, ram_size );
 }
 
 /* Just a stub for now - this was an experiment for the armv7,
@@ -182,8 +194,8 @@ ram_section_nocache ( int xx )
 		return (void *) UNCACHED_BASE;
 }
 
-void
-mmu_setup ( void )
+addr_t
+mmu_setup ( addr_t ram_start, u64 ram_size )
 {
 		int i;
 		u64 *addr;
@@ -194,45 +206,35 @@ mmu_setup ( void )
 
 		// dump_l ( (void *) MMU_BASE, 16 );
 
-#ifdef notdef
-		u64 loc;
-		/* grind out table of VA at 2M stepping */
-		loc =  0x7fff0000;
-		add = 0x40000000;
-		for ( i=0; i<512; i++ ) {
-			printf ( "ADDR %016lx  %016lx\n", loc, add );
-			loc += 8;
-			add += 0x200000;
-		}
-#endif
-
 		addr = (u64 *) MMU_BASE;
 		level1 = addr;
 
-		memset ( addr, 0, 64*1024 );
+		memset ( addr, 0, PG_SIZE );
 
 		/* We leave the other 2G of possible ram
 		 * addresses 0 (invalid)
+		 * This is very much H5 specific and has
+		 * the value for RAM_BASE wired in.
 		 */
 		level1[0] = 0x0000000000000401;		/* IO */
 		level1[1] = 0x0000000040000711;		/* 1G of ram */
 		level1[2] = 0x0000000040000401;		/* again - uncached */
 		level1[3] = 0;						/* invalid, just for the record */
-		dump_l ( level1, 4 );
+		// dump_l ( level1, 4 );
 
 		addr += 512;
 		level2 = addr;
 
 		level1[1] = (u64)addr | 3;
 
-		printf ( "Level 2 pages at %016lx\n", level2 );
-		printf ( "Addr[1] = %08lx\n", (u64)addr | 3 );
+		// printf ( "Level 2 pages at %016lx\n", level2 );
+		// printf ( "Addr[1] = %08lx\n", (u64)addr | 3 );
 
-		add = 0x40000000;
+		add = RAM_BASE;
 
 		for ( i=0; i<NUM_CHUNKS; i++ ) {
 			*addr++ = add | 0x711;
-			add += 0x200000;
+			add += CHUNK_SIZE;
 		}
 
 		/* Now make the last entry uncached */
@@ -243,7 +245,7 @@ mmu_setup ( void )
 		// printf ( "Level2-last = %016lx\n", val );
 		level2[NUM_CHUNKS-1] = val;
 
-		dump_l ( level2, 8 );
+		// dump_l ( level2, 8 );
 
 		/* Don't turn off the MMU without first
 		 * disabling the D cache.
@@ -259,6 +261,16 @@ mmu_setup ( void )
         asm volatile ( "dsb sy" );
         asm volatile ( "isb" );
 		dcache_enable ();
+
+		/* This value gets returned to board.c and then
+		 * gets passed to ram_init()
+		 */
+		// ram_size -= CHUNK_SIZE * 2;
+		ram_size -= CHUNK_SIZE;
+		ram_size -= PG_SIZE;
+		// printf ( "MMU setup returns %ld size\n", ram_size );
+
+		return ram_size;
 }
 
 /* THE END */

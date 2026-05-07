@@ -1091,8 +1091,8 @@ emac_init_new ( void )
 	//syscon_setup ();
 	// show_sid ();
 
-	printf ( "Emac init\n" );
-	printf ( " *************************** Hello from the Emac driver\n" );
+	printf ( "Emac driver initializing\n" );
+	// printf ( " *************************** Hello from the Emac driver\n" );
 	emac_state = 1;
 
 	emac_sem = sem_signal_new ( SEM_FIFO );
@@ -1115,6 +1115,8 @@ emac_init_new ( void )
 	// NEW from old raw init.
 	ep->ctl1 = CTL1_BURST_8;
 
+#ifdef notdef
+	/* Show what we inherit from U-boot */
 	printf ( "emac rx_desc = %08x\n", ep->rx_desc );
 	printf ( "emac tx_desc = %08x\n", ep->tx_desc );
 
@@ -1127,6 +1129,7 @@ emac_init_new ( void )
 	printf ( "emac TX CTL0 = %08x\n", ep->tx_ctl0 );
 	printf ( "emac TX CTL1 = %08x\n", ep->tx_ctl1 );
 	// printf ( "emac rx_filt = %08x\n", ep->rx_filt );
+#endif
 
 	printf ( "Number of rx/tx ring entries = %d/%d\n", NUM_RX, NUM_TX );
 
@@ -1195,7 +1198,7 @@ emac_init_new ( void )
 	phy_update ();
 
 	// This seems to be 0 after reset
-	printf ( "emac CTL0 (orig) = %08x\n", ep->ctl0 );
+	// printf ( "emac CTL0 (orig) = %08x\n", ep->ctl0 );
 
 #ifndef INHERIT_UBOOT
 	/* interestingly when inheriting 100 Mbit from U-boot 2022.10
@@ -1219,7 +1222,7 @@ emac_init_new ( void )
 
 	ep->ctl0 = reg;
 
-	printf ( "emac CTL0 (new) = %08x\n", ep->ctl0 );
+	// printf ( "emac CTL0 (new) = %08x\n", ep->ctl0 );
 
 	return 1;
 }
