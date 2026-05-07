@@ -48,29 +48,6 @@ tlb_invalidate_all ( void )
 		__asm_invalidate_tlb_all ();
 }
 
-/* This is a stub -- to get things going, we just continue to
- * use the setup we inherit from U-boot.
- * XXX
- */
-void
-mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
-{
-	// puts ( "XXX mmu_initialize still pending for ARM v8" );
-	printf ( " -- mmu_initialize --\n" );
-	printf ( "Ram at %016lx, %ld bytes\n", ram_start, ram_size );
-	mmu_setup ();
-}
-
-/* Just a stub for now - this was an experiment for the armv7,
- * but I decided just to flush/invalidate instead.
- * Unlikely ever to get implemented on arm64 -- see mmu_setup.c
- */
-void
-mmu_nocache ( unsigned long addr )
-{
-	panic ( "mmu_nocache not implemented yet for ARM v8" );
-}
-
 /*
  *  MRS is "move to register from special register.
  *  MSR is "move to special register from ARM core register.

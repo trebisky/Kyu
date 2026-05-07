@@ -111,11 +111,23 @@ ADDR 000000007fff0ff8  000000007fe00000
  * page tables in a 64K section at the end.
  */
 
-/* With the v2026.4, this is unused/uninitialized */
-#define MMU_BASE 0x7fcf0000
+/* A "chunk" is one of the 2M sections that the
+ * level 2 table maps.
+ */
 
-#define UNCACHED_BASE 0x7fcf0000
-#define UNCACHED_SIZE 0x00200000
+#ifdef BOARD_ORANGE_PI_PC2
+/* with 1G ram */
+#define MMU_BASE 0x7fcf0000
+#define UNCACHED_BASE 0x7fe00000;
+#define NUM_CHUNKS  512
+#else
+/* Nano Pi Neo2 with 512M */
+#define MMU_BASE 0x5fcf0000
+#define UNCACHED_BASE 0x5fe00000;
+#define NUM_CHUNKS  256
+#endif
+
+void mmu_setup ( void );
 
 static inline void
 mmu_on ( void )
@@ -137,13 +149,37 @@ mmu_off ( void )
         set_SCTLR (val);
 }
 
+/* This gets called very very early as Kyu boots,
+ * even before the Kyu main code runs.
+ */
+void
+mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
+{
+	// puts ( "XXX mmu_initialize still pending for ARM v8" );
+	printf ( " -- mmu_initialize --\n" );
+	printf ( "Ram at %016lx, %ld bytes\n", ram_start, ram_size );
+	mmu_setup ();
+}
+
+/* Just a stub for now - this was an experiment for the armv7,
+ * but I decided just to flush/invalidate instead.
+ * Unlikely ever to get implemented on arm64.
+ * the same scheme now uses ram_section_nocache () below.
+ */
+void
+mmu_nocache ( unsigned long addr )
+{
+	panic ( "mmu_nocache not implemented for ARM v8" );
+}
+
+
 /* This is called by the emac driver to get
  * the base address of an uncached memory block.
  */
 void *
 ram_section_nocache ( int xx )
 {
-		return (void *) 0x7fe00000;
+		return (void *) UNCACHED_BASE;
 }
 
 void
@@ -155,14 +191,6 @@ mmu_setup ( void )
 		u64 val;
 		u64 *level1;
 		u64 *level2;
-
-#ifndef BOARD_ORANGE_PI_PC2
-		/* This code needs work for NEO2, and probably
-		 * others to put special 2M section at end
-		 * of 512M or whatever is available.
-		 */
-		panic ( "mmu_setup() only ready for 1G ram\n" );
-#endif
 
 		// dump_l ( (void *) MMU_BASE, 16 );
 
@@ -189,7 +217,7 @@ mmu_setup ( void )
 		level1[0] = 0x0000000000000401;		/* IO */
 		level1[1] = 0x0000000040000711;		/* 1G of ram */
 		level1[2] = 0x0000000040000401;		/* again - uncached */
-		level1[3] = 0;						/* just for the record */
+		level1[3] = 0;						/* invalid, just for the record */
 		dump_l ( level1, 4 );
 
 		addr += 512;
@@ -201,18 +229,19 @@ mmu_setup ( void )
 		printf ( "Addr[1] = %08lx\n", (u64)addr | 3 );
 
 		add = 0x40000000;
-		for ( i=0; i<512; i++ ) {
+
+		for ( i=0; i<NUM_CHUNKS; i++ ) {
 			*addr++ = add | 0x711;
 			add += 0x200000;
 		}
 
 		/* Now make the last entry uncached */
-		val = level2[511];
-		printf ( "Level2-511 = %016lx\n", val );
+		val = level2[NUM_CHUNKS-1];
+		// printf ( "Level2-last = %016lx\n", val );
 		val &= ~0xfff;
 		val |= 0x401;
-		printf ( "Level2-511 = %016lx\n", val );
-		level2[511] = val;
+		// printf ( "Level2-last = %016lx\n", val );
+		level2[NUM_CHUNKS-1] = val;
 
 		dump_l ( level2, 8 );
 
