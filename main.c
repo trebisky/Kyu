@@ -190,6 +190,27 @@ int orig_ttbr1 = 0xdeadbeef;
 int orig_ttbcr = 0xdeadbeef;
 int orig_dacr = 0xdeadbeef;
 
+void
+cpu_show ( void )
+{
+	u64 val;
+
+	get_SCTLR (val);
+	printf ( "SCTLR = %08x\n", val );
+	if ( val & 0x4 )
+		printf ( "D cache is enabled\n" );
+	else
+		printf ( "D cache is disabled\n" );
+	if ( val & (1<<12))
+		printf ( "I cache is enabled\n" );
+	else
+		printf ( "I cache is disabled\n" );
+	if ( val & 0x1 )
+		printf ( "MMU is enabled\n" );
+	else
+		printf ( "MMU is disabled\n" );
+}
+
 /* This is --almost-- the first bit of C code that runs in 32 bit mode.
  *  almost, because we call board_mmu_init() before calling this.
  *
@@ -223,16 +244,6 @@ kyu_startup ( void )
 #endif
 
 #ifdef notdef
-	// Enable the I cache
-	get_SCTLR (val);
-	val |= 0x1000;
-	set_SCTLR (val);
-
-	get_SCTLR (val);
-	printf ( "SCTLR = %08x\n", val );
-#endif
-
-#ifdef notdef
 	// ensure core stack pointer valid
 	// this works !!
 	preinit_core ();
@@ -263,22 +274,9 @@ kyu_startup ( void )
 	get_DAIF ( val );
 	printf ( "Kyu starting with DAIF: %08x\n",  val );
 
-	get_SCTLR (val);
-	printf ( "Kyu starting with SCTLR = %08x\n", val );
-	if ( val & 0x4 )
-		printf ( "D cache enabled\n" );
-	if ( val & (1<<12))
-		printf ( "I cache enabled\n" );
-	if ( val & 0x1 )
-		printf ( "MMU enabled\n" );
+	cpu_show ();
 
-	asm volatile ("ic ialluis\n");
-	asm volatile ("isb\n");
-
-	printf ( "Disable I cache\n" );
-	val &= ~(1<<12);
-	set_SCTLR (val);
-
+	printf ( "MMU setup is like so ...\n" );
 	mmu_show ();
 
 	/*
@@ -362,7 +360,10 @@ kyu_startup ( void )
 	// timer_bogus (); OK
 
 	// 5-5-2026 for H5 network
+	printf ( " ---\n" );
 	dcache_disable ();
+	printf ( " ---\n" );
+	// ZORO zoro
 
 	thr_init ();	/* prep thread system */
 	thr_sched ();	/* set threads running */

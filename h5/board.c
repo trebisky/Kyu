@@ -182,11 +182,25 @@ void
 board_mmu_init ( void )
 {
 	ram_start = BOARD_RAM_START;
-	// ram_size = BOARD_RAM_SIZE;
+	ram_size = BOARD_RAM_SIZE;
 
+	/* 5-6-2026 avoid probing on the H5
+	 * the dcache_invalidate() bug makes this
+	 * impossible to do properly without disabling
+	 * the D cache, so we just use fixed values.
+	 */
+#ifdef BOARD_ORANGE_PI_PC2
+	printf ( "ram size: %d M for Orange Pi PC2\n", ram_size/(1024*1024) );
+#else
+// #define BOARD_NEO_PLUS2
+	printf ( "ram size: %d M for Neo Plus2\n", ram_size/(1024*1024) );
+#endif
+
+#ifdef notdef
 	printf ( "Probing for amount of ram\n" );
 	ram_size = ram_probe ( ram_start );
 	printf ( "Found %d M of ram\n", ram_size/(1024*1024) );
+#endif
 
 	mmu_initialize ( ram_start, ram_size );
 }

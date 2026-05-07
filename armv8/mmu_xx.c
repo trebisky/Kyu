@@ -27,6 +27,11 @@
 #define MMU_BASE	0x7fff0000
 // #define RAM_BASE	0x40000000
 
+/* For this to work, we need both a cached and uncached
+ * VA mapped to the same physical memory
+ */
+
+#ifdef notdef
 static void
 mmu_setup ( void )
 {
@@ -49,6 +54,7 @@ mmu_setup ( void )
 		asm volatile ( "dsb sy" );
 		asm volatile ( "isb" );
 }
+#endif
 
 static void
 flush_line ( u64 addr )
@@ -72,7 +78,10 @@ mmu_xx ( void )
 		u32 *test_y = (u32 *) 0xf0000000;
 		u32 val1, val2;
 
-		mmu_setup ();
+		printf ( "mmu_xx (diag) not available\n" );
+		return;
+
+		// mmu_setup ();
 
 		/* Prior experiment tells us that this area
 		 * never gets initialized by a reboot,

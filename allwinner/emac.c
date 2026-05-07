@@ -40,6 +40,24 @@
 
 #include "emac_regs.h"
 
+#ifdef notdef
+/* This is the scheme I worked up on the H3 where
+ * a special uncached section of ram is allocated.
+ */
+#define EMAC_NOCACHE
+#endif
+
+/* This is a new way of using the same concept as the above
+ * 5-6-2026
+ */
+#ifdef BOARD_H5
+// #define NOCACHE_ADDR(x)	(x+0x40000000)
+#define NOCACHE_ADDR(x)	(x)
+#else
+#define NOCACHE_ADDR(x)	(x)
+#endif
+
+
 #ifdef BOARD_H5
 /* On the h5 (aarch64) I get lots of these warnings:
 emac.c: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
@@ -90,10 +108,6 @@ emac_debug_h5 ( void )
 /* from linux/compiler_gcc.h in U-Boot */
 #define __aligned(x)            __attribute__((aligned(x)))
 
-/*
-#define EMAC_NOCACHE
-*/
-
 #ifdef EMAC_NOCACHE
 #define emac_cache_flush(a,b)
 #define emac_cache_invalidate(a,b)
@@ -107,7 +121,8 @@ static void tx_start ( void );
 static void rx_start ( void );
 
 /* On the H3 I was using these in conjunction with etimer.c (the event timer)
- * to perform some timing experiments.
+ * to perform some timing experiments.  I have not yet implemented an event
+ * timer on the H5, so these need to be stubs here.
  */
 #ifdef BOARD_H5
 static inline void et_rx ( void ) {}
@@ -182,15 +197,6 @@ typedef union {
 
         unsigned int all;
 } desc0_u;
-#endif
-
-#ifdef notdef
-struct emac_desc {
-	volatile unsigned long status;
-	long size;
-	char * buf;
-	struct emac_desc *next;
-}	__aligned(ARM_DMA_ALIGN);
 #endif
 
 struct emac_desc {
@@ -490,21 +496,23 @@ init_rings ( void )
 #else
 	desc = rx_list_init ();
 #endif
-	rx_list = desc;
+
+	rx_list = NOCACHE_ADDR(desc);
+	cur_rx_dma = rx_list;
 
 	/* Reload the dma pointer register.
 	 * This causes the dma list pointer to get reset. 
 	 */
 	ep->rx_desc = (vp32) desc;
-	cur_rx_dma = desc;
 
 	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
 
 	/* Now set up the Tx list */
 	desc = tx_list_init ();
-	tx_list = desc;
 
-	clean_tx_dma = cur_tx_dma = desc;
+	tx_list = NOCACHE_ADDR(desc);
+	clean_tx_dma = cur_tx_dma = tx_list;
+
 	ep->tx_desc = (vp32) desc;
 }
 
@@ -596,15 +604,6 @@ kyu_receive ( char *buf, int len )
 }
 #endif
 
-#ifdef notdef
-struct emac_desc {
-	unsigned long status;	/* status */
-	long size;		/* st */
-	char * buf;		/* buf_addr */
-	struct emac_desc *next;	/* next */
-}	__aligned(ARM_DMA_ALIGN);
-#endif
-
 static int last_capture = 0;
 
 void
@@ -669,7 +668,8 @@ rx_handler ( int stat )
 	    // pkt_arrive ();
 
 	    nbp->elen = len - 4;
-	    memcpy ( (char *) nbp->eptr, (void *) cur_rx_dma->buf, len - 4 );
+	    // memcpy ( (char *) nbp->eptr, (void *) cur_rx_dma->buf, len - 4 );
+	    memcpy ( (char *) nbp->eptr, (void *) NOCACHE_ADDR(cur_rx_dma->buf), len - 4 );
 
 	    if ( last_capture ) {
 			if ( last_len ) {
@@ -677,7 +677,7 @@ rx_handler ( int stat )
 				memcpy ( prior_buf, last_buf, last_len );
 			}
 			last_len = len - 4;
-			memcpy ( last_buf, (void *) cur_rx_dma->buf, len - 4 );
+			memcpy ( last_buf, (void *) NOCACHE_ADDR(cur_rx_dma->buf), len - 4 );
 	    }
 
 	    // emac_show_packet ( tag, i_dma, nbp );
@@ -696,7 +696,7 @@ rx_handler ( int stat )
 	    net_rcv ( nbp );
 
 		/* Next slot on ring, possible wrap around */
-	    cur_rx_dma = (struct emac_desc *) cur_rx_dma->next;
+	    cur_rx_dma = (struct emac_desc *) NOCACHE_ADDR ( cur_rx_dma->next );
 
 	    // invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	    emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -716,49 +716,6 @@ rx_handler ( int stat )
 	// if ( debug_mask & DB_RX )
 	//	printf ( "Rx interrupt, done)\n" );
 }
-
-#ifdef notdef
-/* What is this?  Why are we saving it? */
-static void
-rx_handler_OLD ( int stat )
-{
-	int len;
-	// int i_dma;
-
-	// don't invalidate the whole thing ...
-	// invalidate_dcache_range ( (void *) rx_list, &rx_list[NUM_RX_UBOOT] );
-
-	/*
-	if ( first_int ) {
-	    rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
-	    first_int = 0;
-	}
-	*/
-
-	invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
-
-	while ( ! (cur_rx_dma->status & DS_ACTIVE) ) {
-	    rx_count++;
-	    len = (cur_rx_dma->status >> 16) & 0x3fff;
-	    /*
-	    i_dma = (cur_rx_dma - rx_list);
-	    printf ( " ---- buf %d (%08x) status: %08x  %d/%d %08x %08x\n",
-		i_dma, cur_rx_dma, cur_rx_dma->status, len, cur_rx_dma->size, cur_rx_dma->buf, cur_rx_dma->next );
-		*/
-
-	    // kyu_receive ( cur_rx_dma->buf, len );
-
-	    cur_rx_dma->status = DS_ACTIVE;
-	    flush_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
-
-	    cur_rx_dma = cur_rx_dma->next;
-	    invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
-	}
-
-	// don't flush the whole thing ...
-	// flush_dcache_range ( (void *) rx_list, &rx_list[NUM_RX_UBOOT] );
-}
-#endif
 
 /* Some notes on the cur and clean pointers ...
  * cur always points to the next available slot
@@ -1022,40 +979,6 @@ verify_regs ( void )
 	printf ( "MII data = %08x\n", &ep->mii_data );
 	printf ( "MII cmd  = %08x\n", &ep->mii_cmd );
 }
-
-#ifdef notdef
-/* Never actually worked */
-static int
-emac_init_ORIG ( void )
-{
-	struct emac *ep = EMAC_BASE;
-	void *list;
-	char mac_buf[6];
-
-	emac_reset ();
-	get_mac ( mac_buf );
-	set_mac ( mac_buf );
-
-	phy_init ();
-
-	ep->ctl1 = CTL1_BURST_8;
-
-	ep->rx_ctl1 |= RX_MD;
-
-	ep->rx_desc = rx_list_init ();
-	// ep->tx_desc = tx_list_init ();
-
-	ep->rx_ctl1 |= RX_DMA_ENA;
-	ep->rx_ctl0 |= RX_EN;
-
-	// ep->tx_ctl1 |= TX_DMA_ENA;
-	// ep->tx_ctl0 = TX_EN;
-
-	ep->rx_filt = RX_FILT_DIS;
-
-        return 1;
-}
-#endif
 
 /* Post this here so our genereic network stack can fetch it.
  * We use it locally also.
@@ -1374,113 +1297,6 @@ rx_start ( void )
 	ep->rx_ctl0 |= RX_EN;
 }
 
-#ifdef notdef
--- /* Stuff pertaining to U-Boot harvesting */
--- 
--- /* Figure out where list activity starts, if there is any.
---  * Note that DMA is active while this is running,
---  * so things can change out from under us.
---  * This is not an issue unless the list fills since
---  * DMA fiddles with the end while we look for the start.
---  */
--- static int
--- scan_rcv_list ( struct emac_desc *list )
--- {
--- 	struct emac_desc *edp;
--- 	int index = -1;
--- 	int ready0 = 0;
--- 	int wait = 0;
--- 	int i;
--- 	int num;
--- 
--- 	if ( ! (list->status & DS_ACTIVE) ) {
--- 	    ready0 = 1;
--- 	    wait = 1;
--- 	}
--- 
--- 	i = 0;
--- 	for ( edp = list;; edp = edp->next ) {
--- 	    if ( edp->next == list )
--- 		break;
--- 	    if ( wait && ! (edp->status & DS_ACTIVE) )
--- 		continue;
--- 	    wait = 0;
--- 	    if ( ! (edp->status & DS_ACTIVE) ) {
--- 		index = i;
--- 		break;
--- 	    }
--- 	    i++;
--- 	}
--- 
--- 	/* detect idle list */
--- 	if ( index < 0 && ready0 == 0 ) {
--- 	    printf ( "Scan finds idle list\n" );
--- 	    return -1;
--- 	}
--- 
--- 	/* detect full list */
--- 	if ( index < 0 && ready0 == 1 && wait == 1 ) {
--- 	    num = i;
--- 	    printf ( "Rcv list found full with %d entries\n", num );
--- 	    for ( i=0; i<num; i++ )
--- 		list[i].status = DS_ACTIVE;
--- 	    return -1;
--- 	}
--- 
--- 	// printf ( "scan ends with %d %d\n", index, ready0 );
--- 	if ( index < 0 )
--- 	    return 0;
--- 	return index;
--- }
--- 
--- static int first_poll = 1;
--- static struct emac_desc *cur_rx_dma;
--- static struct emac_desc *cur_tx_dma;
--- 
--- static void
--- emac_rcv_poll ( void )
--- {
--- 	struct emac *ep = EMAC_BASE;
--- 	struct emac_desc *list;
--- 	struct emac_desc *edp;
--- 	int index;
--- 	int len;
--- 	int i_dma;
--- 
--- 	list = (struct emac_desc *) ep->rx_desc;
--- 
--- 	invalidate_dcache_range ( (void *) list, &list[NUM_RX_UBOOT] );
--- 
--- 	// rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
--- 
--- 	if ( first_poll ) {
--- 	    index = scan_rcv_list ( list );
--- 	    if ( index < 0 ) {
--- 		printf ( "Rx list empty at startup\n" );
--- 		return;
--- 	    }
--- 	    cur_rx_dma = &list[index];
--- 	    first_poll = 0;
--- 	}
--- 
--- 	if ( cur_rx_dma->status & DS_ACTIVE ) {
--- 	    // rx_list_show ( (struct emac_desc *) ep->rx_desc, NUM_RX_UBOOT );
--- 	    // printf ( "Rx list empty on poll\n" );
--- 	    return;
--- 	}
--- 
--- 	while ( ! (cur_rx_dma->status & DS_ACTIVE) ) {
--- 	    i_dma = (cur_rx_dma - list);
--- 	    len = (cur_rx_dma->status >> 16) & 0x3fff;
--- 	    printf ( " ---- buf %d (%08x) status: %08x  %d/%d %08x %08x\n",
--- 		i_dma, cur_rx_dma, cur_rx_dma->status, len, cur_rx_dma->size, cur_rx_dma->buf, cur_rx_dma->next );
--- 	    kyu_receive ( cur_rx_dma->buf, len );
--- 	    cur_rx_dma->status = DS_ACTIVE;
--- 	    cur_rx_dma = cur_rx_dma->next;
--- 	}
--- }
-#endif
-
 /* Not truly official -- called at 1 Hz from "net_slow"
  */
 void
@@ -1616,7 +1432,7 @@ emac_send_int ( struct netbuf *nbp, int wait )
 	// flush_dcache_range ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 	emac_cache_flush ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 
-	cur_tx_dma = (struct emac_desc *) cur_tx_dma->next;
+	cur_tx_dma = (struct emac_desc *) NOCACHE_ADDR ( cur_tx_dma->next );
 
 	// if ( debug_mask & DB_TX ) {
 	// 	printf ( "Emac tx send --------\n" );
@@ -1650,35 +1466,6 @@ emac_send_wait ( struct netbuf *nbp )
 {
 	emac_send_int ( nbp, 1 );
 }
-
-#ifdef notdef
-/* Added by tom 10-7-2023 for Xinu driver */
-void
-eth_tom_debug ( void )
-{
-        struct  ethcblk *ethptr;
-        struct  eth_aw_csreg *ep;
-
-        /* XXX we only have one */
-        ethptr = &ethertab[0];
-        ep = (struct eth_aw_csreg *) ethptr->csr;
-
-        show_reg ( "EMAC regs ", ep );
-        show_reg ( "int ena  ", &ep->int_en );
-        show_reg ( "int stat ", &ep->int_sta );
-
-        show_reg ( "Rx_ctl0 ", &ep->rx_ctl_0 );
-        show_reg ( "Rx_ctl1 ", &ep->rx_ctl_1 );
-        show_reg ( "Tx_ctl0 ", &ep->tx_ctl_0 );
-        show_reg ( "Tx_ctl1 ", &ep->tx_ctl_1 );
-
-        show_rings ();
-        //printf ( " - Tx ring\n" );
-        //tx_list_show(ethptr->txRing);
-        //printf ( " - Rx ring\n" );
-        //rx_list_show(ethptr->rxRing);
-}
-#endif
 
 /* Displayed as "n 11" command output.
  *  more details than the above.

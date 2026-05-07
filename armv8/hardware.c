@@ -32,12 +32,13 @@ enable_ccnt ( int div64 )
 	int val;
 
 	val = PMENSET_CCNT;
-        asm volatile("msr pmcntenset_el0, %0" : : "r" (val) );
+	asm volatile("msr pmcntenset_el0, %0" : : "r" (val) );
 
-        val = PMCR_CCNT_ENA;
+	val = PMCR_CCNT_ENA;
 	if ( div64 )
 	    val |= PMCR_CCNT_DIV64;
-        asm volatile("msr pmcr_el0, %0" : : "r" (val) );
+
+	asm volatile("msr pmcr_el0, %0" : : "r" (val) );
 }
 
 /* It does not seem necessary to disable the counter
@@ -51,9 +52,9 @@ reset_ccnt ( void )
 
 	asm volatile ("mrs %0, PMCR_EL0": "=r" (reg) );
 	rreg = reg | PMCR_CCNT_RESET;
-	asm volatile ("msr PMCR_EL0, %0": "=r" (rreg) );
+	asm volatile ("msr PMCR_EL0, %0": : "r" (rreg) );
 
-	asm volatile ("msr PMCR_EL0, %0": "=r" (reg) );
+	asm volatile ("msr PMCR_EL0, %0": : "r" (reg) );
 	/* XXX - do we really need to clear the bit ? */
 }
 

@@ -17,6 +17,7 @@ OBJS =  startup.o \
 	mmu.o \
 	mmu_dump.o \
 	mmu_xx.o \
+	mmu_setup.o \
 	show_regs.o
 
 OBJS_V7 =  locore.o \

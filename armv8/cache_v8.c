@@ -62,6 +62,7 @@ invalidate_dcache_range ( addr_t start, addr_t stop )
         __asm_invalidate_dcache_range(start, stop);
 }
 
+/* Works great */
 void
 dcache_disable ( void )
 {
@@ -76,6 +77,46 @@ dcache_disable ( void )
 
 		__asm_flush_dcache_all();
 		__asm_invalidate_tlb_all();
+}
+
+void
+dcache_enable ( void )
+{
+		u64 val;
+
+		get_SCTLR (val);
+		val |= 0x4;
+		set_SCTLR (val);
+}
+
+static inline void
+icache_invalidate ( void )
+{
+	asm volatile ("ic ialluis\n");
+	asm volatile ("isb\n");
+}
+
+void
+icache_enable ( void )
+{
+	u64 val;
+
+	// printf ( "Enable I cache\n" );
+	get_SCTLR (val);
+	val |= (1<<12);
+	set_SCTLR (val);
+	icache_invalidate ();
+}
+
+void
+icache_disable ( void )
+{
+	u64 val;
+
+	// printf ( "Disable I cache\n" );
+	get_SCTLR (val);
+	val &= ~(1<<12);
+	set_SCTLR (val);
 }
 
 /* THE END */

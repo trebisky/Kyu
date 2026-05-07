@@ -19,6 +19,7 @@
 #define BOARD_H5
 // #define BOARD_ORANGE_PI64
 #define BOARD_ORANGE_PI_PC2
+// #define BOARD_NEO_PLUS2
 
 /* At this time the Orange Pi PC 2 is the only H5 board we have worked with..
  * Someday we expect to also support the NanoPi Neo Plus 2
@@ -57,8 +58,15 @@
  *  but I am not working with any of those.
  */
 // #define BOARD_RAM_SIZE	0x40000000	/* 1G */
-#define BOARD_RAM_SIZE	0	/* Force probing */
+// #define BOARD_RAM_SIZE	0	/* Force probing */
 
+#ifdef BOARD_ORANGE_PI_PC2
+#define BOARD_RAM_SIZE	0x40000000	/* 1G */
+#else
+#define BOARD_RAM_SIZE	0x20000000	/* 512M */
+#endif
+
+// actually the H5 allocates a 3G address space 
 #define BOARD_RAM_MAX	0x80000000	/* 2G */
 
 #define BOARD_RAM_START	0x40000000

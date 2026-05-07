@@ -16,3 +16,6 @@ Here is what works:
 -- an EMAC (network) driver is working.
     There are unsolved issues with the PHY that
     I am just bypassing.
+
+5-6-2026
+-- After work on the h5, the PHY network is working
