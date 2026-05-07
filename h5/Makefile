@@ -21,6 +21,7 @@ OBJS = \
 	intcon_gic.o \
 	gpio.o \
 	serial.o \
+	i2c_hw.o \
 	emac.o \
 	emac_syscon.o \
 	emac_phy.o \
