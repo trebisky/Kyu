@@ -7,16 +7,17 @@
 INCS = -I. -I..
 include ../Makefile.inc
 
+#	mmu_xx.o \
+#	cache_v7.o \
+
 # startup must be first
 OBJS =  startup.o \
 	hardware.o \
 	interrupts.o \
 	ram.o \
 	cache.o \
-	cache_v8.o \
 	mmu.o \
 	mmu_dump.o \
-	mmu_xx.o \
 	mmu_setup.o \
 	show_regs.o
 
@@ -26,7 +27,6 @@ OBJS_V7 =  locore.o \
 	interrupts.o \
 	armv7_cache.o \
 	cache.o \
-	cache_v7.o \
 	mmu.o \
 	show_regs.o \
 	eabi_stubs.o

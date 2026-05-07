@@ -91,9 +91,6 @@ mmu_show ( void )
 	printf ( "HCR_EL2= %016lx\n", val );
 #endif
 
-	/* xx for experiment */
-	mmu_xx ();
-
 	// U-boot dump code
 	// dump_mmu ();
 

@@ -24,7 +24,13 @@
  * But then I realized that I could set up a
  * separate uncached VA map for all of DRAM
  * using the next 1G entry.
- * The scheme is:
+ *
+ * The scheme with 1G of ram is:
+ *   0x4000_0000 to 0x7fff_ffff - normal cached RAM
+ *   0x8000_0000 to 0xbfff_ffff - uncached RAM alias
+ *   0xc000_0000 to 0xffff_ffff - invalid, illegal.
+ *
+ * The scheme with 512M of ram is:
  *   0x4000_0000 to 0x7fff_ffff - normal cached RAM
  *   0x8000_0000 to 0xbfff_ffff - uncached RAM alias
  *   0xc000_0000 to 0xffff_ffff - invalid, illegal.
@@ -184,7 +190,6 @@ mmu_nocache ( unsigned long addr )
 	panic ( "mmu_nocache not implemented for ARM v8" );
 }
 
-
 /* This is called by the emac driver to get
  * the base address of an uncached memory block.
  */
@@ -194,6 +199,10 @@ ram_section_nocache ( int xx )
 		return (void *) UNCACHED_BASE;
 }
 
+/* Currently we ignore the arguments as far as the MMU
+ * setup and have things wired in for our two H5 boards.
+ * We do return a corrected size value.
+ */
 addr_t
 mmu_setup ( addr_t ram_start, u64 ram_size )
 {
