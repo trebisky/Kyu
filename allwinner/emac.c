@@ -40,21 +40,25 @@
 
 #include "emac_regs.h"
 
-#ifdef notdef
+#ifdef BOARD_H5
 /* This is the scheme I worked up on the H3 where
  * a special uncached section of ram is allocated.
+ * We now use it as a workaround for the weird
+ * "dc ivac" acts like "dc civac" bug.
+ * 5-6-2026
  */
 #define EMAC_NOCACHE
 #endif
 
 /* This is a new way of using the same concept as the above
  * 5-6-2026
+ * (I gave up on this)
  */
 #ifdef BOARD_H5
-// #define NOCACHE_ADDR(x)	(x+0x40000000)
-#define NOCACHE_ADDR(x)	(x)
+// #define XCACHE_ADDR(x)	(x+0x40000000)
+#define XCACHE_ADDR(x)	(x)
 #else
-#define NOCACHE_ADDR(x)	(x)
+#define XCACHE_ADDR(x)	(x)
 #endif
 
 
@@ -487,6 +491,7 @@ init_rings ( void )
 	 * caching disabled.
 	 */
 	nocache = (char *) ram_section_nocache ( 1 );
+	printf ( "Emac gets uncached ram at %08x\n", nocache );
 #endif
 
 #ifdef USE_UBOOT_RX
@@ -497,7 +502,7 @@ init_rings ( void )
 	desc = rx_list_init ();
 #endif
 
-	rx_list = NOCACHE_ADDR(desc);
+	rx_list = XCACHE_ADDR(desc);
 	cur_rx_dma = rx_list;
 
 	/* Reload the dma pointer register.
@@ -510,7 +515,7 @@ init_rings ( void )
 	/* Now set up the Tx list */
 	desc = tx_list_init ();
 
-	tx_list = NOCACHE_ADDR(desc);
+	tx_list = XCACHE_ADDR(desc);
 	clean_tx_dma = cur_tx_dma = tx_list;
 
 	ep->tx_desc = (vp32) desc;
@@ -669,7 +674,7 @@ rx_handler ( int stat )
 
 	    nbp->elen = len - 4;
 	    // memcpy ( (char *) nbp->eptr, (void *) cur_rx_dma->buf, len - 4 );
-	    memcpy ( (char *) nbp->eptr, (void *) NOCACHE_ADDR(cur_rx_dma->buf), len - 4 );
+	    memcpy ( (char *) nbp->eptr, (void *) XCACHE_ADDR(cur_rx_dma->buf), len - 4 );
 
 	    if ( last_capture ) {
 			if ( last_len ) {
@@ -677,7 +682,7 @@ rx_handler ( int stat )
 				memcpy ( prior_buf, last_buf, last_len );
 			}
 			last_len = len - 4;
-			memcpy ( last_buf, (void *) NOCACHE_ADDR(cur_rx_dma->buf), len - 4 );
+			memcpy ( last_buf, (void *) XCACHE_ADDR(cur_rx_dma->buf), len - 4 );
 	    }
 
 	    // emac_show_packet ( tag, i_dma, nbp );
@@ -696,7 +701,7 @@ rx_handler ( int stat )
 	    net_rcv ( nbp );
 
 		/* Next slot on ring, possible wrap around */
-	    cur_rx_dma = (struct emac_desc *) NOCACHE_ADDR ( cur_rx_dma->next );
+	    cur_rx_dma = (struct emac_desc *) XCACHE_ADDR ( cur_rx_dma->next );
 
 	    // invalidate_dcache_range ( (void *) cur_rx_dma, &cur_rx_dma[1] );
 	    emac_cache_invalidate ( (void *) cur_rx_dma, &cur_rx_dma[1] );
@@ -1432,7 +1437,7 @@ emac_send_int ( struct netbuf *nbp, int wait )
 	// flush_dcache_range ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 	emac_cache_flush ( (void *) cur_tx_dma, &cur_tx_dma[1] );
 
-	cur_tx_dma = (struct emac_desc *) NOCACHE_ADDR ( cur_tx_dma->next );
+	cur_tx_dma = (struct emac_desc *) XCACHE_ADDR ( cur_tx_dma->next );
 
 	// if ( debug_mask & DB_TX ) {
 	// 	printf ( "Emac tx send --------\n" );

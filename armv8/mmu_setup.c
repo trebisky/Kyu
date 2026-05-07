@@ -137,19 +137,37 @@ mmu_off ( void )
         set_SCTLR (val);
 }
 
+/* This is called by the emac driver to get
+ * the base address of an uncached memory block.
+ */
+void *
+ram_section_nocache ( int xx )
+{
+		return (void *) 0x7fe00000;
+}
+
 void
 mmu_setup ( void )
 {
 		int i;
 		u64 *addr;
-		u64 loc;
 		u64 add;
+		u64 val;
 		u64 *level1;
 		u64 *level2;
+
+#ifndef BOARD_ORANGE_PI_PC2
+		/* This code needs work for NEO2, and probably
+		 * others to put special 2M section at end
+		 * of 512M or whatever is available.
+		 */
+		panic ( "mmu_setup() only ready for 1G ram\n" );
+#endif
 
 		// dump_l ( (void *) MMU_BASE, 16 );
 
 #ifdef notdef
+		u64 loc;
 		/* grind out table of VA at 2M stepping */
 		loc =  0x7fff0000;
 		add = 0x40000000;
@@ -187,6 +205,14 @@ mmu_setup ( void )
 			*addr++ = add | 0x711;
 			add += 0x200000;
 		}
+
+		/* Now make the last entry uncached */
+		val = level2[511];
+		printf ( "Level2-511 = %016lx\n", val );
+		val &= ~0xfff;
+		val |= 0x401;
+		printf ( "Level2-511 = %016lx\n", val );
+		level2[511] = val;
 
 		dump_l ( level2, 8 );
 

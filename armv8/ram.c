@@ -277,8 +277,10 @@ ram_section ( int arg )
 	return last_ram;
 }
 
+#ifdef notdef
 /* Allocate some number of 1M sections
  *  with caching turned off.
+ * XXX - see mmu_setup.c
  */
 addr_t
 ram_section_nocache ( int arg )
@@ -289,6 +291,7 @@ ram_section_nocache ( int arg )
 	mmu_nocache ( rv );
 	return rv;
 }
+#endif
 
 addr_t
 ram_next ( void )

@@ -63,7 +63,7 @@ mmu_initialize ( unsigned long ram_start, unsigned long ram_size )
 
 /* Just a stub for now - this was an experiment for the armv7,
  * but I decided just to flush/invalidate instead.
- * With 512M descriptors on the armv8, this is basically useless.
+ * Unlikely ever to get implemented on arm64 -- see mmu_setup.c
  */
 void
 mmu_nocache ( unsigned long addr )

@@ -360,9 +360,9 @@ kyu_startup ( void )
 	// timer_bogus (); OK
 
 	// 5-5-2026 for H5 network
-	printf ( " ---\n" );
-	dcache_disable ();
-	printf ( " ---\n" );
+	// printf ( " ---\n" );
+	// dcache_disable ();
+	// printf ( " ---\n" );
 	// ZORO zoro
 
 	thr_init ();	/* prep thread system */
