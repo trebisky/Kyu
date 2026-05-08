@@ -293,7 +293,7 @@ ram_next ( void )
 }
 
 addr_t
-ram_size ( void )
+get_ram_size ( void )
 {
 	return last_ram - next_ram;
 }
