@@ -152,14 +152,31 @@ host_info_init ( void )
 
 	(void) net_dots ( "127.0.0.1", &loopback_ip );
 
-	/* Hopefully this gets overwritten by DHCP
+	/* Someday this will get overwritten by DHCP
 	 */
+
 	// (void) net_dots ( "192.168.0.11", &host_info.my_ip );	/* bbb */
 #ifdef BOARD_H5
+	// XXX tacky, we really need to use dhcp
+	if ( board_is_neo () ) 
+		(void) net_dots ( "192.168.0.69", &host_info.my_ip );		/* nanopi neo plus 2 */
+	else
+		(void) net_dots ( "192.168.0.68", &host_info.my_ip );		/* orange_pi h5 */
+#endif
+
+#ifdef notdef
+#ifdef BOARD_ORANGE_PI_PC2
 	(void) net_dots ( "192.168.0.68", &host_info.my_ip );		/* orange_pi h5 */
-#else
+#endif
+#ifdef BOARD_NEO_PLUS2
+	(void) net_dots ( "192.168.0.69", &host_info.my_ip );		/* nanopi neo plus 2 */
+#endif
+#endif
+
+#ifdef BOARD_H3
 	(void) net_dots ( "192.168.0.61", &host_info.my_ip );		/* orange_pi h3 */
 #endif
+
 	(void) net_dots ( "192.168.0.1", &host_info.gate_ip );
 	host_info.net_mask = htonl ( 0xffffff00 );
 

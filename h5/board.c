@@ -279,6 +279,18 @@ board_hardware_init ( void )
 	// stack_addr_show ();
 }
 
+int get_ram_size ( void );
+
+// XXX tacky
+int
+board_is_neo ( void )
+{
+	if ( get_ram_size() <= 512*1024*1024 )
+		return 1;
+	return 0;
+}
+
+// XXX move to armv8 directory
 /* This gets a fault, but given that we are running at EL 2
  * that doesn't really tell us if we are in secure mode or not.
  * We should get a fault just for trying to access
@@ -292,9 +304,10 @@ get_secure(void)
 
         // asm volatile("mrs %0, SCR_EL2" : "=r" (val) : : "cc");
         asm volatile("mrs %0, SCR_EL3" : "=r" (val) : : "cc");
-	return val;
+		return val;
 }
 
+// XXX move to armv8 directory
 static inline unsigned int
 get_el(void)
 {

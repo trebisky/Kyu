@@ -669,7 +669,11 @@ twi_test ( void )
 	// My LCD demo that I ran for 2,000,000 updates over 2+ weeks
 	// lcd_test ();
 
+#ifdef BOARD_H5
+	printf ( "Sorry no i2c test configured for the h5\n" );
+#else
 	dac_test ();
+#endif
 }
 
 /* THE END */

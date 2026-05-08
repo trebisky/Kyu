@@ -12,18 +12,18 @@
  * board.h for the Allwinner H5
  *
  *  Kyu project  1-6-2017  Tom Trebisky
- *	12-29-2025
+ *	12-29-2025  5-7-2026
  *
  */
 
 #define BOARD_H5
 // #define BOARD_ORANGE_PI64
+
+/* We support both of these boards with the Allwinner h5 chip.
+ * Pick one!
+ */
 #define BOARD_ORANGE_PI_PC2
 // #define BOARD_NEO_PLUS2
-
-/* At this time the Orange Pi PC 2 is the only H5 board we have worked with..
- * Someday we expect to also support the NanoPi Neo Plus 2
- */
 
 #define WANT_NET
 #define WANT_SYMBOLS

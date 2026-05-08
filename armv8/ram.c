@@ -110,6 +110,10 @@ static void ram_scan ( unsigned long start, unsigned long val );
  * No telling what it will do on a Neo2 with 512M
  * I now disable the reenable the D cache,
  * which should guarantee that it works.
+ *
+ * However for the 512M Nanopi Neo Plus2, this fails,
+ * detecting 2G of memory.  It is not too hard to imagine
+ * why this might fail.
  */
 
 unsigned long
@@ -124,6 +128,18 @@ ram_probe ( unsigned long start )
 	// cpu_show ();
 	dcache_disable ();
 
+	/* A quick and dirty test for the Neo with 512M
+	 * versus the Opi PC2 with 1024M
+	*/
+	p = (unsigned long *) (start + (1024-1)*MEG );
+	p2 = (unsigned long *) (start + (512-1)*MEG );
+	*p = RAM_MAGIC;
+	if ( *p2 == RAM_MAGIC )
+		return 512 * MEG;
+	else
+		return 1024 * MEG;
+
+#ifdef notyet
 	for ( i=0; i< sizeof(ram_sizes) / sizeof(unsigned long); i++ ) {
 		// printf ( "ram_probe, test size %d\n", ram_sizes[i] );
 	    p = (unsigned long *) (start + (ram_sizes[i]-1)*MEG );
@@ -150,14 +166,15 @@ ram_probe ( unsigned long start )
 	    }
 	    *p = save;
 	}
+#endif
 
 	dcache_enable ();
 
 	/* This should not happen */
 	printf ( " *** Ram size wacky\n" );
 	// return 1024 * MEG;
-	// return 512 * MEG;
-	return 256 * MEG;
+	return 512 * MEG;
+	// return 256 * MEG;
 }
 
 static void
@@ -318,12 +335,13 @@ ram_next ( void )
 }
 
 addr_t
-ram_size ( void )
+get_ram_size ( void )
 {
 	return last_ram - next_ram;
 }
 
 #define MEG	(1024*1024)
+
 void
 ram_show ( void )
 {

@@ -463,7 +463,7 @@ test_uart ( long arg )
 #endif
 
 unsigned long ram_next ( void );
-unsigned long ram_size ( void );
+unsigned long get_ram_size ( void );
 
 static void
 test_clear ( long arg )
@@ -474,7 +474,7 @@ test_clear ( long arg )
 	int i;
 
 	start = (unsigned long *) ram_next ();
-	size = ram_size ();
+	size = get_ram_size ();
 
 	printf ( "Clearing ram, %d bytes from %08x\n", size, start );
 	size /= sizeof(unsigned long);
