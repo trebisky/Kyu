@@ -89,9 +89,10 @@ version.c:	FORCE
 #	$(MAKE) -C $@
 
 install: kyu.bin kyu.sym
+	@echo "Installing Kyu for zynq"
 	cp kyu.bin /var/lib/tftpboot/bitcoin.bin
-	cp kyu.sym /var/lib/tftpboot/kyu.sym
-	ls -l /var/lib/tftpboot/kyu.sym
+	cp kyu.sym /var/lib/tftpboot/bitcoin.sym
+	ls -l /var/lib/tftpboot/bitcoin.sym
 
 kyu.dump:	kyu
 	$(DUMP) kyu >kyu.dump

@@ -40,7 +40,7 @@
 #include "kyulib.h"
 #include "thread.h"
 
-#define BIT(x)	(1<<(x))
+// #define BIT(x)	(1<<(x))
 
 #define ETH0_BASE	0xE000B000
 #define ETH1_BASE	0xE000C000
@@ -49,42 +49,42 @@
  * the U-boot zynq_gem.c driver
  */
 struct zynq_eth {
-    vu32 nwctrl; /* 0x0 - Network Control reg */
-    vu32 nwcfg; /* 0x4 - Network Config reg */
-    vu32 nwsr; /* 0x8 - Network Status reg */
-    u32 __pad1;
-    vu32 dmacr; /* 0x10 - DMA Control reg */
-    vu32 txsr; /* 0x14 - TX Status reg */
-    vu32 rxqbase; /* 0x18 - RX Q Base address reg */
-    vu32 txqbase; /* 0x1c - TX Q Base address reg */
-    vu32 rxsr; /* 0x20 - RX Status reg */
-    u32 __pad2[2];
-    vu32 idr; /* 0x2c - Interrupt Disable reg */
+    vu32	nwctrl; /* 0x0 - Network Control reg */
+    vu32	nwcfg; /* 0x4 - Network Config reg */
+    vu32	nwsr; /* 0x8 - Network Status reg */
+    u32	__pad1;
+    vu32	dmacr; /* 0x10 - DMA Control reg */
+    vu32	txsr; /* 0x14 - TX Status reg */
+    vu32	rxqbase; /* 0x18 - RX Q Base address reg */
+    vu32	txqbase; /* 0x1c - TX Q Base address reg */
+    vu32	rxsr; /* 0x20 - RX Status reg */
+    u32	__pad2[2];
+    vu32	idr; /* 0x2c - Interrupt Disable reg */
     u32 __pad3;
-    vu32 phymntnc; /* 0x34 - Phy Maintaince reg */
+    vu32	phymntnc; /* 0x34 - Phy Maintaince reg */
     u32 __pad4[18];
-    vu32 hashl; /* 0x80 - Hash Low address reg */
-    vu32 hashh; /* 0x84 - Hash High address reg */
+    vu32	hashl; /* 0x80 - Hash Low address reg */
+    vu32	hashh; /* 0x84 - Hash High address reg */
 #define LADDR_LOW   0
 #define LADDR_HIGH  1
-    vu32 laddr[4][LADDR_HIGH + 1]; /* 0x8c - Specific1 addr low/high reg */
-    vu32 match[4]; /* 0xa8 - Type ID1 Match reg */
+    vu32	laddr[4][LADDR_HIGH + 1]; /* 0x8c - Specific1 addr low/high reg */
+    vu32	match[4]; /* 0xa8 - Type ID1 Match reg */
     u32 __pad6[18];
 #define STAT_SIZE   44
-    vu32 stat[STAT_SIZE]; /* 0x100 - Octects transmitted Low reg */
+    vu32	stat[STAT_SIZE]; /* 0x100 - Octects transmitted Low reg */
     u32 __pad9[20];
-    vu32 pcscntrl;
-    vu32 pcsstatus;
+    vu32	pcscntrl;
+    vu32	pcsstatus;
     u32 rserved12[35];
-    vu32 dcfg6; /* 0x294 Design config reg6 */
+    vu32	dcfg6; /* 0x294 Design config reg6 */
     u32 __pad7[106];
-    vu32 transmit_q1_ptr; /* 0x440 - Transmit priority queue 1 */
+    vu32	transmit_q1_ptr; /* 0x440 - Transmit priority queue 1 */
     u32 __pad8[15];
-    vu32 receive_q1_ptr; /* 0x480 - Receive priority queue 1 */
+    vu32	receive_q1_ptr; /* 0x480 - Receive priority queue 1 */
     u32 __pad10[17];
-    vu32 upper_txqbase; /* 0x4C8 - Upper tx_q base addr */
+    vu32	upper_txqbase; /* 0x4C8 - Upper tx_q base addr */
     u32 __pad11[2];
-    vu32 upper_rxqbase; /* 0x4D4 - Upper rx_q base addr */
+    vu32	upper_rxqbase; /* 0x4D4 - Upper rx_q base addr */
 };
 
 #define ETH_BASE	((struct zynq_eth *) ETH0_BASE)

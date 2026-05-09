@@ -42,7 +42,7 @@
 // #define IRQ_UART0	69
 // #define IRQ_UART1	82
 
-#define BIT(x)	(1<<(x))
+// #define BIT(x)	(1<<(x))
 
 #define NUM_UART 2
 

@@ -36,8 +36,11 @@ static char *sym_file = "kyu_h5.sym";
 #ifdef BOARD_H3
 static char *sym_file = "kyu_h3.sym";
 #endif
+#ifdef BOARD_ZYNQ
+static char *sym_file = "bitcoin.sym";
+#endif
 
-#if !defined(BOARD_H3) && !defined(BOARD_H5)
+#if !defined(BOARD_H3) && !defined(BOARD_H5) && !defined(BOARD_ZYNQ)
 static char *sym_file = "kyu.sym";
 #endif
 

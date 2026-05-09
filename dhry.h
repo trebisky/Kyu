@@ -426,3 +426,7 @@ typedef struct record
       } Rec_Type, *Rec_Pointer;
 
 
+/* tjt - in dhry_1.c */
+Enumeration Func_1 ( Capital_Letter, Capital_Letter );
+
+/* THE END */
