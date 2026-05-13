@@ -19,8 +19,15 @@
 #include "board/board.h"
 #include "cpu.h"
 
-/* Remember the BBB is an ARM Cortex-A8, the cycle count
- * registers on other ARM variants have different addresses.
+void
+cpu_info ( void )
+{
+	// 5-12-2026
+	printf ( "We ain't got no CPU info yet\n" );
+}
+
+/* The BBB is an ARM Cortex-A8, the cycle count registers
+ * on other ARM variants may have different addresses.
  * (They are the same on the Cortex-A7 in the Allwinner H3).
  *
  * On the Cortex-A9 (Zynq) some weird stuff happens using this

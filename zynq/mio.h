@@ -29,7 +29,7 @@
 
 /* pin 16-27 are ethernet */
 
-/* Here we have 9 pins, on in each of the 18 pin
+/* Here we have 9 pins, one on in each of the 18 pin
  * connectors (J1 through J9)
  */
 #define MIO_28_EN1		28

@@ -28,8 +28,3 @@ emio47.bit -- 1-8-2025
 This is super simple, route 47 emio signals to various pins.
 All the work is in the constraints file.
 See my Antiminer Github and project emio.
-
-
-
-
-

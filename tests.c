@@ -315,6 +315,10 @@ shell_main ( long xx )
 			shell_x ( &wp[1], nw-1 );
 	    }
 
+	    if ( **wp == 'c' ) {
+			cpu_info ();
+	    }
+
 	    /* kyu thread test submenu
 	     *  (regression tests)
 	     * 'k' is for Kyu

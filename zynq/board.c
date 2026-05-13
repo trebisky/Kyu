@@ -316,6 +316,8 @@ board_init ( void )
 	// upstream in Kyu code
 	timer_init ( DEFAULT_TIMER_RATE );
 
+	i2c_init ();
+
 	// delay_calib ();
 
 	/* CPU interrupts on */
