@@ -164,6 +164,8 @@ ow_tread ( void )
 {
 	int val;
 	int i;
+	int raw;
+	int tf;
 
 	val = ow_reset ();
 	if ( val ) {
@@ -173,7 +175,21 @@ ow_tread ( void )
 
 	ow_write ( 0xcc );	// skip ROM
 	ow_write ( 0x44 );	// start conversion
-	ow_Delay ( 50 );
+
+	// ow_Delay ( 50 );
+	// ow_Delay ( 500 );
+	for ( i=0; i<100000; i++ ) {
+		val = ow_read_bit ();
+		if ( val == 1 )
+			break;
+	}
+	printf ( "Wait done after %d -- %d\n", i, val );
+	// I get: Wait done after 11984 -- 1
+	// ow_read_bit() takes 55 microseconds, so
+	// 11984*70 = 838,880 us, i.e. 0.8 seconds!
+	// Almost a 1 second conversion time.
+	// The datasheet gives a 750ms conversion
+	// time when in 12 bit mode (the power up).
 
 	(void) ow_reset ();
 	ow_write ( 0xcc );	// skip ROM
@@ -181,7 +197,15 @@ ow_tread ( void )
 	for ( i=0; i<9; i++ ) {
 		val = ow_read ();
 		printf ( "Val %d: %02x\n", i, val );
+		if ( i == 0 )
+			raw = val;
+		if ( i == 1 )
+			raw = val<<8 | raw;
 	}
+	printf ( " Raw temp = %04x\n", raw );
+	raw >>= 4;
+	tf = 32 + (raw*9) / 5;
+	printf ( " Temp = %dC %dF\n", raw, tf );
 }
 
 void
