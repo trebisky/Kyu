@@ -74,12 +74,125 @@ ow_reset ( void )
 }
 
 void
+ow_write_bit ( int bit )
+{
+	if ( bit ) {
+		owLow;
+		ow_Delay ( DELAY_A );
+		owHigh;
+		ow_Delay ( DELAY_B );
+	} else {
+		owLow;
+		ow_Delay ( DELAY_C );
+		owHigh;
+		ow_Delay ( DELAY_D );
+	}
+}
+
+int
+ow_read_bit ( void )
+{
+	int rv;
+
+	owLow;
+	ow_Delay ( DELAY_A );
+	owHigh;
+	ow_Delay ( DELAY_E );
+	rv = owRead ();
+	ow_Delay ( DELAY_F );
+	return rv;
+}
+
+// Write a byte
+//  it goes out lsb first
+void
+ow_write ( int data )
+{
+	int i;
+
+	for ( i=0; i<8; i++ ) {
+		ow_write_bit ( data & 0x01 );
+		data >>= 1;
+	}
+}
+
+// Read a byte
+//  we get lsb first
+int
+ow_read ( void )
+{
+	int i;
+	int rv = 0;
+
+	for ( i=0; i<8; i++ ) {
+		rv >>= 1;
+		if ( ow_read_bit () )
+			rv |= 0x80;
+	}
+	return rv;
+}
+
+/* ======================================================================== */
+/* DS18B20 routines */
+
+/* Read 8 byte ROM code
+ */
+void
+ow_rread ( void )
+{
+	int val;
+	int i;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	ow_write ( 0x33 );	// read ROM
+
+	for ( i=0; i<8; i++ ) {
+		val = ow_read ();
+		printf ( "Rom %d: %02x\n", i, val );
+	}
+}
+
+/* Read from a DS18B20
+ */
+void
+ow_tread ( void )
+{
+	int val;
+	int i;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0x44 );	// start conversion
+	ow_Delay ( 50 );
+
+	(void) ow_reset ();
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xBE );	// read scratchpad
+	for ( i=0; i<9; i++ ) {
+		val = ow_read ();
+		printf ( "Val %d: %02x\n", i, val );
+	}
+}
+
+void
 ow_test ( void )
 {
 	int val;
 
 	val = ow_reset ();
 	printf ( "Dallas reset returns: %d\n", val );
+	ow_tread ();
+	ow_rread ();
 }
 
 /* ======================================================================== */
