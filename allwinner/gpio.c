@@ -311,6 +311,15 @@ setup_twi_mux ( void )
     // gpio_config ( GPIO_E_13, GPIO_F3 );
 }
 
+void
+gpio_one_wire ( int bit )
+{
+	gpio_config ( bit, GPIO_INPUT );
+	// gpio_clear_bit ( bit );
+	gpio_output ( bit/32, bit%32, 0 );
+	gpio_pull ( bit, GPIO_PULL_DISABLE );
+}
+
 /* -------------------------------------------------- */
 /* -------------------------------------------------- */
 /* These are "standard" API routines that

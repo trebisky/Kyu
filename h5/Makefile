@@ -20,6 +20,7 @@ OBJS = \
 	board.o \
 	intcon_gic.o \
 	gpio.o \
+	dallas.o \
 	serial.o \
 	i2c_hw.o \
 	emac.o \

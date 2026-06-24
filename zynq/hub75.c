@@ -219,7 +219,7 @@ hub_diag_test ( void )
 /* ================================================== */
 
 /* The HUB75 interface is not standardized in any official way, but it seems
- * that outfits making this panels have enough sense to allow them to interoperate.
+ * that outfits making these panels have enough sense to allow them to interoperate.
  * The cable has 16 pins.  There are 14 signals and a ground.
  * The extra pin is ambiguous -- it is usually a ground.
  * Here is what the signals are all about:

@@ -73,7 +73,7 @@ delay_ms ( int delay )
 static void
 delay_calib ( void )
 {
-        int ticks;
+	int ticks;
 	int i;
 
 	if ( cpu_clock_mhz != CPU_CLOCK_STD ) {
@@ -458,8 +458,9 @@ static void h5_ram_test ( void );
 void
 board_test_generic ( int arg )
 {
-	printf ( "H5 board test\n" );
-	h5_ram_test ();
+	// printf ( "H5 board test\n" );
+	// h5_ram_test ();
+	dallas_test ();
 }
 
 /* RAM address space starts at 0x4000_0000 and

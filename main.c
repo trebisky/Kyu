@@ -723,9 +723,10 @@ sys_init ( long xxx )
 	(void) thr_new ( "user", user_init, (void *) 0, PRI_USER, 0 );
 
 #ifdef BOARD_H5
-	printf ( "Run H5 blink thread\n" );
-	thr_new_repeat ( "blinker", h5_blinker, 0, 10, 0, 500 );
+	// printf ( "Run H5 blink thread\n" );
+	// thr_new_repeat ( "blinker", h5_blinker, 0, 10, 0, 500 );
 #endif
+
 #ifdef BOARD_H3
 	printf ( "Run H3 blink thread\n" );
 	thr_new_repeat ( "blinker", h3_blinker, 0, 10, 0, 500 );

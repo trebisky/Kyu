@@ -19,6 +19,13 @@
 #include "cpu.h"
 
 void
+cpu_info ( void )
+{
+	// XXX
+	printf ( "No cpu_info() yet for armv8\n" );
+}
+
+void
 cpu_show ( void )
 {
 	u64 val;

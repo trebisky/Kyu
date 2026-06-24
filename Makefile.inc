@@ -1,1 +1,1 @@
-configs/Makefile.inc.zynq
+configs/Makefile.inc.h5

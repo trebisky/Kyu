@@ -16,10 +16,13 @@
  *  but what the heck.
  *
  * A "bus master" chip for the one-wire protocol is available (the DS2480B).
+ *  I don't know what it offers over a driver like this one.
+ *
  * This is a gpio based "bit bang" protocol driver.
  * In the Maxim AN126 they say the crucial thing is the ability to
  * generate an "accurate and repeatable" 1 us delay, as well as the ability
  * to lock out interrupts during transactions.
+ *
  * I base all of my code on two primitives.
  *  - one is the ability to generate the 1 us read pulse
  *  - all others are done via calls to the system function delay_us();
@@ -42,7 +45,7 @@ dallas_init ( int gpio_pin )
 
 /* Someday the following will go into gpio.h perhaps
  */
-#define GPIO_PIN(x)	(x%32)
+#define GPIO_PIN(x)		(x%32)
 #define GPIO_MASK(p)	(1<<p)
 
 /* Here is where we generate the 1 us read pulse.
