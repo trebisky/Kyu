@@ -133,12 +133,12 @@ ow_read ( void )
 }
 
 /* ======================================================================== */
-/* DS18B20 routines */
+/* common routines */
 
 /* Read 8 byte ROM code
  */
 void
-ow_rread ( void )
+ow_rom_read ( void )
 {
 	int val;
 	int i;
@@ -157,10 +157,18 @@ ow_rread ( void )
 	}
 }
 
+/* ======================================================================== */
+/* DS1994 routines */
+/* This is the giant "coin cell" with battery backed nvram and clock */
+
+/* ======================================================================== */
+/* DS18B20 routines */
+
+
 /* Read from a DS18B20
  */
 void
-ow_tread ( void )
+ow_temp_read ( void )
 {
 	int val;
 	int i;
@@ -215,8 +223,8 @@ ow_test ( void )
 
 	val = ow_reset ();
 	printf ( "Dallas reset returns: %d\n", val );
-	ow_tread ();
-	ow_rread ();
+	// ow_temp_read ();
+	ow_rom_read ();
 }
 
 /* ======================================================================== */
