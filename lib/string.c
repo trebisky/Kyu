@@ -106,15 +106,14 @@ EXPORT_SYMBOL(strcasecmp);
  * strcpy - Copy a %NUL terminated string
  * @dest: Where to copy the string to
  * @src: Where to copy the string from
+ *
+ * Use strlcpy() instead to avoid buffer overflows.
  */
 #undef strcpy
 char *strcpy(char *dest, const char *src)
 {
-	char *tmp = dest;
-
-	while ((*dest++ = *src++) != '\0')
-		/* nothing */;
-	return tmp;
+	strlcpy(dest, src, strlen(src) + 1);
+	return dest;
 }
 EXPORT_SYMBOL(strcpy);
 #endif
