@@ -161,9 +161,125 @@ ow_rom_read ( void )
 /* DS1994 routines */
 /* This is the giant "coin cell" with battery backed nvram and clock */
 
+void
+ow_data_read ( void )
+{
+	int val;
+	int i;
+	int num;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xf0 );	// read memory
+	ow_write ( 0 );		// TA1
+	ow_write ( 0 );		// TA2
+
+	num = 512 + 30 + 4;
+	for ( i=0; i<num; i++ ) {
+		val = ow_read ();
+		printf ( "Data %d %04x: %02x\n", i, i, val );
+	}
+}
+
+/* A special twist on the above.
+ * Just read the first 32 bytes and display as an
+ * ascii string.
+ */
+void
+ow_laser_read ( void )
+{
+	int val;
+	int i;
+	int num;
+	char laser[33];
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xf0 );	// read memory
+	ow_write ( 0 );		// TA1
+	ow_write ( 0 );		// TA2
+
+	num = 32;
+	for ( i=0; i<num; i++ ) {
+		val = ow_read ();
+		// printf ( "Data %d: %02x\n", i, val );
+		laser[i] = val;
+	}
+	laser[i] = '\0';
+	printf ( "String: %s\n", laser );
+}
+
+/* Read scratchpad */
+void
+ow_sp_read ( void )
+{
+	int val;
+	int i;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xaa );	// read scratchpad
+	// ow_write ( 16 );	// Ending offset
+
+	for ( i=0; i<36; i++ ) {
+		val = ow_read ();
+		printf ( "SP %d %04x: %02x\n", i, i, val );
+	}
+}
+
+/* The example (in part) from the datasheet
+ */
+void
+ow_sp_test ( void )
+{
+	int val;
+	int i;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home 1\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0x0f );	// write scratchpad
+	ow_write ( 0x26 );	// TA1, offset 6 in page 1
+	ow_write ( 0x0 );	// TA2
+	ow_write ( 0xab );	// first byte
+	ow_write ( 0xcd );	// second byte
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home 2\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xaa );	// write scratchpad
+
+	for ( i=0; i<16; i++ ) {
+		val = ow_read ();
+		printf ( "SP %d %04x: %02x\n", i, i, val );
+	}
+}
+
 /* ======================================================================== */
 /* DS18B20 routines */
-
 
 /* Read from a DS18B20
  */
@@ -216,17 +332,6 @@ ow_temp_read ( void )
 	printf ( " Temp = %dC %dF\n", raw, tf );
 }
 
-void
-ow_test ( void )
-{
-	int val;
-
-	val = ow_reset ();
-	printf ( "Dallas reset returns: %d\n", val );
-	// ow_temp_read ();
-	ow_rom_read ();
-}
-
 /* ======================================================================== */
 /* ======================================================================== */
 /* Test stuff follows */
@@ -271,6 +376,24 @@ down ( void )
 	gpio_dir_out ( dallas_pin );
 }
 
+static void
+ow_test ( void )
+{
+	int val;
+
+	val = ow_reset ();
+	if ( val )
+		printf ( "Dallas reset returns: %d (BAD)\n", val );
+	else
+		printf ( "Dallas reset returns: %d (good)\n", val );
+
+	// ow_temp_read ();
+	// ow_rom_read ();
+	// ow_data_read ();
+	// ow_laser_read ();
+	// ow_sp_read ();
+	ow_sp_test ();
+}
 
 /* Called from board.c
  * Use "i 19" from the Kyu prompt
