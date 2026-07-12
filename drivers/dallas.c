@@ -161,8 +161,136 @@ ow_rom_read ( void )
 /* DS1994 routines */
 /* This is the giant "coin cell" with battery backed nvram and clock */
 
+/* I thought I could use strncmp for this, but strncmp
+ * will stop prematurely on a 0 byte.
+ */
+static int
+verify ( char a[], char b[], int n )
+{
+	int i;
+
+	for ( i=0; i<n; i++ )
+		if ( a[i] != b[i] )
+			return 0;
+	return 1;
+}
+
 void
-ow_data_read ( void )
+ow_read_page ( int page, char *buf )
+{
+	int i;
+	int val;
+	int offset;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home\n" );
+		return;
+	}
+
+	offset = page * 0x20;
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xf0 );	// read memory
+	ow_write ( offset & 0xff );		// TA1
+	ow_write ( offset >> 8 );		// TA2
+
+	for ( i=0; i<32; i++ ) {
+		buf[i] = ow_read ();
+	}
+}
+
+/* write to scratchpad
+ */
+static void
+ow_sp_write ( int offset, char *buf, int n )
+{
+	int val;
+	int i;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home 1\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0x0f );	// write scratchpad
+	ow_write ( offset & 0xff );	// TA1
+	ow_write ( offset >> 8 );	// TA2
+
+	for ( i=0; i<n; i++ )
+		ow_write ( buf[i] );
+}
+
+static int
+ow_sp_check ( char *buf, int n )
+{
+	int val;
+	int i;
+	int es;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home - check\n" );
+		return 0;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0xaa );	// read scratchpad
+
+	val = ow_read ();
+	// printf ( "Check 1 = %02x\n", val );
+	val = ow_read ();
+	// printf ( "Check 2 = %02x\n", val );
+	es = ow_read ();
+	// printf ( "Check 3 = %02x\n", val );
+
+	for ( i=0; i<n; i++ )
+		buf[i] = ow_read ();
+
+	return es;
+}
+
+static void
+ow_sp_copy ( int offset, int es )
+{
+	int val;
+
+	val = ow_reset ();
+	if ( val ) {
+		printf ( "Nobody home 1\n" );
+		return;
+	}
+
+	ow_write ( 0xcc );	// skip ROM
+	ow_write ( 0x55 );	// copy scratchpad
+	ow_write ( offset & 0xff );	// TA1
+	ow_write ( offset >> 8 );	// TA2
+	ow_write ( es );
+}
+
+void
+ow_write_page ( int pg, char *buf )
+{
+	int offset;
+	int es;
+	char buf2[32];
+
+	offset = 0x20 * pg;
+	ow_sp_write ( offset, buf, 32 );
+	es = ow_sp_check ( buf2, 32 );
+
+	if ( verify ( buf, buf2, 32 ) )
+		ow_sp_copy ( offset, es );
+	else
+		printf ( "Trouble writing page %d\n", pg );
+}
+
+/* DS1994 - my experimenta below here */
+
+void
+ow_read_all ( void )
 {
 	int val;
 	int i;
@@ -187,11 +315,24 @@ ow_data_read ( void )
 }
 
 /* A special twist on the above.
- * Just read the first 32 bytes and display as an
- * ascii string.
+ * Just read the first 32 bytes (page 0)
+ *  and display as an * ascii string.
  */
+
 void
 ow_laser_read ( void )
+{
+	char laser[33];
+
+	ow_read_page ( 0, laser );
+
+	laser[32] = '\0';
+	printf ( "String: %s\n", laser );
+}
+
+#ifdef notdef
+void
+ow_laser_read_OLD ( void )
 {
 	int val;
 	int i;
@@ -219,9 +360,12 @@ ow_laser_read ( void )
 	printf ( "String: %s\n", laser );
 }
 
-/* Read scratchpad */
+/* Read scratchpad.
+ * This works fine, but is useless except immediately
+ * after a write
+ */
 void
-ow_sp_read ( void )
+ow_sp_read_OLD ( void )
 {
 	int val;
 	int i;
@@ -234,12 +378,33 @@ ow_sp_read ( void )
 
 	ow_write ( 0xcc );	// skip ROM
 	ow_write ( 0xaa );	// read scratchpad
-	// ow_write ( 16 );	// Ending offset
 
 	for ( i=0; i<36; i++ ) {
 		val = ow_read ();
 		printf ( "SP %d %04x: %02x\n", i, i, val );
 	}
+}
+#endif
+
+void
+ow_test2 ( void )
+{
+	int offset;
+	char buf1[32], buf2[32];
+	int es;
+	int i;
+
+	for ( i=0; i<32; i++ )
+		buf1[i] = i;
+
+	offset = 0x20;
+	ow_sp_write ( offset, buf1, 32 );
+	es = ow_sp_check ( buf2, 32 );
+
+	for ( i=0; i<32; i++ )
+		printf ( "Buf2[%2d] = %02x\n", i, buf2[i] );
+
+	ow_sp_copy ( offset, es );
 }
 
 /* The example (in part) from the datasheet
@@ -270,12 +435,116 @@ ow_sp_test ( void )
 	}
 
 	ow_write ( 0xcc );	// skip ROM
-	ow_write ( 0xaa );	// write scratchpad
+	ow_write ( 0xaa );	// read scratchpad
 
 	for ( i=0; i<16; i++ ) {
 		val = ow_read ();
 		printf ( "SP %d %04x: %02x\n", i, i, val );
 	}
+}
+
+static void
+show_pg ( char *buf, char *ref )
+{
+	int i;
+
+	for ( i=0; i<32; i++ )
+		printf ( "V %2d %02x %02x\n", i, buf[i], ref[i] );
+}
+
+/* Here are the 32 bytes we found in page 0 */
+static char *ds_original = "Laser BAB2110006 785 5 1131 30 1";
+
+/* My first test for the DS1994 coin cell I have
+ * It reads all pages and verifies that they are as expected
+ */
+void
+ow_coin_diag_A ( void )
+{
+	char buf[32];
+	char ref[32];
+	int val;
+	int i;
+	int pg;
+
+	// printf ( "Len = %d\n", strlen(ds_original) );
+
+	ow_laser_read ();
+
+	ow_read_page ( 0, buf );
+	val = verify ( buf, ds_original, 32 );
+	if ( val == 0 ) {
+		printf ( "Trouble\n" );
+		show_pg ( buf, ds_original );
+	} else
+		printf ( "OK\n" );
+
+	for ( i=0; i<32; i++ )
+		ref[i] = 0x55;
+
+	// only needed once to fix a prior experiment
+	// ow_write_page ( 1, ref );
+
+	for ( pg=1; pg<16; pg++ ) {
+		ow_read_page ( pg, buf );
+		val = verify ( buf, ref, 32 );
+		if ( val == 0 ) {
+			printf ( "pg %d Trouble\n", pg );
+			show_pg ( buf, ref );
+		} else
+			printf ( "pg %d OK\n", pg );
+	}
+}
+
+static void
+check_page ( int pg, char *ref, char *msg )
+{
+	char buf[32];
+	int val;
+
+	ow_read_page ( pg, buf );
+
+	val = verify ( buf, ref, 32 );
+	if ( val == 0 ) {
+		printf ( "pg %d Trouble %s\n", pg, msg );
+		show_pg ( buf, ref );
+	} else
+		printf ( "pg %d OK %s\n", pg, msg );
+}
+
+static void
+ow_test_page ( int pg )
+{
+	char orig[32];
+	char buf[32];
+	int i;
+
+	printf ( "Test page %d\n", pg );
+	ow_read_page ( pg, orig );	// save
+
+	memset ( buf, 0xaa, 32 );
+	ow_write_page ( pg, buf );
+	check_page ( pg, buf, "aa" );
+
+	memset ( buf, 0x55, 32 );
+	ow_write_page ( pg, buf );
+	check_page ( pg, buf, "55" );
+
+	ow_write_page ( pg, orig );	// restore
+	check_page ( pg, orig, "orig" );
+}
+
+/* My second diagnostic.  For each page, read and
+ *  save the original contents, then try writing
+ *  two patterns, then restore.
+ */
+void
+ow_coin_diag_B ( void )
+{
+	int pg;
+
+	for ( pg=0; pg<16; pg++ )
+		ow_test_page ( pg );
 }
 
 /* ======================================================================== */
@@ -389,10 +658,17 @@ ow_test ( void )
 
 	// ow_temp_read ();
 	// ow_rom_read ();
-	// ow_data_read ();
+
+	// ow_read_all ();
 	// ow_laser_read ();
 	// ow_sp_read ();
-	ow_sp_test ();
+	// ow_sp_test ();
+
+	// ow_test2 (); -- does write
+	// ow_read_all ();
+
+	ow_coin_diag_B ();
+	ow_coin_diag_A ();
 }
 
 /* Called from board.c
