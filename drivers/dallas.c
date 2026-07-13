@@ -12,6 +12,22 @@
  * Tom Trebisky  Kyu project  6-23-2026
  *
  * This is a driver for the "Dallas Semiconductor" one wire protocol.
+ *
+ * It currently supports the following chips, with limitations:
+ *
+ *   DS1994 coin memory/timer chip
+ *   DS18B20 temperature sensor
+ *
+ * TODO:
+ *
+ *  AN126 says that interrupts must be disabled while this code
+ *   runs.  This is certainly true if timings are to be maintained.
+ *   I do not currently do this.  This was tested/developed on an
+ *   essentially idle system
+ *
+ * ** write driver code for  MAX31850 thermocouple interface (I have these)
+ * ** implement the specify ROM ID mechansim
+ * ** implement the ROM scan protocol
  */
 
 #include "kyu.h"
@@ -23,6 +39,7 @@
  * We try C0 and get nothing.
  * A8 worked with thr_delay(), but when I try
  * 10 us delays I just get the short burst.
+ * This is a bug in my gpio driver.
  */
 #define OW_PIN	GPIO_A_8
 
