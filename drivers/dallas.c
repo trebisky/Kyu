@@ -668,10 +668,13 @@ ow_test ( void )
 	int val;
 
 	val = ow_reset ();
-	if ( val )
+	if ( val ) {
 		printf ( "Dallas reset returns: %d (BAD)\n", val );
-	else
-		printf ( "Dallas reset returns: %d (good)\n", val );
+		printf ( " test abandoned -- no chip on bus\n" );
+		return;
+	}
+
+	printf ( "Dallas reset returns: %d (good)\n", val );
 
 	// ow_temp_read ();
 	// ow_rom_read ();
