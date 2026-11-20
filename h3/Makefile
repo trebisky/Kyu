@@ -22,6 +22,7 @@ OBJS =  board.o \
 	emac.o \
 	emac_syscon.o \
 	emac_phy.o \
+	emup.o \
 	dallas.o \
 	i2c_lcd.o \
 	i2c_lcd2.o \

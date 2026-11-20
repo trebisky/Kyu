@@ -51,6 +51,9 @@
 // We handle this in board/board.h now
 // #define WANT_NET
 
+// See user.c for the first hook to this.
+#define WANT_EMUP
+
 #ifdef notdef
 #define WANT_MMT_PADDLE
 #define WANT_DELAY

@@ -36,6 +36,11 @@ user_init ( long xx )
 	mmt_paddle_init ();
 #endif
 
+/* See kyu.h and h3/emup.c */
+#ifdef WANT_EMUP
+	emup_init ();
+#endif
+
 	/* Run the test "shell" as the user thread */
 	(void) safe_thr_new ( "shell", shell_main, (void *)0, PRI_SHELL, 0 );
 

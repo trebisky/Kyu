@@ -28,7 +28,7 @@
  */
 // #define BOARD_NANOPI_NEO
 
-#define WANT_NET
+// #define WANT_NET
 #define WANT_SYMBOLS
 
 #define ARCH_ARM

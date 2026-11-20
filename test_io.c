@@ -65,6 +65,7 @@ static void test_button ( long );
 static void test_blink_s ( long );
 static void test_blink ( long );
 static void test_i2c ( long );
+static void test_emup ( long );
 #endif
 
 #if defined(BOARD_H5)
@@ -119,6 +120,7 @@ struct test io_test_list[] = {
 	test_blink,	"start LED blink test",	0,
 	test_blink_s,	"stop LED blink test",	0,
 	test_i2c,	"i2c test",		0,
+	test_emup,	"emup test",		0,
 #endif
 
 #if defined(BOARD_H5)
@@ -185,6 +187,13 @@ static void
 test_i2c ( long xxx )
 {
 	twi_test ();
+}
+
+/* Test emup pins 11-1-2026 */
+static void
+test_emup ( long xxx )
+{
+	emup_test ();
 }
 #endif
 
