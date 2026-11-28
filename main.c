@@ -697,6 +697,9 @@ sys_init ( long xxx )
 	 */
 	board_after_net ();
 
+	//  11-27-2026  fails here too
+	// shell_init ();
+
 #ifdef notyet
 	init_pcmcia_ds ();
 #endif

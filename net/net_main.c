@@ -350,6 +350,8 @@ The clock seems to be running just at the rate it should.
 
     arp_announce ();
 
+	telnet_init ();
+
     // net_show ();
 
     /*

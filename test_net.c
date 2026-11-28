@@ -43,6 +43,7 @@ static void test_dns ( long );
 static void test_arp ( long );
  void test_tftp ( long );
 static void test_udp ( long );
+static void test_sym ( long );
 static void test_udp_echo ( long );
 
 #endif
@@ -87,6 +88,7 @@ struct test net_test_list[] = {
 	test_udp,	"Test UDP",		0,
 	test_udp_echo,	"Endless UDP echo",	0,
 	// test_tcp,	"Test TCP",		0,
+	test_sym,	"Test shell/symbols",		0,
 #endif
 	test_netdebug,	"Debug interface",	0,
 	test_fast,	"Test network speed",	0,
@@ -245,6 +247,14 @@ test_udp ( long xxx )
 	thr_delay ( 100 );
 
 	printf ( "%d responses to %d messages\n", udp_echo_count, ECHO_COUNT );
+}
+
+/* See if we can fetch symbols via TFTP
+ */
+static void
+test_sym ( long xxx )
+{
+	shell_init ();
 }
 
 /* ---------------------------------------------------------- */

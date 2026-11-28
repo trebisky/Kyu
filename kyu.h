@@ -52,7 +52,7 @@
 // #define WANT_NET
 
 // See user.c for the first hook to this.
-#define WANT_EMUP
+// #define WANT_EMUP
 
 #ifdef notdef
 #define WANT_MMT_PADDLE
@@ -73,9 +73,9 @@
 #define WANT_SMP
 
 // #define WANT_TCP_XINU
-// #define WANT_TCP_BSD
+#define WANT_TCP_BSD
 // #define WANT_TCP_KYU
-#define WANT_TCP_NONE
+// #define WANT_TCP_NONE
 
 /* Xinu TCP needs the net timer */
 #ifdef WANT_TCP_XINU

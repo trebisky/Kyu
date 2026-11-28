@@ -222,6 +222,7 @@ shell_init ( void )
 	}
 
 #ifdef WANT_SYMBOLS
+	printf ( "Fetch symbol table\n" );
 	sym_buf = malloc ( SYM_SIZE );
 	count = tftp_fetch ( sym_file, sym_buf, SYM_SIZE );
 	printf ( "fetched symbol table: %d bytes\n", count );

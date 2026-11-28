@@ -5,6 +5,8 @@
 # Tom Trebisky  5-18-2015
 
 INCS = -I. -I..
+# Tweak includes for telnet.c
+#INCS = -I. -I.. -DKERNEL -I../tcp_bsd
 include ../Makefile.inc
 
 OBJS =  net_main.o \
@@ -12,7 +14,7 @@ OBJS =  net_main.o \
 	net_arp.o net_icmp.o net_ip.o \
 	net_udp.o dns.o \
 	net_tcp.o \
-	dhcp.o bootp.o tftp.o
+	dhcp.o bootp.o tftp.o telnet.o
 
 all: ../net.o
 
